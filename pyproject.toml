@@ -1,0 +1,30 @@
+[project]
+name = "jev-gateway"
+version = "0.1.0"
+description = "Session-aware OpenAI-compatible model-routing gateway powered by JEV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "litellm>=1.82.4",
+    "python-dotenv>=1.0",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+jev-gateway = "jev_gateway.gateway:run_gateway"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jev_gateway*"]
+exclude = ["tests*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
