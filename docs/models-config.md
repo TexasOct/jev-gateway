@@ -50,7 +50,7 @@ uv run jev-gateway
 
 ## `policy` 和 `strategies`
 
-`policy` 以及每个 `strategies.definitions.<名称>.policy` 都采用相同结构。每个策略的 `tier_models` 必须分别列出至少一个 `simple`、`standard`、`complex` 候选模型，且所有 ID 都要在 `models` 中存在。数组顺序不是严格的优先级；候选还会经过约束筛选与策略排序。约束不足时路由器可能扩大到整个模型目录或逐步放宽筛选，不能把 tier 列表当作绝对隔离名单。
+`policy` 与每个 `strategies.definitions.<名称>.policy` 使用同一字段结构。顶层 `policy` 和未继承其他策略的具名策略必须分别列出至少一个 `simple`、`standard`、`complex` 候选模型，且所有 ID 都要在 `models` 中存在。数组顺序不是严格的优先级；候选还会经过约束筛选与策略排序。约束不足时路由器可能扩大到整个模型目录或逐步放宽筛选，不能把 tier 列表当作绝对隔离名单。
 
 | 字段 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ uv run jev-gateway
 | `budget.max_cost_per_session_usd` | `null` | 会话成本上限；`null` 不按成本触发降级。 |
 | `budget.context_pressure_ratio` | `0.75` | 当前模型上下文使用量超过窗口的该比例时，触发上下文压力检查。 |
 
-`strategies.default` 是默认策略名称，可为顶层 `policy` 注册的 `default` 或 `definitions` 中的名称。每个 `strategies.definitions.<名称>` 可填 `description` 和必填的完整 `policy`；该策略不会继承顶层 `policy` 的字段，省略的子字段使用程序默认值。请求可用 `?strategy=<名称>` 或 `X-JEV-Strategy` 选择。若同时定义顶层 `policy`，不可在 `definitions` 里重复定义 `default`。
+`strategies.default` 是默认策略名称，可为顶层 `policy` 注册的 `default` 或 `definitions` 中的名称；省略时为 `default`。存在顶层 `policy` 时，每个 `strategies.definitions.<名称>.policy` 会继承它，并只覆盖自身声明的字段，因此具名策略通常只需写与默认策略不同的项。没有顶层 `policy` 时，默认策略定义必须提供完整的 `tier_models`。每项还可选填 `description` 和 `kind`。请求可用 `?strategy=<名称>` 或 `X-JEV-Strategy` 选择。若同时定义顶层 `policy`，不可在 `definitions` 里重复定义 `default`。
 
 ### `scoring` 与 `signals`
 

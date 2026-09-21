@@ -683,10 +683,12 @@ SCORING_INT_FIELDS = ("long_prompt_chars", "very_long_prompt_chars")
 SCORING_THRESHOLD_FIELDS = ("standard_threshold", "complex_threshold")
 
 
-def scoring_from_dict(value: Any, source: str) -> ScoringPolicy:
-    """Build the complexity scoring rules from the catalog document."""
+def scoring_from_dict(
+    value: Any, source: str, *, base: ScoringPolicy | None = None
+) -> ScoringPolicy:
+    """Build scoring rules, inheriting unspecified values from ``base``."""
     if value is None:
-        return ScoringPolicy()
+        return base or ScoringPolicy()
     if not isinstance(value, dict):
         raise TypeError(f"{source} policy scoring must be an object.")
 
@@ -720,7 +722,7 @@ def scoring_from_dict(value: Any, source: str) -> ScoringPolicy:
             value["patterns_enabled"], f"{source} scoring.patterns_enabled"
         )
 
-    scoring = ScoringPolicy(**overrides)
+    scoring = replace(base or ScoringPolicy(), **overrides)
     if scoring.complex_threshold < scoring.standard_threshold:
         raise ValueError(
             f"{source} scoring.complex_threshold must not be below "
@@ -730,14 +732,18 @@ def scoring_from_dict(value: Any, source: str) -> ScoringPolicy:
 
 
 def _scoring_with_document_default(
-    value: Any, source: str, patterns_default: bool | None
+    value: Any,
+    source: str,
+    patterns_default: bool | None,
+    *,
+    base: ScoringPolicy | None = None,
 ) -> ScoringPolicy:
     """Apply the document-level signal defaults to one policy's scoring rules.
 
     A strategy that declares the key itself keeps its own value, so the document
     block only supplies the default.
     """
-    scoring = scoring_from_dict(value, source)
+    scoring = scoring_from_dict(value, source, base=base)
     if patterns_default is None:
         return scoring
     if isinstance(value, dict) and "patterns_enabled" in value:
@@ -750,10 +756,26 @@ def policy_from_dict(
     source: str,
     *,
     patterns_default: bool | None = None,
+    base: RoutingPolicy | None = None,
 ) -> RoutingPolicy:
-    """Build the routing policy from the catalog document."""
+    """Build a routing policy, inheriting unspecified values from ``base``."""
     if not isinstance(data, dict):
         raise TypeError(f"{source} policy must be an object.")
+    known = {
+        "mode",
+        "selection",
+        "tier_models",
+        "scoring",
+        "escalation",
+        "hysteresis",
+        "pin",
+        "budget",
+    }
+    unknown = set(data) - known
+    if unknown:
+        raise ValueError(
+            f"{source} policy has unknown keys: {', '.join(sorted(unknown))}."
+        )
     escalation_value = data.get("escalation") or {}
     hysteresis_value = data.get("hysteresis") or {}
     pin_value = data.get("pin") or {}
@@ -766,6 +788,38 @@ def policy_from_dict(
     ):
         if not isinstance(value, dict):
             raise TypeError(f"{source} policy {label} must be an object.")
+    section_keys = {
+        "escalation": {
+            "max_consecutive_failures",
+            "max_consecutive_truncations",
+            "min_turns_before_escalation",
+            "escalate_on_user_correction",
+            "escalate_on_reasoning_request",
+            "escalate_on_complexity_spike",
+            "deescalate_when_settled",
+            "settle_window",
+        },
+        "hysteresis": {
+            "min_turns_between_switches",
+            "cooldown_seconds",
+            "max_switches_per_session",
+        },
+        "pin": {"break_on"},
+        "budget": {"max_cost_per_session_usd", "context_pressure_ratio"},
+    }
+    for label, value in (
+        ("escalation", escalation_value),
+        ("hysteresis", hysteresis_value),
+        ("pin", pin_value),
+        ("budget", budget_value),
+    ):
+        unknown = set(value) - section_keys[label]
+        if unknown:
+            raise ValueError(
+                f"{source} policy {label} has unknown keys: "
+                f"{', '.join(sorted(unknown))}."
+            )
+
     pin_overrides: dict[str, Any] = {}
     if "break_on" in pin_value:
         break_on = pin_value["break_on"]
@@ -773,13 +827,13 @@ def policy_from_dict(
             raise TypeError(f"{source} policy pin.break_on must be a list.")
         pin_overrides["break_on"] = tuple(str(reason) for reason in break_on)
 
-    default_policy = RoutingPolicy()
-    tier_models_value = data.get("tier_models")
+    default_policy = base or RoutingPolicy()
+    tier_models_value = data.get("tier_models", default_policy.tier_models)
     if not isinstance(tier_models_value, dict):
         raise TypeError(f"{source} policy tier_models must be an object.")
     tier_models: dict[str, tuple[str, ...]] = {}
     for tier, model_ids in tier_models_value.items():
-        if not isinstance(model_ids, list):
+        if not isinstance(model_ids, (list, tuple)):
             raise TypeError(
                 f"{source} policy tier_models[{tier!r}] must be a list."
             )
@@ -789,22 +843,16 @@ def policy_from_dict(
         selection=str(data.get("selection", default_policy.selection)),
         tier_models=tier_models,
         scoring=_scoring_with_document_default(
-            data.get("scoring"), source, patterns_default
+            data.get("scoring"),
+            source,
+            patterns_default,
+            base=default_policy.scoring,
         ),
         escalation=replace(
             default_policy.escalation,
             **{
                 key: escalation_value[key]
-                for key in (
-                    "max_consecutive_failures",
-                    "max_consecutive_truncations",
-                    "min_turns_before_escalation",
-                    "escalate_on_user_correction",
-                    "escalate_on_reasoning_request",
-                    "escalate_on_complexity_spike",
-                    "deescalate_when_settled",
-                    "settle_window",
-                )
+                for key in section_keys["escalation"]
                 if key in escalation_value
             },
         ),
@@ -812,11 +860,7 @@ def policy_from_dict(
             default_policy.hysteresis,
             **{
                 key: hysteresis_value[key]
-                for key in (
-                    "min_turns_between_switches",
-                    "cooldown_seconds",
-                    "max_switches_per_session",
-                )
+                for key in section_keys["hysteresis"]
                 if key in hysteresis_value
             },
         ),
@@ -825,7 +869,7 @@ def policy_from_dict(
             default_policy.budget,
             **{
                 key: budget_value[key]
-                for key in ("max_cost_per_session_usd", "context_pressure_ratio")
+                for key in section_keys["budget"]
                 if key in budget_value
             },
         ),
@@ -1037,6 +1081,7 @@ def strategies_from_document(
     source: str,
     *,
     patterns_default: bool | None = None,
+    base_policy: RoutingPolicy | None = None,
 ) -> tuple[tuple[StrategyDefinition, ...], str]:
     """Parse the optional named strategy definitions from the catalog document."""
     raw = document.get("strategies")
@@ -1052,7 +1097,7 @@ def strategies_from_document(
         raise ValueError(
             f"{source} strategies.definitions must be a non-empty object."
         )
-    default_value = raw.get("default")
+    default_value = raw.get("default", "default")
     if not isinstance(default_value, str) or not default_value.strip():
         raise ValueError(f"{source} strategies.default must name a defined strategy.")
 
@@ -1094,6 +1139,7 @@ def strategies_from_document(
                     policy_value,
                     f"{source} strategies.definitions[{clean_name!r}]",
                     patterns_default=patterns_default,
+                    base=base_policy,
                 ),
                 description=description or None,
                 kind=kind_value.strip(),
@@ -1195,17 +1241,22 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         strategies = (StrategyDefinition("default", policy),)
         default_strategy = "default"
     else:
-        definitions, default_strategy = strategies_from_document(
-            document, source, patterns_default=patterns_default
-        )
-        implicit_default = (
-            StrategyDefinition(
-                "default",
-                policy_from_dict(
-                    policy_value, source, patterns_default=patterns_default
-                ),
+        base_policy = (
+            policy_from_dict(
+                policy_value, source, patterns_default=patterns_default
             )
             if policy_value is not None
+            else None
+        )
+        definitions, default_strategy = strategies_from_document(
+            document,
+            source,
+            patterns_default=patterns_default,
+            base_policy=base_policy,
+        )
+        implicit_default = (
+            StrategyDefinition("default", base_policy)
+            if base_policy is not None
             else None
         )
         if implicit_default is not None and any(
