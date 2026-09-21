@@ -135,6 +135,15 @@ def test_top_level_policy_registers_a_default_strategy() -> None:
     assert catalog.default_strategy == "default"
 
 
+def test_named_strategies_default_to_the_top_level_policy() -> None:
+    document = multi_strategy_document()
+    del document["strategies"]["default"]
+
+    catalog = catalog_from_document(document, "test catalog")
+
+    assert catalog.default_strategy == "default"
+
+
 def test_named_strategies_parse_with_a_chosen_default() -> None:
     document = multi_strategy_document()
     document["strategies"]["default"] = "always-strong"

@@ -135,18 +135,11 @@ top-level `strategies` object adds named definitions and chooses the default:
 ```json
 {
   "strategies": {
-    "default": "default",
     "definitions": {
       "quality": {
-        "description": "Re-evaluate every turn and prefer the highest quality model.",
         "policy": {
           "mode": "fresh",
-          "selection": "quality_first",
-          "tier_models": {
-            "simple": ["openai/gpt-5.6-sol"],
-            "standard": ["openai/gpt-5.6-sol"],
-            "complex": ["openai/gpt-5.6-sol"]
-          }
+          "selection": "quality_first"
         }
       }
     }
@@ -154,11 +147,13 @@ top-level `strategies` object adds named definitions and chooses the default:
 }
 ```
 
-`strategies.default` may name `default` or a definition. Definitions may not
-redefine `default`, because the top-level `policy` owns that name. When
-`strategies` is present and `default` names a definition, the top-level `policy`
-block may be omitted, and the chosen definition's policy becomes the catalog's
-active policy.
+`strategies.default` may name `default` or a definition and defaults to
+`default` when omitted. When a top-level `policy` exists, definitions inherit it
+and override only their declared fields. Definitions may not redefine `default`,
+because the top-level `policy` owns that name. When `strategies` is present and
+`default` names a definition, the top-level `policy` block may be omitted. In
+that case the chosen definition must provide complete tier mappings, and its
+policy becomes the catalog's active policy.
 
 A request picks its strategy in this order: the `?strategy=` query parameter,
 the `X-JEV-Strategy` header, the session's pinned strategy, then the default. An

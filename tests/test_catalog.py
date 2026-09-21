@@ -199,6 +199,18 @@ def test_policy_pin_break_on_must_be_a_list() -> None:
         catalog_from_document(document, "test catalog")
 
 
+def test_policy_rejects_unknown_keys_at_every_level() -> None:
+    document = single_route_document()
+    document["policy"]["selection_mode"] = "balanced"
+    with pytest.raises(ValueError, match="policy has unknown keys: selection_mode"):
+        catalog_from_document(document, "test catalog")
+
+    document = single_route_document()
+    document["policy"]["escalation"] = {"max_failures": 2}
+    with pytest.raises(ValueError, match="escalation has unknown keys: max_failures"):
+        catalog_from_document(document, "test catalog")
+
+
 def test_scoring_rules_come_from_the_document() -> None:
     document = tier_one_document(
         scoring={
@@ -253,6 +265,22 @@ def test_document_signal_defaults_reach_every_strategy() -> None:
         for definition in catalog.strategies
     } == {"default": False, "quality": False}
     assert catalog.as_dict()["signals"] == {"patterns_enabled": False}
+
+
+def test_named_strategy_inherits_the_top_level_policy() -> None:
+    document = multi_strategy_document()
+    document["strategies"]["definitions"]["quality"]["policy"] = {
+        "mode": "fresh",
+        "selection": "quality_first",
+    }
+
+    catalog = catalog_from_document(document, "test catalog")
+    quality = next(item for item in catalog.strategies if item.name == "quality")
+
+    assert quality.policy.tier_models == catalog.policy.tier_models
+    assert quality.policy.scoring == catalog.policy.scoring
+    assert quality.policy.mode == "fresh"
+    assert quality.policy.selection == "quality_first"
 
 
 def test_strategy_scoring_overrides_the_document_signal_default() -> None:

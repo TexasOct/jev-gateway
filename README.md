@@ -118,19 +118,11 @@ serves requests that do not name one:
 ```json
 {
   "strategies": {
-    "default": "default",
     "definitions": {
       "quality": {
-        "kind": "auto",
-        "description": "Re-evaluate every turn and prefer the highest quality model.",
         "policy": {
           "mode": "fresh",
-          "selection": "quality_first",
-          "tier_models": {
-            "simple": ["deepseek/deepseek-flash"],
-            "standard": ["deepseek/deepseek-flash", "openai/gpt-5.6-terra"],
-            "complex": ["openai/gpt-5.6-sol"]
-          }
+          "selection": "quality_first"
         }
       }
     }
@@ -138,13 +130,16 @@ serves requests that do not name one:
 }
 ```
 
-Each definition carries a complete policy: `mode`, `selection`, and
-`tier_models` for every tier. Its optional `kind` selects the implementation
-factory. `auto` (the default) uses JEV when JEV sources are configured and the
-plain policy strategy otherwise. Built-in explicit kinds are `jev` and `policy`.
-`strategies.default` may name `default` (the top-level policy) or one of the
-definitions. When `strategies` is present and `default` names a definition, the
-top-level `policy` block may be omitted.
+When a top-level `policy` exists, each definition inherits it and only needs
+to declare fields that differ. The example therefore keeps the same tiers and
+scoring rules while changing only `mode` and `selection`. Its optional `kind`
+selects the implementation factory. `auto` (the default) uses JEV when JEV
+sources are configured and the plain policy strategy otherwise. Built-in
+explicit kinds are `jev` and `policy`. `strategies.default` may name `default`
+(the top-level policy) or one of the definitions; it defaults to `default` when
+omitted. When `strategies` is present and `default` names a definition, the
+top-level `policy` block may be omitted. In that form, the default definition
+must provide complete tier mappings.
 
 `mode` defaults to `sticky`: a session holds the model chosen for its first turn,
 so the conversation keeps whatever reasoning state the provider bound to that
