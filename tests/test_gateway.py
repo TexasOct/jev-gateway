@@ -778,3 +778,156 @@ def test_routing_reads_max_completion_tokens(monkeypatch) -> None:
     # The small route caps output at 2000 tokens, so a 5000 token budget routes up.
     assert large_budget.headers["x-jev-route"] == LARGE_ID
     assert large_budget.headers["x-jev-reason"] == "tier_fallback_complex"
+
+
+# Reasoning effort: declared per route, decided after the route is chosen.
+
+OPENAI_LADDER = ("none", "low", "medium", "high", "xhigh", "max")
+
+
+def make_reasoning_config(
+    ladder: tuple[str, ...] = OPENAI_LADDER, **reasoning: Any
+) -> gateway.GatewayConfig:
+    """A one-route catalog whose route declares which levels it accepts."""
+    document = single_route_document(
+        capabilities={"reasoning": True, "reasoning_effort": list(ladder)}
+    )
+    if reasoning:
+        document["policy"]["reasoning"] = reasoning
+    catalog = catalog_from_document(document, "test catalog")
+    clock = FakeClock()
+    return gateway.GatewayConfig(
+        engine=RoutingEngine(catalog, MemorySessionStore(clock=clock), clock=clock),
+        gateway_api_key=None,
+        session_strategy="derived",
+        echo_requested_model=True,
+        models_file=Path("models.json"),
+    )
+
+
+def test_the_gateway_sends_the_level_it_clamped_to_the_route(
+    monkeypatch,
+) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_reasoning_config(("none", "low")))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+        },
+    )
+
+    assert response.status_code == 200
+    # The complex tier asks for `high`, and this route stops at `low`.
+    assert calls[0]["reasoning_effort"] == "low"
+    assert response.headers["x-jev-reasoning-effort"] == "low"
+    assert response.headers["x-jev-reasoning-source"] == "derived"
+
+
+def test_a_route_without_a_declared_ladder_forwards_the_clients_value(
+    monkeypatch,
+) -> None:
+    """No route has opted in, so the request reaches upstream byte for byte."""
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+            "reasoning_effort": "minimal",
+        },
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["reasoning_effort"] == "minimal"
+    assert "x-jev-reasoning-effort" not in response.headers
+    assert "x-jev-reasoning-source" not in response.headers
+
+
+def test_reasoning_mode_off_never_touches_the_field(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(
+        make_reasoning_config(("none", "low"), mode="off")
+    )
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+            "reasoning_effort": "xhigh",
+        },
+    )
+
+    assert calls[0]["reasoning_effort"] == "xhigh"
+    assert "x-jev-reasoning-effort" not in response.headers
+
+
+def test_a_level_the_route_cannot_name_is_clamped_not_forwarded(
+    monkeypatch,
+) -> None:
+    """`minimal` is the measured 502 on the OpenAI-compatible route."""
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_reasoning_config(mode="preserve"))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+            "reasoning_effort": "minimal",
+        },
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["reasoning_effort"] == "low"
+    assert response.headers["x-jev-reasoning-source"] == "clamped_client"
+
+
+def test_cap_never_raises_above_what_the_client_asked_for(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_reasoning_config(mode="cap"))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+            "reasoning_effort": "low",
+        },
+    )
+
+    assert calls[0]["reasoning_effort"] == "low"
+    assert response.headers["x-jev-reasoning-source"] == "client"
+
+
+def test_preview_reports_the_level_it_would_send(monkeypatch) -> None:
+    app = gateway.create_app(make_reasoning_config(("none", "low")))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/routing/preview",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+        },
+    )
+
+    payload = response.json()
+    assert payload["preview"][0]["reasoning_effort"] == "low"
+    assert payload["preview"][0]["reasoning_effort_source"] == "derived"

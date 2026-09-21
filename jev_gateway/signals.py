@@ -84,6 +84,24 @@ class ScoringPolicy:
     standard_threshold: float = 0.35
     complex_threshold: float = 0.65
     patterns_enabled: bool = True
+    # The two detectors that report what the user is ASKING FOR, rather than how
+    # complex the text looks: a reasoning request and a correction. Kept separate
+    # from `patterns_enabled`, which decides whether text patterns may move the
+    # score. Unset follows `patterns_enabled`, so a catalog that says nothing keeps
+    # the previous behavior of one switch for everything.
+    #
+    # The split exists because the escalation triggers and `policy.reasoning` both
+    # read these two, and a deployment can reasonably want them while local scoring
+    # is deliberately off. Turning them on cannot move the tier: their score
+    # contributions stay gated by `patterns_enabled`.
+    intent_patterns_enabled: bool | None = None
+
+    @property
+    def detects_intent(self) -> bool:
+        """Whether the reasoning-request and correction detectors run."""
+        if self.intent_patterns_enabled is None:
+            return self.patterns_enabled
+        return self.intent_patterns_enabled
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize the scoring rules for the policy endpoint."""
@@ -108,6 +126,7 @@ class ScoringPolicy:
             "standard_threshold": self.standard_threshold,
             "complex_threshold": self.complex_threshold,
             "patterns_enabled": self.patterns_enabled,
+            "intent_patterns_enabled": self.detects_intent,
         }
 
 
@@ -262,10 +281,14 @@ def extract_signals(
     if active.patterns_enabled:
         markers = _matches(prompt, active)
         multi_step = bool(MULTI_STEP_PATTERN.search(prompt))
-        reasoning_requested = bool(REASONING_PATTERN.search(prompt))
-        user_correction = bool(CORRECTION_PATTERN.search(prompt))
         long_output_requested = bool(LONG_OUTPUT_PATTERN.search(prompt))
         has_code = bool(CODE_FENCE_PATTERN.search(prompt))
+    if active.detects_intent:
+        # Detected independently of the scoring switch, because the escalation
+        # triggers and the reasoning-effort policy both read these two. Their score
+        # contributions below stay gated by `patterns_enabled`.
+        reasoning_requested = bool(REASONING_PATTERN.search(prompt))
+        user_correction = bool(CORRECTION_PATTERN.search(prompt))
     needs_tools = bool(tools)
     needs_vision = has_image_part(messages)
     needs_json = bool(
@@ -283,7 +306,10 @@ def extract_signals(
         score += active.marker_weight + bonus
         reasons.append(f"markers:{','.join(markers)}")
     if reasoning_requested:
-        score += active.reasoning_weight
+        if active.patterns_enabled:
+            score += active.reasoning_weight
+        # Reported even when its weight was not applied, so the effort decision a
+        # reader sees in the evidence can be explained by a reason in the same row.
         reasons.append("reasoning_requested")
     if multi_step:
         score += active.multi_step_weight
@@ -314,7 +340,8 @@ def extract_signals(
         score += depth
         reasons.append(f"turn_depth:{turn_index}")
     if user_correction:
-        score += active.correction_weight
+        if active.patterns_enabled:
+            score += active.correction_weight
         reasons.append("user_correction")
 
     score = round(min(score, 1.0), 4)

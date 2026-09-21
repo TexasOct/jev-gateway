@@ -12,7 +12,8 @@ from .contracts import (
     StrategyOutcome,
     UnknownStrategyError,
 )
-from .jev import JevClassifier, JevStrategy
+from .jev import JevClassifier, JevClient, JevStrategy
+from .matrix import JevMatrixStrategy
 from .policy import DEFAULT_OUTPUT_TOKENS, PolicyStrategy
 from .registry import (
     StrategyFactory,
@@ -24,6 +25,8 @@ from .registry import (
 __all__ = [
     "DEFAULT_OUTPUT_TOKENS",
     "JevClassifier",
+    "JevClient",
+    "JevMatrixStrategy",
     "JevStrategy",
     "PolicyStrategy",
     "RoutingRequest",

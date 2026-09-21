@@ -54,7 +54,10 @@ unique.
       "upstream_model": "deepseek-flash",
       "context_window": 1000000,
       "max_output_tokens": 384000,
-      "capabilities": {"reasoning": true},
+      "capabilities": {
+        "reasoning": true,
+        "reasoning_effort": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+      },
       "cost": {"input_per_million": 0.3, "output_per_million": 1.2}
     },
     {
@@ -62,7 +65,11 @@ unique.
       "upstream_model": "gpt-5.6-sol",
       "context_window": 1000000,
       "max_output_tokens": 128000,
-      "capabilities": {"reasoning": true, "temperature": false},
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": ["none", "low", "medium", "high", "xhigh", "max"]
+      },
       "cost": {"input_per_million": 2.0, "output_per_million": 10.0}
     }
   ],
@@ -71,6 +78,10 @@ unique.
       "simple": ["deepseek/deepseek-flash"],
       "standard": ["deepseek/deepseek-flash", "openai/gpt-5.6-sol"],
       "complex": ["openai/gpt-5.6-sol"]
+    },
+    "reasoning": {
+      "mode": "cap",
+      "effort_by_tier": {"simple": "low", "standard": "medium", "complex": "high"}
     }
   }
 }
@@ -80,6 +91,14 @@ Several models may reference one provider, so they share its endpoint and key
 without duplication. A tier can contain models from one provider or from
 several providers. JEV filters candidates by model capabilities, context window,
 and output limit, then applies the configured cost, quality, and priority rules.
+
+The `capabilities.reasoning_effort` ladder is what one route accepts, in the
+upstream's own vocabulary, so it is filled in per model and verified against the
+route: the OpenAI-compatible route above answers `502` for `minimal` while the
+DeepSeek route accepts every level. `policy.reasoning` then picks the level once
+the model is known, clamped into that model's ladder. A route that declares no
+ladder is left untouched. See [docs/models-config.md](docs/models-config.md#reasoning)
+for the modes and the measured values.
 
 ## Configuration and secrets
 
@@ -111,54 +130,124 @@ The other gateway settings apply after a successful reload.
 
 ## Routing strategies
 
-The top-level `policy` block is registered as a strategy named `default`. The
-optional top-level `strategies` object adds named strategies and picks which one
-serves requests that do not name one:
+The top-level `policy` block is the `default` strategy used by `model: "auto"`.
+The optional `strategies` object maps each additional model name directly to its
+routing overrides:
 
 ```json
 {
   "strategies": {
-    "definitions": {
-      "quality": {
-        "policy": {
-          "mode": "fresh",
-          "selection": "quality_first"
-        }
+    "quality": {
+      "mode": "cached",
+      "selection": "quality_first",
+      "tier_models": {
+        "simple": ["openai/gpt-5.6-luna"],
+        "standard": ["openai/gpt-5.6-terra"],
+        "complex": ["openai/gpt-5.6-sol"]
+      }
+    },
+    "economy": {
+      "mode": "cached",
+      "selection": "cheapest_adequate",
+      "tier_models": {
+        "simple": ["deepseek/deepseek-flash"],
+        "standard": ["deepseek/deepseek-flash"]
       }
     }
   }
 }
 ```
 
-When a top-level `policy` exists, each definition inherits it and only needs
-to declare fields that differ. The example therefore keeps the same tiers and
-scoring rules while changing only `mode` and `selection`. Its optional `kind`
-selects the implementation factory. `auto` (the default) uses JEV when JEV
-sources are configured and the plain policy strategy otherwise. Built-in
-explicit kinds are `jev` and `policy`. `strategies.default` may name `default`
-(the top-level policy) or one of the definitions; it defaults to `default` when
-omitted. When `strategies` is present and `default` names a definition, the
-top-level `policy` block may be omitted. In that form, the default definition
-must provide complete tier mappings.
+Each strategy inherits every unspecified field from the top-level `policy`.
+Its `tier_models` override is merged by tier, so `economy` inherits the default
+`complex` candidates while replacing only `simple` and `standard`. Add any
+number of sibling strategy names. Each name is also an OpenAI-compatible model
+name.
 
-`mode` defaults to `sticky`: a session holds the model chosen for its first turn,
-so the conversation keeps whatever reasoning state the provider bound to that
-model. `policy.pin.break_on` lists the reasons that may end the pin and defaults
-to `["capability_gap", "context_pressure", "output_limit"]`, the constraints
-that leave the pinned model unable to serve the request. Set `"mode":
-"escalate"` (or `adaptive` / `fresh`) on a strategy to re-evaluate the model on
-every turn instead.
+`mode` defaults to `sticky`, which holds the first selected model until a reason
+in `pin.break_on` requires a switch. `cached` has the same hard-constraint
+switching behavior, but a JEV-backed strategy calls JEV only on the first turn
+of a live session. Later turns reuse the stored tier and model, improving
+upstream prompt-cache stability. `escalate` and `adaptive` reconsider a session
+on routing signals; `fresh` re-runs selection on every turn.
 
-A request selects its strategy in this order:
+`kind` is optional. `auto` uses JEV when JEV sources are configured and the
+plain policy strategy otherwise. Explicit built-in kinds are `jev`, `policy`, and
+`jev_matrix`.
+The old `default`/`definitions` wrapper remains supported for compatibility and
+custom strategy kinds.
 
-1. the `?strategy=` query parameter,
-2. the `X-JEV-Strategy` request header,
-3. the session's pinned strategy,
-4. the default strategy.
+`jev_matrix` sends multiple typed choice questions to System One and maps the
+answers to a local tier and selection rule. Define strategy-specific parameters
+under `options` (available in both compact and `definitions` formats). Each
+question needs `type: "choice"`, `instructions`, and a `criteria` object with at
+least two labeled descriptions. Rules are checked in order; `when` matches an
+answer label or a list of labels. The first match sets `tier` and/or `selection`.
+If JEV is unavailable or returns invalid answers, `fallback` applies. If no
+rule matches, the strategy uses the local signal tier and policy selection.
 
-An explicit name that is not registered returns `400 unknown_strategy`. A
-non-explicit name that is not registered (for example a pin from an older
-catalog) falls back to the default. The selected name is stored on the session
+```json
+{
+  "strategies": {
+    "risk_aware": {
+      "kind": "jev_matrix",
+      "mode": "fresh",
+      "options": {
+        "questions": {
+          "risk": {
+            "type": "choice",
+            "instructions": "How consequential would a wrong answer be?",
+            "criteria": {
+              "low": "A routine, reversible request.",
+              "high": "Security, migration, or another high-stakes request."
+            }
+          },
+          "objective": {
+            "type": "choice",
+            "instructions": "Which tradeoff best fits the request?",
+            "criteria": {
+              "cost": "Minimize cost for a bounded task.",
+              "quality": "Prioritize answer quality."
+            }
+          }
+        },
+        "rules": [
+          {"when": {"risk": "high"}, "select": {"tier": "complex", "selection": "quality_first"}},
+          {"when": {"objective": "cost"}, "select": {"tier": "simple", "selection": "cheapest_adequate"}}
+        ],
+        "fallback": {"tier": "standard", "selection": "balanced"}
+      }
+    }
+  }
+}
+```
+
+Here `risk_aware` inherits the top-level policy's candidate models. Local policy
+selection still checks model capabilities, context, output limits, and session
+switching rules. With `mode: "cached"`, JEV is queried only on the first live
+session turn. The question/answer state contains the prompt, extracted
+requirements, and a small session summary; do not put sensitive material in
+question descriptions. `reason` records the source and matching rule, not the
+full answers. Restart the gateway after changing Python strategy code; JSON
+configuration can be reloaded through the routing reload endpoint.
+
+Each named strategy is exposed as an OpenAI-compatible virtual model. Use
+`"model": "auto"` for the default strategy, or send the strategy name directly:
+
+```json
+{"model": "quality", "messages": [{"role": "user", "content": "Review this design."}]}
+```
+
+`GET /v1/models` lists `auto`, every non-default strategy name, and concrete
+catalog model IDs. A strategy model name runs that strategy's normal selection;
+a concrete catalog model ID still manually locks the request to that model.
+
+For compatibility, a request can also select a strategy in this order after its
+`model` is resolved: the `?strategy=` query parameter, the `X-JEV-Strategy`
+request header, the session's pinned strategy, then the default strategy. An
+explicit name that is not registered returns `400 unknown_strategy`. A
+non-explicit name that is not registered, for example a pin from an older
+catalog, falls back to the default. The selected name is stored on the session
 and returned in `X-JEV-Strategy`.
 
 The engine passes each strategy a detached copy of the session state, so a
@@ -172,7 +261,8 @@ Strategy code lives under `jev_gateway/strategy/`:
 strategy/
 ├── contracts.py  # RoutingStrategy, RoutingRequest, StrategyOutcome
 ├── policy.py     # policy-based selection, escalation, hysteresis
-├── jev.py        # JevClassifier and JevStrategy
+├── jev.py        # JevClient, JevClassifier, and JevStrategy
+├── matrix.py     # multi-question JEV strategy and local rules
 └── registry.py   # kind factories, registration, name resolution
 ```
 
@@ -260,7 +350,8 @@ send its provider-qualified ID:
 Responses include `X-JEV-Route` (catalog model ID), `X-JEV-Provider`,
 `X-JEV-Model` (provider-native upstream model), `X-JEV-Task-Type`,
 `X-JEV-Reason`, `X-JEV-Strategy`, `X-JEV-Request-Id`, `X-JEV-Session-Id`, and
-`X-JEV-Decision-Id`.
+`X-JEV-Decision-Id`. When the gateway decided a thinking level, the response also
+carries `X-JEV-Reasoning-Effort` and `X-JEV-Reasoning-Source`.
 
 To select a strategy for one request, add `?strategy=<name>` or the
 `X-JEV-Strategy: <name>` header.

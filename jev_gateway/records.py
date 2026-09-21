@@ -47,7 +47,7 @@ class StorageUnavailableError(RuntimeError):
     """The writer cannot accept or persist new evidence."""
 
 
-SCHEMA = """
+_TABLES = """
 CREATE TABLE IF NOT EXISTS requests (
     request_id TEXT PRIMARY KEY,
     received_at REAL NOT NULL,
@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     turn_index INTEGER NOT NULL,
     switched_from TEXT,
     blocked_by TEXT,
+    reasoning_effort TEXT,
+    reasoning_effort_source TEXT,
     candidates_json TEXT NOT NULL,
     signals_json TEXT NOT NULL,
     created_at REAL NOT NULL
@@ -124,8 +126,12 @@ CREATE INDEX IF NOT EXISTS idx_decisions_session ON decisions (session_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_strategy ON decisions (strategy);
 CREATE INDEX IF NOT EXISTS idx_decisions_config ON decisions (config_hash);
 CREATE INDEX IF NOT EXISTS idx_outcomes_request ON outcomes (request_id);
+"""
 
-CREATE VIEW IF NOT EXISTS decision_evidence AS
+# Kept separate from the tables so an existing database can be migrated: the view
+# names the new columns, and `CREATE VIEW IF NOT EXISTS` would otherwise leave the
+# old view in place and silently drop them from every query that reads it.
+DECISION_EVIDENCE_VIEW = """CREATE VIEW IF NOT EXISTS decision_evidence AS
 SELECT
     d.decision_id,
     d.request_id,
@@ -141,6 +147,8 @@ SELECT
     d.turn_index,
     d.switched_from,
     d.blocked_by,
+    d.reasoning_effort,
+    d.reasoning_effort_source,
     d.signals_json,
     d.candidates_json,
     d.created_at,
@@ -163,6 +171,16 @@ FROM decisions d
 LEFT JOIN requests r ON r.request_id = d.request_id
 LEFT JOIN outcomes o ON o.decision_id = d.decision_id;
 """
+
+SCHEMA = _TABLES + "\n" + DECISION_EVIDENCE_VIEW
+
+# Columns added after the first release. SQLite stores a new column in the table
+# header rather than rewriting rows, so adding one to a multi-gigabyte evidence
+# database is a metadata change, not a migration over the data.
+_ADDED_DECISION_COLUMNS = (
+    ("reasoning_effort", "TEXT"),
+    ("reasoning_effort_source", "TEXT"),
+)
 
 
 @dataclass(frozen=True)
@@ -244,6 +262,8 @@ class DecisionRecord:
     turn_index: int
     switched_from: str | None
     blocked_by: str | None
+    reasoning_effort: str | None
+    reasoning_effort_source: str
     candidates: tuple[str, ...]
     signals: dict[str, Any]
     created_at: float
@@ -349,6 +369,29 @@ class NullRecordStore:
         return None
 
 
+def _migrate_decision_columns(connection: sqlite3.Connection) -> None:
+    """Widen a decisions table that a previous version created.
+
+    `CREATE TABLE IF NOT EXISTS` leaves an existing table exactly as it was, so a
+    database written by an earlier release has to be widened explicitly before the
+    new INSERT names the new columns. The view is dropped and recreated rather than
+    altered, because SQLite cannot add a column to a view in place.
+    """
+    existing = {row[1] for row in connection.execute("PRAGMA table_info(decisions)")}
+    if not existing:
+        return
+    missing = [
+        (name, kind) for name, kind in _ADDED_DECISION_COLUMNS if name not in existing
+    ]
+    if not missing:
+        return
+    for name, kind in missing:
+        # Names and types come from the module constant above, never from a request.
+        connection.execute(f"ALTER TABLE decisions ADD COLUMN {name} {kind}")
+    connection.execute("DROP VIEW IF EXISTS decision_evidence")
+    connection.executescript(DECISION_EVIDENCE_VIEW)
+
+
 class _SqliteBackend:
     """SQLite operations confined to the dedicated writer thread."""
 
@@ -385,6 +428,7 @@ class _SqliteBackend:
             connection.execute("PRAGMA synchronous=FULL")
             connection.execute(f"PRAGMA busy_timeout={int(self.settings.busy_timeout_ms)}")
             connection.executescript(SCHEMA)
+            _migrate_decision_columns(connection)
             connection.commit()
         except Exception:
             connection.close()
@@ -464,8 +508,9 @@ class _SqliteBackend:
                 "INSERT OR REPLACE INTO decisions ("
             "decision_id, request_id, session_id, strategy, config_hash, route, "
             "provider, upstream_model, tier, reason, mode, turn_index, switched_from, "
-            "blocked_by, candidates_json, signals_json, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "blocked_by, reasoning_effort, reasoning_effort_source, candidates_json, "
+            "signals_json, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 record.decision_id,
                 record.request_id,
@@ -481,6 +526,8 @@ class _SqliteBackend:
                 record.turn_index,
                 record.switched_from,
                 record.blocked_by,
+                record.reasoning_effort,
+                record.reasoning_effort_source,
                 candidates_json,
                 signals_json,
                 record.created_at,

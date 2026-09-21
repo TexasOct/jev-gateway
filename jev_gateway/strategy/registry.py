@@ -8,6 +8,7 @@ from jev_gateway.catalog import Catalog, StrategyDefinition
 
 from .contracts import RoutingStrategy, UnknownStrategyError
 from .jev import JevClassifier, JevStrategy
+from .matrix import build_jev_matrix_strategy
 from .policy import PolicyStrategy
 
 __all__ = [
@@ -46,6 +47,7 @@ _FACTORIES: dict[str, StrategyFactory] = {
     "auto": _auto_factory,
     "policy": _policy_factory,
     "jev": _jev_factory,
+    "jev_matrix": build_jev_matrix_strategy,
 }
 
 

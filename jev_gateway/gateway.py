@@ -8,9 +8,9 @@ import logging
 import os
 import sqlite3
 import time
-from json import JSONDecodeError
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, cast
 
@@ -31,6 +31,7 @@ from jev_gateway.decision import (
     UnknownModelError,
     UnknownStrategyError,
 )
+from jev_gateway.reasoning import leaves_payload_alone
 from jev_gateway.records import RequestMeta, RequestRecord, record_store_from_settings
 from jev_gateway.sessions import (
     SESSION_HEADER,
@@ -156,7 +157,7 @@ def message_text(messages: list[dict[str, Any]]) -> str:
 
 
 def completion_payload(
-    request: ChatCompletionRequest, profile: ModelProfile
+    request: ChatCompletionRequest, profile: ModelProfile, decision: Decision
 ) -> dict[str, Any]:
     """Forward OpenAI-compatible parameters with the routed upstream model.
 
@@ -168,6 +169,7 @@ def completion_payload(
     payload.pop("stream", None)
     if not profile.capabilities.temperature:
         payload.pop("temperature", None)
+    apply_reasoning_effort(payload, decision)
     return {
         **payload,
         "model": f"openai/{profile.model}",
@@ -175,6 +177,24 @@ def completion_payload(
         "api_key": profile.api_key or "unused",
         "stream": request.stream,
     }
+
+
+def apply_reasoning_effort(payload: dict[str, Any], decision: Decision) -> None:
+    """Write the decided thinking level into the outgoing request.
+
+    A source that leaves the payload alone means the gateway formed no opinion: the
+    operator turned the feature off, or the selected route never declared which
+    levels it accepts. Both keep whatever the client sent, byte for byte, which is
+    what makes an opted-out deployment behave exactly as it did before.
+    """
+    if leaves_payload_alone(decision.reasoning_effort_source):
+        return
+    if decision.reasoning_effort is None:
+        # Dropped, not forwarded: an unrepresentable value is a guaranteed upstream
+        # 502, and a level nobody can name is not a level.
+        payload.pop("reasoning_effort", None)
+        return
+    payload["reasoning_effort"] = decision.reasoning_effort
 
 
 def decision_headers(decision: Decision) -> dict[str, str]:
@@ -197,6 +217,10 @@ def decision_headers(decision: Decision) -> dict[str, str]:
         headers["X-JEV-Switch"] = f"{decision.switched_from}->{decision.route_name}"
     if decision.blocked_by:
         headers["X-JEV-Blocked-By"] = decision.blocked_by
+    if decision.reasoning_effort:
+        headers["X-JEV-Reasoning-Effort"] = decision.reasoning_effort
+    if not leaves_payload_alone(decision.reasoning_effort_source):
+        headers["X-JEV-Reasoning-Source"] = decision.reasoning_effort_source
     return headers
 
 
@@ -218,18 +242,27 @@ def storage_unavailable(error: Exception) -> HTTPException:
 def resolve_strategy_name(
     engine: RoutingEngine,
     *,
+    requested_model: str,
     query_value: str | None,
     header_value: str | None,
     session: SessionState | None,
-) -> tuple[str, bool]:
-    """Resolve the request's strategy: query, then header, then session, then default."""
+) -> tuple[str, bool, str]:
+    """Resolve a strategy from model, then legacy overrides, session, or default.
+
+    A registered strategy name in ``model`` is the primary public API. The returned
+    model is either an automatic alias or a catalog model id for manual routing.
+    """
+    clean_model = requested_model.strip()
+    if engine.strategies.has(clean_model):
+        return clean_model, True, "auto"
+
     explicit = (query_value or "").strip() or (header_value or "").strip()
     if explicit:
-        return explicit, True
+        return explicit, True, clean_model
     pinned = session.strategy if session is not None else None
     if pinned and engine.strategies.has(pinned):
-        return pinned, False
-    return engine.strategies.default_name, False
+        return pinned, False, clean_model
+    return engine.strategies.default_name, False, clean_model
 
 
 def unknown_strategy_error(engine: RoutingEngine, name: str) -> HTTPException:
@@ -347,6 +380,11 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         request: Request, error: RequestValidationError
     ) -> JSONResponse:
         if request.url.path == "/v1/chat/completions":
+            # Read once: the stored request and the malformed-body fallback below
+            # both record this same request-scoped value.
+            requested_strategy = request.query_params.get(
+                "strategy"
+            ) or request.headers.get(STRATEGY_HEADER)
             try:
                 raw = await request.body()
                 parsed = json.loads(raw)
@@ -371,7 +409,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     request_id=active.engine.new_request_id(),
                     received_at=time.time(),
                     session_id=session_id,
-                    requested_strategy=request.query_params.get("strategy") or request.headers.get(STRATEGY_HEADER),
+                    requested_strategy=requested_strategy,
                     requested_model=requested_model if isinstance(requested_model, str) else "auto",
                     endpoint=request.url.path,
                     client=request.client.host if request.client else None,
@@ -398,7 +436,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     text = raw.decode("utf-8", errors="replace")
                     active.engine.record_store.record_request(RequestRecord(
                         request_id=active.engine.new_request_id(), received_at=time.time(),
-                        session_id=None, requested_strategy=request.query_params.get("strategy") or request.headers.get(STRATEGY_HEADER),
+                        session_id=None, requested_strategy=requested_strategy,
                         requested_model="auto", endpoint=request.url.path,
                         client=request.client.host if request.client else None,
                         user_agent=request.headers.get("user-agent"), stream=False,
@@ -461,6 +499,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                         "created": MODEL_CREATED_AT,
                         "owned_by": "jev",
                     }
+                    for name in active.engine.strategies.names()
+                    if name != active.engine.strategies.default_name
+                ],
+                *[
+                    {
+                        "id": name,
+                        "object": "model",
+                        "created": MODEL_CREATED_AT,
+                        "owned_by": "jev",
+                    }
                     for name in active.engine.catalog.names()
                 ],
             ],
@@ -508,8 +556,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         session = (
             active.engine.store.get(session_id) if session_id is not None else None
         )
-        chosen, explicit = resolve_strategy_name(
+        chosen, explicit, routed_model = resolve_strategy_name(
             active.engine,
+            requested_model=body.model,
             query_value=strategy,
             header_value=x_jev_strategy,
             session=session,
@@ -521,6 +570,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         output_budget = body.max_completion_tokens
         if output_budget is None:
             output_budget = body.max_tokens
+        # The client's own level, read off the request. JEV only inspects it when the
+        # selected route declared a ladder, and the reasoning policy decides whether
+        # it is kept, lowered, or replaced.
+        requested_reasoning_effort = getattr(body, "reasoning_effort", None)
         if explicit:
             selected = [chosen]
         elif body.strategy is not None:
@@ -544,12 +597,13 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             previews = [
                 active.engine.preview(
                     messages=body.messages,
-                    requested_model=body.model,
+                    requested_model=routed_model,
                     session_id=session_id,
                     max_tokens=output_budget,
                     tools=body.tools,
                     response_format=body.response_format,
                     strategy=name,
+                    reasoning_effort=requested_reasoning_effort,
                 )
                 for name in selected
             ]
@@ -665,8 +719,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         session = (
             active.engine.store.get(session_id) if session_id is not None else None
         )
-        chosen_strategy, explicit = resolve_strategy_name(
+        chosen_strategy, explicit, routed_model = resolve_strategy_name(
             active.engine,
+            requested_model=body.model,
             query_value=strategy,
             header_value=x_jev_strategy,
             session=session,
@@ -679,6 +734,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         output_budget = body.max_completion_tokens
         if output_budget is None:
             output_budget = body.max_tokens
+        requested_reasoning_effort = getattr(body, "reasoning_effort", None)
         request_id = active.engine.new_request_id()
         # The raw request is stored before routing validates anything, so unknown
         # models and strategies still leave a request row.
@@ -694,7 +750,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     requested_strategy=chosen_strategy,
                 ),
                 messages=body.messages,
-                requested_model=body.model,
+                requested_model=routed_model,
                 max_tokens=output_budget,
                 tools=body.tools,
                 response_format=body.response_format,
@@ -708,13 +764,14 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         try:
             decision = active.engine.decide(
                 messages=body.messages,
-                requested_model=body.model,
+                requested_model=routed_model,
                 session_id=session_id,
                 max_tokens=output_budget,
                 tools=body.tools,
                 response_format=body.response_format,
                 strategy=chosen_strategy,
                 request_id=request_id,
+                reasoning_effort=requested_reasoning_effort,
             )
         except UnknownModelError as error:
             raise HTTPException(
@@ -769,7 +826,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         try:
             from litellm import completion
 
-            response = completion(**completion_payload(body, profile))
+            response = completion(**completion_payload(body, profile, decision))
         except HTTPException:
             raise
         except Exception as error:

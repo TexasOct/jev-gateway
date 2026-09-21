@@ -76,6 +76,47 @@ This permits both same-provider selection, such as choosing a faster and a
 stronger model from one proxy, and cross-provider fallback, such as switching
 from a provider-local small model to a different provider's reasoning model.
 
+## Reasoning effort
+
+The model decides which route; the route decides which thinking levels exist. Only
+the second of those is a fact:
+
+- `models[].capabilities.reasoning_effort` is the ladder one route accepts, in the
+  upstream's own vocabulary. It is per model because it differs per route: a live
+  OpenAI-compatible route answers `502` for `minimal`, while the DeepSeek route
+  accepts all seven levels.
+- `policy.reasoning` is a preference, and it lives on the strategy, so `economy`
+  can ask for `low` where `quality` asks for `high` against the same catalog.
+
+The engine derives the level **after** the strategy names a model, because the
+answer has to be clamped by that model's ladder, which the strategy cannot know
+while it is still comparing candidates. The strategy contract therefore does not
+change: `StrategyOutcome` still returns a model, and a custom strategy gets a
+sensible level for whichever model it picked without doing anything.
+
+The order is `on_user_correction`, `on_reasoning_request`, `effort_by_tier[tier]`,
+then `fallback`, clamped into the ladder by walking up first and then down. The
+tier is the one the router committed to, not the locally scored one: the two
+differ whenever a classifier refines the tier inside a strategy or a pinned
+session keeps an earlier one. Using the committed tier keeps the level from
+contradicting the `X-JEV-Task-Type` the client is told. A model that declares no
+ladder is left alone entirely: no field is sent and nothing is overridden, which
+keeps a catalog that has not opted in byte-identical to one without this feature.
+
+The two text triggers, `on_reasoning_request` and `on_user_correction`, read the
+request-intent detectors. `signals.intent_patterns_enabled` controls those
+separately from the scoring patterns and defaults to following
+`patterns_enabled`, so keeping scoring patterns off while leaving intent
+detection on is a supported combination: the detectors feed both the escalation
+and the effort triggers without moving the tier, because their score weights stay
+behind `patterns_enabled`.
+
+`policy.reasoning.mode` decides what happens to a level the client sent itself.
+`override` replaces it, `cap` lowers but never raises it, `fill` speaks only when
+the client stayed silent, `preserve` keeps it and clamps it into the ladder, and
+`off` never touches the field. The applied level and its source are recorded with
+the decision, so a derived level is distinguishable from a clamped one.
+
 ## Re-routing modes
 
 `policy.mode` decides what happens after the first turn, when a session already
@@ -84,6 +125,7 @@ has a model:
 | Mode | Later-turn behavior |
 | --- | --- |
 | `sticky` (default) | Hold the first turn's model until a reason listed in `policy.pin.break_on` releases it |
+| `cached` | As `sticky`, but a JEV-backed strategy classifies only the first turn of a live session and reuses its stored tier and model afterward |
 | `escalate` | Follow hard requirements and escalation signals, and never lower the tier on complexity alone |
 | `adaptive` | As `escalate`, and return to a lower tier once `escalation.settle_window` turns score below `scoring.standard_threshold` |
 | `fresh` | Re-run selection every turn, ignoring the session's model |
@@ -129,37 +171,52 @@ A strategy is the unit that owns the selection rules above. `PolicyStrategy` is
 the built-in implementation; it wraps one complete `RoutingPolicy` and answers
 one question per request: which catalog model serves this turn.
 
-The top-level `policy` block is registered under the name `default`. The optional
-top-level `strategies` object adds named definitions and chooses the default:
+The top-level `policy` block is the `default` strategy selected by
+`model: "auto"`. The optional `strategies` object defines any number of sibling
+model-routing strategies:
 
 ```json
 {
   "strategies": {
-    "definitions": {
-      "quality": {
-        "policy": {
-          "mode": "fresh",
-          "selection": "quality_first"
-        }
+    "quality": {
+      "mode": "cached",
+      "selection": "quality_first",
+      "tier_models": {
+        "simple": ["openai/gpt-5.6-luna"],
+        "standard": ["openai/gpt-5.6-terra"],
+        "complex": ["openai/gpt-5.6-sol"]
+      }
+    },
+    "economy": {
+      "mode": "cached",
+      "selection": "cheapest_adequate",
+      "tier_models": {
+        "simple": ["deepseek/deepseek-flash"],
+        "standard": ["deepseek/deepseek-flash"]
       }
     }
   }
 }
 ```
 
-`strategies.default` may name `default` or a definition and defaults to
-`default` when omitted. When a top-level `policy` exists, definitions inherit it
-and override only their declared fields. Definitions may not redefine `default`,
-because the top-level `policy` owns that name. When `strategies` is present and
-`default` names a definition, the top-level `policy` block may be omitted. In
-that case the chosen definition must provide complete tier mappings, and its
-policy becomes the catalog's active policy.
+Each strategy inherits the top-level policy. A `tier_models` override merges by
+tier, so `economy` keeps the default complex candidates while replacing simple
+and standard pools. A request with `model: "quality"` or `model: "economy"`
+uses that strategy. The old `default`/`definitions` wrapper remains supported
+for existing catalogs and custom strategy kinds.
 
-A request picks its strategy in this order: the `?strategy=` query parameter,
-the `X-JEV-Strategy` header, the session's pinned strategy, then the default. An
-explicit unknown name is a `400 unknown_strategy`. A non-explicit name that is no
-longer registered falls back to the default, so a session pinned to a strategy
-removed by a reload keeps working.
+Each named strategy is exposed as an OpenAI-compatible virtual model. A request
+with `model: "auto"` uses the default strategy; `model: "quality"` selects the
+strategy named `quality`; and a provider-qualified catalog model ID manually
+selects that concrete model. `GET /v1/models` includes `auto`, non-default
+strategy names, and catalog model IDs. Strategy names cannot conflict with an
+automatic alias or a catalog model ID.
+
+After resolving `model`, compatibility selection uses the `?strategy=` query
+parameter, the `X-JEV-Strategy` header, the session's pinned strategy, then the
+default. An explicit unknown name is a `400 unknown_strategy`. A non-explicit
+name that is no longer registered falls back to the default, so a session pinned
+to a strategy removed by a reload keeps working.
 
 The engine deep-copies the session state before handing it to a strategy, so a
 custom strategy cannot mutate the live store. The `Catalog` dataclass is frozen,
@@ -179,8 +236,9 @@ writes a decision, or mutates session state.
 Sessions store the selected canonical model ID, so provider and model changes
 stay visible in session state. In the default `sticky` mode the first turn's
 model is also the session's pin: later turns keep it until a reason in
-`policy.pin.break_on` releases it. A strategy configured with `mode:
-"escalate"`, `"adaptive"`, or `"fresh"` reconsiders the model on its own terms.
+`policy.pin.break_on` releases it. `cached` follows the same pin rule and avoids
+per-turn JEV classification. A strategy configured with `mode: "escalate"`,
+`"adaptive"`, or `"fresh"` reconsiders the model on its own terms.
 
 Decision records and response headers distinguish the catalog model from the
 provider-native model:
@@ -192,6 +250,8 @@ provider-native model:
 | `X-JEV-Model` | Exact `upstream_model` sent to the provider |
 | `X-JEV-Strategy` | Strategy that produced the decision |
 | `X-JEV-Request-Id` | Stored request row that links to the decision and outcome |
+| `X-JEV-Reasoning-Effort` | Applied `reasoning_effort`, when the gateway decided one |
+| `X-JEV-Reasoning-Source` | `client`, `clamped_client`, `derived`, `capped`, or `invalid_client` |
 
 ## Evidence storage
 
