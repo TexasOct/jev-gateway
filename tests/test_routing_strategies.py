@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import sqlite3
 import sys
 import types
@@ -11,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import pytest
 
 from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
@@ -66,23 +64,27 @@ def install_completion(monkeypatch) -> list[dict[str, Any]]:
 
 
 def multi_strategy_document(**overrides: Any) -> dict[str, Any]:
-    """Return the shared catalog document with one named extra strategy."""
+    """Return the shared catalog with multiple model-selectable strategies."""
     document = catalog_document(**overrides)
     document["strategies"] = {
-        "default": "default",
-        "definitions": {
-            "always-strong": {
-                "description": "Always route to the strongest model.",
-                "policy": {
-                    "mode": "fresh",
-                    "selection": "quality_first",
-                    "tier_models": {
-                        "simple": [LARGE_ID],
-                        "standard": [LARGE_ID],
-                        "complex": [LARGE_ID],
-                    },
-                },
-            }
+        "always-strong": {
+            "description": "Always route to the strongest model.",
+            "mode": "fresh",
+            "selection": "quality_first",
+            "tier_models": {
+                "simple": [LARGE_ID],
+                "standard": [LARGE_ID],
+                "complex": [LARGE_ID],
+            },
+        },
+        "always-small": {
+            "mode": "fresh",
+            "selection": "cheapest_adequate",
+            "tier_models": {
+                "simple": [SMALL_ID],
+                "standard": [SMALL_ID],
+                "complex": [SMALL_ID],
+            },
         },
     }
     return document
@@ -135,62 +137,15 @@ def test_top_level_policy_registers_a_default_strategy() -> None:
     assert catalog.default_strategy == "default"
 
 
-def test_named_strategies_default_to_the_top_level_policy() -> None:
-    document = multi_strategy_document()
-    del document["strategies"]["default"]
-
-    catalog = catalog_from_document(document, "test catalog")
+def test_compact_named_strategies_use_the_top_level_policy_as_default() -> None:
+    catalog = catalog_from_document(multi_strategy_document(), "test catalog")
 
     assert catalog.default_strategy == "default"
-
-
-def test_named_strategies_parse_with_a_chosen_default() -> None:
-    document = multi_strategy_document()
-    document["strategies"]["default"] = "always-strong"
-
-    catalog = catalog_from_document(document, "test catalog")
-
-    assert catalog.default_strategy == "always-strong"
     assert [definition.name for definition in catalog.strategies] == [
         "default",
         "always-strong",
+        "always-small",
     ]
-    assert catalog.policy.mode == "fresh"
-    payload = catalog.as_dict()
-    assert [entry["name"] for entry in payload["strategies"]] == [
-        "default",
-        "always-strong",
-    ]
-
-
-def test_top_level_policy_may_be_omitted_when_a_definition_is_default() -> None:
-    document = multi_strategy_document()
-    del document["policy"]
-    document["strategies"]["default"] = "always-strong"
-
-    catalog = catalog_from_document(document, "test catalog")
-
-    assert catalog.default_strategy == "always-strong"
-    assert catalog.policy.mode == "fresh"
-    assert [definition.name for definition in catalog.strategies] == ["always-strong"]
-
-
-def test_unknown_default_strategy_is_rejected() -> None:
-    document = multi_strategy_document()
-    document["strategies"]["default"] = "missing"
-
-    with pytest.raises(ValueError, match="missing"):
-        catalog_from_document(document, "test catalog")
-
-
-def test_default_definition_may_not_shadow_the_top_level_policy() -> None:
-    document = multi_strategy_document()
-    document["strategies"]["definitions"]["default"] = copy.deepcopy(
-        document["strategies"]["definitions"]["always-strong"]
-    )
-
-    with pytest.raises(ValueError, match="may not redefine 'default'"):
-        catalog_from_document(document, "test catalog")
 
 
 def test_storage_settings_parse_from_the_document(tmp_path: Path) -> None:
@@ -214,6 +169,42 @@ def test_storage_settings_parse_from_the_document(tmp_path: Path) -> None:
 # Gateway endpoints
 
 
+def test_model_name_selects_a_named_strategy(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = make_app(make_engine(multi_strategy_document()))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "always-strong",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-jev-strategy"] == "always-strong"
+    assert response.headers["x-jev-route"] == LARGE_ID
+    assert response.json()["model"] == "always-strong"
+    assert calls[0]["model"] == "openai/vendor/large-model"
+
+
+def test_model_list_includes_named_strategies(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = make_app(make_engine(multi_strategy_document()))
+
+    model_ids = [entry["id"] for entry in request(app, "GET", "/v1/models").json()["data"]]
+
+    assert model_ids == [
+        "auto",
+        "always-strong",
+        "always-small",
+        SMALL_ID,
+        LARGE_ID,
+    ]
+
+
 def test_strategy_listing_endpoint(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = make_app(make_engine(multi_strategy_document()))
@@ -225,6 +216,7 @@ def test_strategy_listing_endpoint(monkeypatch) -> None:
     assert [entry["name"] for entry in payload["data"]] == [
         "default",
         "always-strong",
+        "always-small",
     ]
     assert payload["data"][1]["description"] == "Always route to the strongest model."
 
@@ -339,7 +331,9 @@ def test_preview_compares_all_strategies_without_mutating_state(monkeypatch) -> 
     payload = response.json()
     assert payload["default"] == "default"
     assert {row["strategy"]: row["route"] for row in payload["preview"]} == {
-        "default": SMALL_ID, "always-strong": LARGE_ID,
+        "default": SMALL_ID,
+        "always-strong": LARGE_ID,
+        "always-small": SMALL_ID,
     }
     assert len(engine.store) == 0
     assert engine.decision("missing") is None

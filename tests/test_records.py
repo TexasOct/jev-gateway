@@ -60,6 +60,8 @@ def _decision(request_id: str, config_hash: str) -> DecisionRecord:
         turn_index=1,
         switched_from=None,
         blocked_by=None,
+        reasoning_effort="low",
+        reasoning_effort_source="derived",
         candidates=("provider/model",),
         signals={"score": 0.1, "reasons": ["marker:test"]},
         created_at=1001.0,

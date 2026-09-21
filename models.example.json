@@ -1,4 +1,7 @@
 {
+  "gateway": {
+    "session_ttl_seconds": 7200
+  },
   "storage": {
     "enabled": true
   },
@@ -15,29 +18,26 @@
     ]
   },
   "signals": {
-    "patterns_enabled": false
+    "patterns_enabled": false,
+    "intent_patterns_enabled": true
   },
   "strategies": {
-    "default": "default",
-    "definitions": {
-      "quality": {
-        "policy": {
-          "mode": "fresh",
-          "selection": "quality_first",
-          "tier_models": {
-            "simple": [
-              "deepseek/deepseek-flash",
-              "openai/gpt-5.6-luna"
-            ],
-            "standard": [
-              "openai/gpt-5.6-terra",
-              "deepseek/deepseek-flash"
-            ],
-            "complex": [
-              "openai/gpt-5.6-sol"
-            ]
-          }
-        }
+    "quality": {
+      "mode": "cached",
+      "selection": "quality_first",
+      "tier_models": {
+        "simple": ["openai/gpt-5.6-luna"],
+        "standard": ["openai/gpt-5.6-terra"],
+        "complex": ["openai/gpt-5.6-sol"]
+      }
+    },
+    "economy": {
+      "mode": "cached",
+      "selection": "cheapest_adequate",
+      "tier_models": {
+        "simple": ["deepseek/deepseek-flash"],
+        "standard": ["deepseek/deepseek-flash"],
+        "complex": ["deepseek/deepseek-flash", "openai/gpt-5.6-sol"]
       }
     }
   },
@@ -58,6 +58,17 @@
     "selection": "balanced",
     "pin": {
       "break_on": ["capability_gap", "context_pressure", "output_limit"]
+    },
+    "reasoning": {
+      "mode": "override",
+      "effort_by_tier": {
+        "simple": "low",
+        "standard": "medium",
+        "complex": "high"
+      },
+      "on_reasoning_request": "high",
+      "on_user_correction": "high",
+      "fallback": "medium"
     },
     "tier_models": {
       "simple": [
@@ -82,7 +93,16 @@
       "context_window": 1000000,
       "max_output_tokens": 384000,
       "capabilities": {
-        "reasoning": true
+        "reasoning": true,
+        "reasoning_effort": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
       },
       "cost": {
         "input_per_million": 0.3,
@@ -98,7 +118,15 @@
       "max_output_tokens": 128000,
       "capabilities": {
         "reasoning": true,
-        "temperature": false
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
       },
       "cost": {
         "input_per_million": 2.0,
@@ -113,7 +141,15 @@
       "max_output_tokens": 128000,
       "capabilities": {
         "reasoning": true,
-        "temperature": false
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
       },
       "cost": {
         "input_per_million": 1.0,
@@ -129,7 +165,15 @@
       "max_output_tokens": 128000,
       "capabilities": {
         "reasoning": true,
-        "temperature": false
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
       },
       "cost": {
         "input_per_million": 0.75,

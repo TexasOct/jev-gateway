@@ -183,3 +183,49 @@ def test_estimate_tokens_treats_cjk_as_one_token() -> None:
 
 def test_latest_user_text_is_none_without_a_user_message() -> None:
     assert latest_user_text([{"role": "system", "content": "rules"}]) is None
+
+
+def test_intent_detection_follows_the_pattern_switch_when_unset() -> None:
+    assert ScoringPolicy().detects_intent is True
+    assert ScoringPolicy(patterns_enabled=False).detects_intent is False
+    assert (
+        ScoringPolicy(
+            patterns_enabled=False, intent_patterns_enabled=True
+        ).detects_intent
+        is True
+    )
+    assert (
+        ScoringPolicy(
+            patterns_enabled=True, intent_patterns_enabled=False
+        ).detects_intent
+        is False
+    )
+
+
+def test_intent_detectors_run_while_scoring_patterns_stay_off() -> None:
+    """The two detectors the escalation and effort triggers read are separable."""
+    signals = extract_signals(
+        [{"role": "user", "content": "不对，你上面错了。请逐步推理。"}],
+        scoring=ScoringPolicy(patterns_enabled=False, intent_patterns_enabled=True),
+    )
+
+    assert signals.user_correction is True
+    assert signals.reasoning_requested is True
+    assert "reasoning_requested" in signals.reasons
+    assert "user_correction" in signals.reasons
+    # Turning them on must not move the score or the tier, so their weights stay
+    # gated by patterns_enabled.
+    assert signals.score == 0.0
+    assert signals.tier == "simple"
+
+
+def test_intent_detector_weights_apply_when_scoring_patterns_are_on() -> None:
+    signals = extract_signals(
+        [{"role": "user", "content": "不对，你上面错了。请逐步推理。"}],
+        scoring=ScoringPolicy(intent_patterns_enabled=True),
+    )
+
+    assert signals.user_correction is True
+    assert signals.reasoning_requested is True
+    # correction_weight 0.10 plus reasoning_weight 0.15.
+    assert signals.score == 0.25

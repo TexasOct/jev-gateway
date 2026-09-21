@@ -8,7 +8,12 @@ from typing import Any
 
 import pytest
 
-from jev_gateway.catalog import Catalog, ModelProfile, catalog_from_document
+from jev_gateway.catalog import (
+    Catalog,
+    ModelProfile,
+    RoutingMode,
+    catalog_from_document,
+)
 from tests.helpers import CATALOG_DOCUMENT, single_route_document, tier_one_document
 
 SMALL_ID = "small-provider/vendor/small-model"
@@ -199,6 +204,18 @@ def test_policy_pin_break_on_must_be_a_list() -> None:
         catalog_from_document(document, "test catalog")
 
 
+def test_strategy_names_must_not_conflict_with_models_or_auto_aliases() -> None:
+    document = multi_strategy_document()
+    document["strategies"]["auto"] = document["strategies"].pop("quality")
+    with pytest.raises(ValueError, match="reserved automatic model name"):
+        catalog_from_document(document, "test catalog")
+
+    document = multi_strategy_document()
+    document["strategies"][SMALL_ID] = document["strategies"].pop("quality")
+    with pytest.raises(ValueError, match="conflicts with a catalog model id"):
+        catalog_from_document(document, "test catalog")
+
+
 def test_policy_rejects_unknown_keys_at_every_level() -> None:
     document = single_route_document()
     document["policy"]["selection_mode"] = "balanced"
@@ -209,6 +226,16 @@ def test_policy_rejects_unknown_keys_at_every_level() -> None:
     document["policy"]["escalation"] = {"max_failures": 2}
     with pytest.raises(ValueError, match="escalation has unknown keys: max_failures"):
         catalog_from_document(document, "test catalog")
+
+
+def test_policy_modes_parse_to_routing_mode_members() -> None:
+    document = single_route_document()
+    document["policy"]["mode"] = "cached"
+
+    policy = catalog_from_document(document, "test catalog").policy
+
+    assert policy.mode is RoutingMode.CACHED
+    assert policy.as_dict()["mode"] == "cached"
 
 
 def test_scoring_rules_come_from_the_document() -> None:
@@ -230,22 +257,22 @@ def test_scoring_rules_come_from_the_document() -> None:
 
 
 def multi_strategy_document(**signals: Any) -> dict[str, Any]:
-    """Return the test catalog with a second named strategy and signal defaults."""
+    """Return a compact catalog with multiple named model-routing strategies."""
     document = copy.deepcopy(CATALOG_DOCUMENT)
     document["strategies"] = {
-        "default": "default",
-        "definitions": {
-            "quality": {
-                "policy": {
-                    "mode": "fresh",
-                    "selection": "quality_first",
-                    "tier_models": {
-                        "simple": [SMALL_ID],
-                        "standard": [SMALL_ID, LARGE_ID],
-                        "complex": [LARGE_ID],
-                    },
-                }
-            }
+        "quality": {
+            "mode": "fresh",
+            "selection": "quality_first",
+            "tier_models": {
+                "simple": [LARGE_ID],
+                "standard": [LARGE_ID],
+                "complex": [LARGE_ID],
+            },
+        },
+        "economy": {
+            "mode": "fresh",
+            "selection": "cheapest_adequate",
+            "tier_models": {"simple": [SMALL_ID], "standard": [SMALL_ID]},
         },
     }
     if signals:
@@ -263,38 +290,99 @@ def test_document_signal_defaults_reach_every_strategy() -> None:
     assert {
         definition.name: definition.policy.scoring.patterns_enabled
         for definition in catalog.strategies
-    } == {"default": False, "quality": False}
-    assert catalog.as_dict()["signals"] == {"patterns_enabled": False}
+    } == {"default": False, "quality": False, "economy": False}
+    assert catalog.as_dict()["signals"] == {
+        "patterns_enabled": False,
+        "intent_patterns_enabled": None,
+    }
+
+
+def test_compact_strategy_options_are_immutable_and_round_trip() -> None:
+    document = multi_strategy_document()
+    options = {"attempts": 3, "fallbacks": ["small", {"enabled": True}]}
+    document["strategies"]["quality"]["options"] = options
+
+    catalog = catalog_from_document(document, "test catalog")
+    quality = next(item for item in catalog.strategies if item.name == "quality")
+    options["fallbacks"][1]["enabled"] = False
+
+    assert quality.options["attempts"] == 3
+    assert quality.options["fallbacks"] == ("small", {"enabled": True})
+    with pytest.raises(TypeError):
+        quality.options["attempts"] = 4  # type: ignore[index]
+    assert catalog.as_dict()["strategies"][1]["options"] == {
+        "attempts": 3,
+        "fallbacks": ["small", {"enabled": True}],
+    }
+
+
+def test_legacy_strategy_options_do_not_become_policy_overrides() -> None:
+    document = copy.deepcopy(CATALOG_DOCUMENT)
+    document["strategies"] = {
+        "default": "custom",
+        "definitions": {
+            "custom": {
+                "kind": "special",
+                "options": {"tier_models": "implementation-owned"},
+                "policy": {"mode": "fresh"},
+            }
+        },
+    }
+
+    catalog = catalog_from_document(document, "test catalog")
+    custom = next(item for item in catalog.strategies if item.name == "custom")
+
+    assert custom.options == {"tier_models": "implementation-owned"}
+    assert custom.policy.mode is RoutingMode.FRESH
+    assert custom.policy.tier_models == {
+        "simple": (SMALL_ID,),
+        "standard": (SMALL_ID,),
+        "complex": (LARGE_ID,),
+    }
+
+
+@pytest.mark.parametrize("options", [None, [], "invalid"])
+def test_strategy_options_must_be_a_json_object(options: Any) -> None:
+    document = multi_strategy_document()
+    document["strategies"]["quality"]["options"] = options
+
+    with pytest.raises(TypeError, match="options must be an object"):
+        catalog_from_document(document, "test catalog")
 
 
 def test_named_strategy_inherits_the_top_level_policy() -> None:
     document = multi_strategy_document()
-    document["strategies"]["definitions"]["quality"]["policy"] = {
-        "mode": "fresh",
-        "selection": "quality_first",
-    }
 
     catalog = catalog_from_document(document, "test catalog")
     quality = next(item for item in catalog.strategies if item.name == "quality")
+    economy = next(item for item in catalog.strategies if item.name == "economy")
 
-    assert quality.policy.tier_models == catalog.policy.tier_models
+    assert quality.policy.tier_models == {
+        "simple": (LARGE_ID,),
+        "standard": (LARGE_ID,),
+        "complex": (LARGE_ID,),
+    }
     assert quality.policy.scoring == catalog.policy.scoring
-    assert quality.policy.mode == "fresh"
+    assert quality.policy.mode is RoutingMode.FRESH
     assert quality.policy.selection == "quality_first"
+    assert economy.policy.tier_models == {
+        "simple": (SMALL_ID,),
+        "standard": (SMALL_ID,),
+        "complex": (LARGE_ID,),
+    }
+    assert economy.policy.selection == "cheapest_adequate"
 
 
 def test_strategy_scoring_overrides_the_document_signal_default() -> None:
     document = multi_strategy_document(patterns_enabled=False)
-    document["strategies"]["definitions"]["quality"]["policy"]["scoring"] = {
-        "patterns_enabled": True
-    }
+    document["strategies"]["quality"]["scoring"] = {"patterns_enabled": True}
 
     catalog = catalog_from_document(document, "test catalog")
 
     assert {
         definition.name: definition.policy.scoring.patterns_enabled
         for definition in catalog.strategies
-    } == {"default": False, "quality": True}
+    } == {"default": False, "quality": True, "economy": False}
 
 
 def test_signals_stay_on_when_the_document_omits_the_block() -> None:
@@ -326,3 +414,63 @@ def test_policy_snapshot_keeps_provider_keys_secret() -> None:
     assert "test-route-key" not in payload
     assert '"api_key"' not in payload
     assert '"has_api_key": true' in payload
+
+
+def test_document_intent_default_reaches_every_strategy() -> None:
+    """Intent detection is separable from the scoring switch it used to share."""
+    catalog = catalog_from_document(
+        multi_strategy_document(
+            patterns_enabled=False, intent_patterns_enabled=True
+        ),
+        "test catalog",
+    )
+
+    assert catalog.signals.intent_patterns_enabled is True
+    assert {
+        definition.name: definition.policy.scoring.detects_intent
+        for definition in catalog.strategies
+    } == {"default": True, "quality": True, "economy": True}
+    # The scoring switch it was split from is untouched.
+    assert catalog.policy.scoring.patterns_enabled is False
+
+
+def test_intent_default_is_inert_when_the_document_says_nothing() -> None:
+    catalog = catalog_from_document(
+        multi_strategy_document(patterns_enabled=False), "test catalog"
+    )
+
+    assert catalog.signals.intent_patterns_enabled is None
+    assert {
+        definition.name: definition.policy.scoring.intent_patterns_enabled
+        for definition in catalog.strategies
+    } == {"default": None, "quality": None, "economy": None}
+    # Unset follows patterns_enabled, so nothing changes for an existing catalog.
+    assert catalog.policy.scoring.detects_intent is False
+
+
+def test_a_strategy_keeps_its_own_intent_switch() -> None:
+    document = multi_strategy_document(
+        patterns_enabled=False, intent_patterns_enabled=True
+    )
+    document["strategies"]["quality"]["scoring"] = {
+        "intent_patterns_enabled": False
+    }
+    document["strategies"]["economy"]["scoring"] = {
+        "intent_patterns_enabled": None
+    }
+
+    catalog = catalog_from_document(document, "test catalog")
+
+    assert {
+        definition.name: definition.policy.scoring.detects_intent
+        for definition in catalog.strategies
+    } == {"default": True, "quality": False, "economy": True}
+
+
+@pytest.mark.parametrize("bad", ["true", 1, []])
+def test_intent_default_must_be_a_boolean_or_null(bad: Any) -> None:
+    document = multi_strategy_document(patterns_enabled=False)
+    document["signals"]["intent_patterns_enabled"] = bad
+
+    with pytest.raises(TypeError, match="signals.intent_patterns_enabled"):
+        catalog_from_document(document, "test catalog")

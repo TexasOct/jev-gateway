@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from jev_gateway.catalog import Catalog, ModelProfile, RoutingPolicy
+from jev_gateway.catalog import Catalog, ModelProfile, RoutingMode, RoutingPolicy
 from jev_gateway.config import TIER_ORDER, TIER_RANK
 from jev_gateway.sessions import SessionState
 from jev_gateway.signals import RequestSignals, ScoringPolicy
@@ -139,10 +139,10 @@ class PolicyStrategy:
         """Choose the model for a later turn, or keep the session's model."""
         signals = request.signals
 
-        if self.policy.mode == "fresh":
+        if self.policy.mode is RoutingMode.FRESH:
             return self._select(signals.tier, signals, catalog), "per_turn_policy", None
 
-        if self.policy.mode == "sticky":
+        if self.policy.mode in {RoutingMode.STICKY, RoutingMode.CACHED}:
             return self._pinned_selection(current, session, request, catalog)
 
         hard = self._hard_requirement(current, session, signals)
@@ -320,7 +320,7 @@ class PolicyStrategy:
                 tier=self._lower_tier(session.tier), reason="budget_pressure"
             )
         if (
-            self.policy.mode == "adaptive"
+            self.policy.mode is RoutingMode.ADAPTIVE
             and escalation.deescalate_when_settled
             and signals.tier_rank < rank
             and self._settled(session)
