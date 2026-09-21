@@ -1,0 +1,140 @@
+{
+  "storage": {
+    "enabled": true
+  },
+  "jev": {
+    "enabled": false,
+    "timeout_seconds": 5,
+    "sources": [
+      {
+        "id": "openrouter",
+        "api_base": "https://openrouter.ai/api/v1/systemone",
+        "api_key_env": "JEV_OPENROUTER_API_KEY",
+        "model": "typesafe/jev-1.13"
+      }
+    ]
+  },
+  "signals": {
+    "patterns_enabled": false
+  },
+  "strategies": {
+    "default": "default",
+    "definitions": {
+      "quality": {
+        "policy": {
+          "mode": "fresh",
+          "selection": "quality_first",
+          "tier_models": {
+            "simple": [
+              "deepseek/deepseek-flash",
+              "openai/gpt-5.6-luna"
+            ],
+            "standard": [
+              "openai/gpt-5.6-terra",
+              "deepseek/deepseek-flash"
+            ],
+            "complex": [
+              "openai/gpt-5.6-sol"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "providers": [
+    {
+      "id": "deepseek",
+      "api_base": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    },
+    {
+      "id": "openai",
+      "api_base": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY"
+    }
+  ],
+  "policy": {
+    "mode": "sticky",
+    "selection": "balanced",
+    "pin": {
+      "break_on": ["capability_gap", "context_pressure", "output_limit"]
+    },
+    "tier_models": {
+      "simple": [
+        "deepseek/deepseek-flash",
+        "openai/gpt-5.6-luna"
+      ],
+      "standard": [
+        "deepseek/deepseek-flash",
+        "openai/gpt-5.6-terra"
+      ],
+      "complex": [
+        "openai/gpt-5.6-sol"
+      ]
+    }
+  },
+  "models": [
+    {
+      "provider": "deepseek",
+      "upstream_model": "deepseek-flash",
+      "priority": 10,
+      "quality": 0.6,
+      "context_window": 1000000,
+      "max_output_tokens": 384000,
+      "capabilities": {
+        "reasoning": true
+      },
+      "cost": {
+        "input_per_million": 0.3,
+        "output_per_million": 1.2
+      }
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-5.6-sol",
+      "priority": 20,
+      "quality": 0.95,
+      "context_window": 1000000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false
+      },
+      "cost": {
+        "input_per_million": 2.0,
+        "output_per_million": 10.0
+      }
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-5.6-luna",
+      "priority": 10,
+      "context_window": 1000000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false
+      },
+      "cost": {
+        "input_per_million": 1.0,
+        "output_per_million": 5.0
+      }
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-5.6-terra",
+      "priority": 20,
+      "quality": 0.75,
+      "context_window": 1000000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false
+      },
+      "cost": {
+        "input_per_million": 0.75,
+        "output_per_million": 7.5
+      }
+    }
+  ]
+}

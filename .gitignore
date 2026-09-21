@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local configuration and runtime data
+.env
+models.json
+logs/
+
+# Trellis-generated local tooling
+# Regenerate integration files in a fresh clone with: trellis init --pi
+.trellis/*
+!.trellis/tasks/
+!.trellis/spec/
+!.trellis/workspace/
+!.trellis/.gitignore
+.agents/
+.pi/
+
+# Local routing evidence database
+jev-records.sqlite3*

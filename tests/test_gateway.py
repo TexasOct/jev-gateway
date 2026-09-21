@@ -1,0 +1,780 @@
+"""Tests for the OpenAI-compatible gateway."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+import types
+from pathlib import Path
+from typing import Any
+
+import httpx
+
+from jev_gateway import gateway
+from jev_gateway.catalog import catalog_from_document
+from jev_gateway.decision import RoutingEngine
+from jev_gateway.sessions import MemorySessionStore
+from tests.helpers import (
+    COMPLEX_PROMPT,
+    SIMPLE_PROMPT,
+    FakeClock,
+    catalog_document,
+    single_route_document,
+)
+from tests.helpers import LARGE_MODEL_ID as LARGE_ID
+from tests.helpers import SMALL_MODEL_ID as SMALL_ID
+
+
+def request(app, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    async def send() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
+            return await client.request(method, path, **kwargs)
+
+    return asyncio.run(send())
+
+
+def make_config(
+    gateway_api_key: str | None = None,
+    echo_requested_model: bool = True,
+    models_file: Path = Path("models.json"),
+    **policy_overrides: Any,
+) -> gateway.GatewayConfig:
+    catalog = catalog_from_document(
+        catalog_document(**policy_overrides), "test catalog"
+    )
+    clock = FakeClock()
+    return gateway.GatewayConfig(
+        engine=RoutingEngine(catalog, MemorySessionStore(clock=clock), clock=clock),
+        gateway_api_key=gateway_api_key,
+        session_strategy="derived",
+        echo_requested_model=echo_requested_model,
+        models_file=models_file,
+    )
+
+
+def install_completion(monkeypatch) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"].removeprefix("openai/"),
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "ok"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    return calls
+
+
+def test_runtime_directory_loads_config_env_and_storage_from_home(
+    monkeypatch, tmp_path: Path
+) -> None:
+    runtime = tmp_path / ".jev-gateway"
+    runtime.mkdir()
+    document = catalog_document()
+    document["providers"][0]["api_key_env"] = "RUNTIME_SMALL_KEY"
+    document["providers"][1]["api_key_env"] = "RUNTIME_LARGE_KEY"
+    document["storage"] = {
+        "enabled": True,
+        "path": "jev-records.sqlite3",
+        "capture_content": False,
+    }
+    (runtime / "models.json").write_text(json.dumps(document), encoding="utf-8")
+    (runtime / ".env").write_text(
+        "RUNTIME_SMALL_KEY=small\nRUNTIME_LARGE_KEY=large\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("JEV_GATEWAY_HOME", str(runtime))
+    monkeypatch.delenv("RUNTIME_SMALL_KEY", raising=False)
+    monkeypatch.delenv("RUNTIME_LARGE_KEY", raising=False)
+
+    config = gateway.load_gateway_config()
+
+    assert gateway.runtime_directory() == runtime
+    assert config.models_file == runtime / "models.json"
+    assert config.engine.catalog.storage.path == str(runtime / "jev-records.sqlite3")
+    assert [profile.api_key for profile in config.engine.catalog.profiles] == [
+        "small",
+        "large",
+    ]
+    config.engine.close()
+
+
+def test_first_turn_routes_and_reports_the_decision(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+            "max_tokens": 64,
+            "temperature": 0.2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-jev-route"] == SMALL_ID
+    assert response.headers["x-jev-task-type"] == "simple"
+    assert response.headers["x-jev-reason"] == "first_turn_simple"
+    assert response.headers["x-jev-mode"] == "auto"
+    assert response.headers["x-jev-session-id"].startswith("d-")
+    assert response.headers["x-jev-decision-id"].startswith("dec-")
+    assert response.json()["choices"][0]["message"]["content"] == "ok"
+    assert calls[0]["model"] == "openai/vendor/small-model"
+    assert calls[0]["api_base"] == "https://small.example/v1"
+    assert calls[0]["api_key"] == "test-key-small"
+    assert calls[0]["max_tokens"] == 64
+    assert calls[0]["temperature"] == 0.2
+
+
+def test_temperature_is_dropped_for_models_that_reject_it(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+            "temperature": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-jev-route"] == LARGE_ID
+    assert "temperature" not in calls[0]
+
+
+def test_session_stays_on_its_model_across_turns(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    first = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "messages": [
+                {"role": "user", "content": SIMPLE_PROMPT},
+                {"role": "assistant", "content": "ok"},
+                {"role": "user", "content": "再写一个排序函数。"},
+            ]
+        },
+    )
+
+    assert second.headers["x-jev-session-id"] == first.headers["x-jev-session-id"]
+    assert second.headers["x-jev-route"] == SMALL_ID
+    assert second.headers["x-jev-reason"] == "session_sticky"
+    assert "x-jev-switch" not in second.headers
+
+
+def test_session_switches_models_when_the_work_gets_harder(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+    escalated = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "messages": [
+                {"role": "user", "content": SIMPLE_PROMPT},
+                {"role": "assistant", "content": "ok"},
+                {"role": "user", "content": COMPLEX_PROMPT},
+            ]
+        },
+    )
+
+    assert escalated.headers["x-jev-route"] == LARGE_ID
+    assert escalated.headers["x-jev-reason"] == "complexity_spike"
+    assert escalated.headers["x-jev-switch"] == f"{SMALL_ID}->{LARGE_ID}"
+    assert calls[-1]["model"] == "openai/vendor/large-model"
+
+
+def test_default_pin_holds_the_first_turn_model(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(mode="sticky"))
+
+    request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+    pinned = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "messages": [
+                {"role": "user", "content": SIMPLE_PROMPT},
+                {"role": "assistant", "content": "ok"},
+                {"role": "user", "content": COMPLEX_PROMPT},
+            ]
+        },
+    )
+
+    assert pinned.headers["x-jev-route"] == SMALL_ID
+    assert pinned.headers["x-jev-reason"] == "session_pinned"
+    assert "x-jev-switch" not in pinned.headers
+
+
+def test_explicit_session_header_is_used(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "chat-42"},
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+
+    assert response.headers["x-jev-session-id"] == "chat-42"
+    snapshot = request(app, "GET", "/v1/routing/sessions/chat-42")
+    assert snapshot.status_code == 200
+    assert snapshot.json()["session_id"] == "chat-42"
+    assert snapshot.json()["route"] == SMALL_ID
+
+
+def test_manual_model_selection(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"model": LARGE_ID, "messages": [{"role": "user", "content": "2 + 2?"}]},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-jev-route"] == LARGE_ID
+    assert response.headers["x-jev-mode"] == "manual"
+    assert response.headers["x-jev-reason"] == "manual_override"
+    assert calls[0]["model"] == "openai/vendor/large-model"
+
+
+def test_unknown_model_is_rejected(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "unconfigured-model",
+            "messages": [{"role": "user", "content": "Hello"}],
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "model_not_found"
+    assert response.json()["error"]["param"] == "model"
+    assert "small" in response.json()["error"]["message"]
+
+
+def test_missing_user_message_is_rejected(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "system", "content": "rules"}]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "missing_user_message"
+
+
+def test_gateway_api_key_is_enforced(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(gateway_api_key="client-key"))
+
+    assert request(app, "GET", "/healthz").status_code == 401
+    wrong = request(app, "GET", "/healthz", headers={"Authorization": "Bearer wrong"})
+    assert wrong.status_code == 401
+
+    allowed = request(
+        app, "GET", "/healthz", headers={"Authorization": "Bearer client-key"}
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["models"] == [SMALL_ID, LARGE_ID]
+
+
+def test_upstream_failure_becomes_a_gateway_error(monkeypatch) -> None:
+    def completion(**kwargs):
+        raise RuntimeError("upstream exploded")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "upstream_error"
+    assert "exploded" in response.json()["error"]["message"]
+
+
+def test_streaming_returns_openai_sse(monkeypatch) -> None:
+    def completion(**kwargs):
+        assert kwargs["stream"] is True
+        return iter(
+            [
+                {"id": "one", "choices": [{"delta": {"content": "hel"}}]},
+                {"id": "one", "choices": [{"delta": {"content": "lo"}}]},
+            ]
+        )
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "stream": True,
+            "messages": [{"role": "user", "content": "What is 2 + 2?"}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["x-jev-route"] == SMALL_ID
+    assert 'data: {"id": "one"' in response.text
+    assert response.text.endswith("data: [DONE]\n\n")
+
+
+def test_routing_endpoints_expose_policy_decisions_and_sessions(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    completion = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+    decision_id = completion.headers["x-jev-decision-id"]
+    session_id = completion.headers["x-jev-session-id"]
+
+    policy = request(app, "GET", "/v1/routing/policy")
+    assert policy.status_code == 200
+    assert policy.json()["policy"]["mode"] == "escalate"
+    assert policy.json()["session_strategy"] == "derived"
+    assert [model["name"] for model in policy.json()["models"]] == [
+        SMALL_ID,
+        LARGE_ID,
+    ]
+
+    decision = request(app, "GET", f"/v1/routing/decisions/{decision_id}")
+    assert decision.status_code == 200
+    assert decision.json()["reason"] == "first_turn_simple"
+    assert decision.json()["signals"]["tier"] == "simple"
+
+    session = request(app, "GET", f"/v1/routing/sessions/{session_id}")
+    assert session.status_code == 200
+    assert session.json()["turn_count"] == 1
+    assert session.json()["events"][-1]["type"] == "decision"
+
+    assert request(app, "GET", "/v1/routing/decisions/dec-missing").status_code == 404
+    assert request(app, "GET", "/v1/routing/sessions/unknown").status_code == 404
+
+
+def test_errors_use_the_openai_error_wrapper(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    missing = request(app, "POST", "/v1/chat/completions", json={"model": "auto"})
+    assert missing.status_code == 400
+    assert missing.json() == {
+        "error": {
+            "message": "Missing required parameter: 'messages'",
+            "type": "invalid_request_error",
+            "param": "messages",
+            "code": None,
+        }
+    }
+
+    empty = request(
+        app, "POST", "/v1/chat/completions", json={"model": "auto", "messages": []}
+    )
+    assert empty.status_code == 400
+    assert empty.json()["error"]["param"] == "messages"
+
+    unknown_path = request(app, "GET", "/v1/embeddings")
+    assert unknown_path.status_code == 404
+    assert unknown_path.json()["error"]["message"] == "Invalid URL (GET /v1/embeddings)"
+    assert set(unknown_path.json()["error"]) == {"message", "type", "param", "code"}
+
+    malformed = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        content=b"{not json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert malformed.status_code == 400
+    assert malformed.json()["error"]["param"] is None
+    assert malformed.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_model_list_entries_match_the_openai_schema(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    payload = request(app, "GET", "/v1/models").json()
+
+    assert payload["object"] == "list"
+    for entry in payload["data"]:
+        assert set(entry) == {"id", "object", "created", "owned_by"}
+        assert isinstance(entry["created"], int)
+        assert entry["object"] == "model"
+
+
+def test_auth_failure_uses_the_openai_error_shape(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(gateway_api_key="client-key"))
+
+    response = request(app, "GET", "/v1/models")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["type"] == "invalid_request_error"
+    assert response.json()["error"]["code"] == "invalid_api_key"
+    assert "param" in response.json()["error"]
+
+
+def test_reload_endpoint_swaps_the_catalog(tmp_path, monkeypatch) -> None:
+    models_file = tmp_path / "models.json"
+    models_file.write_text(json.dumps(catalog_document()), encoding="utf-8")
+
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(models_file=models_file))
+    assert request(app, "GET", "/v1/routing/policy").json()["models"][0]["name"] == SMALL_ID
+
+    replacement = catalog_document()
+    for provider in replacement["providers"]:
+        provider["api_base"] = "https://moved.example/v1"
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    reloaded = request(app, "POST", "/v1/routing/reload")
+
+    assert reloaded.status_code == 200
+    assert reloaded.json()["reloaded"] is True
+    assert reloaded.json()["models"][0]["api_base"] == "https://moved.example/v1"
+
+
+def test_reload_endpoint_keeps_the_old_catalog_on_bad_input(
+    tmp_path, monkeypatch
+) -> None:
+    models_file = tmp_path / "models.json"
+    models_file.write_text(json.dumps(catalog_document()), encoding="utf-8")
+
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(models_file=models_file))
+    models_file.write_text("{not json", encoding="utf-8")
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_configuration"
+    # The running catalog is untouched, so routing still works.
+    assert request(app, "GET", "/v1/routing/policy").json()["models"][0]["name"] == SMALL_ID
+
+
+def test_reload_endpoint_applies_gateway_runtime_settings(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("RELOADED_GATEWAY_TOKEN", "new-client-key")
+    models_file = tmp_path / "models.json"
+    models_file.write_text(json.dumps(catalog_document()), encoding="utf-8")
+
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(models_file=models_file))
+    replacement = catalog_document()
+    replacement["gateway"] = {
+        "api_key_env": "RELOADED_GATEWAY_TOKEN",
+        "session_strategy": "off",
+        "session_ttl_seconds": 30,
+        "max_sessions": 2,
+        "decision_log_size": 4,
+        "echo_requested_model": False,
+    }
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    assert request(app, "POST", "/v1/routing/reload").status_code == 200
+    active = app.state.jev_config
+    assert active.gateway_api_key == "new-client-key"
+    assert active.session_strategy == "off"
+    assert active.echo_requested_model is False
+    assert active.engine.store.ttl_seconds == 30
+    assert active.engine.store.max_sessions == 2
+    assert request(app, "GET", "/v1/models").status_code == 401
+    assert (
+        request(
+            app,
+            "GET",
+            "/v1/models",
+            headers={"Authorization": "Bearer new-client-key"},
+        ).status_code
+        == 200
+    )
+
+
+def test_reload_requires_the_gateway_key(tmp_path, monkeypatch) -> None:
+    models_file = tmp_path / "models.json"
+    models_file.write_text(json.dumps(catalog_document()), encoding="utf-8")
+
+    install_completion(monkeypatch)
+    app = gateway.create_app(
+        make_config(gateway_api_key="client-key", models_file=models_file)
+    )
+
+    assert request(app, "POST", "/v1/routing/reload").status_code == 401
+
+
+def test_each_model_uses_its_own_base_and_key(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    simple = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+    complex_request = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+        },
+    )
+
+    assert simple.headers["x-jev-route"] == SMALL_ID
+    assert complex_request.headers["x-jev-route"] == LARGE_ID
+    small_call = next(
+        call for call in calls if call["api_base"] == "https://small.example/v1"
+    )
+    large_call = next(
+        call for call in calls if call["api_base"] == "https://large.example/v1"
+    )
+    assert small_call["api_key"] == "test-key-small"
+    assert large_call["api_key"] == "test-key-large"
+
+
+def test_same_provider_models_share_connection_and_keep_their_upstream_model(
+    monkeypatch,
+) -> None:
+    calls = install_completion(monkeypatch)
+    document = single_route_document()
+    stronger = dict(document["models"][0])
+    stronger["upstream_model"] = "vendor/stronger"
+    document["models"].append(stronger)
+    document["policy"]["tier_models"] = {
+        "simple": ["test-provider/vendor/only"],
+        "standard": ["test-provider/vendor/only"],
+        "complex": ["test-provider/vendor/stronger"],
+    }
+    catalog = catalog_from_document(document, "test catalog")
+    clock = FakeClock()
+    app = gateway.create_app(
+        gateway.GatewayConfig(
+            engine=RoutingEngine(
+                catalog, MemorySessionStore(clock=clock), clock=clock
+            ),
+            gateway_api_key=None,
+            session_strategy="derived",
+        )
+    )
+
+    simple = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+    stronger_request = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "test-provider/vendor/stronger",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    assert simple.headers["x-jev-provider"] == "test-provider"
+    assert stronger_request.headers["x-jev-provider"] == "test-provider"
+    assert [call["api_base"] for call in calls] == [
+        "https://test.example/v1",
+        "https://test.example/v1",
+    ]
+    assert [call["api_key"] for call in calls] == ["test-route-key", "test-route-key"]
+    assert [call["model"] for call in calls] == [
+        "openai/vendor/only",
+        "openai/vendor/stronger",
+    ]
+
+
+def test_response_model_echoes_the_requested_name(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    implicit = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+    assert implicit.json()["model"] == "auto"
+    assert implicit.headers["x-jev-model"] == "vendor/small-model"
+
+    explicit = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": SMALL_ID,
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+    assert explicit.json()["model"] == SMALL_ID
+
+
+def test_response_model_can_keep_the_upstream_name(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(echo_requested_model=False))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    assert response.json()["model"] == "vendor/small-model"
+    assert response.headers["x-jev-model"] == "vendor/small-model"
+
+
+def test_streaming_echoes_the_requested_model(monkeypatch) -> None:
+    def completion(**kwargs):
+        return iter(
+            [
+                {
+                    "id": "chunk-1",
+                    "object": "chat.completion.chunk",
+                    "model": "vendor/small-model",
+                    "choices": [
+                        {"index": 0, "delta": {"content": "hi"}, "finish_reason": None}
+                    ],
+                }
+            ]
+        )
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    app = gateway.create_app(make_config())
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "stream": True,
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    chunk = json.loads(response.text.splitlines()[0].removeprefix("data: "))
+    assert chunk["model"] == "auto"
+    assert chunk["object"] == "chat.completion.chunk"
+
+
+def test_routing_reads_max_completion_tokens(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    default_budget = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+    large_budget = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "auto",
+            "messages": [{"role": "user", "content": "写一个排序函数。"}],
+            "max_completion_tokens": 5000,
+        },
+    )
+
+    assert default_budget.headers["x-jev-route"] == SMALL_ID
+    assert default_budget.headers["x-jev-reason"] == "first_turn_simple"
+    # The small route caps output at 2000 tokens, so a 5000 token budget routes up.
+    assert large_budget.headers["x-jev-route"] == LARGE_ID
+    assert large_budget.headers["x-jev-reason"] == "tier_fallback_complex"

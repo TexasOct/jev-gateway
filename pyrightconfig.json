@@ -1,0 +1,8 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [".", "tests"],
+  "pythonVersion": "3.10",
+  "include": ["jev_gateway", "tests"],
+  "exclude": ["**/__pycache__", ".venv"]
+}

@@ -1,0 +1,16 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+.env
+models.json
+jev-records.sqlite3*
+logs
+build
+dist
+*.egg-info
+.pi
+.agents
+.venv
