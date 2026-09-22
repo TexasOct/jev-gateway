@@ -12,6 +12,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from litellm import provider_list
+
 from jev_gateway.config import (
     TIER_ORDER,
     normalize_api_base,
@@ -112,17 +114,24 @@ class ProviderProfile:
     """One provider's reusable transport and credential configuration."""
 
     name: str
-    api_base: str
-    api_key_env: str
-    api_key: str = ""
+    type: str
+    api_base: str | None = None
+    api_key_env: str | None = None
+    api_key: str | None = None
+    params: Mapping[str, Any] = field(default_factory=dict, repr=False)
+    param_env: Mapping[str, str] = field(default_factory=dict)
+    resolved_params: Mapping[str, Any] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize provider configuration without its resolved secret."""
         return {
             "id": self.name,
+            "type": self.type,
             "api_base": self.api_base,
             "api_key_env": self.api_key_env,
             "has_api_key": bool(self.api_key),
+            "params": dict.fromkeys(self.params, "[configured]"),
+            "param_env": dict(self.param_env),
         }
 
 
@@ -134,8 +143,10 @@ class ModelProfile:
     provider: str
     model: str
     tags: tuple[str, ...] = ()
-    api_base: str = ""
-    api_key: str = ""
+    api_base: str | None = None
+    api_key: str | None = None
+    provider_type: str = "openai"
+    provider_params: Mapping[str, Any] = field(default_factory=dict, repr=False)
     priority: int = 100
     quality: float = 0.5
     context_window: int | None = None
@@ -177,6 +188,7 @@ class ModelProfile:
             "upstream_model": self.model,
             "tags": list(self.tags),
             "api_base": self.api_base,
+            "provider_type": self.provider_type,
             "has_api_key": bool(self.api_key),
             "priority": self.priority,
             "quality": self.quality,
@@ -758,23 +770,87 @@ def _resolve_api_key(api_key_env: str, subject: str) -> str:
 
 
 def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
-    """Build one provider transport definition from the catalog document."""
+    """Resolve a LiteLLM provider type and its configured completion arguments."""
     name = _required_text(item.get("id"), f"Provider entry {index} id")
     if "api_key" in item:
         raise ValueError(
             f"Provider {name!r} may not declare api_key. Use api_key_env instead."
         )
-    api_base = normalize_api_base(
-        _required_text(item.get("api_base"), f"Provider {name!r} api_base")
+    known_fields = {
+        "id", "type", "api_base", "api_key_env", "params", "param_env"
+    }
+    unknown_fields = set(item) - known_fields
+    if unknown_fields:
+        raise ValueError(
+            f"Provider {name!r} has unknown keys: "
+            f"{', '.join(sorted(unknown_fields))}. Use type to select LiteLLM."
+        )
+    provider_type = _required_text(item.get("type"), f"Provider {name!r} type")
+    if provider_type not in provider_list:
+        raise ValueError(
+            f"Provider {name!r} type {provider_type!r} is not supported by LiteLLM."
+        )
+
+    raw_params = item.get("params", {})
+    raw_param_env = item.get("param_env", {})
+    if not isinstance(raw_params, dict) or not isinstance(raw_param_env, dict):
+        raise TypeError(f"Provider {name!r} params and param_env must be objects.")
+    reserved = {"model", "messages", "stream", "api_base", "api_key"}
+    if any(
+        not isinstance(key, str) or not key.isidentifier()
+        for key in (set(raw_params) | set(raw_param_env))
+    ):
+        raise ValueError(
+            f"Provider {name!r} completion parameter names must be identifiers."
+        )
+    overlap = set(raw_params) & set(raw_param_env)
+    conflict = (set(raw_params) | set(raw_param_env)) & reserved
+    if overlap or conflict:
+        raise ValueError(
+            f"Provider {name!r} has duplicate or reserved completion parameters: "
+            f"{', '.join(sorted(overlap | conflict))}."
+        )
+    if any(
+        key.endswith(("_key", "_token", "_secret", "_credentials"))
+        or key in {"extra_headers", "headers", "authorization"}
+        for key in raw_params
+    ):
+        raise ValueError(f"Provider {name!r} credentials belong in param_env.")
+    params = dict(raw_params)
+    resolved_params = dict(params)
+    param_env: dict[str, str] = {}
+    for key, value in raw_param_env.items():
+        param_env[key] = _required_text(value, f"Provider {name!r} param_env.{key}")
+        resolved_params[key] = _resolve_api_key(
+            param_env[key], f"Provider {name!r} param_env.{key}"
+        )
+
+    api_base_value = item.get("api_base")
+    api_base = (
+        normalize_api_base(_required_text(api_base_value, f"Provider {name!r} api_base"))
+        if api_base_value is not None else None
     )
-    api_key_env = _required_text(
-        item.get("api_key_env"), f"Provider {name!r} api_key_env"
+    api_key_env_value = item.get("api_key_env")
+    api_key_env = (
+        _required_text(api_key_env_value, f"Provider {name!r} api_key_env")
+        if api_key_env_value is not None else None
     )
+    if api_key_env and "api_key" in raw_param_env:
+        raise ValueError(f"Provider {name!r} cannot declare api_key twice.")
+    api_key = _resolve_api_key(api_key_env, f"Provider {name!r}") if api_key_env else None
+    if provider_type == "openai" and (not api_base or not api_key):
+        raise ValueError(
+            f"Provider {name!r} type 'openai' requires api_base and api_key_env."
+        )
     return ProviderProfile(
         name=name,
+        type=provider_type,
         api_base=api_base,
         api_key_env=api_key_env,
-        api_key=_resolve_api_key(api_key_env, f"Provider {name!r}"),
+        api_key=api_key,
+        params=MappingProxyType(params),
+        param_env=MappingProxyType(param_env),
+        resolved_params=MappingProxyType(resolved_params),
     )
 
 
@@ -1660,6 +1736,8 @@ def _build_catalog(
             profile,
             api_base=provider_by_name[profile.provider].api_base,
             api_key=provider_by_name[profile.provider].api_key,
+            provider_type=provider_by_name[profile.provider].type,
+            provider_params=provider_by_name[profile.provider].resolved_params,
         )
         for profile in profiles
     ]

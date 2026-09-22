@@ -8,7 +8,8 @@ routed to a catalog model, not directly to an endpoint.
 
 The catalog has three layers:
 
-1. `providers` own reusable connections: `api_base` and `api_key_env`.
+1. `providers` declare a LiteLLM `type` plus the transport settings that type
+   needs. `id` names the JEV catalog entry and is independent of `type`.
 2. `models` name a provider and its exact `upstream_model`, then define model
    capabilities, limits, quality, cost, and scoped routing tags.
 3. `policy.labels` defines each strategy's ordered score boundaries. A label gets
@@ -41,11 +42,13 @@ unique.
   "providers": [
     {
       "id": "deepseek",
+      "type": "deepseek",
       "api_base": "https://api.deepseek.com/v1",
       "api_key_env": "JEV_DEEPSEEK_API_KEY"
     },
     {
       "id": "openai",
+      "type": "openai",
       "api_base": "https://claude.texasoct.tech/v1",
       "api_key_env": "JEV_OPENAI_API_KEY"
     }
@@ -88,8 +91,14 @@ unique.
 }
 ```
 
-Several models may reference one provider, so they share its endpoint and key
-without duplication. Tags use `/` as a scope separator and are matched exactly.
+Several models may reference one provider, so they share its transport settings
+without duplication. `type` is a LiteLLM provider prefix: `deepseek` uses its
+native adapter, while `openai` works with custom OpenAI-compatible endpoints.
+Optional `api_base`, `api_key_env`, `params`, and `param_env` supply the arguments
+LiteLLM needs. For example, Azure can specify `params.api_version` and Vertex AI
+can specify `params.vertex_project` and `params.vertex_location`; secret arguments
+belong in `param_env`. `type` does not change the catalog model ID. Tags use `/`
+as a scope separator and are matched exactly.
 For the default strategy, label `quick` resolves `default/quick`; label `critical`
 in strategy `quality` resolves `quality/critical`. A label may set `tag` to use a
 different exact tag. JEV filters the matching models by capabilities, context
@@ -111,14 +120,15 @@ process does not read fixed `JEV_API_BASE`, `JEV_API_KEY`, `JEV_ROUTES`,
 `JEV_MODELS_FILE`, route override, or policy override variables.
 
 `.env` contains only secrets whose names are explicitly declared as
-`api_key_env` in the catalog. The only production environment lookup is:
+`api_key_env` or in `providers[].param_env` in the catalog. Secret resolution
+uses only those declared environment-variable names:
 
 ```python
 os.getenv(api_key_env)
 ```
 
 `api_key` literals are rejected in both `providers` and `models`. The policy
-endpoint returns `api_key_env` and `has_api_key`, never the resolved secret.
+endpoint returns environment-variable names, never the resolved secrets.
 
 The optional `gateway.api_key_env` protects JEV's inbound HTTP API. It follows
 the same rule: JSON names the environment variable and `.env` supplies its

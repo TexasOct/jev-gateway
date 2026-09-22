@@ -197,6 +197,66 @@ def test_temperature_is_dropped_for_models_that_reject_it(monkeypatch) -> None:
     assert "temperature" not in calls[0]
 
 
+def test_deepseek_uses_native_litellm_provider(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    document = catalog_document()
+    document["providers"][0]["id"] = "deepseek-proxy"
+    document["providers"][0]["type"] = "deepseek"
+    document["models"][0]["provider"] = "deepseek-proxy"
+    document["models"][0]["capabilities"]["tools"] = True
+    document["policy"]["tier_models"]["simple"] = ["deepseek-proxy/vendor/small-model"]
+    document["policy"]["tier_models"]["standard"] = ["deepseek-proxy/vendor/small-model"]
+    config = make_config()
+    config.engine.reload_catalog(catalog_from_document(document, "test catalog"))
+    app = gateway.create_app(config)
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "deepseek-proxy/vendor/small-model",
+            "messages": [{"role": "user", "content": "Use a tool."}],
+            "tools": [
+                {"type": "function", "function": {
+                    "name": "ping", "parameters": {"type": "object", "properties": {}}
+                }}
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["model"] == "deepseek/vendor/small-model"
+    assert calls[0]["tools"]
+
+
+def test_provider_type_forwards_declared_completion_parameters(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    document = catalog_document()
+    provider = document["providers"][0]
+    provider.update({
+        "type": "azure",
+        "params": {"api_version": "2024-10-21"},
+        "param_env": {"azure_ad_token": "TEST_AZURE_TOKEN"},
+    })
+    del provider["api_key_env"]
+    monkeypatch.setenv("TEST_AZURE_TOKEN", "value-from-env")
+    config = make_config()
+    config.engine.reload_catalog(catalog_from_document(document, "test catalog"))
+
+    response = request(
+        gateway.create_app(config),
+        "POST", "/v1/chat/completions",
+        json={"model": SMALL_ID, "messages": [{"role": "user", "content": "Hi"}]},
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["model"] == "azure/vendor/small-model"
+    assert calls[0]["api_version"] == "2024-10-21"
+    assert calls[0]["azure_ad_token"] == "value-from-env"
+    assert "api_key" not in calls[0]
+
+
 def test_session_stays_on_its_model_across_turns(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = gateway.create_app(make_config())

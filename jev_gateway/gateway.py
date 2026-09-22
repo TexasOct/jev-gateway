@@ -164,10 +164,11 @@ def message_text(messages: list[dict[str, Any]]) -> str:
 def completion_payload(
     request: ChatCompletionRequest, profile: ModelProfile, decision: Decision
 ) -> dict[str, Any]:
-    """Forward OpenAI-compatible parameters with the routed upstream model.
+    """Build LiteLLM completion arguments from the selected catalog profile.
 
-    The catalog resolves each model's base URL and key, so this only has to inject
-    the routed values and drop parameters the selected model cannot accept.
+    The catalog resolves the provider type, optional transport arguments and
+    credentials. Model capabilities and routing policy control the remaining
+    request adjustments.
     """
     payload = request.model_dump(exclude_none=True)
     payload.pop("model", None)
@@ -175,11 +176,15 @@ def completion_payload(
     if not profile.capabilities.temperature:
         payload.pop("temperature", None)
     apply_reasoning_effort(payload, decision)
+    transport = dict(profile.provider_params)
+    if profile.api_base is not None:
+        transport["api_base"] = profile.api_base
+    if profile.api_key is not None:
+        transport["api_key"] = profile.api_key
     return {
         **payload,
-        "model": f"openai/{profile.model}",
-        "api_base": profile.api_base,
-        "api_key": profile.api_key or "unused",
+        **transport,
+        "model": f"{profile.provider_type}/{profile.model}",
         "stream": request.stream,
     }
 

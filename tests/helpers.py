@@ -14,11 +14,13 @@ CATALOG_DOCUMENT: dict[str, Any] = {
     "providers": [
         {
             "id": "small-provider",
+            "type": "openai",
             "api_base": "https://small.example/v1",
             "api_key_env": "TEST_SMALL_PROVIDER_KEY",
         },
         {
             "id": "large-provider",
+            "type": "openai",
             "api_base": "https://large.example/v1",
             "api_key_env": "TEST_LARGE_PROVIDER_KEY",
         },
@@ -126,6 +128,7 @@ def single_route_document(**route_overrides: Any) -> dict[str, Any]:
         "providers": [
             {
                 "id": "test-provider",
+                "type": "openai",
                 "api_base": "https://test.example/v1",
                 "api_key_env": "TEST_PROVIDER_KEY",
             }
@@ -153,6 +156,7 @@ def tier_one_document(**policy_overrides: Any) -> dict[str, Any]:
         "providers": [
             {
                 "id": "test-provider",
+                "type": "openai",
                 "api_base": "https://test.example/v1",
                 "api_key_env": "TEST_PROVIDER_KEY",
             }
