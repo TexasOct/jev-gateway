@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 RUN pip install --no-cache-dir uv
@@ -6,7 +6,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY jev_gateway ./jev_gateway
 RUN uv build --wheel
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 ENV HOME=/home/jev \
     JEV_GATEWAY_HOME=/home/jev/.jev-gateway \
