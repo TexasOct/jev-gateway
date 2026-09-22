@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from jev_gateway.sessions import (
     MemorySessionStore,
     SessionState,
@@ -71,6 +73,64 @@ def test_derived_session_is_stable_when_history_is_resent() -> None:
     assert resent == first
     assert derive_session_id(CONVERSATION, user="alice", strategy="derived") != first
     assert derive_session_id([{"role": "system", "content": "rules"}]) is None
+
+
+def test_store_mutate_creates_one_canonical_session_concurrently() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(clock=clock)
+    barrier = threading.Barrier(3)
+    states: list[SessionState] = []
+    states_lock = threading.Lock()
+
+    def mutate(route: str) -> None:
+        barrier.wait()
+        state = store.mutate(
+            "same",
+            lambda current: current.events.append({"route": route}),
+            factory=lambda: make_state("same", clock()),
+        )
+        assert state is not None
+        with states_lock:
+            states.append(state)
+
+    threads = [threading.Thread(target=mutate, args=(route,)) for route in ("a", "b")]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    canonical = store.get("same")
+    assert canonical is not None
+    assert states[0] is states[1] is canonical
+    assert {event["route"] for event in canonical.events} == {"a", "b"}
+
+
+def test_concurrent_expired_session_reads_do_not_raise() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(ttl_seconds=1, clock=clock)
+    store.put(make_state("same", clock()))
+    clock.advance(2)
+    barrier = threading.Barrier(3)
+    errors: list[BaseException] = []
+    errors_lock = threading.Lock()
+
+    def read_expired() -> None:
+        barrier.wait()
+        try:
+            assert store.get("same") is None
+        except BaseException as error:
+            with errors_lock:
+                errors.append(error)
+
+    threads = [threading.Thread(target=read_expired) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert errors == []
 
 
 def test_store_expires_sessions_after_the_ttl() -> None:

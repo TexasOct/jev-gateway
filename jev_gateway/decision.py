@@ -10,7 +10,6 @@ decision evidence, and the upstream outcome is delegated to a
 
 from __future__ import annotations
 
-import copy
 import logging
 import time
 import uuid
@@ -29,6 +28,7 @@ from jev_gateway.records import (
     RecordStore,
     RequestMeta,
     RequestRecord,
+    build_config_hash,
 )
 from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.signals import RequestSignals, extract_signals
@@ -42,7 +42,6 @@ from jev_gateway.strategy import (
 __all__ = [
     "Decision",
     "RoutingEngine",
-    "StorageUnavailableError",
     "UnknownModelError",
     "UnknownStrategyError",
 ]
@@ -55,10 +54,6 @@ DECISION_LOG_SIZE = 500
 
 class UnknownModelError(ValueError):
     """Raised when a client names a model that is not in the catalog."""
-
-
-class StorageUnavailableError(RuntimeError):
-    """Raised when an enabled record store cannot persist routing evidence."""
 
 
 @dataclass(frozen=True)
@@ -192,6 +187,10 @@ class RoutingEngine:
         self._store(lambda: self.record_store.record_request(record), "request")
         return signals
 
+    def record_invalid_request(self, record: RequestRecord) -> None:
+        """Queue an invalid request record without affecting the HTTP response."""
+        self._store(lambda: self.record_store.record_request(record), "invalid_request")
+
     # Routing
 
     def decide(
@@ -222,13 +221,13 @@ class RoutingEngine:
             if manual is None:
                 raise UnknownModelError(requested_model)
 
-        session = self.store.get(session_id) if session_id else None
-        # The strategy contract forbids mutation. SessionState is mutable, so hand
-        # the strategy a detached copy and keep the live store object untouched.
+        session = self.store.copy(session_id) if session_id else None
+        # The store returns a detached snapshot, so strategy code cannot mutate the
+        # canonical session shared with concurrent requests.
         outcome = strategy_impl.decide(
             RoutingRequest(
                 signals=signals,
-                session=copy.deepcopy(session) if session is not None else None,
+                session=session,
                 manual=manual,
                 turn_index=signals.turn_index,
                 now=self._clock(),
@@ -291,12 +290,12 @@ class RoutingEngine:
             if manual is None:
                 raise UnknownModelError(requested_model)
 
-        session = self.store.get(session_id) if session_id else None
-        # Preview must not touch the live session object either.
+        session = self.store.copy(session_id) if session_id else None
+        # Preview receives a detached snapshot and cannot touch live state.
         outcome = strategy_impl.decide(
             RoutingRequest(
                 signals=signals,
-                session=copy.deepcopy(session) if session is not None else None,
+                session=session,
                 manual=manual,
                 turn_index=signals.turn_index,
                 now=self._clock(),
@@ -378,31 +377,28 @@ class RoutingEngine:
 
         if decision.session_id is None:
             return
-        state = self.store.get(decision.session_id)
-        if state is None:
-            return
+        def update(state: SessionState) -> None:
+            if ok:
+                state.consecutive_failures = 0
+            else:
+                state.consecutive_failures += 1
+            if ok and finish_reason == "length":
+                state.consecutive_truncations += 1
+            elif ok:
+                state.consecutive_truncations = 0
 
-        if ok:
-            state.consecutive_failures = 0
-        else:
-            state.consecutive_failures += 1
-        if ok and finish_reason == "length":
-            state.consecutive_truncations += 1
-        elif ok:
-            state.consecutive_truncations = 0
+            if profile is not None and has_usage:
+                state.cost_usd += profile.estimated_cost(
+                    prompt_tokens or 0, completion_tokens or 0
+                )
 
-        if profile is not None and has_usage:
-            state.cost_usd += profile.estimated_cost(
-                prompt_tokens or 0, completion_tokens or 0
-            )
+            score = decision.signals.get("score")
+            if isinstance(score, (int, float)) and not isinstance(score, bool):
+                state.recent_scores.append(coerce_float(score))
+                del state.recent_scores[:-RECENT_SCORE_LIMIT]
+            state.updated_at = self._clock()
 
-        score = decision.signals.get("score")
-        if isinstance(score, (int, float)) and not isinstance(score, bool):
-            state.recent_scores.append(coerce_float(score))
-            del state.recent_scores[:-RECENT_SCORE_LIMIT]
-
-        state.updated_at = self._clock()
-        self.store.put(state)
+        self.store.mutate(decision.session_id, update)
 
     # Retrieval and maintenance
 
@@ -417,17 +413,27 @@ class RoutingEngine:
         """Return the stored session state for inspection."""
         return self.store.snapshot(session_id)
 
-    def reload_catalog(self, catalog: Catalog, source: str | None = None) -> None:
-        """Swap in a freshly loaded catalog, keeping the session store intact.
+    def prepare_catalog_reload(self, catalog: Catalog) -> StrategyRegistry:
+        """Validate a candidate catalog and construct its strategy registry."""
+        catalog.validate()
+        return StrategyRegistry.from_catalog(catalog)
+
+    def reload_catalog(
+        self,
+        catalog: Catalog,
+        source: str | None = None,
+        *,
+        registry: StrategyRegistry | None = None,
+    ) -> None:
+        """Swap in a prevalidated catalog, keeping the session store intact.
 
         Running sessions survive: one whose route disappeared falls back to a fresh
         first-turn decision. An invalid catalog raises and leaves the active one alone.
         """
-        catalog.validate()
-        registry = StrategyRegistry.from_catalog(catalog)
+        prepared = registry or self.prepare_catalog_reload(catalog)
         config_hash = self._register_config(catalog, source=source)
         self.catalog = catalog
-        self.strategies = registry
+        self.strategies = prepared
         self.config_hash = config_hash
         if source is not None:
             self.config_source = source
@@ -452,24 +458,25 @@ class RoutingEngine:
 
     def _register_config(self, catalog: Catalog, source: str | None = None) -> str:
         active_source = source if source is not None else self.config_source
+        snapshot = catalog.routing_snapshot()
         try:
-            return self.record_store.register_config(
-                catalog.routing_snapshot(), active_source
-            )
+            return self.record_store.register_config(snapshot, active_source)
         except Exception as error:
-            raise StorageUnavailableError(
-                f"Routing storage could not register the configuration: {error}"
-            ) from error
+            logger.warning(
+                "routing record dropped",
+                extra={"record_kind": "config", "error_type": type(error).__name__},
+            )
+            return build_config_hash(snapshot)
 
     def _store(self, write: Callable[[], None], label: str) -> None:
-        """Run one storage write, converting any failure into a 503 signal."""
+        """Submit one best-effort record without affecting routing or responses."""
         try:
             write()
         except Exception as error:
-            logger.error("routing storage %s write failed error=%s", label, error)
-            raise StorageUnavailableError(
-                f"Routing storage could not persist the {label} record: {error}"
-            ) from error
+            logger.warning(
+                "routing record dropped",
+                extra={"record_kind": label, "error_type": type(error).__name__},
+            )
 
     def _record_decision(self, decision: Decision) -> None:
         record = DecisionRecord(
@@ -574,49 +581,53 @@ class RoutingEngine:
         )
 
     def _persist(self, decision: Decision, session: SessionState | None) -> None:
+        del session
         if decision.session_id is None:
             return
         now = self._clock()
-        state = session
-        if state is None:
-            state = SessionState(
-                session_id=decision.session_id,
+
+        def create() -> SessionState:
+            return SessionState(
+                session_id=decision.session_id or "",
                 route=decision.route_name,
                 tier=decision.tier,
                 created_at=now,
                 updated_at=now,
                 switched_at=now,
             )
-        if decision.switched_from is not None:
-            state.switch_count += 1
-            state.switched_at_turn = decision.turn_index
-            state.switched_at = now
+
+        def update(state: SessionState) -> None:
+            if decision.switched_from is not None:
+                state.switch_count += 1
+                state.switched_at_turn = decision.turn_index
+                state.switched_at = now
+                state.record_event(
+                    {
+                        "type": "switch",
+                        "from": decision.switched_from,
+                        "to": decision.route_name,
+                        "reason": decision.reason,
+                        "turn": decision.turn_index,
+                        "decision_id": decision.decision_id,
+                    }
+                )
+            state.route = decision.route_name
+            state.tier = decision.tier
+            state.strategy = decision.strategy
+            state.turn_count = max(state.turn_count, decision.turn_index, 1)
+            state.updated_at = now
             state.record_event(
                 {
-                    "type": "switch",
-                    "from": decision.switched_from,
-                    "to": decision.route_name,
+                    "type": "decision",
+                    "route": decision.route_name,
+                    "tier": decision.tier,
+                    "strategy": decision.strategy,
                     "reason": decision.reason,
+                    "mode": decision.mode,
                     "turn": decision.turn_index,
+                    "score": decision.signals.get("score"),
                     "decision_id": decision.decision_id,
                 }
             )
-        state.route = decision.route_name
-        state.tier = decision.tier
-        state.strategy = decision.strategy
-        state.turn_count = max(state.turn_count, decision.turn_index, 1)
-        state.updated_at = now
-        state.record_event(
-            {
-                "type": "decision",
-                "route": decision.route_name,
-                "tier": decision.tier,
-                "strategy": decision.strategy,
-                "reason": decision.reason,
-                "mode": decision.mode,
-                "turn": decision.turn_index,
-                "score": decision.signals.get("score"),
-                "decision_id": decision.decision_id,
-            }
-        )
-        self.store.put(state)
+
+        self.store.mutate(decision.session_id, update, factory=create)

@@ -6,13 +6,13 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from jev_gateway.records import RecordStore
 from jev_gateway.sessions import SessionState
 
 from .base import (
     ConversationAdapter,
     ResponseCapture,
     assistant_continuations,
-    save_assistant_continuation,
 )
 
 _REASONING_CONTENT = "reasoning_content"
@@ -42,9 +42,10 @@ class DeepSeekConversationAdapter(ConversationAdapter):
         self,
         messages: list[dict[str, Any]],
         session: SessionState | None,
+        store: RecordStore | None = None,
     ) -> list[dict[str, Any]]:
         prepared = deepcopy(messages)
-        matched = assistant_continuations(session, prepared)
+        matched = assistant_continuations(session, prepared, store)
         for index, message in enumerate(prepared):
             if message.get("role") != "assistant":
                 continue
@@ -56,7 +57,12 @@ class DeepSeekConversationAdapter(ConversationAdapter):
             if continuation is None:
                 continue
             origin = continuation["provider_type"]
-            cached = continuation.get(_REASONING_CONTENT)
+            payload = continuation.get("payload")
+            cached = (
+                payload.get(_REASONING_CONTENT)
+                if isinstance(payload, Mapping)
+                else None
+            )
             if origin == self.provider_type and cached:
                 message[_REASONING_CONTENT] = cached
             elif origin != self.provider_type:
@@ -65,8 +71,12 @@ class DeepSeekConversationAdapter(ConversationAdapter):
                 message[_REASONING_CONTENT] = _CROSS_PROVIDER_PLACEHOLDER
         return prepared
 
-    def capture_response(self, session: SessionState | None) -> ResponseCapture:
-        return _DeepSeekResponseCapture(self, session)
+    def capture_response(
+        self,
+        session: SessionState | None,
+        store: RecordStore | None = None,
+    ) -> ResponseCapture:
+        return _DeepSeekResponseCapture(self, session, store)
 
 
 class _DeepSeekResponseCapture(ResponseCapture):
@@ -74,8 +84,9 @@ class _DeepSeekResponseCapture(ResponseCapture):
         self,
         adapter: DeepSeekConversationAdapter,
         session: SessionState | None,
+        store: RecordStore | None = None,
     ) -> None:
-        super().__init__(adapter.provider_type, session)
+        super().__init__(adapter.provider_type, session, store)
         self.reasoning: list[str] = []
 
     def observe(self, response: Mapping[str, Any]) -> None:
@@ -89,13 +100,9 @@ class _DeepSeekResponseCapture(ResponseCapture):
         if reasoning is not None:
             self.reasoning.append(reasoning)
 
-    def _save(self, message: Mapping[str, Any]) -> None:
-        save_assistant_continuation(
-            self.session,
-            message,
-            self.provider_type,
-            reasoning_content=_reasoning_content(message),
-        )
+    def continuation_payload(self, message: Mapping[str, Any]) -> dict[str, Any]:
+        reasoning = _reasoning_content(message)
+        return {_REASONING_CONTENT: reasoning} if reasoning else {}
 
     def finish(self) -> None:
         if self.complete:

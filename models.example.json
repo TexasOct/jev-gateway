@@ -1,9 +1,12 @@
 {
   "gateway": {
-    "session_ttl_seconds": 7200
+    "session_ttl_seconds": 7200,
+    "log_format": "pretty"
   },
   "storage": {
-    "enabled": true
+    "enabled": true,
+    "max_continuations_per_session": 40,
+    "max_continuation_sessions": 2048
   },
   "jev": {
     "enabled": false,

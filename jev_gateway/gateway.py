@@ -6,7 +6,7 @@ import hmac
 import json
 import logging
 import os
-import sqlite3
+import threading
 import time
 import warnings
 from collections.abc import Iterator
@@ -28,13 +28,18 @@ from jev_gateway.config import coerce_int
 from jev_gateway.decision import (
     Decision,
     RoutingEngine,
-    StorageUnavailableError,
     UnknownModelError,
     UnknownStrategyError,
 )
-from jev_gateway.reasoning import leaves_payload_alone
-from jev_gateway.records import RequestMeta, RequestRecord, record_store_from_settings
 from jev_gateway.provider import adapter_for
+from jev_gateway.reasoning import leaves_payload_alone
+from jev_gateway.records import (
+    RecordStore,
+    RequestMeta,
+    RequestRecord,
+    StorageUnavailableError,
+    record_store_from_settings,
+)
 from jev_gateway.sessions import (
     SESSION_HEADER,
     MemorySessionStore,
@@ -121,18 +126,25 @@ def runtime_directory() -> Path:
     return Path(configured).expanduser() if configured else Path.cwd()
 
 
+def _resolve_storage_path(catalog: Any, models_file: Path):
+    storage_path = Path(catalog.storage.path)
+    if not catalog.storage.enabled or storage_path.is_absolute():
+        return catalog
+    return replace(
+        catalog,
+        storage=replace(
+            catalog.storage,
+            path=str((models_file.parent / storage_path).resolve()),
+        ),
+    )
+
+
 def load_gateway_config(models_file: Path | None = None) -> GatewayConfig:
     """Build the gateway configuration from the selected catalog file."""
     path = models_file or runtime_directory() / "models.json"
     path = path.expanduser().resolve()
     load_dotenv(path.parent / ".env", override=True)
-    catalog = load_catalog(path)
-    storage_path = Path(catalog.storage.path)
-    if not storage_path.is_absolute():
-        catalog = replace(
-            catalog,
-            storage=replace(catalog.storage, path=str(path.parent / storage_path)),
-        )
+    catalog = _resolve_storage_path(load_catalog(path), path)
     settings: GatewaySettings = catalog.gateway
     return GatewayConfig(
         engine=RoutingEngine(
@@ -174,6 +186,7 @@ def completion_payload(
     profile: ModelProfile,
     decision: Decision,
     session: SessionState | None = None,
+    continuation_store: RecordStore | None = None,
 ) -> dict[str, Any]:
     """Build LiteLLM completion arguments from the selected catalog profile.
 
@@ -185,7 +198,7 @@ def completion_payload(
     payload.pop("model", None)
     payload.pop("stream", None)
     payload["messages"] = adapter_for(profile.provider_type).prepare_messages(
-        payload["messages"], session
+        payload["messages"], session, continuation_store
     )
     if not profile.capabilities.temperature:
         payload.pop("temperature", None)
@@ -247,21 +260,6 @@ def decision_headers(decision: Decision) -> dict[str, str]:
     if not leaves_payload_alone(decision.reasoning_effort_source):
         headers["X-JEV-Reasoning-Source"] = decision.reasoning_effort_source
     return headers
-
-
-def storage_unavailable(error: Exception) -> HTTPException:
-    """Report that enabled routing storage could not persist this turn."""
-    return HTTPException(
-        status_code=503,
-        detail={
-            "error": {
-                "message": f"Routing storage is unavailable: {error}",
-                "type": "server_error",
-                "param": None,
-                "code": "storage_unavailable",
-            }
-        },
-    )
 
 
 def resolve_strategy_name(
@@ -390,6 +388,7 @@ def error_body(
 def create_app(config: GatewayConfig | None = None) -> FastAPI:
     """Create the gateway app. Supplying a config makes the app easy to test."""
     active = config or load_gateway_config()
+    reload_lock = threading.Lock()
     app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0")
     app.state.jev_config = active
 
@@ -441,7 +440,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     strategy=active.session_strategy,
                 )
                 requested_model = body.get("model")
-                active.engine.record_store.record_request(RequestRecord(
+                active.engine.record_invalid_request(RequestRecord(
                     request_id=active.engine.new_request_id(),
                     received_at=time.time(),
                     session_id=session_id,
@@ -467,24 +466,19 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             except (JSONDecodeError, UnicodeDecodeError):
                 # Invalid JSON still needs a record. Store the raw body as text,
                 # subject to the configured capture_content switch.
-                try:
-                    raw = await request.body()
-                    text = raw.decode("utf-8", errors="replace")
-                    active.engine.record_store.record_request(RequestRecord(
-                        request_id=active.engine.new_request_id(), received_at=time.time(),
-                        session_id=None, requested_strategy=requested_strategy,
-                        requested_model=None, endpoint=request.url.path,
-                        client=request.client.host if request.client else None,
-                        user_agent=request.headers.get("user-agent"), stream=False,
-                        max_tokens=None, tools=None, response_format=None,
-                        messages={"raw_body": text}, prompt=text, prompt_chars=len(text),
-                        prompt_tokens=estimate_tokens(text), conversation_tokens=estimate_tokens(text),
-                        turn_index=0, has_tools=False, has_vision=False, wants_json=False,
-                    ))
-                except (OSError, RuntimeError, sqlite3.Error) as storage_error:
-                    return JSONResponse(status_code=503, content=storage_unavailable(storage_error).detail)
-            except (OSError, RuntimeError, sqlite3.Error) as storage_error:
-                return JSONResponse(status_code=503, content=storage_unavailable(storage_error).detail)
+                raw = await request.body()
+                text = raw.decode("utf-8", errors="replace")
+                active.engine.record_invalid_request(RequestRecord(
+                    request_id=active.engine.new_request_id(), received_at=time.time(),
+                    session_id=None, requested_strategy=requested_strategy,
+                    requested_model=None, endpoint=request.url.path,
+                    client=request.client.host if request.client else None,
+                    user_agent=request.headers.get("user-agent"), stream=False,
+                    max_tokens=None, tools=None, response_format=None,
+                    messages={"raw_body": text}, prompt=text, prompt_chars=len(text),
+                    prompt_tokens=estimate_tokens(text), conversation_tokens=estimate_tokens(text),
+                    turn_index=0, has_tools=False, has_vision=False, wants_json=False,
+                ))
         failures = error.errors()
         first = failures[0] if failures else {}
         # loc entries can be field names or offsets; only names belong in param.
@@ -594,7 +588,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             strategy=active.session_strategy,
         )
         session = (
-            active.engine.store.get(session_id) if session_id is not None else None
+            active.engine.store.copy(session_id) if session_id is not None else None
         )
         chosen, explicit, routed_model = resolve_strategy_name(
             active.engine,
@@ -660,9 +654,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     }
                 },
             ) from error
-        except StorageUnavailableError as error:
-            raise storage_unavailable(error) from error
-
     @app.post("/v1/routing/reload", response_model=None)
     def reload_routing(
         authorization: str | None = Header(default=None),
@@ -671,7 +662,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         require_gateway_key(active.gateway_api_key, authorization)
         try:
             load_dotenv(active.models_file.parent / ".env", override=True)
-            catalog = load_catalog(active.models_file)
+            catalog = _resolve_storage_path(
+                load_catalog(active.models_file), active.models_file
+            )
         except (TypeError, ValueError, RuntimeError) as error:
             raise HTTPException(
                 status_code=400,
@@ -685,10 +678,66 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 },
             ) from error
         try:
-            active.engine.reload_catalog(catalog, source=str(active.models_file))
+            registry = active.engine.prepare_catalog_reload(catalog)
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {
+                        "message": f"Reload rejected: {error}",
+                        "type": "invalid_request_error",
+                        "param": None,
+                        "code": "invalid_configuration",
+                    }
+                },
+            ) from error
+        try:
+            active.engine.record_store.validate_reconfiguration(catalog.storage)
         except StorageUnavailableError as error:
-            raise storage_unavailable(error) from error
-        active.apply_settings(catalog.gateway)
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": {
+                        "message": f"Reload rejected: {error}",
+                        "type": "server_error",
+                        "param": "storage",
+                        "code": "storage_unavailable",
+                    }
+                },
+            ) from error
+        except ValueError as error:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {
+                        "message": f"Reload rejected: {error}",
+                        "type": "invalid_request_error",
+                        "param": "storage",
+                        "code": "restart_required",
+                    }
+                },
+            ) from error
+        with reload_lock:
+            try:
+                active.engine.record_store.reconfigure(catalog.storage)
+            except StorageUnavailableError as error:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "error": {
+                            "message": f"Reload rejected: {error}",
+                            "type": "server_error",
+                            "param": "storage",
+                            "code": "storage_unavailable",
+                        }
+                    },
+                ) from error
+            active.engine.reload_catalog(
+                catalog,
+                source=str(active.models_file),
+                registry=registry,
+            )
+            active.apply_settings(catalog.gateway)
         return {
             "reloaded": True,
             "models_file": str(active.models_file),
@@ -751,7 +800,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             strategy=active.session_strategy,
         )
         session = (
-            active.engine.store.get(session_id) if session_id is not None else None
+            active.engine.store.copy(session_id) if session_id is not None else None
         )
         chosen_strategy, explicit, routed_model = resolve_strategy_name(
             active.engine,
@@ -767,25 +816,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         request_id = active.engine.new_request_id()
         # The raw request is stored before routing validates anything, so unknown
         # models and strategies still leave a request row.
-        try:
-            active.engine.record_request(
-                request_id=request_id,
-                session_id=session_id,
-                meta=RequestMeta(
-                    endpoint=str(http_request.url.path),
-                    client=http_request.client.host if http_request.client else None,
-                    user_agent=http_request.headers.get("user-agent"),
-                    stream=body.stream,
-                    requested_strategy=chosen_strategy,
-                ),
-                messages=body.messages,
-                requested_model=routed_model,
-                max_tokens=output_budget,
-                tools=body.tools,
-                response_format=body.response_format,
-            )
-        except StorageUnavailableError as error:
-            raise storage_unavailable(error) from error
+        active.engine.record_request(
+            request_id=request_id,
+            session_id=session_id,
+            meta=RequestMeta(
+                endpoint=str(http_request.url.path),
+                client=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
+                stream=body.stream,
+                requested_strategy=chosen_strategy,
+            ),
+            messages=body.messages,
+            requested_model=routed_model,
+            max_tokens=output_budget,
+            tools=body.tools,
+            response_format=body.response_format,
+        )
 
         if explicit and not active.engine.strategies.has(chosen_strategy):
             raise unknown_strategy_error(active.engine, chosen_strategy)
@@ -820,9 +866,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             ) from error
         except UnknownStrategyError as error:
             raise unknown_strategy_error(active.engine, error.name) from error
-        except StorageUnavailableError as error:
-            raise storage_unavailable(error) from error
-
         profile = active.engine.catalog.by_name(decision.route_name)
         if profile is None:
             raise HTTPException(
@@ -869,22 +912,25 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             from litellm import completion
 
             response = completion(
-                **completion_payload(body, profile, decision, session)
+                **completion_payload(
+                    body,
+                    profile,
+                    decision,
+                    session,
+                    active.engine.record_store,
+                )
             )
         except HTTPException:
             raise
         except Exception as error:
             latency_ms = (time.perf_counter() - started) * 1000
-            try:
-                active.engine.record_outcome(
-                    decision,
-                    ok=False,
-                    latency_ms=latency_ms,
-                    error_type=type(error).__name__,
-                    error_message=str(error),
-                )
-            except StorageUnavailableError as storage_error:
-                raise storage_unavailable(storage_error) from error
+            active.engine.record_outcome(
+                decision,
+                ok=False,
+                latency_ms=latency_ms,
+                error_type=type(error).__name__,
+                error_message=str(error),
+            )
             logger.warning(
                 "routing failed",
                 extra={
@@ -910,7 +956,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
 
         headers = decision_headers(decision)
         echoed_model = body.model if active.echo_requested_model else None
-        response_capture = adapter_for(profile.provider_type).capture_response(session)
+        response_capture = adapter_for(profile.provider_type).capture_response(
+            session, active.engine.record_store
+        )
         if body.stream:
             logger.debug(
                 "routing stream started",
@@ -946,33 +994,24 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     raise
                 finally:
                     response_capture.finish()
-                    try:
-                        active.engine.record_outcome(
-                            decision,
-                            ok=ok,
-                            latency_ms=(time.perf_counter() - started) * 1000,
-                            error_type=error_type,
-                        )
-                        if ok:
-                            logger.info(
-                                "routing served",
-                                extra={
-                                    "decision_id": decision.decision_id,
-                                    "provider": decision.provider,
-                                    "model": decision.model,
-                                    "ok": True,
-                                    "latency_ms": round(
-                                        (time.perf_counter() - started) * 1000, 2
-                                    ),
-                                },
-                            )
-                    except StorageUnavailableError as storage_error:
-                        # The response has already started, so this cannot become a
-                        # 503; record the loss loudly instead of dropping it.
-                        logger.error(
-                            "routing storage lost a stream outcome %s",
-                            storage_error,
-                            extra={"decision_id": decision.decision_id},
+                    active.engine.record_outcome(
+                        decision,
+                        ok=ok,
+                        latency_ms=(time.perf_counter() - started) * 1000,
+                        error_type=error_type,
+                    )
+                    if ok:
+                        logger.info(
+                            "routing served",
+                            extra={
+                                "decision_id": decision.decision_id,
+                                "provider": decision.provider,
+                                "model": decision.model,
+                                "ok": True,
+                                "latency_ms": round(
+                                    (time.perf_counter() - started) * 1000, 2
+                                ),
+                            },
                         )
 
             return StreamingResponse(
@@ -989,19 +1028,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             # OpenAI echoes the requested model; the resolved one stays in X-JEV-Model.
             result_body["model"] = echoed_model
         usage = result_body.get("usage")
-        try:
-            active.engine.record_outcome(
-                decision,
-                ok=True,
-                finish_reason=finish_reason(result_body),
-                usage=usage if isinstance(usage, dict) else None,
-                latency_ms=(time.perf_counter() - started) * 1000,
-                returned_model=(
-                    upstream_model if isinstance(upstream_model, str) else None
-                ),
-            )
-        except StorageUnavailableError as error:
-            raise storage_unavailable(error) from error
+        active.engine.record_outcome(
+            decision,
+            ok=True,
+            finish_reason=finish_reason(result_body),
+            usage=usage if isinstance(usage, dict) else None,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            returned_model=(
+                upstream_model if isinstance(upstream_model, str) else None
+            ),
+        )
         logger.info(
             "routing served",
             extra={
@@ -1037,7 +1073,10 @@ def run_gateway() -> None:
         port=settings.port,
         log_level=settings.logging.level.lower(),
         access_log=settings.logging.access_log,
-        log_config=uvicorn_log_config(settings.logging.level),
+        log_config=uvicorn_log_config(
+            settings.logging.level,
+            settings.logging.output_format,
+        ),
     )
 
 

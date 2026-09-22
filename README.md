@@ -138,11 +138,12 @@ value.
 
 The optional `gateway` object has `host`, `port`, `api_key_env`,
 `session_strategy`, `session_ttl_seconds`, `max_sessions`, `decision_log_size`,
-`echo_requested_model`, `logging_level`, and `access_log`. Host, port, and logging
+`echo_requested_model`, `logging_level`, `log_format`, and `access_log`. Host, port, and logging
 settings apply when the process starts; the other gateway settings apply after a
 successful reload. By default, `jev-gateway` logs routing decisions and outcomes
-at INFO with module names and request IDs, and skips per-request Uvicorn access
-lines. Set `gateway.access_log` to `true` for HTTP request lines, or
+at INFO in grouped, multi-line `pretty` format and skips per-request Uvicorn access
+lines. Set `gateway.log_format` to `json` for one JSON object per log event, or
+to `compact` for single-line `key=value` output. Set `gateway.access_log` to `true` for HTTP request lines, or
 `gateway.logging_level` to `DEBUG` for stream-start and traceback details.
 LiteLLM's provider-list debug print is disabled; warnings remain visible. Uvicorn's
 lifecycle logger is displayed as `uvicorn`, not `uvicorn.error`; terminal output
@@ -313,6 +314,8 @@ The optional top-level `storage` object controls the SQLite record store:
     "path": "jev-records.sqlite3",
     "capture_content": true,
     "max_requests": null,
+    "max_continuations_per_session": 40,
+    "max_continuation_sessions": 2048,
     "busy_timeout_ms": 5000,
     "queue_size": 4096
   }
@@ -320,20 +323,30 @@ The optional top-level `storage` object controls the SQLite record store:
 ```
 
 When enabled, the gateway queues the inbound request, decision evidence,
-upstream outcome, and active config snapshot. A dedicated `jev-record-writer`
+upstream outcome, active config snapshot, and provider continuation metadata. A dedicated `jev-record-writer`
 thread performs all SQLite I/O. Request threads enqueue without waiting for disk;
-`queue_size` is bounded (default 4096) and a full queue returns
-`503 storage_unavailable`. `record_store.flush()` waits for queued writes to
-commit; `close()` drains the queue on orderly shutdown. A successful enqueue
-does not guarantee persistence if the process crashes before the writer commits.
-Worker errors appear in `/healthz` as `storage.error` and reject new submissions.
-A stream outcome failure after headers were sent can only be logged.
+`queue_size` is bounded (default 4096). A full queue or failed writer drops the
+record and writes a structured warning; neither case changes the gateway
+response. `record_store.flush()` waits for queued writes to commit; `close()`
+drains the queue on orderly shutdown. A successful enqueue does not guarantee
+persistence if the process crashes before the writer commits. Worker errors
+appear in `/healthz` as `storage.error`. A stream outcome follows the same
+best-effort rule.
 
 `capture_content: false` stores a prompt digest and signal counts instead of
-prompt text. `max_requests: null` keeps all records; setting a number opts into
-pruning. The gateway also queues malformed JSON and requests rejected by
-Pydantic, but requests rejected before the handler for authorization are not
-stored.
+prompt text. `max_requests: null` keeps all request records; setting a number opts
+into pruning. Provider continuation rows contain a session ID, an assistant
+message hash, the source provider type, and an opaque provider-owned JSON payload.
+They do not contain the public assistant message, tool arguments, or prompt.
+`max_continuations_per_session` and `max_continuation_sessions` bound this state.
+Provider adapters decide how to capture and restore their payload, which lets the
+same store support DeepSeek reasoning content and future provider signatures
+without provider-specific gateway code. All `storage` settings are process-start
+settings. `/v1/routing/reload` rejects storage changes with `restart_required`;
+restart the gateway to apply retention, path, queue, or capture changes. The
+gateway also queues malformed JSON
+and requests rejected by Pydantic, but requests rejected before the handler for
+authorization are not stored.
 
 ## Run
 
