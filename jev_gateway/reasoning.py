@@ -113,7 +113,11 @@ def derive_effort(
         return policy.on_user_correction
     if policy.on_reasoning_request and signals.reasoning_requested:
         return policy.on_reasoning_request
-    by_tier = policy.effort_by_tier.get(signals.tier if tier is None else tier)
+    label = signals.tier if tier is None else tier
+    by_label = getattr(policy, "effort_by_label", {}).get(label)
+    if by_label:
+        return by_label
+    by_tier = policy.effort_by_tier.get(label)
     if by_tier:
         return by_tier
     return policy.fallback

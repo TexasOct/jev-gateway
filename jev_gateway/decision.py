@@ -87,6 +87,10 @@ class Decision:
     signals: dict[str, Any]
     created_at: float
 
+    @property
+    def label(self) -> str:
+        return self.tier
+
     def as_dict(self) -> dict[str, Any]:
         """Serialize the decision for the decision-log endpoint."""
         return {
@@ -97,6 +101,7 @@ class Decision:
             "route": self.route_name,
             "provider": self.provider,
             "model": self.model,
+            "label": self.label,
             "tier": self.tier,
             "reason": self.reason,
             "mode": self.mode,
@@ -315,6 +320,7 @@ class RoutingEngine:
             "route": outcome.model,
             "provider": profile.provider,
             "upstream_model": profile.model,
+            "label": outcome.tier,
             "tier": outcome.tier,
             "reason": outcome.reason,
             "mode": outcome.mode,
@@ -513,6 +519,13 @@ class RoutingEngine:
         """
         policy = getattr(strategy_impl, "policy", None)
         reasoning = policy.reasoning if policy is not None else self.catalog.policy.reasoning
+        active_policy = policy if policy is not None else self.catalog.policy
+        configured = active_policy.labels.get(tier)
+        if configured is not None and configured.reasoning_effort is not None:
+            from dataclasses import replace
+            reasoning = replace(reasoning, effort_by_label={
+                **reasoning.effort_by_label, tier: configured.reasoning_effort
+            })
         return effort_for(
             signals,
             reasoning,

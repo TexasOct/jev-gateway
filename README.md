@@ -10,8 +10,9 @@ The catalog has three layers:
 
 1. `providers` own reusable connections: `api_base` and `api_key_env`.
 2. `models` name a provider and its exact `upstream_model`, then define model
-   capabilities, limits, quality, and cost.
-3. `policy.tier_models` lists the concrete model IDs that may serve each tier.
+   capabilities, limits, quality, cost, and scoped routing tags.
+3. `policy.labels` defines each strategy's ordered score boundaries. A label gets
+   its model pool from tags such as `default/quick` or `quality/critical`.
 
 A catalog model is indexed only by its provider-qualified identity:
 
@@ -24,13 +25,14 @@ For example, a model declared as:
 ```json
 {
   "provider": "deepseek",
-  "upstream_model": "deepseek-flash"
+  "upstream_model": "deepseek-flash",
+  "tags": ["default/quick", "economy/budget"]
 }
 ```
 
-has the catalog model ID `deepseek/deepseek-flash`. This ID is used in
-`tier_models`, OpenAI-compatible manual model selection, session state,
-`X-JEV-Route`, and decision records. Bare upstream names such as
+has the catalog model ID `deepseek/deepseek-flash`. This ID is used for
+OpenAI-compatible manual model selection, session state, `X-JEV-Route`, and
+records. Its `tags` place it in strategy-local model pools. Bare upstream names such as
 `deepseek-flash` are not valid manual selections because they are not globally
 unique.
 
@@ -52,6 +54,7 @@ unique.
     {
       "provider": "deepseek",
       "upstream_model": "deepseek-flash",
+      "tags": ["default/quick", "default/working"],
       "context_window": 1000000,
       "max_output_tokens": 384000,
       "capabilities": {
@@ -63,6 +66,7 @@ unique.
     {
       "provider": "openai",
       "upstream_model": "gpt-5.6-sol",
+      "tags": ["default/deep"],
       "context_window": 1000000,
       "max_output_tokens": 128000,
       "capabilities": {
@@ -74,23 +78,22 @@ unique.
     }
   ],
   "policy": {
-    "tier_models": {
-      "simple": ["deepseek/deepseek-flash"],
-      "standard": ["deepseek/deepseek-flash", "openai/gpt-5.6-sol"],
-      "complex": ["openai/gpt-5.6-sol"]
+    "labels": {
+      "quick": {"score": 0, "description": "Short requests", "reasoning_effort": "low"},
+      "working": {"score": 0.35, "description": "Multi-step work", "reasoning_effort": "medium"},
+      "deep": {"score": 0.65, "description": "Architecture and audit", "reasoning_effort": "high"}
     },
-    "reasoning": {
-      "mode": "cap",
-      "effort_by_tier": {"simple": "low", "standard": "medium", "complex": "high"}
-    }
+    "reasoning": {"mode": "cap"}
   }
 }
 ```
 
 Several models may reference one provider, so they share its endpoint and key
-without duplication. A tier can contain models from one provider or from
-several providers. JEV filters candidates by model capabilities, context window,
-and output limit, then applies the configured cost, quality, and priority rules.
+without duplication. Tags use `/` as a scope separator and are matched exactly.
+For the default strategy, label `quick` resolves `default/quick`; label `critical`
+in strategy `quality` resolves `quality/critical`. A label may set `tag` to use a
+different exact tag. JEV filters the matching models by capabilities, context
+window, and output limit, then applies the configured cost, quality, and priority rules.
 
 The `capabilities.reasoning_effort` ladder is what one route accepts, in the
 upstream's own vocabulary, so it is filled in per model and verified against the
@@ -103,7 +106,7 @@ for the modes and the measured values.
 ## Configuration and secrets
 
 `models.json` is the only static configuration source. It contains providers,
-models, tiers, scoring, re-routing policy, and gateway runtime settings. The
+models, strategy labels, scoring, re-routing policy, and gateway runtime settings. The
 process does not read fixed `JEV_API_BASE`, `JEV_API_KEY`, `JEV_ROUTES`,
 `JEV_MODELS_FILE`, route override, or policy override variables.
 
@@ -138,20 +141,17 @@ routing overrides:
 {
   "strategies": {
     "quality": {
-      "mode": "cached",
       "selection": "quality_first",
-      "tier_models": {
-        "simple": ["openai/gpt-5.6-luna"],
-        "standard": ["openai/gpt-5.6-terra"],
-        "complex": ["openai/gpt-5.6-sol"]
+      "labels": {
+        "routine": {"score": 0, "description": "Routine answers"},
+        "critical": {"score": 0.65, "description": "Critical work"}
       }
     },
     "economy": {
-      "mode": "cached",
       "selection": "cheapest_adequate",
-      "tier_models": {
-        "simple": ["deepseek/deepseek-flash"],
-        "standard": ["deepseek/deepseek-flash"]
+      "labels": {
+        "budget": {"score": 0, "description": "Bounded tasks"},
+        "extended": {"score": 0.35, "description": "Extended tasks"}
       }
     }
   }
@@ -159,8 +159,7 @@ routing overrides:
 ```
 
 Each strategy inherits every unspecified field from the top-level `policy`.
-Its `tier_models` override is merged by tier, so `economy` inherits the default
-`complex` candidates while replacing only `simple` and `standard`. Add any
+Declaring `labels` replaces the inherited set as a whole; `economy` does not inherit `quick`, `working`, or `deep`. Add any
 number of sibling strategy names. Each name is also an OpenAI-compatible model
 name.
 
@@ -178,13 +177,13 @@ The old `default`/`definitions` wrapper remains supported for compatibility and
 custom strategy kinds.
 
 `jev_matrix` sends multiple typed choice questions to System One and maps the
-answers to a local tier and selection rule. Define strategy-specific parameters
+answers to a strategy-local label and selection rule. Define strategy-specific parameters
 under `options` (available in both compact and `definitions` formats). Each
 question needs `type: "choice"`, `instructions`, and a `criteria` object with at
 least two labeled descriptions. Rules are checked in order; `when` matches an
-answer label or a list of labels. The first match sets `tier` and/or `selection`.
+answer label or a list of labels. The first match sets `label` and/or `selection`.
 If JEV is unavailable or returns invalid answers, `fallback` applies. If no
-rule matches, the strategy uses the local signal tier and policy selection.
+rule matches, the strategy uses the local score mapped to its labels and policy selection.
 
 ```json
 {
@@ -192,51 +191,29 @@ rule matches, the strategy uses the local signal tier and policy selection.
     "task_aware": {
       "kind": "jev_matrix",
       "mode": "fresh",
-      "reasoning": {
-        "mode": "override",
-        "effort_by_tier": {"simple": "low", "standard": "medium", "complex": "high"}
-      },
-      "tier_models": {
-        "simple": ["deepseek/deepseek-flash"],
-        "standard": ["openai/gpt-5.6-terra"],
-        "complex": ["openai/gpt-5.6-sol"]
+      "labels": {
+        "draft": {"score": 0, "description": "Drafts", "reasoning_effort": "low"},
+        "review": {"score": 0.35, "description": "Review", "reasoning_effort": "medium"},
+        "engineering": {"score": 0.65, "description": "Engineering", "reasoning_effort": "high"}
       },
       "options": {
         "questions": {
           "workload": {
             "type": "choice",
-            "instructions": "What is the main kind of work this request asks for?",
-            "criteria": {
-              "docs": "Documentation, comments, prose, translation, or summarization; no code behavior changes.",
-              "small_change": "A narrow, bounded code or config change: a rename, dependency bump, formatting pass, or single-file tweak.",
-              "coding": "Implement, fix, or refactor behavior in code; the change has to work.",
-              "reverse": "Understand, audit, or reverse-engineer existing code or systems: architecture, protocol or binary analysis, security review, or hard debugging."
-            }
-          },
-          "rigor": {
-            "type": "choice",
-            "instructions": "How exact does the output need to be?",
-            "criteria": {
-              "draft": "A first pass is fine; it will be reviewed or reworked.",
-              "exacting": "It ships or gates other work: an interface, migration, security boundary, or release."
-            }
+            "instructions": "What work is requested?",
+            "criteria": {"docs": "Documentation and prose", "coding": "Implement or fix code"}
           }
         },
-        "rules": [
-          {"when": {"workload": "reverse"}, "select": {"tier": "complex", "selection": "quality_first"}},
-          {"when": {"workload": "coding"}, "select": {"tier": "complex", "selection": "quality_first"}},
-          {"when": {"workload": ["docs", "small_change"], "rigor": "exacting"}, "select": {"tier": "standard", "selection": "balanced"}},
-          {"when": {"workload": ["docs", "small_change"]}, "select": {"tier": "simple", "selection": "cheapest_adequate"}}
-        ],
-        "fallback": {"tier": "standard", "selection": "balanced"}
+        "rules": [{"when": {"workload": "coding"}, "select": {"label": "engineering"}}],
+        "fallback": {"label": "draft"}
       }
     }
   }
 }
 ```
 
-Here `task_aware` states its own `tier_models` and `reasoning` blocks, so the
-tier a rule selects also fixes the thinking level: docs and small edits run on
+Here `task_aware` states its own `labels` block, so the
+label a rule selects also fixes the thinking level: docs and small edits run on
 the small model at low effort, and coding or reverse-engineering work on the
 top model at high effort. A strategy that omits these fields inherits them from
 the top-level policy. Local policy selection still checks model capabilities,
@@ -366,7 +343,7 @@ send its provider-qualified ID:
 ```
 
 Responses include `X-JEV-Route` (catalog model ID), `X-JEV-Provider`,
-`X-JEV-Model` (provider-native upstream model), `X-JEV-Task-Type`,
+`X-JEV-Model` (provider-native upstream model), `X-JEV-Route-Label`, `X-JEV-Task-Type` (alias),
 `X-JEV-Reason`, `X-JEV-Strategy`, `X-JEV-Request-Id`, `X-JEV-Session-Id`, and
 `X-JEV-Decision-Id`. When the gateway decided a thinking level, the response also
 carries `X-JEV-Reasoning-Effort` and `X-JEV-Reasoning-Source`.

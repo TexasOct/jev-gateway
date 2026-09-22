@@ -7,8 +7,8 @@ JEV separates provider transport from concrete model metadata.
 | Layer | Identity | Owns |
 | --- | --- | --- |
 | Provider | `provider.id` | OpenAI-compatible base URL and `api_key_env` |
-| Model | `provider/upstream_model` | Capabilities, context and output limits, quality, priority, and cost |
-| Tier | `policy.tier_models[tier]` | Ordered set of eligible catalog models |
+| Model | `provider/upstream_model` | Capabilities, context and output limits, quality, priority, cost, and scoped tags |
+| Label | `policy.labels[label]` | Score boundary, JEV description, and the tag that selects eligible models |
 
 `provider/upstream_model` is the canonical model ID. JEV rejects a bare
 upstream model name for manual selection because multiple providers may expose
@@ -29,6 +29,7 @@ the same model label.
     {
       "provider": "openai",
       "upstream_model": "gpt-5.6-sol",
+      "tags": ["default/quick", "default/deep"],
       "priority": 20,
       "quality": 0.95,
       "context_window": 1000000,
@@ -44,23 +45,25 @@ the same model label.
     }
   ],
   "policy": {
-    "tier_models": {
-      "simple": ["openai/gpt-5.6-sol"],
-      "standard": ["openai/gpt-5.6-sol"],
-      "complex": ["openai/gpt-5.6-sol"]
+    "labels": {
+      "quick": {"score": 0, "description": "Bounded work"},
+      "deep": {"score": 0.65, "description": "Deep analysis"}
     }
   }
 }
 ```
 
 Every provider requires `id`, `api_base`, and `api_key_env`. Every model
-requires `provider` and `upstream_model`. The loader rejects duplicate provider
-IDs, duplicate canonical model IDs, missing provider references, unknown tier
-candidate IDs, and literal `api_key` fields.
+requires `provider` and `upstream_model`. Tags use `/` for scope and match only
+as complete strings. The default strategy label `deep` resolves `default/deep`;
+strategy `quality` label `critical` resolves `quality/critical`. A label can set
+`tag` to override that convention. The loader rejects duplicate provider IDs,
+duplicate canonical model IDs, missing provider references, labels whose tag
+matches no model, malformed tags, and literal `api_key` fields.
 
 ## Selection
 
-For an inferred tier, JEV starts with that tier's `tier_models` set. It filters
+The strategy maps the local score to its ordered `labels` (markers select the last label). It starts with models carrying that label's scoped tag. It filters
 models by required tools, vision, JSON mode, reasoning, context capacity, and
 output capacity. The remaining models are ranked by `policy.selection`:
 
@@ -68,9 +71,9 @@ output capacity. The remaining models are ranked by `policy.selection`:
 - `quality_first` prioritizes model quality.
 - `balanced` combines normalized cost and quality, then priority.
 
-If no model in the tier can satisfy a hard constraint, JEV widens the search to
-the complete model catalog. The decision reports the actual selected model tier
-when a widened fallback selects a model configured for another tier.
+If no model in the label can satisfy a hard constraint, JEV widens the search to
+the complete model catalog. The decision reports the actual selected model label
+when a widened fallback selects a model configured for another label.
 
 This permits both same-provider selection, such as choosing a faster and a
 stronger model from one proxy, and cross-provider fallback, such as switching
@@ -94,12 +97,12 @@ while it is still comparing candidates. The strategy contract therefore does not
 change: `StrategyOutcome` still returns a model, and a custom strategy gets a
 sensible level for whichever model it picked without doing anything.
 
-The order is `on_user_correction`, `on_reasoning_request`, `effort_by_tier[tier]`,
+The order is `on_user_correction`, `on_reasoning_request`, `labels.*.reasoning_effort` or `effort_by_label[label]`,
 then `fallback`, clamped into the ladder by walking up first and then down. The
-tier is the one the router committed to, not the locally scored one: the two
-differ whenever a classifier refines the tier inside a strategy or a pinned
-session keeps an earlier one. Using the committed tier keeps the level from
-contradicting the `X-JEV-Task-Type` the client is told. A model that declares no
+label is the one the router committed to, not the locally scored one: the two
+differ whenever a classifier refines the label inside a strategy or a pinned
+session keeps an earlier one. Using the committed label keeps the level from
+contradicting the `X-JEV-Route-Label` (`X-JEV-Task-Type` remains an alias) the client is told. A model that declares no
 ladder is left alone entirely: no field is sent and nothing is overridden, which
 keeps a catalog that has not opted in byte-identical to one without this feature.
 
@@ -181,29 +184,29 @@ model-routing strategies:
     "quality": {
       "mode": "cached",
       "selection": "quality_first",
-      "tier_models": {
-        "simple": ["openai/gpt-5.6-luna"],
-        "standard": ["openai/gpt-5.6-terra"],
-        "complex": ["openai/gpt-5.6-sol"]
+      "labels": {
+        "routine": {"score": 0, "description": "Routine answers"},
+        "critical": {"score": 0.65, "description": "Critical work"}
       }
     },
     "economy": {
       "mode": "cached",
       "selection": "cheapest_adequate",
-      "tier_models": {
-        "simple": ["deepseek/deepseek-flash"],
-        "standard": ["deepseek/deepseek-flash"]
+      "labels": {
+        "budget": {"score": 0, "description": "Bounded work"},
+        "extended": {"score": 0.35, "description": "Extended work"}
       }
     }
   }
 }
 ```
 
-Each strategy inherits the top-level policy. A `tier_models` override merges by
-tier, so `economy` keeps the default complex candidates while replacing simple
-and standard pools. A request with `model: "quality"` or `model: "economy"`
-uses that strategy. The old `default`/`definitions` wrapper remains supported
-for existing catalogs and custom strategy kinds.
+Each strategy inherits unspecified policy fields. Declaring `labels` replaces
+the label set, and its pools resolve from tags such as `quality/routine` and
+`economy/budget`. A strategy that does not declare `labels` keeps the top-level
+labels and their `default/*` pools. A request with `model: "quality"` or
+`model: "economy"` uses that strategy. The old `default`/`definitions` wrapper
+and `tier_models` remain readable for existing catalogs.
 
 Each named strategy is exposed as an OpenAI-compatible virtual model. A request
 with `model: "auto"` uses the default strategy; `model: "quality"` selects the

@@ -208,6 +208,7 @@ def decision_headers(decision: Decision) -> dict[str, str]:
         "X-JEV-Route": decision.route_name,
         "X-JEV-Provider": decision.provider,
         "X-JEV-Model": decision.model,
+        "X-JEV-Route-Label": decision.label,
         "X-JEV-Task-Type": decision.tier,
         "X-JEV-Mode": decision.mode,
         "X-JEV-Reason": decision.reason,

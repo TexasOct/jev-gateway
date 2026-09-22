@@ -14,7 +14,6 @@ from jev_gateway.catalog import (
     RoutingPolicy,
     StrategyDefinition,
 )
-from jev_gateway.config import TIER_ORDER
 
 from .contracts import RoutingRequest, StrategyOutcome
 from .jev import JevClient
@@ -37,7 +36,7 @@ class JevMatrixStrategy(PolicyStrategy):
         super().__init__(name, policy, description)
         self.client = client
         self.options = _mutable_json(options)
-        self.questions, self.rules, self.fallback = _validate_options(self.options)
+        self.questions, self.rules, self.fallback = _validate_options(self.options, policy)
 
     def describe(self) -> dict[str, Any]:
         payload = super().describe()
@@ -76,11 +75,11 @@ class JevMatrixStrategy(PolicyStrategy):
                     reason = f"rule_{index + 1}"
                     break
 
-        tier = choice.get("tier", request.signals.tier)
+        tier = choice.get("label", self._signal_label(request.signals))
         selection = choice.get("selection", self.policy.selection)
         signals = request.signals
-        if tier != signals.tier:
-            signals = replace(signals, tier=tier, base_tier=tier, score_tier=tier)
+        if tier != self._signal_label(signals):
+            signals = replace(signals, route_label=tier)
         policy = replace(self.policy, selection=selection)
         outcome = PolicyStrategy(self.name, policy, self.description).decide(
             replace(request, signals=signals), catalog
@@ -94,6 +93,7 @@ class JevMatrixStrategy(PolicyStrategy):
         session = request.session
         return {
             "prompt": signals.prompt,
+            "local_score": signals.score,
             "local_tier": signals.tier,
             "conversation_tokens": signals.conversation_tokens,
             "requested_max_tokens": signals.requested_max_tokens,
@@ -104,6 +104,7 @@ class JevMatrixStrategy(PolicyStrategy):
             "session": None
             if session is None
             else {
+                "label": session.tier,
                 "tier": session.tier,
                 "current_model": session.route,
                 "consecutive_failures": session.consecutive_failures,
@@ -122,13 +123,16 @@ def _mutable_json(value: Any) -> Any:
     return value
 
 
-def _validate_choice(value: Any, name: str) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) - {"tier", "selection"}:
-        raise ValueError(f"{name} must contain only tier and selection.")
-    if "tier" in value and (
-        not isinstance(value["tier"], str) or value["tier"] not in TIER_ORDER
+def _validate_choice(value: Any, name: str, policy: RoutingPolicy) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) - {"label", "tier", "selection"}:
+        raise ValueError(f"{name} must contain only label and selection (tier is a legacy alias).")
+    if "label" in value and "tier" in value:
+        raise ValueError(f"{name} cannot contain both label and tier.")
+    label = value.get("label", value.get("tier"))
+    if ("label" in value or "tier" in value) and (
+        not isinstance(label, str) or label not in policy.labels
     ):
-        raise ValueError(f"{name}.tier must be one of {', '.join(TIER_ORDER)}.")
+        raise ValueError(f"{name}.label must be one of {', '.join(policy.labels)}.")
     if "selection" in value and (
         not isinstance(value["selection"], str)
         or value["selection"] not in SELECTION_MODES
@@ -136,11 +140,14 @@ def _validate_choice(value: Any, name: str) -> dict[str, str]:
         raise ValueError(
             f"{name}.selection must be one of {', '.join(SELECTION_MODES)}."
         )
-    return dict(value)
+    result = dict(value)
+    if "tier" in result:
+        result["label"] = result.pop("tier")
+    return result
 
 
 def _validate_options(
-    options: Mapping[str, Any],
+    options: Mapping[str, Any], policy: RoutingPolicy,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, str]]:
     if set(options) - {"questions", "rules", "fallback"}:
         raise ValueError("jev_matrix options contain unknown fields.")
@@ -199,10 +206,10 @@ def _validate_options(
         rules.append(
             {
                 "when": predicates,
-                "select": _validate_choice(rule["select"], f"rule {index + 1}.select"),
+                "select": _validate_choice(rule["select"], f"rule {index + 1}.select", policy),
             }
         )
-    fallback = _validate_choice(options.get("fallback", {}), "fallback")
+    fallback = _validate_choice(options.get("fallback", {}), "fallback", policy)
     return dict(questions), rules, fallback
 
 

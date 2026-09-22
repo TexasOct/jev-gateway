@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from jev_gateway.catalog import Catalog, ModelProfile, RoutingMode, RoutingPolicy
-from jev_gateway.config import TIER_ORDER, TIER_RANK
 from jev_gateway.sessions import SessionState
 from jev_gateway.signals import RequestSignals, ScoringPolicy
 
@@ -75,7 +74,7 @@ class PolicyStrategy:
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         """Route one request according to this strategy's policy."""
-        if request.session is None:
+        if request.session is None or request.session.tier not in self.policy.labels:
             return self._initial(request, catalog)
         return self._continuation(request, catalog, request.session)
 
@@ -83,14 +82,15 @@ class PolicyStrategy:
 
     def _initial(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         manual = request.manual
+        label = self._signal_label(request.signals)
         if manual is not None:
             return self._outcome(
                 manual,
-                self._tier_for_profile(manual, request.signals.tier),
+                self._tier_for_profile(manual, label),
                 "manual_override",
                 "manual",
             )
-        selection = self._select(request.signals.tier, request.signals, catalog)
+        selection = self._select(label, request.signals, catalog)
         effective_tier = self._effective_tier(selection)
         reason = (
             f"first_turn_{effective_tier}"
@@ -110,7 +110,7 @@ class PolicyStrategy:
         if manual is not None and manual.name != current.name:
             return self._outcome(
                 manual,
-                self._tier_for_profile(manual, request.signals.tier),
+                self._tier_for_profile(manual, self._signal_label(request.signals)),
                 "manual_override",
                 "manual",
                 switched_from=current.name,
@@ -120,9 +120,14 @@ class PolicyStrategy:
             current, session, request, catalog
         )
         switched_from = current.name if selection.profile.name != current.name else None
+        effective_tier = (
+            self._effective_tier(selection)
+            if switched_from or self.policy.mode is RoutingMode.FRESH
+            else session.tier
+        )
         return self._outcome(
             selection.profile,
-            self._effective_tier(selection) if switched_from else session.tier,
+            effective_tier,
             reason,
             "auto",
             switched_from=switched_from,
@@ -140,7 +145,7 @@ class PolicyStrategy:
         signals = request.signals
 
         if self.policy.mode is RoutingMode.FRESH:
-            return self._select(signals.tier, signals, catalog), "per_turn_policy", None
+            return self._select(self._signal_label(signals), signals, catalog), "per_turn_policy", None
 
         if self.policy.mode in {RoutingMode.STICKY, RoutingMode.CACHED}:
             return self._pinned_selection(current, session, request, catalog)
@@ -285,7 +290,8 @@ class PolicyStrategy:
     ) -> _Escalation | None:
         """Return the highest-priority quality reason to change models."""
         escalation = self.policy.escalation
-        rank = TIER_RANK.get(session.tier, 0)
+        rank = self._rank(session.tier)
+        signal_label = self._signal_label(signals)
 
         if session.consecutive_failures >= escalation.max_consecutive_failures:
             return _Escalation(
@@ -311,10 +317,10 @@ class PolicyStrategy:
             )
         if (
             escalation.escalate_on_complexity_spike
-            and signals.tier_rank > rank
+            and self._rank(signal_label) > rank
             and signals.turn_index >= escalation.min_turns_before_escalation
         ):
-            return _Escalation(tier=signals.tier, reason="complexity_spike")
+            return _Escalation(tier=signal_label, reason="complexity_spike")
         if self._over_budget(session) and rank > 0:
             return _Escalation(
                 tier=self._lower_tier(session.tier), reason="budget_pressure"
@@ -322,10 +328,10 @@ class PolicyStrategy:
         if (
             self.policy.mode is RoutingMode.ADAPTIVE
             and escalation.deescalate_when_settled
-            and signals.tier_rank < rank
+            and self._rank(signal_label) < rank
             and self._settled(session)
         ):
-            return _Escalation(tier=signals.tier, reason="complexity_settled")
+            return _Escalation(tier=signal_label, reason="complexity_settled")
         return None
 
     def _over_budget(self, session: SessionState) -> bool:
@@ -342,8 +348,8 @@ class PolicyStrategy:
             return False
         if session.consecutive_failures or session.consecutive_truncations:
             return False
-        standard = self.policy.scoring.standard_threshold
-        return all(score < standard for score in recent)
+        boundary = self.policy.labels[session.tier].score
+        return all(score < boundary for score in recent)
 
     def _hysteresis_allows(
         self, session: SessionState, turn_index: int, now: float
@@ -361,13 +367,17 @@ class PolicyStrategy:
     # Selection
 
     def _tier_pool(self, tier: str, catalog: Catalog) -> list[ModelProfile]:
-        """Return this strategy's configured candidates for one tier."""
-        return [
-            profile
-            for model_id in self.policy.tier_models.get(tier, ())
-            for profile in [catalog.by_name(model_id)]
-            if profile is not None
-        ]
+        """Return this strategy's candidates for one routing label."""
+        route = self.policy.labels[tier]
+        if route.models:
+            return [
+                profile
+                for model_id in route.models
+                for profile in [catalog.by_name(model_id)]
+                if profile is not None
+            ]
+        tag = route.tag or f"{self.name}/{tier}"
+        return [profile for profile in catalog.profiles if tag in profile.tags]
 
     def _select(
         self,
@@ -519,16 +529,37 @@ class PolicyStrategy:
         return self._tier_for_profile(selection.profile, selection.tier)
 
     def _tier_for_profile(self, profile: ModelProfile, fallback: str) -> str:
-        for tier in TIER_ORDER:
-            if profile.name in self.policy.tier_models.get(tier, ()):
+        for tier, route in self.policy.labels.items():
+            tag = route.tag or f"{self.name}/{tier}"
+            if profile.name in route.models or (not route.models and tag in profile.tags):
                 return tier
         return fallback
 
+    def _signal_label(self, signals: RequestSignals) -> str:
+        """Map local score to this strategy's labels, with marker promotion."""
+        override = signals.route_label
+        if override in self.policy.labels:
+            return override
+        if self.policy.tier_models and signals.tier in self.policy.labels:
+            return signals.tier
+        if signals.markers:
+            return next(reversed(self.policy.labels))
+        chosen = next(iter(self.policy.labels))
+        for name, route in self.policy.labels.items():
+            if signals.score >= route.score:
+                chosen = name
+        return chosen
+
+    def _rank(self, tier: str) -> int:
+        return list(self.policy.labels).index(tier)
+
     def _raise_tier(self, tier: str) -> str:
-        return TIER_ORDER[min(TIER_RANK.get(tier, 0) + 1, len(TIER_ORDER) - 1)]
+        labels = list(self.policy.labels)
+        return labels[min(self._rank(tier) + 1, len(labels) - 1)]
 
     def _lower_tier(self, tier: str) -> str:
-        return TIER_ORDER[max(TIER_RANK.get(tier, 0) - 1, 0)]
+        labels = list(self.policy.labels)
+        return labels[max(self._rank(tier) - 1, 0)]
 
     # Bookkeeping
 
