@@ -6,7 +6,7 @@ JEV separates provider transport from concrete model metadata.
 
 | Layer | Identity | Owns |
 | --- | --- | --- |
-| Provider | `provider.id` | OpenAI-compatible base URL and `api_key_env` |
+| Provider | `provider.id` | LiteLLM `type` and its transport parameters |
 | Model | `provider/upstream_model` | Capabilities, context and output limits, quality, priority, cost, and scoped tags |
 | Label | `policy.labels[label]` | Score boundary, JEV description, and the tag that selects eligible models |
 
@@ -21,6 +21,7 @@ the same model label.
   "providers": [
     {
       "id": "openai",
+      "type": "openai",
       "api_base": "https://provider.example/v1",
       "api_key_env": "OPENAI_PROXY_KEY"
     }
@@ -53,8 +54,14 @@ the same model label.
 }
 ```
 
-Every provider requires `id`, `api_base`, and `api_key_env`. Every model
-requires `provider` and `upstream_model`. Tags use `/` for scope and match only
+Every provider requires `id` and a LiteLLM-supported `type`. The provider `id`
+names the catalog identity; `type` selects LiteLLM's adapter. Optional
+`api_base`, `api_key_env`, `params`, and `param_env` supply that adapter's
+completion arguments. For `type: "openai"`, both `api_base` and `api_key_env` are
+required. Other types may use LiteLLM's defaults or additional arguments such
+as `params.api_version`; `param_env` resolves secret arguments without exposing
+them in the policy response. Every model requires `provider` and
+`upstream_model`. Tags use `/` for scope and match only
 as complete strings. The default strategy label `deep` resolves `default/deep`;
 strategy `quality` label `critical` resolves `quality/critical`. A label can set
 `tag` to override that convention. The loader rejects duplicate provider IDs,

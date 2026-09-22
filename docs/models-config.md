@@ -29,9 +29,12 @@ uv run jev-gateway
 
 | 字段 | 类型 / 默认值 | 含义 |
 | --- | --- | --- |
-| `providers[].id` | 非空字符串，必填 | Provider 标识，例如 `deepseek`。 |
-| `providers[].api_base` | 非空字符串，必填 | OpenAI 兼容 API 的基础地址；解析时去掉末尾 `/`。 |
-| `providers[].api_key_env` | 非空字符串，必填 | 保存上游密钥的环境变量名；变量未设置或为空时加载失败。 |
+| `providers[].id` | 非空字符串，必填 | 目录中的 Provider 标识，例如 `deepseek`；不决定 LiteLLM 的适配器。 |
+| `providers[].type` | LiteLLM 支持的 provider 前缀，必填 | 例如 `deepseek`、`openai`、`azure` 或 `vertex_ai`；加载时校验是否由已安装的 LiteLLM 支持。 |
+| `providers[].api_base` | 非空字符串，可选 | 上游基础地址；解析时去掉末尾 `/`。`type: "openai"` 时必填。 |
+| `providers[].api_key_env` | 非空字符串，可选 | `api_key` 对应的环境变量名；设置后变量必须有值。`type: "openai"` 时必填。 |
+| `providers[].params` | 对象，默认 `{}` | 发给 LiteLLM `completion()` 的非敏感 provider 参数，如 `api_version` 或 `vertex_location`；不可覆盖 `model`、`messages`、`stream`、`api_base`、`api_key`。 |
+| `providers[].param_env` | 对象，默认 `{}` | 参数名到环境变量名的映射，供额外凭据使用，如 `vertex_credentials`；解析后的密钥不出现在策略响应中。 |
 | `models[].provider` | 非空字符串，必填 | 引用已有的 `providers[].id`。 |
 | `models[].upstream_model` | 非空字符串，必填 | 发给该 provider 的实际模型名。 |
 | `models[].tags` | 字符串数组；默认 `[]` | 模型所属的精确路由标签。推荐使用 `<策略名>/<标签名>`，例如 `quality/critical`。`/` 只用于作用域分隔，不执行前缀或通配匹配。 |
@@ -48,7 +51,7 @@ uv run jev-gateway
 | `models[].cost.input_per_million` | 数值；默认 `0` | 每百万输入 token 的美元单价，用于估算请求与会话成本。 |
 | `models[].cost.output_per_million` | 数值；默认 `0` | 每百万输出 token 的美元单价。 |
 
-模型的唯一 ID 由 `<provider>/<upstream_model>` 自动生成。例如 `deepseek` + `deepseek-flash` 对应 `deepseek/deepseek-flash`。手动指定请求 `model` 时使用完整 ID。自动分流由 `models[].tags` 建池；一个模型可以同时属于多个策略和标签。不要在模型里写 `id`、`api_base`、`api_key` 或 `api_key_env`；连接信息由 provider 提供，明文 `api_key` 也不能写在 provider 中。`capabilities` 不接受表中以外的字段。
+模型的唯一 ID 由 `<provider>/<upstream_model>` 自动生成。例如 `deepseek` + `deepseek-flash` 对应 `deepseek/deepseek-flash`。`type` 只控制 LiteLLM 上游适配器，不改变这个 ID。手动指定请求 `model` 时使用完整 ID。自动分流由 `models[].tags` 建池；一个模型可以同时属于多个策略和标签。不要在模型里写 `id`、`api_base`、`api_key` 或 `api_key_env`；连接信息由 provider 提供，明文 `api_key` 也不能写在 provider 中。`capabilities` 不接受表中以外的字段。
 
 ## `policy` 和 `strategies`
 

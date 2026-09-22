@@ -45,6 +45,38 @@ def test_models_inherit_connection_details_from_their_provider() -> None:
     assert small.model == "vendor/small-model"
     assert small.api_base == "https://small.example/v1"
     assert small.api_key == "test-key-small"
+    assert small.provider_type == "openai"
+
+
+def test_provider_type_is_independent_of_catalog_id() -> None:
+    document = single_route_document()
+    document["providers"][0]["type"] = "deepseek"
+    catalog = catalog_from_document(document, "test catalog")
+
+    assert catalog.providers[0].name == "test-provider"
+    assert catalog.providers[0].type == "deepseek"
+    assert profile(catalog, ONLY_ID).provider_type == "deepseek"
+    assert catalog.providers[0].as_dict()["type"] == "deepseek"
+
+
+@pytest.mark.parametrize("provider_type", ["", "openai/deepseek", "deep seek", "nonesuch"])
+def test_provider_rejects_unknown_type(provider_type: str) -> None:
+    document = single_route_document()
+    document["providers"][0]["type"] = provider_type
+
+    with pytest.raises(ValueError, match="type"):
+        catalog_from_document(document, "test catalog")
+
+
+def test_provider_requires_type_and_rejects_old_field() -> None:
+    document = single_route_document()
+    del document["providers"][0]["type"]
+    with pytest.raises(ValueError, match="type"):
+        catalog_from_document(document, "test catalog")
+    document["providers"][0]["type"] = "openai"
+    document["providers"][0]["litellm_provider"] = "deepseek"
+    with pytest.raises(ValueError, match="Use type"):
+        catalog_from_document(document, "test catalog")
 
 
 def test_same_provider_can_supply_multiple_models_without_duplicate_credentials() -> None:
@@ -83,6 +115,73 @@ def test_capabilities_limits_and_cost_remain_model_specific() -> None:
     assert small.fits_context(8001) is False
     assert large.fits_context(150_000) is True
     assert large.fits_context(300_000) is False
+
+
+def test_provider_type_derives_native_completion_parameters(monkeypatch) -> None:
+    document = single_route_document()
+    provider = document["providers"][0]
+    provider.update({
+        "type": "azure",
+        "params": {"api_version": "2024-10-21"},
+        "param_env": {"azure_ad_token": "TEST_AZURE_TOKEN"},
+    })
+    del provider["api_key_env"]
+    monkeypatch.setenv("TEST_AZURE_TOKEN", "private-token")
+
+    catalog = catalog_from_document(document, "test catalog")
+    route = profile(catalog, ONLY_ID)
+    assert route.provider_type == "azure"
+    assert route.api_key is None
+    assert route.provider_params == {
+        "api_version": "2024-10-21", "azure_ad_token": "private-token"
+    }
+    exposed = catalog.providers[0].as_dict()
+    assert exposed["params"] == {"api_version": "[configured]"}
+    assert exposed["param_env"] == {"azure_ad_token": "TEST_AZURE_TOKEN"}
+    assert "private-token" not in str(exposed)
+
+
+@pytest.mark.parametrize("key", ["model", "messages", "stream", "api_key"])
+def test_provider_rejects_reserved_completion_parameters(key: str) -> None:
+    document = single_route_document()
+    document["providers"][0]["params"] = {key: "value"}
+    with pytest.raises(ValueError, match="reserved"):
+        catalog_from_document(document, "test catalog")
+
+
+def test_vertex_provider_uses_native_parameters_without_api_base_or_key() -> None:
+    document = single_route_document()
+    provider = document["providers"][0]
+    provider["type"] = "vertex_ai"
+    provider["params"] = {
+        "vertex_project": "example-project", "vertex_location": "us-central1"
+    }
+    del provider["api_base"]
+    del provider["api_key_env"]
+
+    route = profile(catalog_from_document(document, "test catalog"), ONLY_ID)
+    assert route.provider_type == "vertex_ai"
+    assert route.api_base is None
+    assert route.api_key is None
+    assert route.provider_params == {
+        "vertex_project": "example-project", "vertex_location": "us-central1"
+    }
+
+
+def test_provider_rejects_unprotected_headers() -> None:
+    document = single_route_document()
+    document["providers"][0]["params"] = {
+        "extra_headers": {"Authorization": "unsafe-literal"}
+    }
+    with pytest.raises(ValueError, match="credentials belong in param_env"):
+        catalog_from_document(document, "test catalog")
+
+
+def test_openai_compatible_type_requires_base_and_key() -> None:
+    document = single_route_document()
+    del document["providers"][0]["api_base"]
+    with pytest.raises(ValueError, match="requires api_base"):
+        catalog_from_document(document, "test catalog")
 
 
 def test_provider_key_environment_variable_is_required(monkeypatch) -> None:

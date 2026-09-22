@@ -169,11 +169,13 @@
   "providers": [
     {
       "id": "deepseek",
+      "type": "deepseek",
       "api_base": "https://api.deepseek.com/v1",
       "api_key_env": "DEEPSEEK_API_KEY"
     },
     {
       "id": "openai",
+      "type": "openai",
       "api_base": "https://api.openai.com/v1",
       "api_key_env": "OPENAI_API_KEY"
     }
