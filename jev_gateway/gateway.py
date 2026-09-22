@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from jev_gateway.catalog import GatewaySettings, ModelProfile, load_catalog
@@ -34,6 +34,7 @@ from jev_gateway.decision import (
 )
 from jev_gateway.reasoning import leaves_payload_alone
 from jev_gateway.records import RequestMeta, RequestRecord, record_store_from_settings
+from jev_gateway.provider import adapter_for
 from jev_gateway.sessions import (
     SESSION_HEADER,
     MemorySessionStore,
@@ -42,7 +43,7 @@ from jev_gateway.sessions import (
 )
 from jev_gateway.signals import content_text, estimate_tokens, latest_user_text
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 # A router has no creation time of its own, and OpenAI requires the field on
 # every model entry, so report when this process started.
@@ -69,7 +70,14 @@ class ChatCompletionRequest(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    model: str = "auto"
+    model: str
+
+    @field_validator("model")
+    @classmethod
+    def nonempty_model(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("model must be a non-empty string")
+        return value
     messages: list[dict[str, Any]] = Field(min_length=1)
     stream: bool = False
     user: str | None = None
@@ -162,7 +170,10 @@ def message_text(messages: list[dict[str, Any]]) -> str:
 
 
 def completion_payload(
-    request: ChatCompletionRequest, profile: ModelProfile, decision: Decision
+    request: ChatCompletionRequest,
+    profile: ModelProfile,
+    decision: Decision,
+    session: SessionState | None = None,
 ) -> dict[str, Any]:
     """Build LiteLLM completion arguments from the selected catalog profile.
 
@@ -173,6 +184,9 @@ def completion_payload(
     payload = request.model_dump(exclude_none=True)
     payload.pop("model", None)
     payload.pop("stream", None)
+    payload["messages"] = adapter_for(profile.provider_type).prepare_messages(
+        payload["messages"], session
+    )
     if not profile.capabilities.temperature:
         payload.pop("temperature", None)
     apply_reasoning_effort(payload, decision)
@@ -254,22 +268,13 @@ def resolve_strategy_name(
     engine: RoutingEngine,
     *,
     requested_model: str,
-    query_value: str | None,
-    header_value: str | None,
     session: SessionState | None,
-) -> tuple[str, bool, str]:
-    """Resolve a strategy from model, then legacy overrides, session, or default.
-
-    A registered strategy name in ``model`` is the primary public API. The returned
-    model is either an automatic alias or a catalog model id for manual routing.
-    """
+) -> tuple[str, bool, str | None]:
+    """Resolve a strategy from the OpenAI ``model`` field or session state."""
     clean_model = requested_model.strip()
     if engine.strategies.has(clean_model):
-        return clean_model, True, "auto"
+        return clean_model, True, None
 
-    explicit = (query_value or "").strip() or (header_value or "").strip()
-    if explicit:
-        return explicit, True, clean_model
     pinned = session.strategy if session is not None else None
     if pinned and engine.strategies.has(pinned):
         return pinned, False, clean_model
@@ -332,7 +337,9 @@ def _next_stream_chunk(response: Iterator[Any]) -> Any:
 
 
 def sse_chunks(
-    response: Iterator[Any], model_override: str | None = None
+    response: Iterator[Any],
+    model_override: str | None = None,
+    observe_chunk: Any | None = None,
 ) -> Iterator[str]:
     """Encode LiteLLM streaming chunks in OpenAI's SSE format."""
     while True:
@@ -341,6 +348,8 @@ def sse_chunks(
         except StopIteration:
             break
         body = response_data(chunk)
+        if observe_chunk is not None:
+            observe_chunk(body)
         if model_override is not None:
             body["model"] = model_override
         yield f"data: {json.dumps(body, ensure_ascii=False)}\n\n"
@@ -411,9 +420,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         if request.url.path == "/v1/chat/completions":
             # Read once: the stored request and the malformed-body fallback below
             # both record this same request-scoped value.
-            requested_strategy = request.query_params.get(
-                "strategy"
-            ) or request.headers.get(STRATEGY_HEADER)
+            requested_strategy = request.headers.get(STRATEGY_HEADER)
             try:
                 raw = await request.body()
                 parsed = json.loads(raw)
@@ -439,7 +446,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     received_at=time.time(),
                     session_id=session_id,
                     requested_strategy=requested_strategy,
-                    requested_model=requested_model if isinstance(requested_model, str) else "auto",
+                    requested_model=requested_model if isinstance(requested_model, str) else None,
                     endpoint=request.url.path,
                     client=request.client.host if request.client else None,
                     user_agent=request.headers.get("user-agent"),
@@ -466,7 +473,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     active.engine.record_store.record_request(RequestRecord(
                         request_id=active.engine.new_request_id(), received_at=time.time(),
                         session_id=None, requested_strategy=requested_strategy,
-                        requested_model="auto", endpoint=request.url.path,
+                        requested_model=None, endpoint=request.url.path,
                         client=request.client.host if request.client else None,
                         user_agent=request.headers.get("user-agent"), stream=False,
                         max_tokens=None, tools=None, response_format=None,
@@ -493,6 +500,19 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             message = str(first.get("msg", "Invalid request."))
         return JSONResponse(status_code=400, content=error_body(message, param=param))
 
+    @app.middleware("http")
+    async def reject_strategy_query(request: Request, call_next: Any) -> Any:
+        if request.url.path in {"/v1/chat/completions", "/v1/routing/preview"} and "strategy" in request.query_params:
+            return JSONResponse(
+                status_code=400,
+                content=error_body(
+                    "Query parameter 'strategy' is not supported; use the request body 'model' field.",
+                    code="unsupported_parameter",
+                    param="strategy",
+                ),
+            )
+        return await call_next(request)
+
     @app.get("/healthz")
     def healthz(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         require_gateway_key(active.gateway_api_key, authorization)
@@ -515,12 +535,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         return {
             "object": "list",
             "data": [
-                {
-                    "id": "auto",
-                    "object": "model",
-                    "created": MODEL_CREATED_AT,
-                    "owned_by": "jev",
-                },
                 *[
                     {
                         "id": name,
@@ -529,7 +543,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                         "owned_by": "jev",
                     }
                     for name in active.engine.strategies.names()
-                    if name != active.engine.strategies.default_name
                 ],
                 *[
                     {
@@ -568,9 +581,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     @app.post("/v1/routing/preview", response_model=None)
     def routing_preview(
         body: PreviewRequest,
-        strategy: str | None = Query(default=None),
         x_jev_session_id: str | None = Header(default=None, alias=SESSION_HEADER),
-        x_jev_strategy: str | None = Header(default=None, alias=STRATEGY_HEADER),
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Return the routing answer for a request without serving or mutating it."""
@@ -588,14 +599,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         chosen, explicit, routed_model = resolve_strategy_name(
             active.engine,
             requested_model=body.model,
-            query_value=strategy,
-            header_value=x_jev_strategy,
             session=session,
         )
         if explicit and not active.engine.strategies.has(chosen):
             raise unknown_strategy_error(active.engine, chosen)
-        if not active.engine.strategies.has(chosen):
-            chosen = active.engine.strategies.default_name
         output_budget = body.max_completion_tokens
         if output_budget is None:
             output_budget = body.max_tokens
@@ -603,10 +610,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         # selected route declared a ladder, and the reasoning policy decides whether
         # it is kept, lowered, or replaced.
         requested_reasoning_effort = getattr(body, "reasoning_effort", None)
-        if explicit:
-            selected = [chosen]
-        elif body.strategy is not None:
+        if body.strategy is not None:
             selected = body.strategy
+        elif explicit:
+            selected = [chosen]
         else:
             selected = active.engine.strategies.names()
         if not selected:
@@ -732,9 +739,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     def chat_completions(
         body: ChatCompletionRequest,
         http_request: Request,
-        strategy: str | None = Query(default=None),
         x_jev_session_id: str | None = Header(default=None, alias=SESSION_HEADER),
-        x_jev_strategy: str | None = Header(default=None, alias=STRATEGY_HEADER),
         authorization: str | None = Header(default=None),
     ) -> JSONResponse | StreamingResponse:
         require_gateway_key(active.gateway_api_key, authorization)
@@ -751,13 +756,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         chosen_strategy, explicit, routed_model = resolve_strategy_name(
             active.engine,
             requested_model=body.model,
-            query_value=strategy,
-            header_value=x_jev_strategy,
             session=session,
         )
-        if not explicit and not active.engine.strategies.has(chosen_strategy):
-            chosen_strategy = active.engine.strategies.default_name
-
         # OpenAI deprecates max_tokens in favour of max_completion_tokens, and the
         # newer field wins when a client sends both.
         output_budget = body.max_completion_tokens
@@ -836,26 +836,41 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 },
             )
 
+        # The decision creates a session on its first turn. Fetch it again so
+        # provider adapters can retain opaque continuation metadata.
+        session = (
+            active.engine.store.get(session_id) if session_id is not None else None
+        )
+
         logger.info(
-            "routing decision_id=%s request_id=%s session_id=%s strategy=%s "
-            "requested_model=%s provider=%s model=%s tier=%s mode=%s reason=%s",
-            decision.decision_id,
-            decision.request_id,
-            decision.session_id,
-            decision.strategy,
-            body.model,
-            decision.provider,
-            decision.model,
-            decision.tier,
-            decision.mode,
-            decision.reason,
+            "routing decided",
+            extra={
+                "decision_id": decision.decision_id,
+                "request_id": decision.request_id,
+                "session_id": decision.session_id,
+                "strategy": decision.strategy,
+                "capability_gap": decision.blocked_by,
+                "label": decision.label,
+                "tier": decision.tier,
+                "mode": decision.mode,
+                "switched_from": decision.switched_from,
+                "reasoning_effort": decision.reasoning_effort,
+                "reasoning_effort_source": decision.reasoning_effort_source,
+                "requested_model": body.model,
+                "route": decision.route_name,
+                "provider": decision.provider,
+                "model": decision.model,
+                "reason": decision.reason,
+            },
         )
 
         started = time.perf_counter()
         try:
             from litellm import completion
 
-            response = completion(**completion_payload(body, profile, decision))
+            response = completion(
+                **completion_payload(body, profile, decision, session)
+            )
         except HTTPException:
             raise
         except Exception as error:
@@ -871,13 +886,17 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             except StorageUnavailableError as storage_error:
                 raise storage_unavailable(storage_error) from error
             logger.warning(
-                "routing outcome decision_id=%s provider=%s model=%s ok=false "
-                "error_type=%s",
-                decision.decision_id,
-                decision.provider,
-                decision.model,
-                type(error).__name__,
+                "routing failed",
+                extra={
+                    "decision_id": decision.decision_id,
+                    "provider": decision.provider,
+                    "model": decision.model,
+                    "ok": False,
+                    "error_type": type(error).__name__,
+                    "latency_ms": round(latency_ms, 2),
+                },
             )
+            logger.debug("upstream failure details", exc_info=True)
             raise HTTPException(
                 status_code=502,
                 detail={
@@ -891,12 +910,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
 
         headers = decision_headers(decision)
         echoed_model = body.model if active.echo_requested_model else None
+        response_capture = adapter_for(profile.provider_type).capture_response(session)
         if body.stream:
-            logger.info(
-                "routing stream_started decision_id=%s provider=%s model=%s",
-                decision.decision_id,
-                decision.provider,
-                decision.model,
+            logger.debug(
+                "routing stream started",
+                extra={
+                    "decision_id": decision.decision_id,
+                    "provider": decision.provider,
+                    "model": decision.model,
+                },
             )
 
             def recorded_stream() -> Iterator[str]:
@@ -904,13 +926,26 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 error_type: str | None = None
                 try:
                     yield from sse_chunks(
-                        cast(Iterator[Any], response), echoed_model
+                        cast(Iterator[Any], response),
+                        echoed_model,
+                        response_capture.observe,
                     )
                 except Exception as error:
                     ok = False
                     error_type = type(error).__name__
+                    logger.error(
+                        "routing stream failed",
+                        extra={
+                            "decision_id": decision.decision_id,
+                            "provider": decision.provider,
+                            "model": decision.model,
+                            "error_type": error_type,
+                        },
+                    )
+                    logger.debug("stream failure details", exc_info=True)
                     raise
                 finally:
+                    response_capture.finish()
                     try:
                         active.engine.record_outcome(
                             decision,
@@ -918,14 +953,26 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                             latency_ms=(time.perf_counter() - started) * 1000,
                             error_type=error_type,
                         )
+                        if ok:
+                            logger.info(
+                                "routing served",
+                                extra={
+                                    "decision_id": decision.decision_id,
+                                    "provider": decision.provider,
+                                    "model": decision.model,
+                                    "ok": True,
+                                    "latency_ms": round(
+                                        (time.perf_counter() - started) * 1000, 2
+                                    ),
+                                },
+                            )
                     except StorageUnavailableError as storage_error:
                         # The response has already started, so this cannot become a
                         # 503; record the loss loudly instead of dropping it.
                         logger.error(
-                            "routing storage stream outcome write failed "
-                            "decision_id=%s error=%s",
-                            decision.decision_id,
+                            "routing storage lost a stream outcome %s",
                             storage_error,
+                            extra={"decision_id": decision.decision_id},
                         )
 
             return StreamingResponse(
@@ -935,6 +982,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             )
 
         result_body = response_data(response)
+        response_capture.observe(result_body)
+        response_capture.finish()
         upstream_model = result_body.get("model")
         if echoed_model is not None:
             # OpenAI echoes the requested model; the resolved one stays in X-JEV-Model.
@@ -954,10 +1003,14 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         except StorageUnavailableError as error:
             raise storage_unavailable(error) from error
         logger.info(
-            "routing outcome decision_id=%s provider=%s model=%s ok=true",
-            decision.decision_id,
-            decision.provider,
-            decision.model,
+            "routing served",
+            extra={
+                "decision_id": decision.decision_id,
+                "provider": decision.provider,
+                "model": decision.model,
+                "ok": True,
+                "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+            },
         )
         return JSONResponse(content=result_body, headers=headers)
 
@@ -971,11 +1024,20 @@ def run_gateway() -> None:
     """Run the gateway using configuration from the selected runtime directory."""
     import uvicorn
 
+    from jev_gateway.logging import (
+        suppress_litellm_debug_prints,
+        uvicorn_log_config,
+    )
+
     settings = app.state.jev_config.engine.catalog.gateway
+    suppress_litellm_debug_prints()
     uvicorn.run(
         app,
         host=settings.host,
         port=settings.port,
+        log_level=settings.logging.level.lower(),
+        access_log=settings.logging.access_log,
+        log_config=uvicorn_log_config(settings.logging.level),
     )
 
 

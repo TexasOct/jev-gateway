@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 
 from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
@@ -67,6 +68,7 @@ def multi_strategy_document(**overrides: Any) -> dict[str, Any]:
     """Return the shared catalog with multiple model-selectable strategies."""
     document = catalog_document(**overrides)
     document["strategies"] = {
+        "task_aware": {},
         "always-strong": {
             "description": "Always route to the strongest model.",
             "mode": "fresh",
@@ -130,19 +132,19 @@ def stored_document(tmp_path: Path) -> dict[str, Any]:
 # Catalog parsing
 
 
-def test_top_level_policy_registers_a_default_strategy() -> None:
+def test_task_aware_is_the_required_default_strategy() -> None:
     catalog = catalog_from_document(catalog_document(), "test catalog")
 
-    assert [definition.name for definition in catalog.strategies] == ["default"]
-    assert catalog.default_strategy == "default"
+    assert [definition.name for definition in catalog.strategies] == ["task_aware"]
+    assert catalog.default_strategy == "task_aware"
 
 
-def test_compact_named_strategies_use_the_top_level_policy_as_default() -> None:
+def test_compact_named_strategies_keep_task_aware_as_default() -> None:
     catalog = catalog_from_document(multi_strategy_document(), "test catalog")
 
-    assert catalog.default_strategy == "default"
+    assert catalog.default_strategy == "task_aware"
     assert [definition.name for definition in catalog.strategies] == [
-        "default",
+        "task_aware",
         "always-strong",
         "always-small",
     ]
@@ -197,7 +199,7 @@ def test_model_list_includes_named_strategies(monkeypatch) -> None:
     model_ids = [entry["id"] for entry in request(app, "GET", "/v1/models").json()["data"]]
 
     assert model_ids == [
-        "auto",
+        "task_aware",
         "always-strong",
         "always-small",
         SMALL_ID,
@@ -212,47 +214,103 @@ def test_strategy_listing_endpoint(monkeypatch) -> None:
     payload = request(app, "GET", "/v1/routing/strategies").json()
 
     assert payload["object"] == "list"
-    assert payload["default"] == "default"
+    assert payload["default"] == "task_aware"
     assert [entry["name"] for entry in payload["data"]] == [
-        "default",
+        "task_aware",
         "always-strong",
         "always-small",
     ]
     assert payload["data"][1]["description"] == "Always route to the strongest model."
 
 
-def test_query_strategy_overrides_header_strategy(monkeypatch) -> None:
+def test_query_strategy_is_rejected(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = make_app(make_engine(multi_strategy_document()))
+
+    for path in (
+        "/v1/chat/completions?strategy=always-strong",
+        "/v1/routing/preview?strategy=always-strong",
+    ):
+        response = request(
+            app,
+            "POST",
+            path,
+            json={
+                "model": "task_aware",
+                "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "unsupported_parameter"
+        assert response.json()["error"]["param"] == "strategy"
+    assert calls == []
+
+
+@pytest.mark.parametrize("retired_name", ["auto", "jev-auto"])
+def test_retired_automatic_model_names_are_not_routable(
+    monkeypatch, retired_name: str
+) -> None:
+    calls = install_completion(monkeypatch)
+    app = make_app(make_engine(multi_strategy_document()))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": retired_name,
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "model_not_found"
+    assert response.json()["error"]["param"] == "model"
+    assert calls == []
+
+
+def test_strategy_header_does_not_select_a_strategy(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = make_app(make_engine(multi_strategy_document()))
 
     response = request(
         app,
         "POST",
-        "/v1/chat/completions?strategy=default",
+        "/v1/chat/completions",
         headers={"X-JEV-Strategy": "always-strong"},
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
     )
 
     assert response.status_code == 200
-    assert response.headers["x-jev-strategy"] == "default"
+    assert response.headers["x-jev-strategy"] == "task_aware"
     assert response.headers["x-jev-route"] == SMALL_ID
 
 
 def test_explicit_strategy_pins_the_session(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = make_app(make_engine(multi_strategy_document()))
-    conversation = {"messages": [{"role": "user", "content": SIMPLE_PROMPT}]}
+    conversation = {
+        "model": "always-strong",
+        "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+    }
 
-    first = request(
-        app,
-        "POST",
-        "/v1/chat/completions?strategy=always-strong",
-        json=conversation,
-    )
+    first = request(app, "POST", "/v1/chat/completions", json=conversation)
     assert first.headers["x-jev-strategy"] == "always-strong"
     assert first.headers["x-jev-route"] == LARGE_ID
 
-    second = request(app, "POST", "/v1/chat/completions", json=conversation)
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "always-strong",
+            "messages": conversation["messages"],
+        },
+    )
 
     assert second.headers["x-jev-session-id"] == first.headers["x-jev-session-id"]
     assert second.headers["x-jev-strategy"] == "always-strong"
@@ -262,33 +320,44 @@ def test_explicit_strategy_pins_the_session(monkeypatch) -> None:
 def test_pinned_session_strategy_can_be_overridden(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = make_app(make_engine(multi_strategy_document()))
-    conversation = {"messages": [{"role": "user", "content": SIMPLE_PROMPT}]}
+    messages = [{"role": "user", "content": SIMPLE_PROMPT}]
 
-    request(app, "POST", "/v1/chat/completions?strategy=always-strong", json=conversation)
+    request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"model": "always-strong", "messages": messages},
+    )
     overridden = request(
-        app, "POST", "/v1/chat/completions?strategy=default", json=conversation
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"model": "task_aware", "messages": messages},
     )
 
-    # The explicit name wins for this turn even though the session pinned the other
+    # The model field wins for this turn even though the session pinned the other
     # strategy; the sticky session state still keeps the already-selected model.
-    assert overridden.headers["x-jev-strategy"] == "default"
+    assert overridden.headers["x-jev-strategy"] == "task_aware"
     assert overridden.headers["x-jev-route"] == LARGE_ID
 
 
-def test_unknown_explicit_strategy_is_rejected(monkeypatch) -> None:
+def test_unknown_model_name_is_rejected(monkeypatch) -> None:
     calls = install_completion(monkeypatch)
     app = make_app(make_engine(multi_strategy_document()))
 
     response = request(
         app,
         "POST",
-        "/v1/chat/completions?strategy=nope",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        "/v1/chat/completions",
+        json={
+            "model": "nope",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "unknown_strategy"
-    assert response.json()["error"]["param"] == "strategy"
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "model_not_found"
+    assert response.json()["error"]["param"] == "model"
     assert calls == []
 
 
@@ -300,13 +369,16 @@ def test_preview_routes_without_mutating_state(monkeypatch) -> None:
     response = request(
         app,
         "POST",
-        "/v1/routing/preview?strategy=always-strong",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        "/v1/routing/preview",
+        json={
+            "model": "always-strong",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["default"] == "default"
+    assert payload["default"] == "task_aware"
     assert len(payload["preview"]) == 1
     chosen = payload["preview"][0]
     assert chosen["strategy"] == "always-strong"
@@ -324,14 +396,18 @@ def test_preview_compares_all_strategies_without_mutating_state(monkeypatch) -> 
 
     response = request(
         app, "POST", "/v1/routing/preview",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={
+            "model": "task_aware",
+            "strategy": ["task_aware", "always-strong", "always-small"],
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["default"] == "default"
+    assert payload["default"] == "task_aware"
     assert {row["strategy"]: row["route"] for row in payload["preview"]} == {
-        "default": SMALL_ID,
+        "task_aware": SMALL_ID,
         "always-strong": LARGE_ID,
         "always-small": SMALL_ID,
     }
@@ -346,8 +422,12 @@ def test_preview_rejects_an_unknown_strategy(monkeypatch) -> None:
     response = request(
         app,
         "POST",
-        "/v1/routing/preview?strategy=nope",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        "/v1/routing/preview",
+        json={
+            "model": "task_aware",
+            "strategy": ["nope"],
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
     )
 
     assert response.status_code == 400
@@ -371,7 +451,10 @@ def test_enabled_storage_records_request_decision_and_outcome(
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": COMPLEX_PROMPT}]},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
+        },
     )
 
     assert response.status_code == 200
@@ -388,10 +471,10 @@ def test_enabled_storage_records_request_decision_and_outcome(
         decision_row = db.execute(
             "SELECT strategy, route, request_id, config_hash FROM decisions"
         ).fetchone()
-    assert request_row[0] == "default"
-    assert request_row[1] == "auto"
+    assert request_row[0] == "task_aware"
+    assert request_row[1] is None
     assert request_row[2] == COMPLEX_PROMPT
-    assert decision_row[0] == "default"
+    assert decision_row[0] == "task_aware"
     assert decision_row[1] == LARGE_ID
     assert decision_row[2] == response.headers["x-jev-request-id"]
     assert decision_row[3]
@@ -421,7 +504,9 @@ def test_unknown_model_request_is_still_recorded(tmp_path: Path, monkeypatch) ->
     store.close()
 
 
-def test_unknown_strategy_request_is_recorded(tmp_path: Path, monkeypatch) -> None:
+def test_unknown_model_request_records_the_default_strategy(
+    tmp_path: Path, monkeypatch
+) -> None:
     install_completion(monkeypatch)
     document = stored_document(tmp_path)
     catalog = catalog_from_document(document, "test catalog")
@@ -431,15 +516,15 @@ def test_unknown_strategy_request_is_recorded(tmp_path: Path, monkeypatch) -> No
     response = request(
         app,
         "POST",
-        "/v1/chat/completions?strategy=nope",
-        json={"messages": [{"role": "user", "content": "hi"}]},
+        "/v1/chat/completions",
+        json={"model": "nope", "messages": [{"role": "user", "content": "hi"}]},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 404
     assert store.counts()["requests"] == 1
     with sqlite3.connect(catalog.storage.path) as db:
         row = db.execute("SELECT strategy FROM requests").fetchone()
-    assert row[0] == "nope"
+    assert row[0] == "task_aware"
     store.close()
 
 
@@ -491,7 +576,7 @@ def test_request_write_failure_returns_503_before_upstream(
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
     assert response.status_code == 503
@@ -509,7 +594,7 @@ def test_decision_write_failure_returns_503_before_upstream(monkeypatch) -> None
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
     assert response.status_code == 503
@@ -527,7 +612,7 @@ def test_outcome_write_failure_is_reported(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
     assert response.status_code == 503

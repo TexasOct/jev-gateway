@@ -37,6 +37,7 @@ def custom_document() -> dict:
         "audit": {"models": [LARGE_MODEL_ID], "score": 0.8, "description": "Security audits", "reasoning_effort": "high"},
     }
     document["strategies"] = {
+        "task_aware": {},
         "economy": {
             "kind": "policy", "mode": "fresh",
             "labels": {
@@ -58,8 +59,8 @@ def tag_document() -> dict:
         "cheap": {"score": 0, "description": "Cheap tasks"},
         "expensive": {"score": 0.6, "description": "Expensive tasks"},
     }
-    document["models"][0]["tags"] = ["default/quick", "economy/cheap"]
-    document["models"][1]["tags"] = ["default/deep", "economy/expensive"]
+    document["models"][0]["tags"] = ["task_aware/quick", "economy/cheap"]
+    document["models"][1]["tags"] = ["task_aware/deep", "economy/expensive"]
     return document
 
 
@@ -67,7 +68,7 @@ def test_named_strategy_replaces_labels_and_four_label_order() -> None:
     catalog = catalog_from_document(custom_document(), "test")
     assert list(catalog.policy.labels) == ["quick", "work", "thorough", "audit"]
     assert list(catalog.strategies[1].policy.labels) == ["cheap", "expensive"]
-    strategy = PolicyStrategy("default", catalog.policy)
+    strategy = PolicyStrategy("task_aware", catalog.policy)
     signals = extract_signals(turns("hello"))
     assert strategy._signal_label(replace(signals, score=0.55)) == "thorough"
     assert strategy._signal_label(replace(signals, score=0.85)) == "audit"
@@ -108,7 +109,7 @@ def test_named_strategy_without_labels_inherits_default_scoped_pools() -> None:
 
     assert outcome.model == LARGE_MODEL_ID
     assert outcome.tier == "deep"
-    assert catalog.strategies[-1].policy.labels["deep"].tag == "default/deep"
+    assert catalog.strategies[-1].policy.labels["deep"].tag == "task_aware/deep"
 
 
 def test_models_can_route_only_by_scoped_tags() -> None:
@@ -116,7 +117,7 @@ def test_models_can_route_only_by_scoped_tags() -> None:
     signals = extract_signals(turns("hello"))
     registry = StrategyRegistry.from_catalog(catalog)
 
-    default = registry.get("default").decide(
+    default = registry.get("task_aware").decide(
         RoutingRequest(replace(signals, score=0.8), None, None, 1, 0), catalog
     )
     economy = registry.get("economy").decide(
@@ -129,14 +130,14 @@ def test_models_can_route_only_by_scoped_tags() -> None:
     assert economy.tier == "expensive"
     large = catalog.by_name(LARGE_MODEL_ID)
     assert large is not None
-    assert large.tags == ("default/deep", "economy/expensive")
+    assert large.tags == ("task_aware/deep", "economy/expensive")
 
 
 def test_label_can_override_its_default_scoped_tag() -> None:
     document = tag_document()
     document["policy"]["labels"]["deep"]["tag"] = "shared/high"
     document["models"][1]["tags"].append("shared/high")
-    document["models"][1]["tags"].remove("default/deep")
+    document["models"][1]["tags"].remove("task_aware/deep")
 
     catalog = catalog_from_document(document, "tags")
     assert catalog.policy.labels["deep"].tag == "shared/high"
@@ -153,7 +154,7 @@ def test_label_can_override_its_default_scoped_tag() -> None:
             "both models and tag",
         ),
         (
-            lambda d: d["models"][0].update(tags=["default/quick", "default/quick"]),
+            lambda d: d["models"][0].update(tags=["task_aware/quick", "task_aware/quick"]),
             "more than once",
         ),
         (lambda d: d["models"][0].update(tags=["default//quick"]), "segments"),
@@ -166,7 +167,7 @@ def test_label_can_override_its_default_scoped_tag() -> None:
 def test_invalid_scoped_tags(mutation, error: str) -> None:
     document = tag_document()
     if "both models" in error:
-        document["policy"]["labels"]["quick"]["tag"] = "default/quick"
+        document["policy"]["labels"]["quick"]["tag"] = "task_aware/quick"
     mutation(document)
     with pytest.raises(ValueError, match=error):
         catalog_from_document(document, "tags")
@@ -190,7 +191,7 @@ def test_legacy_tiers_keep_custom_scoring_thresholds() -> None:
         "long_prompt_weight": 0.2,
     }
     catalog = catalog_from_document(document, "legacy")
-    strategy = StrategyRegistry.from_catalog(catalog).get("default")
+    strategy = StrategyRegistry.from_catalog(catalog).get("task_aware")
     signals = extract_signals(turns("hello"), scoring=strategy.scoring)
 
     assert signals.score == 0.2
@@ -203,10 +204,10 @@ def test_legacy_tiers_keep_custom_scoring_thresholds() -> None:
 def test_fresh_mode_updates_label_when_model_does_not_change() -> None:
     document = tag_document()
     document["policy"]["mode"] = "fresh"
-    document["models"][0]["tags"].append("default/deep")
-    document["models"][1]["tags"].remove("default/deep")
+    document["models"][0]["tags"].append("task_aware/deep")
+    document["models"][1]["tags"].remove("task_aware/deep")
     catalog = catalog_from_document(document, "tags")
-    strategy = StrategyRegistry.from_catalog(catalog).get("default")
+    strategy = StrategyRegistry.from_catalog(catalog).get("task_aware")
     quick = extract_signals(turns("hello"))
     first = strategy.decide(RoutingRequest(quick, None, None, 1, 0), catalog)
     session = SessionState(
@@ -260,7 +261,7 @@ def test_old_session_label_recovers_and_reasoning_label_wins() -> None:
     snapshot = engine.session_snapshot("old")
     assert snapshot is not None
     assert snapshot["label"] == "quick"
-    audit = engine.decide(messages=turns("hello"), strategy="default", session_id=None, requested_model=LARGE_MODEL_ID)
+    audit = engine.decide(messages=turns("hello"), strategy="task_aware", session_id=None, requested_model=LARGE_MODEL_ID)
     assert audit.label in catalog.policy.labels
     direct = engine.decide(messages=turns("audit security architecture"))
     assert direct.label == "audit"

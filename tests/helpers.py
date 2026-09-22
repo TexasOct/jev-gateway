@@ -25,6 +25,7 @@ CATALOG_DOCUMENT: dict[str, Any] = {
             "api_key_env": "TEST_LARGE_PROVIDER_KEY",
         },
     ],
+    "strategies": {"task_aware": {}},
     "policy": {
         "mode": "escalate",
         "selection": "balanced",
@@ -118,6 +119,7 @@ def route_entry(name: str, **overrides: Any) -> dict[str, Any]:
 def single_route_document(**route_overrides: Any) -> dict[str, Any]:
     """Build a minimal valid document with one route named 'only'."""
     return {
+        "strategies": {"task_aware": {}},
         "policy": {
             "tier_models": {
                 "simple": ["test-provider/vendor/only"],
@@ -152,6 +154,7 @@ def tier_one_document(**policy_overrides: Any) -> dict[str, Any]:
         else:
             policy[key] = value
     return {
+        "strategies": {"task_aware": {}},
         "policy": policy,
         "providers": [
             {

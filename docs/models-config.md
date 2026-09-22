@@ -55,7 +55,7 @@ uv run jev-gateway
 
 ## `policy` 和 `strategies`
 
-`policy` 与每个 `strategies.<名称>` 使用同一字段结构。每个策略有自己的 `labels`，按 JSON 声明顺序排列。第一项 `score` 必须为 `0`，后续阈值严格递增且落在 `[0, 1]`。本地评分选择分数不高于当前分数的最后一个标签；命中 `scoring.markers` 时直接选最后一个标签。每项的 `description` 供 JEV 分类使用，`reasoning_effort` 可选。模型池默认来自 `<策略名>/<标签名>`：顶层策略名是 `default`，具名策略直接使用配置名。匹配是完整字符串精确匹配。标签可用 `tag` 改成其他精确标签。具名策略未声明 `labels` 时继承顶层集合，声明后整体替换，不合并不同命名体系。候选仍会经过约束筛选和策略排序；必要时可能扩大至整个模型目录。
+`policy` 与每个 `strategies.<名称>` 使用同一字段结构。每个策略有自己的 `labels`，按 JSON 声明顺序排列。第一项 `score` 必须为 `0`，后续阈值严格递增且落在 `[0, 1]`。本地评分选择分数不高于当前分数的最后一个标签；命中 `scoring.markers` 时直接选最后一个标签。每项的 `description` 供 JEV 分类使用，`reasoning_effort` 可选。模型池默认来自 `<策略名>/<标签名>`：默认策略名是 `task_aware`，其他策略直接使用配置名。匹配是完整字符串精确匹配。标签可用 `tag` 改成其他精确标签。具名策略未声明 `labels` 时继承顶层集合，声明后整体替换，不合并不同命名体系。候选仍会经过约束筛选和策略排序；必要时可能扩大至整个模型目录。
 
 ```json
 "labels": {
@@ -64,8 +64,8 @@ uv run jev-gateway
 }
 
 "models": [
-  {"provider": "deepseek", "upstream_model": "deepseek-flash", "tags": ["default/quick"]},
-  {"provider": "openai", "upstream_model": "gpt-5.6-sol", "tags": ["default/deep"]}
+  {"provider": "deepseek", "upstream_model": "deepseek-flash", "tags": ["task_aware/quick"]},
+  {"provider": "openai", "upstream_model": "gpt-5.6-sol", "tags": ["task_aware/deep"]}
 ]
 ```
 
@@ -84,7 +84,7 @@ uv run jev-gateway
 | `budget.context_pressure_ratio` | `0.75` | 当前模型上下文使用量超过窗口的该比例时，触发上下文压力检查。 |
 | `reasoning` | 见下文 | 选定模型之后如何决定思考档位。 |
 
-紧凑格式中，`strategies` 的每个同级键都是策略名和 OpenAI API 的虚拟模型名。例如 `strategies.quality` 通过 `model: "quality"` 选择，`model: "auto"` 使用顶层 `policy` 的默认策略；provider 限定的具体模型 ID 仍表示手动指定。可以同时定义任意多个策略，每个策略只写与顶层策略不同的字段，并可声明自己的完整标签集合。每项还可选填 `description` 和 `kind`。请求也可用 `?strategy=<名称>` 或 `X-JEV-Strategy` 兼容选择。策略名不得与 `auto`、`jev-auto` 或任何具体模型 ID 重名。旧的 `default`/`definitions` 包装格式仍可用于兼容已有配置和自定义策略类型。
+紧凑格式中，`strategies` 的每个同级键都是策略名和 OpenAI API 的虚拟模型名。`strategies.task_aware` 必须存在，并且是默认虚拟模型；例如 `model: "quality"` 选择 `strategies.quality`，`model: "task_aware"` 选择默认策略。provider 限定的具体模型 ID 仍表示手动指定。可以同时定义任意多个策略，每个策略只写与顶层策略不同的字段，并可声明自己的完整标签集合。每项还可选填 `description` 和 `kind`。请求只能通过 JSON body 的 `model` 字段选择策略；`?strategy=` 会返回 `400 unsupported_parameter`，`X-JEV-Strategy` 请求头不参与选择。已废除的 `auto`、`jev-auto` 仍是保留名称，不能配置为策略名；请求它们会返回 `404 model_not_found`。策略名也不得与具体模型 ID 重名。旧的 `default`/`definitions` 包装格式仍可读取，但默认项省略时使用 `task_aware`。
 
 ### `scoring` 与 `signals`
 
@@ -242,6 +242,10 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | `max_sessions` | `2048` | 内存会话数量上限，至少为 1。 |
 | `decision_log_size` | `500` | 内存决策日志条数，至少为 1。 |
 | `echo_requested_model` | `true` | 响应中的模型名是否回显请求的 `model`；路由选中的具体模型仍可从 `X-JEV-Route` 查看。 |
+| `logging_level` | `INFO` | 网关模块日志等级：`DEBUG`、`INFO`、`WARNING`、`ERROR` 或 `CRITICAL`，不区分大小写；启动时生效。 |
+| `access_log` | `false` | 是否输出 Uvicorn 的逐条 HTTP 访问记录；启动时生效，默认关闭轮询造成的刷屏。 |
+
+`jev-gateway` 启动后将网关、Uvicorn 与 LiteLLM 日志写入 stderr。常规路由决策和结果按 INFO 输出，开始流式响应按 DEBUG 输出，失败与存储异常按 WARNING/ERROR 输出。日志包含模块名、决策 ID、路由和耗时等字段；不输出请求正文或密钥。`uvicorn.error` 是 Uvicorn 的生命周期 logger 名称，不代表 ERROR 级别；终端中显示为 `uvicorn`。终端输出只给日志级别文本着色，时间、模块名和正文保持终端默认颜色；重定向到文件或管道时全部保持纯文本。LiteLLM 的 provider 提示直写 stdout 已关闭；其有效警告仍保留。需要查看每个 HTTP 请求时将 `gateway.access_log` 设为 `true` 并重启。通过其他 ASGI 启动方式运行时，应自行配置服务器日志。
 
 ## `storage`
 
