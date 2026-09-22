@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "DecisionRecord",
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS requests (
     received_at REAL NOT NULL,
     session_id TEXT,
     strategy TEXT,
-    requested_model TEXT NOT NULL,
+    requested_model TEXT,
     endpoint TEXT NOT NULL,
     client TEXT,
     user_agent TEXT,
@@ -225,7 +225,7 @@ class RequestRecord:
     received_at: float
     session_id: str | None
     requested_strategy: str | None
-    requested_model: str
+    requested_model: str | None
     endpoint: str
     client: str | None
     user_agent: str | None
@@ -369,6 +369,36 @@ class NullRecordStore:
         return None
 
 
+def _migrate_requested_model(connection: sqlite3.Connection) -> None:
+    """Rebuild legacy requests tables so invalid input can retain a NULL model."""
+    columns = {row[1]: row for row in connection.execute("PRAGMA table_info(requests)")}
+    if not columns or not columns["requested_model"][3]:
+        return
+    connection.execute("DROP VIEW IF EXISTS decision_evidence")
+    # This table has no inbound foreign keys. Copy all original columns and rows;
+    # SQLite cannot remove a NOT NULL constraint with ALTER TABLE.
+    connection.execute("ALTER TABLE requests RENAME TO requests_legacy")
+    # The source table is an older version of our own fixed schema. Do not
+    # interpolate SQLite metadata into DDL or identifiers.
+    connection.execute(_TABLES.split(";", 1)[0])
+    connection.execute(
+        "INSERT INTO requests (request_id, received_at, session_id, strategy, "
+        "requested_model, endpoint, client, user_agent, stream, max_tokens, "
+        "has_tools, has_vision, wants_json, prompt_chars, prompt_tokens, "
+        "conversation_tokens, turn_index, capture_content, prompt_digest, prompt, "
+        "messages_json, tools_json, response_format_json) "
+        "SELECT request_id, received_at, session_id, strategy, requested_model, "
+        "endpoint, client, user_agent, stream, max_tokens, has_tools, has_vision, "
+        "wants_json, prompt_chars, prompt_tokens, conversation_tokens, turn_index, "
+        "capture_content, prompt_digest, prompt, messages_json, tools_json, "
+        "response_format_json FROM requests_legacy"
+    )
+    connection.execute("DROP TABLE requests_legacy")
+    connection.execute("CREATE INDEX idx_requests_received_at ON requests (received_at)")
+    connection.execute("CREATE INDEX idx_requests_session ON requests (session_id)")
+    connection.executescript(DECISION_EVIDENCE_VIEW)
+
+
 def _migrate_decision_columns(connection: sqlite3.Connection) -> None:
     """Widen a decisions table that a previous version created.
 
@@ -429,6 +459,7 @@ class _SqliteBackend:
             connection.execute(f"PRAGMA busy_timeout={int(self.settings.busy_timeout_ms)}")
             connection.executescript(SCHEMA)
             _migrate_decision_columns(connection)
+            _migrate_requested_model(connection)
             connection.commit()
         except Exception:
             connection.close()

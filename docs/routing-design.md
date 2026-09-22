@@ -30,7 +30,7 @@ the same model label.
     {
       "provider": "openai",
       "upstream_model": "gpt-5.6-sol",
-      "tags": ["default/quick", "default/deep"],
+      "tags": ["task_aware/quick", "task_aware/deep"],
       "priority": 20,
       "quality": 0.95,
       "context_window": 1000000,
@@ -62,7 +62,7 @@ required. Other types may use LiteLLM's defaults or additional arguments such
 as `params.api_version`; `param_env` resolves secret arguments without exposing
 them in the policy response. Every model requires `provider` and
 `upstream_model`. Tags use `/` for scope and match only
-as complete strings. The default strategy label `deep` resolves `default/deep`;
+as complete strings. The default strategy label `deep` resolves `task_aware/deep`;
 strategy `quality` label `critical` resolves `quality/critical`. A label can set
 `tag` to override that convention. The loader rejects duplicate provider IDs,
 duplicate canonical model IDs, missing provider references, labels whose tag
@@ -181,13 +181,14 @@ A strategy is the unit that owns the selection rules above. `PolicyStrategy` is
 the built-in implementation; it wraps one complete `RoutingPolicy` and answers
 one question per request: which catalog model serves this turn.
 
-The top-level `policy` block is the `default` strategy selected by
-`model: "auto"`. The optional `strategies` object defines any number of sibling
-model-routing strategies:
+The top-level `policy` block contains fields inherited by every strategy.
+`strategies.task_aware` is required and is the default virtual model. The same
+object may define any number of sibling model-routing strategies:
 
 ```json
 {
   "strategies": {
+    "task_aware": {},
     "quality": {
       "mode": "cached",
       "selection": "quality_first",
@@ -211,22 +212,24 @@ model-routing strategies:
 Each strategy inherits unspecified policy fields. Declaring `labels` replaces
 the label set, and its pools resolve from tags such as `quality/routine` and
 `economy/budget`. A strategy that does not declare `labels` keeps the top-level
-labels and their `default/*` pools. A request with `model: "quality"` or
-`model: "economy"` uses that strategy. The old `default`/`definitions` wrapper
-and `tier_models` remain readable for existing catalogs.
+labels and resolves their implicit pools under its own strategy name. A request
+with `model: "quality"` or `model: "economy"` uses that strategy. The old
+`default`/`definitions` wrapper and `tier_models` remain readable for existing
+catalogs.
 
 Each named strategy is exposed as an OpenAI-compatible virtual model. A request
-with `model: "auto"` uses the default strategy; `model: "quality"` selects the
-strategy named `quality`; and a provider-qualified catalog model ID manually
-selects that concrete model. `GET /v1/models` includes `auto`, non-default
-strategy names, and catalog model IDs. Strategy names cannot conflict with an
-automatic alias or a catalog model ID.
+with `model: "task_aware"` uses the default strategy; `model: "quality"` selects
+the strategy named `quality`; and a provider-qualified catalog model ID manually
+selects that concrete model. `GET /v1/models` includes all strategy names and
+catalog model IDs. The retired `auto` and `jev-auto` names remain reserved and
+return `404 model_not_found` when requested.
 
-After resolving `model`, compatibility selection uses the `?strategy=` query
-parameter, the `X-JEV-Strategy` header, the session's pinned strategy, then the
-default. An explicit unknown name is a `400 unknown_strategy`. A non-explicit
-name that is no longer registered falls back to the default, so a session pinned
-to a strategy removed by a reload keeps working.
+The request body's `model` field is the only strategy-selection input. A
+strategy name there takes precedence over session state. A concrete model ID
+uses the session's pinned strategy, then falls back to `task_aware` when the pin
+is absent or no longer registered. `?strategy=` returns
+`400 unsupported_parameter`; the `X-JEV-Strategy` request header is ignored.
+The same header remains in responses to report the strategy that ran.
 
 The engine deep-copies the session state before handing it to a strategy, so a
 custom strategy cannot mutate the live store. The `Catalog` dataclass is frozen,
@@ -236,9 +239,10 @@ are frozen dataclasses.
 
 `GET /v1/routing/strategies` lists the registered strategies and their policies.
 `POST /v1/routing/preview` compares all strategies for the same chat request
-by default. The body may contain `"strategy": ["default", "quality"]` to select a
-subset, and `?strategy=quality` previews one. The response is
-`{"default": "default", "preview": [...]}`. It never serves an upstream call,
+by default. The body may contain
+`"strategy": ["task_aware", "quality"]` to select a subset. Put one strategy
+name in `model` and omit `strategy` to preview only that strategy. The response
+is `{"default": "task_aware", "preview": [...]}`. It never serves an upstream call,
 writes a decision, or mutates session state.
 
 ## Sessions and observability

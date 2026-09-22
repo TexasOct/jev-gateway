@@ -40,7 +40,6 @@ from jev_gateway.strategy import (
 )
 
 __all__ = [
-    "AUTO_MODELS",
     "Decision",
     "RoutingEngine",
     "StorageUnavailableError",
@@ -48,9 +47,8 @@ __all__ = [
     "UnknownStrategyError",
 ]
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
-AUTO_MODELS = {"", "auto", "jev-auto"}
 RECENT_SCORE_LIMIT = 10
 DECISION_LOG_SIZE = 500
 
@@ -155,7 +153,7 @@ class RoutingEngine:
         session_id: str | None,
         meta: RequestMeta,
         messages: list[dict[str, Any]],
-        requested_model: str = "auto",
+        requested_model: str | None = None,
         max_tokens: int | None = None,
         tools: list[Any] | None = None,
         response_format: dict[str, Any] | None = None,
@@ -200,7 +198,7 @@ class RoutingEngine:
         self,
         *,
         messages: list[dict[str, Any]],
-        requested_model: str = "auto",
+        requested_model: str | None = None,
         session_id: str | None = None,
         max_tokens: int | None = None,
         tools: list[Any] | None = None,
@@ -219,7 +217,7 @@ class RoutingEngine:
             scoring=strategy_impl.scoring,
         )
         manual: ModelProfile | None = None
-        if requested_model not in AUTO_MODELS:
+        if requested_model is not None:
             manual = self.catalog.by_name(requested_model)
             if manual is None:
                 raise UnknownModelError(requested_model)
@@ -270,7 +268,7 @@ class RoutingEngine:
         self,
         *,
         messages: list[dict[str, Any]],
-        requested_model: str = "auto",
+        requested_model: str | None = None,
         session_id: str | None = None,
         max_tokens: int | None = None,
         tools: list[Any] | None = None,
@@ -288,7 +286,7 @@ class RoutingEngine:
             scoring=strategy_impl.scoring,
         )
         manual: ModelProfile | None = None
-        if requested_model not in AUTO_MODELS:
+        if requested_model is not None:
             manual = self.catalog.by_name(requested_model)
             if manual is None:
                 raise UnknownModelError(requested_model)

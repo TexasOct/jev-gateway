@@ -100,6 +100,7 @@ def test_content_opt_out_keeps_digest_and_evidence(tmp_path: Path) -> None:
         StorageSettings(enabled=True, path=str(path), capture_content=False)
     )
     store.record_request(_request("req-1"))
+    store.flush()
     with sqlite3.connect(path) as db:
         digest, prompt, messages, chars = db.execute(
             "SELECT prompt_digest, prompt, messages_json, prompt_chars FROM requests"

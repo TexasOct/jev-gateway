@@ -13,7 +13,7 @@ The catalog has three layers:
 2. `models` name a provider and its exact `upstream_model`, then define model
    capabilities, limits, quality, cost, and scoped routing tags.
 3. `policy.labels` defines each strategy's ordered score boundaries. A label gets
-   its model pool from tags such as `default/quick` or `quality/critical`.
+   its model pool from tags such as `task_aware/quick` or `quality/critical`.
 
 A catalog model is indexed only by its provider-qualified identity:
 
@@ -27,7 +27,7 @@ For example, a model declared as:
 {
   "provider": "deepseek",
   "upstream_model": "deepseek-flash",
-  "tags": ["default/quick", "economy/budget"]
+  "tags": ["task_aware/quick", "economy/budget"]
 }
 ```
 
@@ -57,7 +57,7 @@ unique.
     {
       "provider": "deepseek",
       "upstream_model": "deepseek-flash",
-      "tags": ["default/quick", "default/working"],
+      "tags": ["task_aware/quick", "task_aware/working"],
       "context_window": 1000000,
       "max_output_tokens": 384000,
       "capabilities": {
@@ -69,7 +69,7 @@ unique.
     {
       "provider": "openai",
       "upstream_model": "gpt-5.6-sol",
-      "tags": ["default/deep"],
+      "tags": ["task_aware/deep"],
       "context_window": 1000000,
       "max_output_tokens": 128000,
       "capabilities": {
@@ -99,7 +99,7 @@ LiteLLM needs. For example, Azure can specify `params.api_version` and Vertex AI
 can specify `params.vertex_project` and `params.vertex_location`; secret arguments
 belong in `param_env`. `type` does not change the catalog model ID. Tags use `/`
 as a scope separator and are matched exactly.
-For the default strategy, label `quick` resolves `default/quick`; label `critical`
+For the default strategy, label `quick` resolves `task_aware/quick`; label `critical`
 in strategy `quality` resolves `quality/critical`. A label may set `tag` to use a
 different exact tag. JEV filters the matching models by capabilities, context
 window, and output limit, then applies the configured cost, quality, and priority rules.
@@ -138,18 +138,26 @@ value.
 
 The optional `gateway` object has `host`, `port`, `api_key_env`,
 `session_strategy`, `session_ttl_seconds`, `max_sessions`, `decision_log_size`,
-and `echo_requested_model`. The host and port apply when the process starts.
-The other gateway settings apply after a successful reload.
+`echo_requested_model`, `logging_level`, and `access_log`. Host, port, and logging
+settings apply when the process starts; the other gateway settings apply after a
+successful reload. By default, `jev-gateway` logs routing decisions and outcomes
+at INFO with module names and request IDs, and skips per-request Uvicorn access
+lines. Set `gateway.access_log` to `true` for HTTP request lines, or
+`gateway.logging_level` to `DEBUG` for stream-start and traceback details.
+LiteLLM's provider-list debug print is disabled; warnings remain visible. Uvicorn's
+lifecycle logger is displayed as `uvicorn`, not `uvicorn.error`; terminal output
+uses level colors and redirected output remains plain text.
 
 ## Routing strategies
 
-The top-level `policy` block is the `default` strategy used by `model: "auto"`.
-The optional `strategies` object maps each additional model name directly to its
-routing overrides:
+The top-level `policy` block contains fields inherited by named strategies.
+`strategies.task_aware` is required and is the default virtual model. Other
+entries add sibling virtual models and override only the routing fields they need:
 
 ```json
 {
   "strategies": {
+    "task_aware": {},
     "quality": {
       "selection": "quality_first",
       "labels": {
@@ -170,8 +178,8 @@ routing overrides:
 
 Each strategy inherits every unspecified field from the top-level `policy`.
 Declaring `labels` replaces the inherited set as a whole; `economy` does not inherit `quick`, `working`, or `deep`. Add any
-number of sibling strategy names. Each name is also an OpenAI-compatible model
-name.
+number of sibling strategy names, but keep `task_aware` defined. Each name is
+also an OpenAI-compatible model name.
 
 `mode` defaults to `sticky`, which holds the first selected model until a reason
 in `pin.break_on` requires a switch. `cached` has the same hard-constraint
@@ -236,24 +244,25 @@ source and matching rule, not the full answers. Restart the gateway after
 changing Python strategy code; JSON configuration can be reloaded through the
 routing reload endpoint.
 
-Each named strategy is exposed as an OpenAI-compatible virtual model. Use
-`"model": "auto"` for the default strategy, or send the strategy name directly:
+Each named strategy is exposed as an OpenAI-compatible virtual model. Send the
+strategy name through the standard request-body `model` field. The default is
+`task_aware`:
 
 ```json
 {"model": "quality", "messages": [{"role": "user", "content": "Review this design."}]}
 ```
 
-`GET /v1/models` lists `auto`, every non-default strategy name, and concrete
+`GET /v1/models` lists `task_aware`, the other strategy names, and concrete
 catalog model IDs. A strategy model name runs that strategy's normal selection;
-a concrete catalog model ID still manually locks the request to that model.
+a concrete catalog model ID manually locks the request to that model.
 
-For compatibility, a request can also select a strategy in this order after its
-`model` is resolved: the `?strategy=` query parameter, the `X-JEV-Strategy`
-request header, the session's pinned strategy, then the default strategy. An
-explicit name that is not registered returns `400 unknown_strategy`. A
-non-explicit name that is not registered, for example a pin from an older
-catalog, falls back to the default. The selected name is stored on the session
-and returned in `X-JEV-Strategy`.
+The request body is the only strategy-selection interface. A registered
+strategy name in `model` selects that strategy. A concrete model ID uses the
+strategy pinned to the session, or `task_aware` when no valid pin exists. The
+retired `auto` and `jev-auto` names return `404 model_not_found`. The
+`?strategy=` query parameter returns `400 unsupported_parameter`, and the
+`X-JEV-Strategy` request header does not affect selection. `X-JEV-Strategy`
+remains a response header that reports the strategy used.
 
 The engine passes each strategy a detached copy of the session state, so a
 strategy cannot mutate live session state. The catalog dataclass itself is
@@ -286,9 +295,10 @@ with the same `name` and must not mutate either input.
 
 `GET /v1/routing/strategies` lists the registered strategies and their policies.
 `POST /v1/routing/preview` compares all registered strategies for the same chat
-request by default. Send `{"strategy": ["default", "quality"], "messages": [...]}` to
-compare a subset, or use `?strategy=quality` to preview only one. It returns
-`{"default": "default", "preview": [{"strategy": "default", "route": "...", ...}]}`
+request by default. Send `{"model": "task_aware", "strategy": ["task_aware", "quality"], "messages": [...]}` to
+compare a subset. To preview one strategy, put its name in `model` and omit
+`strategy`. It returns
+`{"default": "task_aware", "preview": [{"strategy": "task_aware", "route": "...", ...}]}`
 without serving an upstream call, writing a decision, or touching session or
 storage state.
 
@@ -342,8 +352,8 @@ The gateway provides `GET /healthz`, `GET /v1/models`,
 `GET /v1/routing/sessions/{session_id}`, and OpenAI-compatible
 `POST /v1/chat/completions`.
 
-Use `model: "auto"` for routing. To select a concrete catalog model manually,
-send its provider-qualified ID:
+Use `model: "task_aware"` for the default routing behavior. To select a
+concrete catalog model manually, send its provider-qualified ID:
 
 ```json
 {
@@ -358,8 +368,9 @@ Responses include `X-JEV-Route` (catalog model ID), `X-JEV-Provider`,
 `X-JEV-Decision-Id`. When the gateway decided a thinking level, the response also
 carries `X-JEV-Reasoning-Effort` and `X-JEV-Reasoning-Source`.
 
-To select a strategy for one request, add `?strategy=<name>` or the
-`X-JEV-Strategy: <name>` header.
+To select another strategy for one request, put its registered name in the JSON
+body's `model` field. Query parameters and request headers do not select
+strategies.
 
 ## Reload
 

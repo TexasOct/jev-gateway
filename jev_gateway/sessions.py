@@ -43,6 +43,9 @@ class SessionState:
     cost_usd: float = 0.0
     recent_scores: list[float] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
+    # Provider adapters may retain bounded, opaque continuation metadata for the
+    # life of this session. It is deliberately excluded from inspection output.
+    adapter_state: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def record_event(self, event: dict[str, Any], *, limit: int = EVENT_LIMIT) -> None:
         """Append a decision or switch event, keeping only the newest entries."""

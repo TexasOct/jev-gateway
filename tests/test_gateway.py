@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import types
 import warnings
@@ -156,7 +157,7 @@ def test_first_turn_routes_and_reports_the_decision(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
             "max_tokens": 64,
             "temperature": 0.2,
@@ -187,6 +188,7 @@ def test_temperature_is_dropped_for_models_that_reject_it(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
             "temperature": 0,
         },
@@ -230,6 +232,120 @@ def test_deepseek_uses_native_litellm_provider(monkeypatch) -> None:
     assert calls[0]["tools"]
 
 
+def test_deepseek_restores_reasoning_content_from_session_history(monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "The answer is 4.",
+                    "reasoning_content": "I added two and two.",
+                },
+                "finish_reason": "stop",
+            }],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    document = catalog_document()
+    document["providers"][0]["type"] = "deepseek"
+    config = make_config()
+    config.engine.reload_catalog(catalog_from_document(document, "test catalog"))
+    app = gateway.create_app(config)
+
+    first = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "What is 2 + 2?"}],
+        },
+    )
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "task_aware",
+            "messages": [
+                {"role": "user", "content": "What is 2 + 2?"},
+                {"role": "assistant", "content": "The answer is 4."},
+                {"role": "user", "content": "Explain that answer."},
+            ]
+        },
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert calls[1]["messages"][1]["reasoning_content"] == "I added two and two."
+
+
+def test_deepseek_bridges_openai_history_in_same_session(monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        content = "OpenAI answer." if len(calls) == 1 else "DeepSeek answer."
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    document = catalog_document()
+    document["providers"][0]["type"] = "deepseek"
+    config = make_config(mode="fresh")
+    config.engine.reload_catalog(catalog_from_document(document, "test catalog"))
+    app = gateway.create_app(config)
+
+    first = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": LARGE_ID,
+            "messages": [{"role": "user", "content": "First turn."}],
+        },
+    )
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": SMALL_ID,
+            "messages": [
+                {"role": "user", "content": "First turn."},
+                {"role": "assistant", "content": "OpenAI answer."},
+                {"role": "user", "content": "Second turn."},
+            ],
+        },
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.headers["x-jev-session-id"] == second.headers["x-jev-session-id"]
+    assert calls[0]["model"].startswith("openai/")
+    assert calls[1]["model"].startswith("deepseek/")
+    assert calls[1]["messages"][1]["reasoning_content"] == " "
+
+
 def test_provider_type_forwards_declared_completion_parameters(monkeypatch) -> None:
     calls = install_completion(monkeypatch)
     document = catalog_document()
@@ -253,7 +369,7 @@ def test_provider_type_forwards_declared_completion_parameters(monkeypatch) -> N
     assert response.status_code == 200
     assert calls[0]["model"] == "azure/vendor/small-model"
     assert calls[0]["api_version"] == "2024-10-21"
-    assert calls[0]["azure_ad_token"] == "value-from-env"
+    assert calls[0]["azure_ad_token"] == os.environ["TEST_AZURE_TOKEN"]
     assert "api_key" not in calls[0]
 
 
@@ -265,13 +381,14 @@ def test_session_stays_on_its_model_across_turns(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
     second = request(
         app,
         "POST",
         "/v1/chat/completions",
         json={
+            "model": "task_aware",
             "messages": [
                 {"role": "user", "content": SIMPLE_PROMPT},
                 {"role": "assistant", "content": "ok"},
@@ -294,13 +411,14 @@ def test_session_switches_models_when_the_work_gets_harder(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
     escalated = request(
         app,
         "POST",
         "/v1/chat/completions",
         json={
+            "model": "task_aware",
             "messages": [
                 {"role": "user", "content": SIMPLE_PROMPT},
                 {"role": "assistant", "content": "ok"},
@@ -323,13 +441,14 @@ def test_default_pin_holds_the_first_turn_model(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
     pinned = request(
         app,
         "POST",
         "/v1/chat/completions",
         json={
+            "model": "task_aware",
             "messages": [
                 {"role": "user", "content": SIMPLE_PROMPT},
                 {"role": "assistant", "content": "ok"},
@@ -352,7 +471,7 @@ def test_explicit_session_header_is_used(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         headers={"X-JEV-Session-Id": "chat-42"},
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
     assert response.headers["x-jev-session-id"] == "chat-42"
@@ -408,7 +527,10 @@ def test_missing_user_message_is_rejected(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "system", "content": "rules"}]},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "system", "content": "rules"}],
+        },
     )
 
     assert response.status_code == 400
@@ -443,7 +565,7 @@ def test_upstream_failure_becomes_a_gateway_error(monkeypatch) -> None:
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
     assert response.status_code == 502
@@ -492,7 +614,7 @@ def test_streaming_returns_openai_sse(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "stream": True,
             "messages": [{"role": "user", "content": "What is 2 + 2?"}],
         },
@@ -513,7 +635,7 @@ def test_routing_endpoints_expose_policy_decisions_and_sessions(monkeypatch) -> 
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
     decision_id = completion.headers["x-jev-decision-id"]
     session_id = completion.headers["x-jev-session-id"]
@@ -545,7 +667,7 @@ def test_errors_use_the_openai_error_wrapper(monkeypatch) -> None:
     install_completion(monkeypatch)
     app = gateway.create_app(make_config())
 
-    missing = request(app, "POST", "/v1/chat/completions", json={"model": "auto"})
+    missing = request(app, "POST", "/v1/chat/completions", json={"model": "task_aware"})
     assert missing.status_code == 400
     assert missing.json() == {
         "error": {
@@ -557,7 +679,7 @@ def test_errors_use_the_openai_error_wrapper(monkeypatch) -> None:
     }
 
     empty = request(
-        app, "POST", "/v1/chat/completions", json={"model": "auto", "messages": []}
+        app, "POST", "/v1/chat/completions", json={"model": "task_aware", "messages": []}
     )
     assert empty.status_code == 400
     assert empty.json()["error"]["param"] == "messages"
@@ -700,7 +822,7 @@ def test_each_model_uses_its_own_base_and_key(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
         },
     )
@@ -709,7 +831,7 @@ def test_each_model_uses_its_own_base_and_key(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
         },
     )
@@ -755,7 +877,7 @@ def test_same_provider_models_share_connection_and_keep_their_upstream_model(
         app,
         "POST",
         "/v1/chat/completions",
-        json={"messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
     stronger_request = request(
         app,
@@ -789,11 +911,11 @@ def test_response_model_echoes_the_requested_name(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
         },
     )
-    assert implicit.json()["model"] == "auto"
+    assert implicit.json()["model"] == "task_aware"
     assert implicit.headers["x-jev-model"] == "vendor/small-model"
 
     explicit = request(
@@ -817,7 +939,7 @@ def test_response_model_can_keep_the_upstream_name(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
         },
     )
@@ -851,14 +973,14 @@ def test_streaming_echoes_the_requested_model(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "stream": True,
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
         },
     )
 
     chunk = json.loads(response.text.splitlines()[0].removeprefix("data: "))
-    assert chunk["model"] == "auto"
+    assert chunk["model"] == "task_aware"
     assert chunk["object"] == "chat.completion.chunk"
 
 
@@ -871,7 +993,7 @@ def test_routing_reads_max_completion_tokens(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
         },
     )
@@ -880,7 +1002,7 @@ def test_routing_reads_max_completion_tokens(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": "写一个排序函数。"}],
             "max_completion_tokens": 5000,
         },
@@ -929,7 +1051,7 @@ def test_the_gateway_sends_the_level_it_clamped_to_the_route(
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
         },
     )
@@ -953,7 +1075,7 @@ def test_a_route_without_a_declared_ladder_forwards_the_clients_value(
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
             "reasoning_effort": "minimal",
         },
@@ -976,7 +1098,7 @@ def test_reasoning_mode_off_never_touches_the_field(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
             "reasoning_effort": "xhigh",
         },
@@ -998,7 +1120,7 @@ def test_a_level_the_route_cannot_name_is_clamped_not_forwarded(
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
             "reasoning_effort": "minimal",
         },
@@ -1018,7 +1140,7 @@ def test_cap_never_raises_above_what_the_client_asked_for(monkeypatch) -> None:
         "POST",
         "/v1/chat/completions",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
             "reasoning_effort": "low",
         },
@@ -1036,7 +1158,7 @@ def test_preview_reports_the_level_it_would_send(monkeypatch) -> None:
         "POST",
         "/v1/routing/preview",
         json={
-            "model": "auto",
+            "model": "task_aware",
             "messages": [{"role": "user", "content": COMPLEX_PROMPT}],
         },
     )

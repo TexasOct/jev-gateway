@@ -303,10 +303,15 @@ def test_policy_pin_break_on_must_be_a_list() -> None:
         catalog_from_document(document, "test catalog")
 
 
-def test_strategy_names_must_not_conflict_with_models_or_auto_aliases() -> None:
+def test_strategy_names_must_not_conflict_with_models_or_retired_aliases() -> None:
     document = multi_strategy_document()
     document["strategies"]["auto"] = document["strategies"].pop("quality")
-    with pytest.raises(ValueError, match="reserved automatic model name"):
+    with pytest.raises(ValueError, match="reserved model name"):
+        catalog_from_document(document, "test catalog")
+
+    document = multi_strategy_document()
+    document["strategies"]["jev-auto"] = document["strategies"].pop("quality")
+    with pytest.raises(ValueError, match="reserved model name"):
         catalog_from_document(document, "test catalog")
 
     document = multi_strategy_document()
@@ -359,6 +364,7 @@ def multi_strategy_document(**signals: Any) -> dict[str, Any]:
     """Return a compact catalog with multiple named model-routing strategies."""
     document = copy.deepcopy(CATALOG_DOCUMENT)
     document["strategies"] = {
+        "task_aware": {},
         "quality": {
             "mode": "fresh",
             "selection": "quality_first",
@@ -389,7 +395,7 @@ def test_document_signal_defaults_reach_every_strategy() -> None:
     assert {
         definition.name: definition.policy.scoring.patterns_enabled
         for definition in catalog.strategies
-    } == {"default": False, "quality": False, "economy": False}
+    } == {"task_aware": False, "quality": False, "economy": False}
     assert catalog.as_dict()["signals"] == {
         "patterns_enabled": False,
         "intent_patterns_enabled": None,
@@ -481,7 +487,7 @@ def test_strategy_scoring_overrides_the_document_signal_default() -> None:
     assert {
         definition.name: definition.policy.scoring.patterns_enabled
         for definition in catalog.strategies
-    } == {"default": False, "quality": True, "economy": False}
+    } == {"task_aware": False, "quality": True, "economy": False}
 
 
 def test_signals_stay_on_when_the_document_omits_the_block() -> None:
@@ -528,7 +534,7 @@ def test_document_intent_default_reaches_every_strategy() -> None:
     assert {
         definition.name: definition.policy.scoring.detects_intent
         for definition in catalog.strategies
-    } == {"default": True, "quality": True, "economy": True}
+    } == {"task_aware": True, "quality": True, "economy": True}
     # The scoring switch it was split from is untouched.
     assert catalog.policy.scoring.patterns_enabled is False
 
@@ -542,7 +548,7 @@ def test_intent_default_is_inert_when_the_document_says_nothing() -> None:
     assert {
         definition.name: definition.policy.scoring.intent_patterns_enabled
         for definition in catalog.strategies
-    } == {"default": None, "quality": None, "economy": None}
+    } == {"task_aware": None, "quality": None, "economy": None}
     # Unset follows patterns_enabled, so nothing changes for an existing catalog.
     assert catalog.policy.scoring.detects_intent is False
 
@@ -563,7 +569,7 @@ def test_a_strategy_keeps_its_own_intent_switch() -> None:
     assert {
         definition.name: definition.policy.scoring.detects_intent
         for definition in catalog.strategies
-    } == {"default": True, "quality": False, "economy": True}
+    } == {"task_aware": True, "quality": False, "economy": True}
 
 
 @pytest.mark.parametrize("bad", ["true", 1, []])

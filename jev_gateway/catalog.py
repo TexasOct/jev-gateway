@@ -18,6 +18,7 @@ from jev_gateway.config import (
     TIER_ORDER,
     normalize_api_base,
 )
+from jev_gateway.logging import LoggingSettings, logging_from_gateway
 from jev_gateway.reasoning import (
     REASONING_MODES,
     effort_by_tier_from_dict,
@@ -294,6 +295,7 @@ class GatewaySettings:
     max_sessions: int = 2048
     decision_log_size: int = 500
     echo_requested_model: bool = True
+    logging: LoggingSettings = field(default_factory=LoggingSettings)
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize non-secret gateway settings for the policy endpoint."""
@@ -307,6 +309,7 @@ class GatewaySettings:
             "max_sessions": self.max_sessions,
             "decision_log_size": self.decision_log_size,
             "echo_requested_model": self.echo_requested_model,
+            **self.logging.as_dict(),
         }
 
 
@@ -551,7 +554,7 @@ class Catalog:
     policy: RoutingPolicy
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
     strategies: tuple[StrategyDefinition, ...] = ()
-    default_strategy: str = "default"
+    default_strategy: str = "task_aware"
     storage: StorageSettings = field(default_factory=StorageSettings)
     jev: JevSettings = field(default_factory=JevSettings)
     signals: SignalsSettings = field(default_factory=SignalsSettings)
@@ -579,7 +582,7 @@ class Catalog:
                 for profile in [self.by_name(model_id)]
                 if profile is not None
             ]
-        tag = route.tag or f"default/{tier}"
+        tag = route.tag or f"{self.default_strategy}/{tier}"
         return [profile for profile in self.profiles if tag in profile.tags]
 
     def provider_for(self, profile: ModelProfile) -> ProviderProfile:
@@ -604,7 +607,7 @@ class Catalog:
                 raise ValueError(
                     f"Model {profile.name!r} references unknown provider {profile.provider!r}."
                 )
-        _validate_policy(self.policy, "policy", self.profiles, "default")
+        _validate_policy(self.policy, "policy", self.profiles, self.default_strategy)
         strategy_names: list[str] = []
         for definition in self.strategies:
             if not definition.name:
@@ -612,7 +615,7 @@ class Catalog:
             if definition.name in RESERVED_STRATEGY_MODEL_NAMES:
                 raise ValueError(
                     f"Routing strategy {definition.name!r} conflicts with a reserved "
-                    "automatic model name."
+                    "model name."
                 )
             if definition.name in names:
                 raise ValueError(
@@ -1224,6 +1227,7 @@ def policy_from_dict(
     patterns_default: bool | None = None,
     intent_default: bool | None = None,
     base: RoutingPolicy | None = None,
+    inherited_strategy: str = "task_aware",
 ) -> RoutingPolicy:
     """Build a routing policy, inheriting unspecified values from ``base``."""
     if not isinstance(data, dict):
@@ -1334,7 +1338,7 @@ def policy_from_dict(
         # the top-level label vocabulary and its default-scoped model pools.
         labels = {
             name: (
-                replace(route, tag=f"default/{name}")
+                replace(route, tag=f"{inherited_strategy}/{name}")
                 if not route.models and route.tag is None
                 else route
             )
@@ -1410,6 +1414,8 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
         "max_sessions",
         "decision_log_size",
         "echo_requested_model",
+        "logging_level",
+        "access_log",
     }
     unknown = set(value) - known
     if unknown:
@@ -1425,6 +1431,7 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
     )
     if not isinstance(echo_requested_model, bool):
         raise TypeError(f"{source} gateway echo_requested_model must be a boolean.")
+    logging_settings = logging_from_gateway(value, source)
     settings = GatewaySettings(
         host=_required_text(value.get("host", defaults.host), f"{source} gateway host"),
         port=_document_int(value.get("port", defaults.port), f"{source} gateway port"),
@@ -1443,6 +1450,7 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
             f"{source} gateway decision_log_size",
         ),
         echo_requested_model=echo_requested_model,
+        logging=logging_settings,
     )
     if not 1 <= settings.port <= 65535:
         raise ValueError(f"{source} gateway port must be between 1 and 65535.")
@@ -1636,7 +1644,7 @@ def strategies_from_document(
             raise ValueError(
                 f"{source} strategies.definitions must be a non-empty object."
             )
-        default_value = raw.get("default", "default")
+        default_value = raw.get("default", "task_aware")
         if not isinstance(default_value, str) or not default_value.strip():
             raise ValueError(
                 f"{source} strategies.default must name a defined strategy."
@@ -1651,7 +1659,7 @@ def strategies_from_document(
             )
         entries = raw
         label = "strategies"
-        default_strategy = "default"
+        default_strategy = "task_aware"
 
     definitions: list[StrategyDefinition] = []
     for name, body in entries.items():
@@ -1698,6 +1706,7 @@ def strategies_from_document(
                     patterns_default=patterns_default,
                     intent_default=intent_default,
                     base=base_policy,
+                    inherited_strategy=default_strategy,
                 ),
                 description=description or None,
                 kind=kind_value.strip(),
@@ -1803,14 +1812,7 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
     strategies_value = document.get("strategies")
     policy_value = document.get("policy")
     if strategies_value is None:
-        policy = policy_from_dict(
-            policy_value or {},
-            source,
-            patterns_default=patterns_default,
-            intent_default=intent_default,
-        )
-        strategies = (StrategyDefinition("default", policy),)
-        default_strategy = "default"
+        raise ValueError(f"{source} strategies must define 'task_aware' explicitly.")
     else:
         base_policy = (
             policy_from_dict(
@@ -1829,21 +1831,7 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
             intent_default=intent_default,
             base_policy=base_policy,
         )
-        implicit_default = (
-            StrategyDefinition("default", base_policy)
-            if base_policy is not None
-            else None
-        )
-        if implicit_default is not None and any(
-            definition.name == "default" for definition in definitions
-        ):
-            raise ValueError(
-                f"{source} strategies.definitions may not redefine 'default'; "
-                "the top-level policy owns that name."
-            )
-        strategies = (
-            ((implicit_default,) if implicit_default is not None else ()) + definitions
-        )
+        strategies = definitions
         known_strategies = [definition.name for definition in strategies]
         if default_strategy not in known_strategies:
             raise ValueError(
