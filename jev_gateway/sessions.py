@@ -55,6 +55,7 @@ class SessionState:
         return {
             "session_id": self.session_id,
             "route": self.route,
+            "label": self.tier,
             "tier": self.tier,
             "strategy": self.strategy,
             "turn_count": self.turn_count,

@@ -216,6 +216,7 @@ class RequestSignals:
     needs_vision: bool
     needs_json: bool
     reasons: tuple[str, ...]
+    route_label: str | None = None
 
     @property
     def tier_rank(self) -> int:
@@ -227,8 +228,10 @@ class RequestSignals:
             "tier": self.tier,
             "base_tier": self.base_tier,
             "score": round(self.score, 4),
+            "local_score": round(self.score, 4),
             "score_tier": self.score_tier,
             "tier_rank": self.tier_rank,
+            "route_label": self.route_label,
             "prompt_chars": self.prompt_chars,
             "prompt_tokens": self.prompt_tokens,
             "conversation_tokens": self.conversation_tokens,

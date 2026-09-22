@@ -25,19 +25,43 @@
     "quality": {
       "mode": "cached",
       "selection": "quality_first",
-      "tier_models": {
-        "simple": ["openai/gpt-5.6-luna"],
-        "standard": ["openai/gpt-5.6-terra"],
-        "complex": ["openai/gpt-5.6-sol"]
+      "labels": {
+        "routine": {
+          "score": 0,
+          "description": "Routine answers",
+          "reasoning_effort": "low"
+        },
+        "analysis": {
+          "score": 0.35,
+          "description": "Multi-step analysis",
+          "reasoning_effort": "medium"
+        },
+        "critical": {
+          "score": 0.65,
+          "description": "Critical architecture and audits",
+          "reasoning_effort": "high"
+        }
       }
     },
     "economy": {
       "mode": "cached",
       "selection": "cheapest_adequate",
-      "tier_models": {
-        "simple": ["deepseek/deepseek-flash"],
-        "standard": ["deepseek/deepseek-flash"],
-        "complex": ["deepseek/deepseek-flash", "openai/gpt-5.6-sol"]
+      "labels": {
+        "budget": {
+          "score": 0,
+          "description": "Low-cost short requests",
+          "reasoning_effort": "low"
+        },
+        "extended": {
+          "score": 0.35,
+          "description": "Low-cost multi-step requests",
+          "reasoning_effort": "medium"
+        },
+        "exception": {
+          "score": 0.65,
+          "description": "Complex work with a cost-aware pool",
+          "reasoning_effort": "high"
+        }
       }
     },
     "task_aware": {
@@ -46,16 +70,11 @@
       "description": "Routes docs and small edits to a small model, while coding and reverse-engineering use the top model with a higher thinking level.",
       "reasoning": {
         "mode": "override",
-        "effort_by_tier": {
-          "simple": "low",
-          "standard": "medium",
-          "complex": "high"
+        "effort_by_label": {
+          "draft": "low",
+          "review": "medium",
+          "engineering": "high"
         }
-      },
-      "tier_models": {
-        "simple": ["deepseek/deepseek-flash"],
-        "standard": ["openai/gpt-5.6-terra"],
-        "complex": ["openai/gpt-5.6-sol"]
       },
       "options": {
         "questions": {
@@ -80,23 +99,70 @@
         },
         "rules": [
           {
-            "when": {"workload": "reverse"},
-            "select": {"tier": "complex", "selection": "quality_first"}
+            "when": {
+              "workload": "reverse"
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "engineering"
+            }
           },
           {
-            "when": {"workload": "coding"},
-            "select": {"tier": "complex", "selection": "quality_first"}
+            "when": {
+              "workload": "coding"
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "engineering"
+            }
           },
           {
-            "when": {"workload": ["docs", "small_change"], "rigor": "exacting"},
-            "select": {"tier": "standard", "selection": "balanced"}
+            "when": {
+              "workload": [
+                "docs",
+                "small_change"
+              ],
+              "rigor": "exacting"
+            },
+            "select": {
+              "selection": "balanced",
+              "label": "review"
+            }
           },
           {
-            "when": {"workload": ["docs", "small_change"]},
-            "select": {"tier": "simple", "selection": "cheapest_adequate"}
+            "when": {
+              "workload": [
+                "docs",
+                "small_change"
+              ]
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "draft"
+            }
           }
         ],
-        "fallback": {"tier": "standard", "selection": "balanced"}
+        "fallback": {
+          "selection": "balanced",
+          "label": "review"
+        }
+      },
+      "labels": {
+        "draft": {
+          "score": 0,
+          "description": "Documentation drafts and bounded edits",
+          "reasoning_effort": "low"
+        },
+        "review": {
+          "score": 0.35,
+          "description": "Exacting review",
+          "reasoning_effort": "medium"
+        },
+        "engineering": {
+          "score": 0.65,
+          "description": "Coding and reverse engineering",
+          "reasoning_effort": "high"
+        }
       }
     }
   },
@@ -116,31 +182,39 @@
     "mode": "sticky",
     "selection": "balanced",
     "pin": {
-      "break_on": ["capability_gap", "context_pressure", "output_limit"]
+      "break_on": [
+        "capability_gap",
+        "context_pressure",
+        "output_limit"
+      ]
     },
     "reasoning": {
       "mode": "override",
-      "effort_by_tier": {
-        "simple": "low",
-        "standard": "medium",
-        "complex": "high"
-      },
       "on_reasoning_request": "high",
       "on_user_correction": "high",
-      "fallback": "medium"
+      "fallback": "medium",
+      "effort_by_label": {
+        "quick": "low",
+        "working": "medium",
+        "deep": "high"
+      }
     },
-    "tier_models": {
-      "simple": [
-        "deepseek/deepseek-flash",
-        "openai/gpt-5.6-luna"
-      ],
-      "standard": [
-        "deepseek/deepseek-flash",
-        "openai/gpt-5.6-terra"
-      ],
-      "complex": [
-        "openai/gpt-5.6-sol"
-      ]
+    "labels": {
+      "quick": {
+        "score": 0,
+        "description": "Short bounded tasks",
+        "reasoning_effort": "low"
+      },
+      "working": {
+        "score": 0.35,
+        "description": "Multi-step tasks",
+        "reasoning_effort": "medium"
+      },
+      "deep": {
+        "score": 0.65,
+        "description": "Architecture and deep reasoning",
+        "reasoning_effort": "high"
+      }
     }
   },
   "models": [
@@ -166,7 +240,15 @@
       "cost": {
         "input_per_million": 0.3,
         "output_per_million": 1.2
-      }
+      },
+      "tags": [
+        "default/quick",
+        "default/working",
+        "economy/budget",
+        "economy/extended",
+        "economy/exception",
+        "task_aware/draft"
+      ]
     },
     {
       "provider": "openai",
@@ -190,7 +272,13 @@
       "cost": {
         "input_per_million": 2.0,
         "output_per_million": 10.0
-      }
+      },
+      "tags": [
+        "default/deep",
+        "quality/critical",
+        "economy/exception",
+        "task_aware/engineering"
+      ]
     },
     {
       "provider": "openai",
@@ -213,7 +301,11 @@
       "cost": {
         "input_per_million": 1.0,
         "output_per_million": 5.0
-      }
+      },
+      "tags": [
+        "default/quick",
+        "quality/routine"
+      ]
     },
     {
       "provider": "openai",
@@ -237,7 +329,12 @@
       "cost": {
         "input_per_million": 0.75,
         "output_per_million": 7.5
-      }
+      },
+      "tags": [
+        "default/working",
+        "quality/analysis",
+        "task_aware/review"
+      ]
     }
   ]
 }

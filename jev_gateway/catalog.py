@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
@@ -43,6 +44,7 @@ __all__ = [
     "PinPolicy",
     "ProviderProfile",
     "ReasoningPolicy",
+    "RouteLabel",
     "RoutingMode",
     "RoutingPolicy",
     "ScoringPolicy",
@@ -131,6 +133,7 @@ class ModelProfile:
     name: str
     provider: str
     model: str
+    tags: tuple[str, ...] = ()
     api_base: str = ""
     api_key: str = ""
     priority: int = 100
@@ -172,6 +175,7 @@ class ModelProfile:
             "name": self.name,
             "provider": self.provider,
             "upstream_model": self.model,
+            "tags": list(self.tags),
             "api_base": self.api_base,
             "has_api_key": bool(self.api_key),
             "priority": self.priority,
@@ -332,6 +336,30 @@ class JevSettings:
 
 
 @dataclass(frozen=True)
+class RouteLabel:
+    """One ordered score boundary and its model selector."""
+
+    score: float
+    models: tuple[str, ...] = ()
+    tag: str | None = None
+    description: str = ""
+    reasoning_effort: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "score": self.score,
+            "description": self.description,
+        }
+        if self.models:
+            result["models"] = list(self.models)
+        if self.tag is not None:
+            result["tag"] = self.tag
+        if self.reasoning_effort is not None:
+            result["reasoning_effort"] = self.reasoning_effort
+        return result
+
+
+@dataclass(frozen=True)
 class ReasoningPolicy:
     """How the thinking level is chosen once the routed model is known.
 
@@ -350,14 +378,16 @@ class ReasoningPolicy:
     effort_by_tier: Mapping[str, str] = field(
         default_factory=lambda: {"simple": "low", "standard": "medium", "complex": "high"}
     )
+    effort_by_label: Mapping[str, str] = field(default_factory=dict)
     on_reasoning_request: str | None = "high"
     on_user_correction: str | None = "high"
     fallback: str = "medium"
 
     def as_dict(self) -> dict[str, Any]:
-        """Serialize the reasoning policy for the policy endpoint."""
+        """Serialize current labels and the legacy tier map."""
         return {
             "mode": self.mode,
+            "effort_by_label": dict(self.effort_by_label),
             "effort_by_tier": dict(self.effort_by_tier),
             "on_reasoning_request": self.on_reasoning_request,
             "on_user_correction": self.on_user_correction,
@@ -367,13 +397,14 @@ class ReasoningPolicy:
 
 @dataclass(frozen=True)
 class RoutingPolicy:
-    """Tier mapping, selection preference, and the re-routing thresholds."""
+    """Ordered labels, selection preference, and re-routing thresholds."""
 
     mode: RoutingMode = RoutingMode.STICKY
     selection: str = "balanced"
     tier_models: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_TIER_ROUTES)
     )
+    labels: dict[str, RouteLabel] = field(default_factory=dict)
     scoring: ScoringPolicy = field(default_factory=ScoringPolicy)
     escalation: EscalationPolicy = field(default_factory=EscalationPolicy)
     hysteresis: HysteresisPolicy = field(default_factory=HysteresisPolicy)
@@ -381,14 +412,16 @@ class RoutingPolicy:
     budget: BudgetPolicy = field(default_factory=BudgetPolicy)
     reasoning: ReasoningPolicy = field(default_factory=ReasoningPolicy)
 
+    def __post_init__(self) -> None:
+        if not self.labels and set(self.tier_models) == set(TIER_ORDER):
+            object.__setattr__(self, "labels", _legacy_labels(self.tier_models, "policy"))
+
     def as_dict(self) -> dict[str, Any]:
         """Serialize the policy for the policy endpoint."""
-        return {
+        result = {
             "mode": self.mode.value,
             "selection": self.selection,
-            "tier_models": {
-                tier: list(model_ids) for tier, model_ids in self.tier_models.items()
-            },
+            "labels": {name: label.as_dict() for name, label in self.labels.items()},
             "scoring": self.scoring.as_dict(),
             "escalation": {
                 "max_consecutive_failures": self.escalation.max_consecutive_failures,
@@ -426,6 +459,12 @@ class RoutingPolicy:
             },
             "reasoning": self.reasoning.as_dict(),
         }
+        if self.tier_models:
+            result["tier_models"] = {
+                tier: list(model_ids)
+                for tier, model_ids in self.tier_models.items()
+            }
+        return result
 
 
 def _freeze_json_value(value: Any) -> Any:
@@ -517,13 +556,19 @@ class Catalog:
         return [profile.name for profile in self.profiles]
 
     def for_tier(self, tier: str) -> list[ModelProfile]:
-        """Return the configured candidate models for a routing tier."""
-        return [
-            profile
-            for model_id in self.policy.tier_models.get(tier, ())
-            for profile in [self.by_name(model_id)]
-            if profile is not None
-        ]
+        """Return the default strategy's candidates for a routing label."""
+        route = self.policy.labels.get(tier)
+        if route is None:
+            return []
+        if route.models:
+            return [
+                profile
+                for model_id in route.models
+                for profile in [self.by_name(model_id)]
+                if profile is not None
+            ]
+        tag = route.tag or f"default/{tier}"
+        return [profile for profile in self.profiles if tag in profile.tags]
 
     def provider_for(self, profile: ModelProfile) -> ProviderProfile:
         """Return the reusable provider configuration for one model."""
@@ -547,7 +592,7 @@ class Catalog:
                 raise ValueError(
                     f"Model {profile.name!r} references unknown provider {profile.provider!r}."
                 )
-        _validate_policy(self.policy, "policy", names)
+        _validate_policy(self.policy, "policy", self.profiles, "default")
         strategy_names: list[str] = []
         for definition in self.strategies:
             if not definition.name:
@@ -569,7 +614,8 @@ class Catalog:
             _validate_policy(
                 definition.policy,
                 f"strategies.definitions[{definition.name!r}]",
-                names,
+                self.profiles,
+                definition.name,
             )
         if not strategy_names:
             raise ValueError("At least one routing strategy is required.")
@@ -604,32 +650,43 @@ class Catalog:
 
 
 def _validate_policy(
-    policy: RoutingPolicy, label: str, model_names: set[str]
+    policy: RoutingPolicy,
+    label: str,
+    profiles: tuple[ModelProfile, ...],
+    strategy_name: str,
 ) -> None:
-    """Reject a routing policy that cannot serve every configured tier."""
-    for tier, model_ids in policy.tier_models.items():
-        if tier not in TIER_ORDER:
+    """Reject a routing policy that cannot serve its declared labels."""
+    if not policy.labels:
+        raise ValueError(f"{label} labels must be a non-empty object.")
+    model_names = {profile.name for profile in profiles}
+    previous = -1.0
+    for name, route in policy.labels.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"{label} labels must have non-empty names.")
+        if not 0 <= route.score <= 1 or route.score <= previous:
             raise ValueError(
-                f"{label} tier_models key {tier!r} is unknown. "
-                f"Use: {', '.join(TIER_ORDER)}."
+                f"{label} labels[{name!r}].score must increase within [0, 1]."
             )
-        if not model_ids:
-            raise ValueError(
-                f"{label} tier_models[{tier!r}] must name at least one model."
-            )
-        unknown_models = [model_id for model_id in model_ids if model_id not in model_names]
+        previous = route.score
+        unknown_models = [model for model in route.models if model not in model_names]
         if unknown_models:
             raise ValueError(
-                f"{label} tier_models[{tier!r}] references unknown model ids: "
-                f"{', '.join(unknown_models)}. Configured models: "
-                f"{', '.join(sorted(model_names))}."
+                f"{label} labels[{name!r}] references unknown model ids: "
+                f"{', '.join(unknown_models)}."
             )
-    missing_tiers = set(TIER_ORDER) - set(policy.tier_models)
-    if missing_tiers:
-        raise ValueError(
-            f"{label} tier_models is missing tiers: "
-            + ", ".join(sorted(missing_tiers))
-        )
+        tag = route.tag or f"{strategy_name}/{name}"
+        tagged = [profile for profile in profiles if tag in profile.tags]
+        if route.models and route.tag is not None:
+            raise ValueError(
+                f"{label} labels[{name!r}] cannot declare both models and tag."
+            )
+        if not route.models and not tagged:
+            raise ValueError(
+                f"{label} labels[{name!r}] resolves tag {tag!r}, but no model "
+                "declares that tag."
+            )
+    if next(iter(policy.labels.values())).score != 0:
+        raise ValueError(f"{label} first label score must be 0.")
     if not isinstance(policy.mode, RoutingMode):
         raise TypeError(
             f"{label} mode {policy.mode!r} is unknown. "
@@ -767,6 +824,7 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
     known_fields = {
         "provider",
         "upstream_model",
+        "tags",
         "priority",
         "quality",
         "context_window",
@@ -780,10 +838,26 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
             f"Model {name!r} has unknown keys: "
             f"{', '.join(sorted(unknown_fields))}."
         )
+    tags_value = item.get("tags", [])
+    if isinstance(tags_value, (str, bytes)) or not isinstance(tags_value, list):
+        raise TypeError(f"Model {name!r} tags must be a list of scoped tag names.")
+    tags: list[str] = []
+    for tag in tags_value:
+        if not isinstance(tag, str) or not tag.strip():
+            raise ValueError(f"Model {name!r} tags must contain non-empty strings.")
+        clean_tag = tag.strip()
+        if clean_tag.startswith("/") or clean_tag.endswith("/") or "//" in clean_tag:
+            raise ValueError(
+                f"Model {name!r} tag {clean_tag!r} must use non-empty '/' segments."
+            )
+        if clean_tag in tags:
+            raise ValueError(f"Model {name!r} declares tag {clean_tag!r} more than once.")
+        tags.append(clean_tag)
     return ModelProfile(
         name=name,
         provider=provider,
         model=model,
+        tags=tuple(tags),
         priority=_document_int(
             item.get("priority", index * 10), f"Model {name!r} priority"
         ),
@@ -935,6 +1009,7 @@ def reasoning_from_dict(
     known = {
         "mode",
         "effort_by_tier",
+        "effort_by_label",
         "on_reasoning_request",
         "on_user_correction",
         "fallback",
@@ -958,6 +1033,11 @@ def reasoning_from_dict(
                 value["effort_by_tier"], f"{source} policy reasoning.effort_by_tier"
             )
         )
+    by_label = dict(default_policy.effort_by_label)
+    if "effort_by_label" in value:
+        by_label = dict(effort_by_tier_from_dict(
+            value["effort_by_label"], f"{source} policy reasoning.effort_by_label"
+        ))
     unknown_tiers = set(by_tier) - set(TIER_ORDER)
     if unknown_tiers:
         # Routing only ever produces the three shipped tiers, so a level mapped to
@@ -970,6 +1050,7 @@ def reasoning_from_dict(
     return ReasoningPolicy(
         mode=mode,
         effort_by_tier=by_tier,
+        effort_by_label=by_label,
         on_reasoning_request=optional_policy_effort(
             value.get("on_reasoning_request", default_policy.on_reasoning_request),
             f"{source} policy reasoning.on_reasoning_request",
@@ -983,6 +1064,81 @@ def reasoning_from_dict(
             f"{source} policy reasoning.fallback",
         ),
     )
+
+
+def _legacy_labels(routes: dict[str, tuple[str, ...]], source: str) -> dict[str, RouteLabel]:
+    if set(routes) != set(TIER_ORDER):
+        missing = set(TIER_ORDER) - set(routes)
+        extra = set(routes) - set(TIER_ORDER)
+        raise ValueError(f"{source} tier_models has missing tiers or unknown tiers: "
+                         f"{', '.join(sorted(missing | extra))}.")
+    return {
+        name: RouteLabel(
+            score=score,
+            models=routes[name],
+            description=description,
+        )
+        for name, score, description in zip(
+            TIER_ORDER, (0.0, 0.35, 0.65),
+            ("Direct bounded work", "Multi-step work", "Deep analysis or architecture"),
+            strict=True,
+        )
+    }
+
+
+def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
+    if not isinstance(value, dict) or not value:
+        raise ValueError(f"{source} policy labels must be a non-empty object.")
+    labels: dict[str, RouteLabel] = {}
+    previous = -1.0
+    for name, raw in value.items():
+        subject = f"{source} policy labels[{name!r}]"
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"{source} policy label names must be non-empty strings.")
+        if not isinstance(raw, dict) or set(raw) - {
+            "models", "tag", "score", "description", "reasoning_effort"
+        }:
+            raise ValueError(
+                f"{subject} must contain only models, tag, score, description, "
+                "reasoning_effort."
+            )
+        if "models" in raw and "tag" in raw:
+            raise ValueError(f"{subject} cannot declare both models and tag.")
+        models = raw.get("models", [])
+        if not isinstance(models, list) or any(
+            not isinstance(model, str) or not model for model in models
+        ):
+            raise ValueError(f"{subject}.models must be a list of model ids.")
+        if "models" in raw and not models:
+            raise ValueError(f"{subject}.models must not be empty when declared.")
+        tag = raw.get("tag")
+        if tag is not None and (not isinstance(tag, str) or not tag.strip()):
+            raise ValueError(f"{subject}.tag must be a non-empty scoped tag.")
+        clean_tag = tag.strip() if isinstance(tag, str) else None
+        if clean_tag is not None and (
+            clean_tag.startswith("/")
+            or clean_tag.endswith("/")
+            or "//" in clean_tag
+        ):
+            raise ValueError(f"{subject}.tag must use non-empty '/' segments.")
+        score = raw.get("score")
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1 or score <= previous:
+            raise ValueError(f"{subject}.score must increase within [0, 1].")
+        previous = score
+        description = raw.get("description", "")
+        if not isinstance(description, str):
+            raise TypeError(f"{subject}.description must be text.")
+        effort = optional_policy_effort(raw.get("reasoning_effort"), f"{subject}.reasoning_effort")
+        labels[name] = RouteLabel(
+            score=score,
+            models=tuple(models),
+            tag=clean_tag,
+            description=description,
+            reasoning_effort=effort,
+        )
+    if next(iter(labels.values())).score != 0:
+        raise ValueError(f"{source} policy first label score must be 0.")
+    return labels
 
 
 def policy_from_dict(
@@ -1000,6 +1156,7 @@ def policy_from_dict(
         "mode",
         "selection",
         "tier_models",
+        "labels",
         "scoring",
         "escalation",
         "hysteresis",
@@ -1047,6 +1204,7 @@ def policy_from_dict(
         "reasoning": {
             "mode",
             "effort_by_tier",
+            "effort_by_label",
             "on_reasoning_request",
             "on_user_correction",
             "fallback",
@@ -1074,6 +1232,8 @@ def policy_from_dict(
         pin_overrides["break_on"] = tuple(str(reason) for reason in break_on)
 
     default_policy = base or RoutingPolicy()
+    if "labels" in data and "tier_models" in data:
+        raise ValueError(f"{source} policy cannot mix labels and tier_models.")
     tier_models = dict(default_policy.tier_models) if base is not None else {}
     tier_models_value = data.get("tier_models", {})
     if not isinstance(tier_models_value, dict):
@@ -1084,10 +1244,45 @@ def policy_from_dict(
                 f"{source} policy tier_models[{tier!r}] must be a list."
             )
         tier_models[str(tier)] = tuple(str(model_id) for model_id in model_ids)
+    if "labels" in data:
+        labels = _labels_from_dict(data["labels"], source)
+        tier_models = {}
+    elif "tier_models" in data:
+        # Legacy tier overrides retain the old partial-merge behavior only when
+        # the inherited policy itself uses legacy tiers.
+        if base is not None and not base.tier_models:
+            raise ValueError(f"{source} policy cannot mix inherited labels and tier_models.")
+        labels = _legacy_labels(tier_models, source)
+    elif base is not None:
+        # A named strategy that only changes selection or session behavior keeps
+        # the top-level label vocabulary and its default-scoped model pools.
+        labels = {
+            name: (
+                replace(route, tag=f"default/{name}")
+                if not route.models and route.tag is None
+                else route
+            )
+            for name, route in base.labels.items()
+        }
+    else:
+        labels = _legacy_labels(tier_models, source)
+    reasoning = reasoning_from_dict(
+        data.get("reasoning"), source, base=default_policy.reasoning
+    )
+    unknown_efforts = set(reasoning.effort_by_label) - set(labels)
+    if unknown_efforts:
+        # A replacing strategy may inherit the old map; discard it only when
+        # this strategy has explicitly replaced its label collection.
+        if "labels" in data and "effort_by_label" not in reasoning_value:
+            reasoning = replace(reasoning, effort_by_label={})
+        else:
+            raise ValueError(f"{source} reasoning.effort_by_label has unknown labels: "
+                             f"{', '.join(sorted(unknown_efforts))}.")
     return RoutingPolicy(
         mode=parse_routing_mode(data.get("mode", default_policy.mode), source),
         selection=str(data.get("selection", default_policy.selection)),
         tier_models=tier_models,
+        labels=labels,
         scoring=_scoring_with_document_default(
             data.get("scoring"),
             source,
@@ -1120,9 +1315,7 @@ def policy_from_dict(
                 if key in budget_value
             },
         ),
-        reasoning=reasoning_from_dict(
-            data.get("reasoning"), source, base=default_policy.reasoning
-        ),
+        reasoning=reasoning,
     )
 
 
