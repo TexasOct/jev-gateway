@@ -130,7 +130,7 @@ uv run jev-gateway
 
 推导顺序为 `on_user_correction` → `on_reasoning_request` → `effort_by_tier[等级]` → `fallback`，取第一个适用者，再向所选模型的梯度收敛：档位以 `none, minimal, low, medium, high, xhigh, max` 为序，先向上再向下取最近的可接受值。`mode`、各档位与 `effort_by_tier` 的键都会在加载时校验，写错拼写或写一个不存在的等级都会直接报错。
 
-这里的“等级”是路由最终采用的等级，也就是响应头 `X-JEV-Task-Type` 和决策记录 `tier` 里的值，不是本地评分算出的 `signals.tier`。两者会不一致：JEV 分类器和 `risk_aware` 这类策略在策略内部就改掉了等级，会话固定模式又会沿用会话已有的等级。用最终等级可以保证告知客户端的等级与思考档位不会互相矛盾。
+这里的“等级”是路由最终采用的等级，也就是响应头 `X-JEV-Task-Type` 和决策记录 `tier` 里的值，不是本地评分算出的 `signals.tier`。两者会不一致：JEV 分类器和 `task_aware` 这类策略在策略内部就改掉了等级，会话固定模式又会沿用会话已有的等级。用最终等级可以保证告知客户端的等级与思考档位不会互相矛盾。
 
 因此，`on_reasoning_request` 与 `on_user_correction` 读的是「用户意图」检测器，它由 `signals.intent_patterns_enabled`（或策略内的 `scoring.intent_patterns_enabled`）单独控制，默认跟随 `patterns_enabled`。本仓库把评分 pattern 关闭、把意图检测开启：`patterns_enabled: false` 保证本地文本不影响等级，`intent_patterns_enabled: true` 让这两个触发仍然有效。意图检测器不会改变等级，它们的评分权重仍受 `patterns_enabled` 约束。
 

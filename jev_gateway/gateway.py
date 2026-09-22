@@ -8,6 +8,7 @@ import logging
 import os
 import sqlite3
 import time
+import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from json import JSONDecodeError
@@ -48,6 +49,10 @@ logger = logging.getLogger("uvicorn.error")
 MODEL_CREATED_AT = coerce_int(time.time())
 
 STRATEGY_HEADER = "X-JEV-Strategy"
+_USAGE_SERIALIZER_WARNING = (
+    r"^Pydantic serializer warnings:\s+"
+    r"PydanticSerializationUnexpectedValue\(Expected `ResponseAPIUsage`"
+)
 
 __all__ = [
     "ChatCompletionRequest",
@@ -288,7 +293,10 @@ def response_data(response: Any) -> dict[str, Any]:
     if isinstance(response, dict):
         return dict(response)
     if hasattr(response, "model_dump"):
-        return response.model_dump(exclude_none=True)
+        # LiteLLM may populate a typed usage model with a plain mapping. Serialize
+        # the value by its runtime shape instead of warning about LiteLLM's
+        # internal annotation mismatch.
+        return response.model_dump(exclude_none=True, serialize_as_any=True)
     if hasattr(response, "dict"):
         return response.dict(exclude_none=True)
     return jsonable_encoder(response)
@@ -306,11 +314,26 @@ def finish_reason(body: dict[str, Any]) -> str | None:
     return reason if isinstance(reason, str) else None
 
 
+def _next_stream_chunk(response: Iterator[Any]) -> Any:
+    """Read one LiteLLM chunk without its known usage annotation warning."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=_USAGE_SERIALIZER_WARNING,
+            category=UserWarning,
+        )
+        return next(response)
+
+
 def sse_chunks(
     response: Iterator[Any], model_override: str | None = None
 ) -> Iterator[str]:
     """Encode LiteLLM streaming chunks in OpenAI's SSE format."""
-    for chunk in response:
+    while True:
+        try:
+            chunk = _next_stream_chunk(response)
+        except StopIteration:
+            break
         body = response_data(chunk)
         if model_override is not None:
             body["model"] = model_override

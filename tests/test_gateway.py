@@ -6,10 +6,12 @@ import asyncio
 import json
 import sys
 import types
+import warnings
 from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import BaseModel
 
 from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
@@ -79,6 +81,36 @@ def install_completion(monkeypatch) -> list[dict[str, Any]]:
         sys.modules, "litellm", types.SimpleNamespace(completion=completion)
     )
     return calls
+
+
+def test_response_data_silences_litellm_usage_serializer_mismatch() -> None:
+    class ResponseAPIUsage(BaseModel):
+        completion_tokens: int
+        prompt_tokens: int
+        total_tokens: int
+
+    class LiteLLMResponse(BaseModel):
+        model: str
+        usage: ResponseAPIUsage
+
+    # LiteLLM can construct this response shape with a plain dict in `usage`.
+    response = LiteLLMResponse.model_construct(
+        model="provider/model",
+        usage={"completion_tokens": 82, "prompt_tokens": 18, "total_tokens": 100},
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        payload = gateway.response_data(response)
+
+    assert not caught
+    assert payload == {
+        "model": "provider/model",
+        "usage": {
+            "completion_tokens": 82,
+            "prompt_tokens": 18,
+            "total_tokens": 100,
+        },
+    }
 
 
 def test_runtime_directory_loads_config_env_and_storage_from_home(
@@ -357,6 +389,27 @@ def test_upstream_failure_becomes_a_gateway_error(monkeypatch) -> None:
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "upstream_error"
     assert "exploded" in response.json()["error"]["message"]
+
+
+def test_sse_chunks_silences_only_litellm_usage_serializer_warning() -> None:
+    expected = (
+        "Pydantic serializer warnings:\n"
+        "  PydanticSerializationUnexpectedValue(Expected `ResponseAPIUsage` - "
+        "serialized value may not be as expected [field_name='usage'])"
+    )
+
+    def chunks():
+        warnings.warn(expected, UserWarning, stacklevel=1)
+        yield {"id": "one", "choices": []}
+        warnings.warn("keep this warning", UserWarning, stacklevel=1)
+        yield {"id": "two", "choices": []}
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        payload = list(gateway.sse_chunks(chunks()))
+
+    assert [str(item.message) for item in caught] == ["keep this warning"]
+    assert payload[-1] == "data: [DONE]\n\n"
 
 
 def test_streaming_returns_openai_sse(monkeypatch) -> None:

@@ -39,6 +39,65 @@
         "standard": ["deepseek/deepseek-flash"],
         "complex": ["deepseek/deepseek-flash", "openai/gpt-5.6-sol"]
       }
+    },
+    "task_aware": {
+      "kind": "jev_matrix",
+      "mode": "fresh",
+      "description": "Routes docs and small edits to a small model, while coding and reverse-engineering use the top model with a higher thinking level.",
+      "reasoning": {
+        "mode": "override",
+        "effort_by_tier": {
+          "simple": "low",
+          "standard": "medium",
+          "complex": "high"
+        }
+      },
+      "tier_models": {
+        "simple": ["deepseek/deepseek-flash"],
+        "standard": ["openai/gpt-5.6-terra"],
+        "complex": ["openai/gpt-5.6-sol"]
+      },
+      "options": {
+        "questions": {
+          "workload": {
+            "type": "choice",
+            "instructions": "What is the main kind of work this request asks for?",
+            "criteria": {
+              "docs": "Documentation, comments, prose, translation, or summarization; no code behavior changes.",
+              "small_change": "A narrow, bounded code or config change: a rename, dependency bump, formatting pass, or single-file tweak.",
+              "coding": "Implement, fix, or refactor behavior in code; the change has to work.",
+              "reverse": "Understand, audit, or reverse-engineer existing code or systems: architecture, protocol or binary analysis, security review, or hard debugging."
+            }
+          },
+          "rigor": {
+            "type": "choice",
+            "instructions": "How exact does the output need to be?",
+            "criteria": {
+              "draft": "A first pass is fine; it will be reviewed or reworked.",
+              "exacting": "It ships or gates other work: an interface, migration, security boundary, or release."
+            }
+          }
+        },
+        "rules": [
+          {
+            "when": {"workload": "reverse"},
+            "select": {"tier": "complex", "selection": "quality_first"}
+          },
+          {
+            "when": {"workload": "coding"},
+            "select": {"tier": "complex", "selection": "quality_first"}
+          },
+          {
+            "when": {"workload": ["docs", "small_change"], "rigor": "exacting"},
+            "select": {"tier": "standard", "selection": "balanced"}
+          },
+          {
+            "when": {"workload": ["docs", "small_change"]},
+            "select": {"tier": "simple", "selection": "cheapest_adequate"}
+          }
+        ],
+        "fallback": {"tier": "standard", "selection": "balanced"}
+      }
     }
   },
   "providers": [
