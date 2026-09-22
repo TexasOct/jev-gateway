@@ -1,0 +1,32 @@
+{
+  "ignore": [
+    ".pi/**",
+    ".agents/**",
+    "AGENTS.md",
+    ".trellis/scripts/**",
+    ".trellis/agents/**",
+    ".trellis/.runtime/**",
+    ".trellis/spec/guides/**",
+    ".trellis/workspace/**",
+    ".trellis/workflow.md",
+    ".trellis/config.yaml"
+  ],
+  "rules": {
+    "generated-trellis-tooling": {
+      "disable": [
+        "prefer-at",
+        "redundant-state",
+        "no-conditional-empty-object-spread",
+        "require-safety-comment-for-as-unknown-as",
+        "long-parameter-list",
+        "no-unknown-parameters",
+        "no-unsafe-dictionary-unknown",
+        "no-non-null-assertion",
+        "large-class",
+        "no-runtime-typeof",
+        "nested-ternary",
+        "no-known-value-widening"
+      ]
+    }
+  }
+}
