@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import logging
+import threading
+from pathlib import Path
 from typing import Any, cast
 
 from litellm.llms.deepseek.chat.transformation import DeepSeekChatConfig
 from litellm.types.llms.openai import AllMessageValues
 
 from jev_gateway.provider import adapter_for
+from jev_gateway.provider.base import save_assistant_continuation
+from jev_gateway.records import (
+    AssistantContinuationRecord,
+    NullRecordStore,
+    SqliteRecordStore,
+    StorageSettings,
+)
 from jev_gateway.sessions import SessionState
 
 
@@ -266,6 +275,137 @@ def test_deepseek_captures_streaming_tool_call_reasoning() -> None:
     )
 
     assert prepared[0]["reasoning_content"] == "Use ping."
+
+
+def test_concurrent_saves_keep_both_in_memory() -> None:
+    session = make_session()
+    barrier = threading.Barrier(3)
+
+    def save(content: str) -> None:
+        barrier.wait()
+        save_assistant_continuation(
+            session,
+            {"role": "assistant", "content": content},
+            "openai",
+            store=NullRecordStore(),
+        )
+
+    threads = [
+        threading.Thread(target=save, args=(content,))
+        for content in ("First.", "Second.")
+    ]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    saved = session.adapter_state["assistant_continuations"]
+    assert len(saved) == 2
+    assert {item["provider_type"] for item in saved} == {"openai"}
+
+
+def test_save_during_hydration_merges_and_persists_pending_record() -> None:
+    class BlockingStore(NullRecordStore):
+        enabled = True
+        continuation_limit = 40
+
+        def __init__(self) -> None:
+            self.entered = threading.Event()
+            self.release = threading.Event()
+            self.written: list[AssistantContinuationRecord] = []
+
+        def load_assistant_continuations(
+            self, session_id: str, *, limit: int
+        ) -> list[AssistantContinuationRecord]:
+            self.entered.set()
+            assert self.release.wait(timeout=2)
+            return [AssistantContinuationRecord(
+                session_id=session_id,
+                message_key="old-key",
+                provider_type="deepseek",
+                payload={"reasoning_content": "old"},
+                created_at=1,
+            )]
+
+        def record_assistant_continuation(
+            self, record: AssistantContinuationRecord
+        ) -> None:
+            self.written.append(record)
+
+    store = BlockingStore()
+    session = make_session()
+    loader = threading.Thread(
+        target=lambda: adapter_for("deepseek").prepare_messages([], session, store)
+    )
+    loader.start()
+    assert store.entered.wait(timeout=2)
+
+    save_assistant_continuation(
+        session,
+        {"role": "assistant", "content": "New answer."},
+        "openai",
+        store=store,
+    )
+    store.release.set()
+    loader.join(timeout=2)
+
+    saved = session.adapter_state["assistant_continuations"]
+    assert [item["provider_type"] for item in saved] == ["deepseek", "openai"]
+    assert [item.provider_type for item in store.written] == ["openai"]
+
+
+def test_deepseek_reasoning_survives_store_restart(tmp_path: Path) -> None:
+    settings = StorageSettings(
+        enabled=True, path=str(tmp_path / "continuations.sqlite3")
+    )
+    first_store = SqliteRecordStore(settings)
+    first_session = make_session()
+    capture = adapter_for("deepseek").capture_response(first_session, first_store)
+    capture.observe({
+        "choices": [{
+            "message": {
+                "role": "assistant",
+                "content": "Same answer.",
+                "reasoning_content": "Durable trace.",
+            }
+        }]
+    })
+    first_store.close()
+
+    second_store = SqliteRecordStore(settings)
+    prepared = adapter_for("deepseek").prepare_messages(
+        [{"role": "assistant", "content": "Same answer."}],
+        make_session(),
+        second_store,
+    )
+
+    assert prepared[0]["reasoning_content"] == "Durable trace."
+    second_store.close()
+
+
+def test_cross_provider_origin_survives_store_restart(tmp_path: Path) -> None:
+    settings = StorageSettings(
+        enabled=True, path=str(tmp_path / "continuations.sqlite3")
+    )
+    first_store = SqliteRecordStore(settings)
+    capture = adapter_for("openai").capture_response(make_session(), first_store)
+    capture.observe({
+        "choices": [{
+            "message": {"role": "assistant", "content": "OpenAI answer."}
+        }]
+    })
+    first_store.close()
+
+    second_store = SqliteRecordStore(settings)
+    prepared = adapter_for("deepseek").prepare_messages(
+        [{"role": "assistant", "content": "OpenAI answer."}],
+        make_session(),
+        second_store,
+    )
+
+    assert prepared[0]["reasoning_content"] == " "
+    second_store.close()
 
 
 def test_deepseek_bounds_cached_continuation_history() -> None:

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -89,53 +91,102 @@ class MemorySessionStore:
         self.max_sessions = max_sessions
         self._clock = clock
         self._sessions: dict[str, SessionState] = {}
+        self._lock = threading.RLock()
 
-    def get(self, session_id: str) -> SessionState | None:
-        """Return a live session, dropping it when its TTL has passed."""
+    def _get_locked(self, session_id: str) -> SessionState | None:
         session = self._sessions.get(session_id)
         if session is None:
             return None
         if self._expired(session):
-            del self._sessions[session_id]
+            self._sessions.pop(session_id, None)
             return None
         return session
 
+    def get(self, session_id: str) -> SessionState | None:
+        """Return the canonical live session, dropping it after its TTL."""
+        with self._lock:
+            return self._get_locked(session_id)
+
+    def copy(self, session_id: str) -> SessionState | None:
+        """Return a detached routing snapshot without provider continuation state."""
+        with self._lock:
+            session = self._get_locked(session_id)
+            if session is None:
+                return None
+            snapshot = copy.copy(session)
+            snapshot.recent_scores = list(session.recent_scores)
+            snapshot.events = [dict(event) for event in session.events]
+            snapshot.adapter_state = {}
+            return snapshot
+
+    def mutate(
+        self,
+        session_id: str,
+        update: Callable[[SessionState], None],
+        *,
+        factory: Callable[[], SessionState] | None = None,
+    ) -> SessionState | None:
+        """Atomically update the canonical state, optionally creating it once."""
+        with self._lock:
+            session = self._get_locked(session_id)
+            if session is None:
+                if factory is None:
+                    return None
+                session = factory()
+                self._sessions[session_id] = session
+            update(session)
+            if len(self._sessions) > self.max_sessions:
+                self._evict()
+            return session
+
     def put(self, session: SessionState) -> None:
         """Store a session and evict the least recently updated ones."""
-        self._sessions[session.session_id] = session
-        if len(self._sessions) > self.max_sessions:
-            self._evict()
+        with self._lock:
+            self._sessions[session.session_id] = session
+            if len(self._sessions) > self.max_sessions:
+                self._evict()
 
     def snapshot(self, session_id: str) -> dict[str, Any] | None:
         """Return a serializable view of one session."""
-        session = self.get(session_id)
-        return session.snapshot() if session is not None else None
+        with self._lock:
+            session = self._get_locked(session_id)
+            return session.snapshot() if session is not None else None
 
     def prune(self) -> int:
         """Drop expired sessions and report how many were removed."""
-        expired = [
-            session_id
-            for session_id, session in self._sessions.items()
-            if self._expired(session)
-        ]
-        for session_id in expired:
-            del self._sessions[session_id]
-        return len(expired)
+        with self._lock:
+            expired = [
+                session_id
+                for session_id, session in self._sessions.items()
+                if self._expired(session)
+            ]
+            for session_id in expired:
+                self._sessions.pop(session_id, None)
+            return len(expired)
 
     def clear(self) -> None:
         """Drop every stored session."""
-        self._sessions.clear()
+        with self._lock:
+            self._sessions.clear()
 
     def configure(self, *, ttl_seconds: float, max_sessions: int) -> None:
         """Apply catalog limits while preserving still-valid sessions."""
-        self.ttl_seconds = ttl_seconds
-        self.max_sessions = max_sessions
-        self.prune()
-        if len(self._sessions) > self.max_sessions:
-            self._evict()
+        with self._lock:
+            self.ttl_seconds = ttl_seconds
+            self.max_sessions = max_sessions
+            expired = [
+                session_id
+                for session_id, session in self._sessions.items()
+                if self._expired(session)
+            ]
+            for session_id in expired:
+                self._sessions.pop(session_id, None)
+            if len(self._sessions) > self.max_sessions:
+                self._evict()
 
     def __len__(self) -> int:
-        return len(self._sessions)
+        with self._lock:
+            return len(self._sessions)
 
     def _expired(self, session: SessionState) -> bool:
         return self._clock() - session.updated_at > self.ttl_seconds

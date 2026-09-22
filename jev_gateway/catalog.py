@@ -1416,6 +1416,7 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
         "echo_requested_model",
         "logging_level",
         "access_log",
+        "log_format",
     }
     unknown = set(value) - known
     if unknown:
@@ -1569,6 +1570,8 @@ def storage_from_dict(value: Any, source: str) -> StorageSettings:
         "path",
         "capture_content",
         "max_requests",
+        "max_continuations_per_session",
+        "max_continuation_sessions",
         "busy_timeout_ms",
         "queue_size",
     }
@@ -1596,6 +1599,20 @@ def storage_from_dict(value: Any, source: str) -> StorageSettings:
         ),
         capture_content=capture_content,
         max_requests=max_requests,
+        max_continuations_per_session=_document_int(
+            value.get(
+                "max_continuations_per_session",
+                defaults.max_continuations_per_session,
+            ),
+            f"{source} storage max_continuations_per_session",
+        ),
+        max_continuation_sessions=_document_int(
+            value.get(
+                "max_continuation_sessions",
+                defaults.max_continuation_sessions,
+            ),
+            f"{source} storage max_continuation_sessions",
+        ),
         busy_timeout_ms=_document_int(
             value.get("busy_timeout_ms", defaults.busy_timeout_ms),
             f"{source} storage busy_timeout_ms",
@@ -1607,6 +1624,14 @@ def storage_from_dict(value: Any, source: str) -> StorageSettings:
     )
     if settings.max_requests is not None and settings.max_requests < 0:
         raise ValueError(f"{source} storage max_requests must not be negative.")
+    if settings.max_continuations_per_session < 1:
+        raise ValueError(
+            f"{source} storage max_continuations_per_session must be at least 1."
+        )
+    if settings.max_continuation_sessions < 1:
+        raise ValueError(
+            f"{source} storage max_continuation_sessions must be at least 1."
+        )
     if settings.busy_timeout_ms < 0:
         raise ValueError(f"{source} storage busy_timeout_ms must not be negative.")
     if settings.queue_size < 1:

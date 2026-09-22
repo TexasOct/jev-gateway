@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from jev_gateway.records import (
+    AssistantContinuationRecord,
     DecisionRecord,
     OutcomeRecord,
     RequestRecord,
@@ -81,7 +82,11 @@ def test_store_joins_request_decision_outcome_and_config(tmp_path: Path) -> None
         )
     )
     assert store.counts() == {
-        "requests": 1, "decisions": 1, "outcomes": 1, "config_versions": 1,
+        "requests": 1,
+        "decisions": 1,
+        "outcomes": 1,
+        "config_versions": 1,
+        "assistant_continuations": 0,
     }
     with sqlite3.connect(path) as db:
         route, strategy, ok, signals = db.execute(
@@ -128,6 +133,84 @@ def test_no_retention_limit_by_default(tmp_path: Path) -> None:
     for index in range(260):
         store.record_request(_request(f"req-{index}"))
     assert store.counts()["requests"] == 260
+    store.close()
+
+
+def _continuation(
+    session_id: str,
+    message_key: str,
+    provider_type: str = "openai",
+    payload: dict[str, object] | None = None,
+) -> AssistantContinuationRecord:
+    return AssistantContinuationRecord(
+        session_id=session_id,
+        message_key=message_key,
+        provider_type=provider_type,
+        payload=payload or {},
+        created_at=1000.0,
+    )
+
+
+def test_continuations_survive_reopen_in_insertion_order(tmp_path: Path) -> None:
+    path = tmp_path / "records.sqlite3"
+    settings = StorageSettings(enabled=True, path=str(path))
+    store = SqliteRecordStore(settings)
+    store.record_assistant_continuation(
+        _continuation(
+            "session-1",
+            "same-key",
+            "deepseek",
+            {"reasoning_content": "first"},
+        )
+    )
+    store.record_assistant_continuation(
+        _continuation("session-1", "same-key", "openai", {"opaque": [1, 2]})
+    )
+    store.close()
+
+    reopened = SqliteRecordStore(settings)
+    loaded = reopened.load_assistant_continuations("session-1", limit=40)
+
+    assert [(item.message_key, item.provider_type) for item in loaded] == [
+        ("same-key", "deepseek"),
+        ("same-key", "openai"),
+    ]
+    assert loaded[0].payload == {"reasoning_content": "first"}
+    assert loaded[1].payload == {"opaque": [1, 2]}
+    with sqlite3.connect(path) as db:
+        columns = {
+            row[1]
+            for row in db.execute("PRAGMA table_info(assistant_continuations)")
+        }
+        assert "content" not in columns
+        assert "messages_json" not in columns
+    reopened.close()
+
+
+def test_continuation_retention_bounds_turns_and_sessions(tmp_path: Path) -> None:
+    path = tmp_path / "records.sqlite3"
+    store = SqliteRecordStore(StorageSettings(
+        enabled=True,
+        path=str(path),
+        max_continuations_per_session=2,
+        max_continuation_sessions=2,
+    ))
+    for index in range(3):
+        store.record_assistant_continuation(
+            _continuation("session-1", f"one-{index}")
+        )
+    store.record_assistant_continuation(_continuation("session-2", "two"))
+    store.record_assistant_continuation(_continuation("session-3", "three"))
+    store.flush()
+
+    assert store.load_assistant_continuations("session-1", limit=40) == []
+    assert [item.message_key for item in store.load_assistant_continuations(
+        "session-2", limit=40
+    )] == ["two"]
+    assert [item.message_key for item in store.load_assistant_continuations(
+        "session-3", limit=40
+    )] == ["three"]
+    assert store.counts()["assistant_continuations"] == 2
     store.close()
 
 

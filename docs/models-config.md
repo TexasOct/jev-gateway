@@ -243,9 +243,10 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | `decision_log_size` | `500` | 内存决策日志条数，至少为 1。 |
 | `echo_requested_model` | `true` | 响应中的模型名是否回显请求的 `model`；路由选中的具体模型仍可从 `X-JEV-Route` 查看。 |
 | `logging_level` | `INFO` | 网关模块日志等级：`DEBUG`、`INFO`、`WARNING`、`ERROR` 或 `CRITICAL`，不区分大小写；启动时生效。 |
+| `log_format` | `pretty` | 日志输出格式：`pretty` 按字段分组换行，适合终端阅读；`json` 每条事件输出一个 JSON 对象，适合日志采集；`compact` 使用单行 `key=value` 格式。启动时生效。 |
 | `access_log` | `false` | 是否输出 Uvicorn 的逐条 HTTP 访问记录；启动时生效，默认关闭轮询造成的刷屏。 |
 
-`jev-gateway` 启动后将网关、Uvicorn 与 LiteLLM 日志写入 stderr。常规路由决策和结果按 INFO 输出，开始流式响应按 DEBUG 输出，失败与存储异常按 WARNING/ERROR 输出。日志包含模块名、决策 ID、路由和耗时等字段；不输出请求正文或密钥。`uvicorn.error` 是 Uvicorn 的生命周期 logger 名称，不代表 ERROR 级别；终端中显示为 `uvicorn`。终端输出只给日志级别文本着色，时间、模块名和正文保持终端默认颜色；重定向到文件或管道时全部保持纯文本。LiteLLM 的 provider 提示直写 stdout 已关闭；其有效警告仍保留。需要查看每个 HTTP 请求时将 `gateway.access_log` 设为 `true` 并重启。通过其他 ASGI 启动方式运行时，应自行配置服务器日志。
+`jev-gateway` 启动后将网关、Uvicorn 与 LiteLLM 日志写入 stderr。常规路由决策和结果按 INFO 输出，开始流式响应按 DEBUG 输出，失败与存储异常按 WARNING/ERROR 输出。默认 `pretty` 格式会把路由事件按 identifiers、model、selection、reasoning、outcome 等分组换行，避免长行在终端折断。`json` 不添加 ANSI 颜色，并保持每条事件为一个 JSON 对象，字段名与控制台格式一致。三种格式都只输出白名单字段，不输出请求正文或密钥。`uvicorn.error` 是 Uvicorn 的生命周期 logger 名称，不代表 ERROR 级别；终端中显示为 `uvicorn`。在 `pretty` 与 `compact` 格式中，终端输出只给日志级别文本着色，时间、模块名和正文保持终端默认颜色；重定向到文件或管道时全部保持纯文本。LiteLLM 的 provider 提示直写 stdout 已关闭；其有效警告仍保留。需要查看每个 HTTP 请求时将 `gateway.access_log` 设为 `true` 并重启。通过其他 ASGI 启动方式运行时，应自行配置服务器日志。
 
 ## `storage`
 

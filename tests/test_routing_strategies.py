@@ -16,10 +16,12 @@ from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
 from jev_gateway.decision import RoutingEngine
 from jev_gateway.records import (
+    AssistantContinuationRecord,
     DecisionRecord,
     OutcomeRecord,
     RecordStore,
     RequestRecord,
+    StorageSettings,
     record_store_from_settings,
 )
 from jev_gateway.sessions import MemorySessionStore
@@ -158,6 +160,8 @@ def test_storage_settings_parse_from_the_document(tmp_path: Path) -> None:
         "path": str(path),
         "capture_content": False,
         "max_requests": None,
+        "max_continuations_per_session": 12,
+        "max_continuation_sessions": 34,
     }
 
     storage = catalog_from_document(document, "test catalog").storage
@@ -166,6 +170,8 @@ def test_storage_settings_parse_from_the_document(tmp_path: Path) -> None:
     assert storage.path == str(path)
     assert storage.capture_content is False
     assert storage.max_requests is None
+    assert storage.max_continuations_per_session == 12
+    assert storage.max_continuation_sessions == 34
 
 
 # Gateway endpoints
@@ -463,6 +469,7 @@ def test_enabled_storage_records_request_decision_and_outcome(
         "decisions": 1,
         "outcomes": 1,
         "config_versions": 1,
+        "assistant_continuations": 1,
     }
     with sqlite3.connect(catalog.storage.path) as db:
         request_row = db.execute(
@@ -532,6 +539,7 @@ class _FailingStore:
     """A store that succeeds at registration and fails on the chosen write."""
 
     enabled = True
+    continuation_limit = 40
 
     def __init__(self, fail_on: str) -> None:
         self.fail_on = fail_on
@@ -553,6 +561,23 @@ class _FailingStore:
         if self.fail_on == "outcome":
             raise RuntimeError("outcome write failed")
 
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        if self.fail_on == "continuation":
+            raise RuntimeError("continuation write failed")
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        return []
+
+    def validate_reconfiguration(self, settings: StorageSettings) -> None:
+        return None
+
+    def reconfigure(self, settings: StorageSettings) -> None:
+        return None
+
     def flush(self) -> None:
         return None
 
@@ -566,9 +591,7 @@ class _FailingStore:
         return None
 
 
-def test_request_write_failure_returns_503_before_upstream(
-    monkeypatch,
-) -> None:
+def test_request_write_failure_does_not_block_upstream(monkeypatch, caplog) -> None:
     calls = install_completion(monkeypatch)
     app = make_app(make_engine(catalog_document(), record_store=_FailingStore("request")))
 
@@ -579,12 +602,15 @@ def test_request_write_failure_returns_503_before_upstream(
         json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "storage_unavailable"
-    assert calls == []
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert any(
+        getattr(record, "record_kind", None) == "request"
+        for record in caplog.records
+    )
 
 
-def test_decision_write_failure_returns_503_before_upstream(monkeypatch) -> None:
+def test_decision_write_failure_does_not_block_upstream(monkeypatch, caplog) -> None:
     calls = install_completion(monkeypatch)
     app = make_app(
         make_engine(catalog_document(), record_store=_FailingStore("decision"))
@@ -597,12 +623,15 @@ def test_decision_write_failure_returns_503_before_upstream(monkeypatch) -> None
         json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "storage_unavailable"
-    assert calls == []
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert any(
+        getattr(record, "record_kind", None) == "decision"
+        for record in caplog.records
+    )
 
 
-def test_outcome_write_failure_is_reported(monkeypatch) -> None:
+def test_outcome_write_failure_does_not_block_response(monkeypatch, caplog) -> None:
     install_completion(monkeypatch)
     app = make_app(
         make_engine(catalog_document(), record_store=_FailingStore("outcome"))
@@ -615,5 +644,48 @@ def test_outcome_write_failure_is_reported(monkeypatch) -> None:
         json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
     )
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "storage_unavailable"
+    assert response.status_code == 200
+    assert any(
+        getattr(record, "record_kind", None) == "outcome"
+        for record in caplog.records
+    )
+
+
+def test_invalid_request_record_failure_preserves_validation_error(monkeypatch) -> None:
+    calls = install_completion(monkeypatch)
+    app = make_app(make_engine(catalog_document(), record_store=_FailingStore("request")))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"model": "task_aware"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["param"] == "messages"
+    assert calls == []
+
+
+def test_storage_startup_failure_does_not_block_gateway(
+    tmp_path: Path, monkeypatch
+) -> None:
+    calls = install_completion(monkeypatch)
+    store = record_store_from_settings(
+        StorageSettings(
+            enabled=True,
+            path=str(tmp_path / "missing" / "records.sqlite3"),
+        )
+    )
+    app = make_app(make_engine(catalog_document(), record_store=store))
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={"model": "task_aware", "messages": [{"role": "user", "content": SIMPLE_PROMPT}]},
+    )
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert request(app, "GET", "/healthz").json()["status"] == "degraded"

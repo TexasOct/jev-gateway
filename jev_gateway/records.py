@@ -1,8 +1,8 @@
-"""Durable storage for inbound requests, routing decisions, and outcomes.
+"""Best-effort durable storage for inbound requests, routing decisions, and outcomes.
 
 A config version links each decision to the policy and model metadata that
-produced it. Writes raise on failure; callers must not silently serve a request
-whose evidence could not be stored.
+produced it. Record delivery must never determine whether the gateway serves a
+request.
 """
 
 from __future__ import annotations
@@ -21,11 +21,12 @@ from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NoReturn, Protocol
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "AssistantContinuationRecord",
     "DecisionRecord",
     "NullRecordStore",
     "OutcomeRecord",
@@ -119,6 +120,15 @@ CREATE TABLE IF NOT EXISTS config_versions (
     catalog_json TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS assistant_continuations (
+    continuation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    message_key TEXT NOT NULL,
+    provider_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_requests_received_at ON requests (received_at);
 CREATE INDEX IF NOT EXISTS idx_requests_session ON requests (session_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_request ON decisions (request_id);
@@ -126,6 +136,8 @@ CREATE INDEX IF NOT EXISTS idx_decisions_session ON decisions (session_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_strategy ON decisions (strategy);
 CREATE INDEX IF NOT EXISTS idx_decisions_config ON decisions (config_hash);
 CREATE INDEX IF NOT EXISTS idx_outcomes_request ON outcomes (request_id);
+CREATE INDEX IF NOT EXISTS idx_assistant_continuations_session
+    ON assistant_continuations (session_id, continuation_id);
 """
 
 # Kept separate from the tables so an existing database can be migrated: the view
@@ -177,10 +189,12 @@ SCHEMA = _TABLES + "\n" + DECISION_EVIDENCE_VIEW
 # Columns added after the first release. SQLite stores a new column in the table
 # header rather than rewriting rows, so adding one to a multi-gigabyte evidence
 # database is a metadata change, not a migration over the data.
-_ADDED_DECISION_COLUMNS = (
-    ("reasoning_effort", "TEXT"),
-    ("reasoning_effort_source", "TEXT"),
-)
+_DECISION_COLUMN_MIGRATIONS = {
+    "reasoning_effort": "ALTER TABLE decisions ADD COLUMN reasoning_effort TEXT",
+    "reasoning_effort_source": (
+        "ALTER TABLE decisions ADD COLUMN reasoning_effort_source TEXT"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -191,6 +205,8 @@ class StorageSettings:
     path: str = "jev-records.sqlite3"
     capture_content: bool = True
     max_requests: int | None = None
+    max_continuations_per_session: int = 40
+    max_continuation_sessions: int = 2_048
     busy_timeout_ms: int = 5_000
     queue_size: int = DEFAULT_QUEUE_SIZE
 
@@ -201,9 +217,22 @@ class StorageSettings:
             "path": self.path,
             "capture_content": self.capture_content,
             "max_requests": self.max_requests,
+            "max_continuations_per_session": self.max_continuations_per_session,
+            "max_continuation_sessions": self.max_continuation_sessions,
             "busy_timeout_ms": self.busy_timeout_ms,
             "queue_size": self.queue_size,
         }
+
+
+@dataclass(frozen=True)
+class AssistantContinuationRecord:
+    """Provider-owned continuation metadata for one replayable assistant turn."""
+
+    session_id: str
+    message_key: str
+    provider_type: str
+    payload: dict[str, Any]
+    created_at: float
 
 
 @dataclass(frozen=True)
@@ -291,38 +320,60 @@ class RecordStore(Protocol):
     """The storage contract the engine and gateway depend on."""
 
     enabled: bool
+    continuation_limit: int
+    settings: StorageSettings
 
     def register_config(self, payload: dict[str, Any], source: str) -> str:
         """Persist a routing configuration snapshot and return its hash."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def record_request(self, record: RequestRecord) -> None:
         """Persist one inbound request."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def record_decision(self, record: DecisionRecord) -> None:
         """Persist one routing decision with its evidence chain."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def record_outcome(self, record: OutcomeRecord) -> None:
         """Persist the upstream result for one decision."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        """Persist provider-owned continuation metadata."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        """Load recent continuation metadata in insertion order."""
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def counts(self) -> dict[str, int]:
         """Return the number of stored rows per table."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def validate_reconfiguration(self, settings: StorageSettings) -> None:
+        """Reject runtime changes that require replacing process-owned resources."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def reconfigure(self, settings: StorageSettings) -> None:
+        """Apply reloadable settings or reject changes that require restart."""
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def flush(self) -> None:
         """Wait for all previously submitted writes, raising on writer failure."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def status(self) -> dict[str, Any]:
         """Report pending writes and any background failure."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
     def close(self) -> None:
         """Drain queued writes and release storage resources."""
-        raise NotImplementedError
+        raise RuntimeError("RecordStore protocol method called directly")
 
 
 def build_config_hash(payload: dict[str, Any]) -> str:
@@ -344,6 +395,10 @@ class NullRecordStore:
 
     enabled = False
 
+    def __init__(self, settings: StorageSettings | None = None) -> None:
+        self.settings = settings or StorageSettings()
+        self.continuation_limit = self.settings.max_continuations_per_session
+
     def register_config(self, payload: dict[str, Any], source: str) -> str:
         return build_config_hash(payload)
 
@@ -356,14 +411,104 @@ class NullRecordStore:
     def record_outcome(self, record: OutcomeRecord) -> None:
         return None
 
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        return None
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        return []
+
     def counts(self) -> dict[str, int]:
-        return {"requests": 0, "decisions": 0, "outcomes": 0, "config_versions": 0}
+        return {
+            "requests": 0,
+            "decisions": 0,
+            "outcomes": 0,
+            "config_versions": 0,
+            "assistant_continuations": 0,
+        }
+
+    def validate_reconfiguration(self, settings: StorageSettings) -> None:
+        if settings != self.settings:
+            raise ValueError("Changing storage settings requires a restart.")
+
+    def reconfigure(self, settings: StorageSettings) -> None:
+        self.validate_reconfiguration(settings)
 
     def flush(self) -> None:
         return None
 
     def status(self) -> dict[str, Any]:
         return {"enabled": False, "pending": 0, "error": None}
+
+    def close(self) -> None:
+        return None
+
+
+class _UnavailableRecordStore:
+    """A degraded store that lets the gateway run after recorder startup fails."""
+
+    enabled = True
+
+    def __init__(self, error: BaseException, settings: StorageSettings) -> None:
+        self._error = error
+        self.settings = settings
+        self.continuation_limit = settings.max_continuations_per_session
+
+    def register_config(self, payload: dict[str, Any], source: str) -> str:
+        return build_config_hash(payload)
+
+    def _unavailable(self) -> NoReturn:
+        raise StorageUnavailableError(str(self._error)) from self._error
+
+    def record_request(self, record: RequestRecord) -> None:
+        self._unavailable()
+
+    def record_decision(self, record: DecisionRecord) -> None:
+        self._unavailable()
+
+    def record_outcome(self, record: OutcomeRecord) -> None:
+        self._unavailable()
+
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        self._unavailable()
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        self._unavailable()
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "requests": 0,
+            "decisions": 0,
+            "outcomes": 0,
+            "config_versions": 0,
+            "assistant_continuations": 0,
+        }
+
+    def validate_reconfiguration(self, settings: StorageSettings) -> None:
+        if settings != self.settings:
+            raise ValueError("Changing storage settings requires a restart.")
+        self._unavailable()
+
+    def reconfigure(self, settings: StorageSettings) -> None:
+        self._unavailable()
+
+    def flush(self) -> None:
+        self._unavailable()
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "enabled": True,
+            "pending": 0,
+            "error": str(self._error),
+            "alive": False,
+        }
 
     def close(self) -> None:
         return None
@@ -410,14 +555,11 @@ def _migrate_decision_columns(connection: sqlite3.Connection) -> None:
     existing = {row[1] for row in connection.execute("PRAGMA table_info(decisions)")}
     if not existing:
         return
-    missing = [
-        (name, kind) for name, kind in _ADDED_DECISION_COLUMNS if name not in existing
-    ]
+    missing = [name for name in _DECISION_COLUMN_MIGRATIONS if name not in existing]
     if not missing:
         return
-    for name, kind in missing:
-        # Names and types come from the module constant above, never from a request.
-        connection.execute(f"ALTER TABLE decisions ADD COLUMN {name} {kind}")
+    for name in missing:
+        connection.execute(_DECISION_COLUMN_MIGRATIONS[name])
     connection.execute("DROP VIEW IF EXISTS decision_evidence")
     connection.executescript(DECISION_EVIDENCE_VIEW)
 
@@ -456,7 +598,6 @@ class _SqliteBackend:
         try:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=FULL")
-            connection.execute(f"PRAGMA busy_timeout={int(self.settings.busy_timeout_ms)}")
             connection.executescript(SCHEMA)
             _migrate_decision_columns(connection)
             _migrate_requested_model(connection)
@@ -465,21 +606,6 @@ class _SqliteBackend:
             connection.close()
             raise
         self._connection = connection
-
-    def reopen(self, settings: StorageSettings) -> None:
-        """Point the store at a new path, keeping the current one on failure."""
-        if settings.path == self.settings.path:
-            self.settings = settings
-            return
-        candidate = _SqliteBackend(settings)
-        with self._lock:
-            previous = self._connection
-            self.settings = settings
-            self.path = settings.path
-            self._connection = candidate._connection
-            candidate._connection = None
-            if previous is not None:
-                previous.close()
 
     def register_config(self, payload: dict[str, Any], source: str) -> str:
         config_hash = build_config_hash(payload)
@@ -589,6 +715,57 @@ class _SqliteBackend:
             ),
         )
 
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        with self._transaction() as connection:
+            connection.execute(
+                "INSERT INTO assistant_continuations ("
+                "session_id, message_key, provider_type, payload_json, created_at"
+                ") VALUES (?, ?, ?, ?, ?)",
+                (
+                    record.session_id,
+                    record.message_key,
+                    record.provider_type,
+                    _json(record.payload) or "{}",
+                    record.created_at,
+                ),
+            )
+            self._prune_continuations(connection, record.session_id)
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        if limit < 1:
+            return []
+        connection = self._connection
+        if connection is None:
+            return []
+        with self._lock:
+            rows = connection.execute(
+                "SELECT message_key, provider_type, payload_json, created_at "
+                "FROM assistant_continuations WHERE session_id = ? "
+                "ORDER BY continuation_id DESC LIMIT ?",
+                (session_id, limit),
+            ).fetchall()
+        loaded: list[AssistantContinuationRecord] = []
+        for row in reversed(rows):
+            try:
+                decoded = json.loads(row["payload_json"])
+            except (TypeError, ValueError):
+                decoded = {}
+            payload = decoded if isinstance(decoded, dict) else {}
+            loaded.append(
+                AssistantContinuationRecord(
+                    session_id=session_id,
+                    message_key=row["message_key"],
+                    provider_type=row["provider_type"],
+                    payload=payload,
+                    created_at=row["created_at"],
+                )
+            )
+        return loaded
+
     def counts(self) -> dict[str, int]:
         connection = self._connection
         if connection is None:
@@ -597,17 +774,24 @@ class _SqliteBackend:
                 "decisions": 0,
                 "outcomes": 0,
                 "config_versions": 0,
+                "assistant_continuations": 0,
             }
         with self._lock:
             requests = connection.execute("SELECT COUNT(*) FROM requests").fetchone()
             decisions = connection.execute("SELECT COUNT(*) FROM decisions").fetchone()
             outcomes = connection.execute("SELECT COUNT(*) FROM outcomes").fetchone()
             versions = connection.execute("SELECT COUNT(*) FROM config_versions").fetchone()
+            continuations = connection.execute(
+                "SELECT COUNT(*) FROM assistant_continuations"
+            ).fetchone()
         return {
             "requests": requests[0] if requests is not None else 0,
             "decisions": decisions[0] if decisions is not None else 0,
             "outcomes": outcomes[0] if outcomes is not None else 0,
             "config_versions": versions[0] if versions is not None else 0,
+            "assistant_continuations": (
+                continuations[0] if continuations is not None else 0
+            ),
         }
 
     def close(self) -> None:
@@ -627,6 +811,30 @@ class _SqliteBackend:
             self._writes += 1
             if self._writes % PRUNE_INTERVAL == 0:
                 self._prune(connection)
+
+    def _prune_continuations(
+        self, connection: sqlite3.Connection, session_id: str
+    ) -> None:
+        """Bound provider continuation state by turns per session and session count."""
+        connection.execute(
+            "DELETE FROM assistant_continuations WHERE session_id = ? "
+            "AND continuation_id NOT IN ("
+            "SELECT continuation_id FROM assistant_continuations "
+            "WHERE session_id = ? ORDER BY continuation_id DESC LIMIT ?)",
+            (
+                session_id,
+                session_id,
+                self.settings.max_continuations_per_session,
+            ),
+        )
+        connection.execute(
+            "DELETE FROM assistant_continuations WHERE session_id IN ("
+            "SELECT session_id FROM ("
+            "SELECT session_id, MAX(continuation_id) AS latest "
+            "FROM assistant_continuations GROUP BY session_id "
+            "ORDER BY latest DESC LIMIT -1 OFFSET ?))",
+            (self.settings.max_continuation_sessions,),
+        )
 
     def _prune(self, connection: sqlite3.Connection) -> None:
         """Drop the oldest requests and the rows that hang off them."""
@@ -661,6 +869,7 @@ class SqliteRecordStore:
     def __init__(self, settings: StorageSettings) -> None:
         self.settings = settings
         self.path = settings.path
+        self.continuation_limit = settings.max_continuations_per_session
         # Queue operations do not touch SQLite; the worker owns the connection.
         self._queue: queue.Queue[
             tuple[Callable[[_SqliteBackend], Any] | None, Future[Any] | None]
@@ -756,16 +965,41 @@ class SqliteRecordStore:
     def record_outcome(self, record: OutcomeRecord) -> None:
         self._submit(lambda backend: backend.record_outcome(record))
 
+    def record_assistant_continuation(
+        self, record: AssistantContinuationRecord
+    ) -> None:
+        snapshot = copy.deepcopy(record)
+        self._submit(lambda backend: backend.record_assistant_continuation(snapshot))
+
+    def load_assistant_continuations(
+        self, session_id: str, *, limit: int
+    ) -> list[AssistantContinuationRecord]:
+        return self._submit(
+            lambda backend: backend.load_assistant_continuations(
+                session_id, limit=limit
+            ),
+            wait=True,
+        )
+
     def flush(self) -> None:
         self._submit(lambda backend: None, wait=True)
 
-    def reopen(self, settings: StorageSettings) -> None:
-        """Retain the original path; changing it requires restarting the gateway."""
-        if settings.path != self.path:
-            raise ValueError("Changing the routing storage path requires a restart.")
+    def validate_reconfiguration(self, settings: StorageSettings) -> None:
+        """Require restart for every storage setting change."""
+        if settings != self.settings:
+            raise ValueError("Changing storage settings requires a restart.")
+        status = self.status()
+        if status.get("error"):
+            raise StorageUnavailableError(str(status["error"]))
+
+    def reconfigure(self, settings: StorageSettings) -> None:
+        """Confirm unchanged settings and synchronize queued writes."""
+        self.validate_reconfiguration(settings)
         self.flush()
-        self._submit(lambda backend: backend.reopen(settings), wait=True)
-        self.settings = settings
+
+    def reopen(self, settings: StorageSettings) -> None:
+        """Compatibility alias for runtime storage reconfiguration."""
+        self.reconfigure(settings)
 
     def counts(self) -> dict[str, int]:
         return self._submit(lambda backend: backend.counts(), wait=True)
@@ -806,5 +1040,12 @@ def _digest(text: str) -> str:
 def record_store_from_settings(settings: StorageSettings) -> RecordStore:
     """Build the enabled store, or the null store when storage is off."""
     if not settings.enabled:
-        return NullRecordStore()
-    return SqliteRecordStore(settings)
+        return NullRecordStore(settings)
+    try:
+        return SqliteRecordStore(settings)
+    except (OSError, RuntimeError, ValueError, sqlite3.Error) as error:
+        logger.error(
+            "routing record store unavailable at startup",
+            extra={"record_kind": "startup", "error_type": type(error).__name__},
+        )
+        return _UnavailableRecordStore(error, settings)

@@ -6,17 +6,20 @@ import asyncio
 import json
 import os
 import sys
+import threading
 import types
 import warnings
 from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 from pydantic import BaseModel
 
 from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
 from jev_gateway.decision import RoutingEngine
+from jev_gateway.records import SqliteRecordStore, StorageSettings
 from jev_gateway.sessions import MemorySessionStore
 from tests.helpers import (
     COMPLEX_PROMPT,
@@ -287,6 +290,145 @@ def test_deepseek_restores_reasoning_content_from_session_history(monkeypatch) -
     assert first.status_code == 200
     assert second.status_code == 200
     assert calls[1]["messages"][1]["reasoning_content"] == "I added two and two."
+
+
+def test_concurrent_first_requests_share_canonical_continuation_session(
+    monkeypatch
+) -> None:
+    barrier = threading.Barrier(3)
+
+    def completion(**kwargs):
+        content = kwargs["messages"][-1]["content"]
+        barrier.wait()
+        return {
+            "id": f"chatcmpl-{content}",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    document = catalog_document(mode="fresh")
+    config = make_config(mode="fresh")
+    config.engine.reload_catalog(catalog_from_document(document, "test catalog"))
+    app = gateway.create_app(config)
+    results: list[httpx.Response] = []
+    results_lock = threading.Lock()
+
+    def send(content: str) -> None:
+        response = request(
+            app,
+            "POST",
+            "/v1/chat/completions",
+            headers={"X-JEV-Session-Id": "same-session"},
+            json={
+                "model": LARGE_ID,
+                "messages": [{"role": "user", "content": content}],
+            },
+        )
+        with results_lock:
+            results.append(response)
+
+    threads = [threading.Thread(target=send, args=(content,)) for content in ("A", "B")]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert [response.status_code for response in results] == [200, 200]
+    session = config.engine.store.get("same-session")
+    assert session is not None
+    saved = session.adapter_state["assistant_continuations"]
+    assert len(saved) == 2
+    assert {item["provider_type"] for item in saved} == {"openai"}
+
+
+def test_deepseek_restores_reasoning_after_gateway_restart(
+    monkeypatch, tmp_path: Path
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Durable answer.",
+                    "reasoning_content": "Durable trace.",
+                },
+                "finish_reason": "stop",
+            }],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    document = catalog_document()
+    document["providers"][0]["type"] = "deepseek"
+    catalog = catalog_from_document(document, "test catalog")
+    settings = StorageSettings(
+        enabled=True, path=str(tmp_path / "continuations.sqlite3")
+    )
+
+    def restarted_app():
+        store = SqliteRecordStore(settings)
+        engine = RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=store,
+            config_source="test catalog",
+        )
+        return gateway.create_app(gateway.GatewayConfig(
+            engine=engine,
+            gateway_api_key=None,
+            session_strategy="header",
+        )), engine
+
+    first_app, first_engine = restarted_app()
+    first = request(
+        first_app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "worker-session"},
+        json={
+            "model": SMALL_ID,
+            "messages": [{"role": "user", "content": "First turn."}],
+        },
+    )
+    assert first.status_code == 200
+    first_engine.close()
+
+    second_app, second_engine = restarted_app()
+    second = request(
+        second_app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "worker-session"},
+        json={
+            "model": SMALL_ID,
+            "messages": [
+                {"role": "user", "content": "First turn."},
+                {"role": "assistant", "content": "Durable answer."},
+                {"role": "user", "content": "Continue."},
+            ],
+        },
+    )
+
+    assert second.status_code == 200
+    assert calls[1]["messages"][1]["reasoning_content"] == "Durable trace."
+    second_engine.close()
 
 
 def test_deepseek_bridges_openai_history_in_same_session(monkeypatch) -> None:
@@ -744,6 +886,233 @@ def test_reload_endpoint_swaps_the_catalog(tmp_path, monkeypatch) -> None:
     assert reloaded.status_code == 200
     assert reloaded.json()["reloaded"] is True
     assert reloaded.json()["models"][0]["api_base"] == "https://moved.example/v1"
+
+
+def test_reload_rejects_continuation_retention_changes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    models_file = tmp_path / "models.json"
+    database = tmp_path / "records.sqlite3"
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(database),
+        "max_continuations_per_session": 40,
+        "max_continuation_sessions": 20,
+    }
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, "test catalog")
+    store = SqliteRecordStore(catalog.storage)
+    config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=store,
+            config_source=str(models_file),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+    install_completion(monkeypatch)
+    app = gateway.create_app(config)
+
+    replacement = catalog_document()
+    replacement["storage"] = {
+        "enabled": True,
+        "path": str(database),
+        "max_continuations_per_session": 2,
+        "max_continuation_sessions": 3,
+    }
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "restart_required"
+    assert store.settings.max_continuations_per_session == 40
+    assert store.settings.max_continuation_sessions == 20
+    assert config.engine.catalog.storage == catalog.storage
+    config.engine.close()
+
+
+@pytest.mark.parametrize("change", ["enabled", "path", "queue_size"])
+def test_reload_rejects_storage_changes_that_require_restart(
+    tmp_path: Path, monkeypatch, change: str
+) -> None:
+    models_file = tmp_path / "models.json"
+    database = tmp_path / "records.sqlite3"
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(database),
+        "queue_size": 8,
+    }
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, "test catalog")
+    store = SqliteRecordStore(catalog.storage)
+    config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=store,
+            config_source=str(models_file),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+    install_completion(monkeypatch)
+    app = gateway.create_app(config)
+
+    replacement = json.loads(json.dumps(document))
+    if change == "enabled":
+        replacement["storage"]["enabled"] = False
+    elif change == "path":
+        replacement["storage"]["path"] = str(tmp_path / "other.sqlite3")
+    else:
+        replacement["storage"]["queue_size"] = 9
+    replacement["providers"][0]["api_base"] = "https://should-not-apply.example/v1"
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "restart_required"
+    assert config.engine.catalog.storage == catalog.storage
+    assert config.engine.catalog.providers[0].api_base == "https://small.example/v1"
+    assert store.settings == catalog.storage
+    config.engine.close()
+
+
+def test_reload_accepts_unchanged_relative_storage_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    models_file = runtime / "models.json"
+    document = catalog_document()
+    document["storage"] = {"enabled": True, "path": "records.sqlite3"}
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    monkeypatch.setenv("JEV_GATEWAY_HOME", str(runtime))
+    install_completion(monkeypatch)
+    config = gateway.load_gateway_config(models_file)
+    app = gateway.create_app(config)
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 200
+    assert config.engine.catalog.storage.path == str(runtime / "records.sqlite3")
+    config.engine.close()
+
+
+def test_reload_strategy_preflight_failure_keeps_storage_and_catalog(
+    tmp_path: Path, monkeypatch
+) -> None:
+    models_file = tmp_path / "models.json"
+    database = tmp_path / "records.sqlite3"
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(database),
+        "max_continuations_per_session": 40,
+    }
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, "test catalog")
+    store = SqliteRecordStore(catalog.storage)
+    config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=store,
+            config_source=str(models_file),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+    install_completion(monkeypatch)
+    app = gateway.create_app(config)
+
+    replacement = json.loads(json.dumps(document))
+    replacement["storage"]["max_continuations_per_session"] = 2
+    replacement["strategies"]["task_aware"] = {"kind": "missing-kind"}
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_configuration"
+    assert store.settings.max_continuations_per_session == 40
+    assert config.engine.catalog.storage.max_continuations_per_session == 40
+    config.engine.close()
+
+
+def test_reload_reports_degraded_storage_as_unavailable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    models_file = tmp_path / "models.json"
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(tmp_path / "missing" / "records.sqlite3"),
+    }
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, "test catalog")
+    config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=gateway.record_store_from_settings(catalog.storage),
+            config_source=str(models_file),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+    install_completion(monkeypatch)
+    app = gateway.create_app(config)
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "storage_unavailable"
+    config.engine.close()
+
+
+def test_reload_prioritizes_restart_required_for_degraded_storage_change(
+    tmp_path: Path, monkeypatch
+) -> None:
+    models_file = tmp_path / "models.json"
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(tmp_path / "missing" / "records.sqlite3"),
+    }
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, "test catalog")
+    config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=gateway.record_store_from_settings(catalog.storage),
+            config_source=str(models_file),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+    install_completion(monkeypatch)
+    app = gateway.create_app(config)
+    replacement = json.loads(json.dumps(document))
+    replacement["storage"]["max_continuations_per_session"] = 2
+    models_file.write_text(json.dumps(replacement), encoding="utf-8")
+
+    response = request(app, "POST", "/v1/routing/reload")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "restart_required"
+    config.engine.close()
 
 
 def test_reload_endpoint_keeps_the_old_catalog_on_bad_input(

@@ -2,6 +2,7 @@
 
 from .catalog import LoggingSettings, logging_from_gateway
 from .config import (
+    LOG_FORMATS,
     GatewayFormatter,
     display_logger_name,
     suppress_litellm_debug_prints,
@@ -9,6 +10,7 @@ from .config import (
 )
 
 __all__ = [
+    "LOG_FORMATS",
     "GatewayFormatter",
     "LoggingSettings",
     "display_logger_name",

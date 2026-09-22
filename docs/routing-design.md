@@ -296,11 +296,11 @@ wait for disk writes. The worker opens the database and writes records in queue
 order, so config snapshots precede the decisions that reference them. Use
 `engine.record_store.flush()` when a caller needs confirmation that all earlier
 writes have committed. Shutdown calls `close()` to drain the queue. A full
-queue or failed worker rejects new submissions with `503 storage_unavailable`;
-a successful enqueue does **not** guarantee the record survived a crash. Later
-worker failures appear in `/healthz` under `storage.error`, and subsequent
-submissions fail. Stream outcomes are enqueued after the stream ends; at that
-point HTTP status cannot change if enqueueing fails.
+queue or failed worker drops new submissions and writes a structured warning;
+it never changes the gateway response. A successful enqueue does **not**
+guarantee the record survived a crash. Later worker failures appear in
+`/healthz` under `storage.error`, and subsequent submissions are dropped.
+Stream outcomes are enqueued after the stream ends under the same rule.
 
 `queue_size` defaults to 4096. `max_requests: null` keeps every request; set a
 number only if you explicitly want to prune old evidence. `capture_content:
