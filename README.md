@@ -189,31 +189,44 @@ rule matches, the strategy uses the local signal tier and policy selection.
 ```json
 {
   "strategies": {
-    "risk_aware": {
+    "task_aware": {
       "kind": "jev_matrix",
       "mode": "fresh",
+      "reasoning": {
+        "mode": "override",
+        "effort_by_tier": {"simple": "low", "standard": "medium", "complex": "high"}
+      },
+      "tier_models": {
+        "simple": ["deepseek/deepseek-flash"],
+        "standard": ["openai/gpt-5.6-terra"],
+        "complex": ["openai/gpt-5.6-sol"]
+      },
       "options": {
         "questions": {
-          "risk": {
+          "workload": {
             "type": "choice",
-            "instructions": "How consequential would a wrong answer be?",
+            "instructions": "What is the main kind of work this request asks for?",
             "criteria": {
-              "low": "A routine, reversible request.",
-              "high": "Security, migration, or another high-stakes request."
+              "docs": "Documentation, comments, prose, translation, or summarization; no code behavior changes.",
+              "small_change": "A narrow, bounded code or config change: a rename, dependency bump, formatting pass, or single-file tweak.",
+              "coding": "Implement, fix, or refactor behavior in code; the change has to work.",
+              "reverse": "Understand, audit, or reverse-engineer existing code or systems: architecture, protocol or binary analysis, security review, or hard debugging."
             }
           },
-          "objective": {
+          "rigor": {
             "type": "choice",
-            "instructions": "Which tradeoff best fits the request?",
+            "instructions": "How exact does the output need to be?",
             "criteria": {
-              "cost": "Minimize cost for a bounded task.",
-              "quality": "Prioritize answer quality."
+              "draft": "A first pass is fine; it will be reviewed or reworked.",
+              "exacting": "It ships or gates other work: an interface, migration, security boundary, or release."
             }
           }
         },
         "rules": [
-          {"when": {"risk": "high"}, "select": {"tier": "complex", "selection": "quality_first"}},
-          {"when": {"objective": "cost"}, "select": {"tier": "simple", "selection": "cheapest_adequate"}}
+          {"when": {"workload": "reverse"}, "select": {"tier": "complex", "selection": "quality_first"}},
+          {"when": {"workload": "coding"}, "select": {"tier": "complex", "selection": "quality_first"}},
+          {"when": {"workload": ["docs", "small_change"], "rigor": "exacting"}, "select": {"tier": "standard", "selection": "balanced"}},
+          {"when": {"workload": ["docs", "small_change"]}, "select": {"tier": "simple", "selection": "cheapest_adequate"}}
         ],
         "fallback": {"tier": "standard", "selection": "balanced"}
       }
@@ -222,14 +235,19 @@ rule matches, the strategy uses the local signal tier and policy selection.
 }
 ```
 
-Here `risk_aware` inherits the top-level policy's candidate models. Local policy
-selection still checks model capabilities, context, output limits, and session
-switching rules. With `mode: "cached"`, JEV is queried only on the first live
-session turn. The question/answer state contains the prompt, extracted
-requirements, and a small session summary; do not put sensitive material in
-question descriptions. `reason` records the source and matching rule, not the
-full answers. Restart the gateway after changing Python strategy code; JSON
-configuration can be reloaded through the routing reload endpoint.
+Here `task_aware` states its own `tier_models` and `reasoning` blocks, so the
+tier a rule selects also fixes the thinking level: docs and small edits run on
+the small model at low effort, and coding or reverse-engineering work on the
+top model at high effort. A strategy that omits these fields inherits them from
+the top-level policy. Local policy selection still checks model capabilities,
+context, output limits, and session switching rules. With `mode: "fresh"`, JEV
+is queried on every turn so a session that changes purpose changes model;
+`cached` queries only the first live session turn. The question/answer state
+contains the prompt, extracted requirements, and a small session summary; do
+not put sensitive material in question descriptions. `reason` records the
+source and matching rule, not the full answers. Restart the gateway after
+changing Python strategy code; JSON configuration can be reloaded through the
+routing reload endpoint.
 
 Each named strategy is exposed as an OpenAI-compatible virtual model. Use
 `"model": "auto"` for the default strategy, or send the strategy name directly:
