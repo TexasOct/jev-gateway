@@ -8,6 +8,8 @@ cp models.example.json models.json
 uv run jev-gateway
 ```
 
+`models.json` 是唯一的静态配置来源：providers、models、策略、评分、重路由和网关运行参数都从这里读取。进程不读取固定的 `JEV_API_BASE`、`JEV_API_KEY`、`JEV_ROUTES`、`JEV_MODELS_FILE`，也不读取路由或策略覆盖变量。密钥只按配置中声明的名字解析，包括 `providers[].api_key_env`、`providers[].param_env`、`jev.sources[].api_key_env` 和 `gateway.api_key_env`。前两类用于上游调用，后两类分别用于分类器调用和入站鉴权；策略与检查响应只返回变量名或密钥是否存在的标记，不返回密钥内容。
+
 以下默认值指字段省略时程序采用的值，不一定与仓库现有 `models.json` 的显式取值相同。配置文件变更后调用 `POST /v1/routing/reload`；`gateway.host` 和 `gateway.port` 改动需重启进程。
 
 ## 顶层结构
@@ -52,6 +54,8 @@ uv run jev-gateway
 | `models[].cost.output_per_million` | 数值；默认 `0` | 每百万输出 token 的美元估算单价。 |
 
 模型的唯一 ID 由 `<provider>/<upstream_model>` 自动生成。例如 `deepseek` + `deepseek-flash` 对应 `deepseek/deepseek-flash`。`type` 只控制 LiteLLM 上游适配器，不改变这个 ID。手动指定请求 `model` 时使用完整 ID。自动分流由 `models[].tags` 建池；一个模型可以同时属于多个策略和标签。不要在模型里写 `id`、`api_base`、`api_key` 或 `api_key_env`；连接信息由 provider 提供，明文 `api_key` 也不能写在 provider 中。`capabilities` 不接受表中以外的字段。
+
+`type: "deepseek"` 使用 LiteLLM 的原生适配器；`type: "openai"` 可连接自定义 OpenAI 兼容地址。Azure 可在 `params.api_version` 指定 API 版本，Vertex AI 可在 `params.vertex_project` 和 `params.vertex_location` 指定项目与区域；额外凭据使用 `param_env`。
 
 `cost` 只支持一个输入价，不能表达缓存命中、批量模式或按时段计费。它应取最保守且可复现的输入单价，用于路由排序与记录估算，不是账单结算。仓库当前 `deepseek-flash` 用中国大陆官方高峰价：缓存未命中输入 2 元、输出 8 元 / 百万 token，按 2026-09-23 人民币中间价 6.7468 元 / 美元换算为约 $0.2964 / $1.1857。DeepSeek 高峰是北京时间工作日（不含法定节假日）9:00-12:00、14:00-18:00；其余时间价格减半。
 
@@ -282,10 +286,16 @@ JEV 不可用、调用失败，或回答缺少任一问题时使用 `fallback`�
 | `path` | `jev-records.sqlite3` | SQLite 文件路径。 |
 | `capture_content` | `true` | 是否保存请求与最终 LiteLLM 请求的内容；关闭后保留摘要、信号统计、模型、时序和安全的结构信息，不保存消息、提示词、工具或响应格式正文。 |
 | `max_requests` | `null` | 最多保留的请求数；`null` 不剪裁，非负整数启用清理。 |
+| `max_continuations_per_session` | `40` | 每个会话保留的提供方续写记录上限，至少为 1。 |
+| `max_continuation_sessions` | `2048` | 保留提供方续写记录的会话数上限，至少为 1。 |
 | `busy_timeout_ms` | `5000` | SQLite 忙等待时间，须为非负整数。 |
 | `queue_size` | `4096` | 异步写入队列容量，至少为 1；满队列会拒绝新请求。 |
 
 启用后，请求、决策、脱敏后的最终 LiteLLM 请求、上游结果与配置快照写入 SQLite。最终 LiteLLM 请求在 provider 消息转换和 reasoning effort 应用后记录；`api_key`、Authorization/header、凭据特征字段以及 `providers[].param_env` 提供的字段会在入队前脱敏。写入先进入队列，进程异常退出前尚未提交的数据可能丢失。会话仪表盘的保留请求时间线依赖此存储；关闭或降级时仍可查看当前进程中的活动会话和路由信息。
+
+提供方续写记录包含会话 ID、assistant 消息哈希、来源 provider type 和由适配器定义的 JSON 数据，不保存公开的 assistant 消息、工具参数或提示词。适配器负责提取和恢复这些数据，例如 DeepSeek 的 reasoning content；同一存储接口也可供后续提供方签名使用。上述两个上限分别约束每个会话的记录数和保留的会话数。
+
+所有 `storage` 字段都在进程启动时生效。修改路径、保留上限、队列或内容采集设置后需重启；`POST /v1/routing/reload` 会以 `400 restart_required` 拒绝这些变更。
 
 ## `jev`
 
