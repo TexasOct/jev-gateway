@@ -24,15 +24,25 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from jev_gateway.catalog import GatewaySettings, ModelProfile, load_catalog
+from jev_gateway.catalog import (
+    Catalog,
+    GatewaySettings,
+    ModelProfile,
+    catalog_from_document,
+)
 from jev_gateway.config import coerce_int
+from jev_gateway.dashboard import (
+    DashboardStatic,
+    create_dashboard_router,
+    dashboard_url,
+    static_directory,
+)
 from jev_gateway.decision import (
     Decision,
     RoutingEngine,
     UnknownModelError,
     UnknownStrategyError,
 )
-from jev_gateway.dashboard import create_dashboard_router
 from jev_gateway.logging.config import safe_traceback
 from jev_gateway.provider import adapter_for
 from jev_gateway.reasoning import leaves_payload_alone
@@ -43,6 +53,17 @@ from jev_gateway.records import (
     StorageUnavailableError,
     record_store_from_settings,
     sanitize_upstream_payload,
+)
+from jev_gateway.routing_overlay import (
+    load_catalog_with_overlay,
+    merge_overlay,
+    merge_warnings,
+    overlay_path,
+    read_models_document,
+    read_overlay,
+    remove_overlay,
+    validate_overlay_shape,
+    write_overlay,
 )
 from jev_gateway.sessions import (
     SESSION_HEADER,
@@ -154,7 +175,7 @@ def load_gateway_config(models_file: Path | None = None) -> GatewayConfig:
     path = models_file or runtime_directory() / "models.json"
     path = path.expanduser().resolve()
     load_dotenv(path.parent / ".env", override=True)
-    catalog = _resolve_storage_path(load_catalog(path), path)
+    catalog = _resolve_storage_path(load_catalog_with_overlay(path), path)
     settings: GatewaySettings = catalog.gateway
     return GatewayConfig(
         engine=RoutingEngine(
@@ -401,7 +422,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     reload_lock = threading.Lock()
     app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0")
     app.state.jev_config = active
-    app.include_router(create_dashboard_router(active, require_gateway_key))
 
     @app.exception_handler(StarletteHTTPException)
     async def openai_error_response(
@@ -665,6 +685,264 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     }
                 },
             ) from error
+    def require_config_write(authorization: str | None) -> None:
+        require_gateway_key(active.gateway_api_key, authorization)
+        if not active.gateway_api_key:
+            raise HTTPException(
+                status_code=403,
+                detail=error_body(
+                    "Configuration writes require gateway.api_key_env to be configured.",
+                    code="config_writes_disabled",
+                ),
+            )
+
+    # Registered here, after the write guard exists, so the dashboard router can
+    # share it. Mounting is additive: it never shadows a /v1 route.
+    app.include_router(
+        create_dashboard_router(active, require_gateway_key, require_config_write)
+    )
+    assets = static_directory()
+    if assets.is_dir():
+        app.mount(
+            "/dashboard",
+            DashboardStatic(directory=assets, html=True),
+            name="dashboard",
+        )
+    else:
+        logger.warning(
+            "dashboard assets are missing; build the frontend to serve the operator UI"
+        )
+
+    def prepare_overlay(payload: Any) -> tuple[Catalog, Any, list[dict[str, str]]]:
+        """Validate the complete candidate without changing active routing."""
+        baseline = read_models_document(active.models_file)
+        overlay = validate_overlay_shape(payload)
+        if not overlay:
+            raise ValueError("Overlay requires version, strategy, and rules or models.")
+        merged = merge_overlay(baseline, overlay)
+        catalog = _resolve_storage_path(
+            catalog_from_document(merged, str(active.models_file)), active.models_file
+        )
+        registry = active.engine.prepare_catalog_reload(catalog)
+        if catalog.storage != active.engine.catalog.storage:
+            raise ValueError("Storage settings require a process restart.")
+        warnings = merge_warnings(baseline, overlay, catalog)
+        return catalog, registry, warnings
+
+    def invalid_configuration(error: Exception) -> HTTPException:
+        return HTTPException(
+            status_code=400,
+            detail=error_body(str(error), code="invalid_configuration"),
+        )
+
+    @app.get("/v1/routing/configuration")
+    def routing_configuration(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_gateway_key(active.gateway_api_key, authorization)
+        with reload_lock:
+            catalog = active.engine.catalog
+            definition = next(
+                (item for item in catalog.strategies if item.name == "task_aware"), None
+            )
+            if definition is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_body("Strategy 'task_aware' is not configured.", code="invalid_configuration"),
+                )
+            options = definition.as_dict()["options"]
+            try:
+                baseline = read_models_document(active.models_file)
+                overlay, overlay_error = read_overlay(active.models_file)
+            except (TypeError, ValueError) as error:
+                raise invalid_configuration(error) from error
+            baseline_models = {
+                f"{item['provider']}/{item['upstream_model']}": item
+                for item in baseline["models"]
+            }
+            models = [
+                {
+                    "id": model.name,
+                    "provider": model.provider,
+                    "upstream_model": model.model,
+                    "priority": model.priority,
+                    "baseline_priority": baseline_models.get(model.name, {}).get("priority", index * 10),
+                    "tags": list(model.tags),
+                    "baseline_tags": baseline_models.get(model.name, {}).get("tags", []),
+                }
+                for index, model in enumerate(catalog.profiles)
+            ]
+            labels = []
+            for name, route in definition.policy.labels.items():
+                tag = route.tag or f"task_aware/{name}"
+                pool = (
+                    [catalog.by_name(model_id) for model_id in route.models]
+                    if route.models else [model for model in catalog.profiles if tag in model.tags]
+                )
+                candidates = [model for model in pool if model is not None]
+                selection = definition.policy.selection
+                costs = {
+                    model.name: model.estimated_cost(1000, 1000) for model in candidates
+                }
+                max_cost = max(costs.values(), default=0) or 1.0
+                def rank(
+                    model: ModelProfile,
+                    selection: str = selection,
+                    costs: dict[str, float] = costs,
+                    max_cost: float = max_cost,
+                ) -> tuple[float | int, ...]:
+                    if selection == "cheapest_adequate":
+                        return (round(costs[model.name], 6), model.priority)
+                    if selection == "quality_first":
+                        return (-model.quality, model.priority)
+                    return (
+                        round(0.4 * costs[model.name] / max_cost - 0.6 * model.quality, 6),
+                        model.priority,
+                    )
+                labels.append({
+                    "name": name,
+                    "score": route.score,
+                    "reasoning_effort": route.reasoning_effort,
+                    "description": route.description,
+                    "tag": tag,
+                    "resolution": "models" if route.models else "tag",
+                    "models": [model.name for model in sorted(candidates, key=rank)],
+                })
+            return {
+                "write_available": bool(active.gateway_api_key),
+                "write_disabled_reason": None if active.gateway_api_key else "gateway_key_not_configured",
+                "strategy": "task_aware",
+                "baseline_source": str(active.models_file),
+                "overlay": {
+                    "applied": bool(overlay) and overlay_error is None,
+                    "path": str(overlay_path(active.models_file)),
+                    "error": overlay_error,
+                },
+                "config_hash": active.engine.config_hash,
+                "questions": options.get("questions", {}),
+                "fallback": options.get("fallback", {}),
+                "rules": [
+                    {"index": index, **rule}
+                    for index, rule in enumerate(options.get("rules", []))
+                ],
+                "labels": labels,
+                "models": models,
+                "warnings": merge_warnings(baseline, overlay, catalog) if overlay else [],
+            }
+
+    @app.post("/v1/routing/configuration/validate")
+    def validate_routing_configuration(
+        body: dict[str, Any], authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_config_write(authorization)
+        try:
+            _catalog, _registry, warnings = prepare_overlay(body)
+            return {
+                "valid": True, "warnings": warnings,
+                "diff": {"rules": len(body.get("rules", [])), "models": len(body.get("models", {}))},
+            }
+        except (ValueError, TypeError, RuntimeError) as error:
+            raise invalid_configuration(error) from error
+
+    @app.put("/v1/routing/configuration")
+    def apply_routing_configuration(
+        body: dict[str, Any], authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_config_write(authorization)
+        with reload_lock:
+            try:
+                catalog, registry, warnings = prepare_overlay(body)
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise invalid_configuration(error) from error
+            path = overlay_path(active.models_file)
+            try:
+                previous_content = path.read_bytes()
+            except FileNotFoundError:
+                previous_content = None
+            except OSError as error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_body("Could not read the previous routing overlay.", code="overlay_apply_failed"),
+                ) from error
+            previous_catalog = active.engine.catalog
+            previous_source = active.engine.config_source
+            try:
+                write_overlay(active.models_file, body)
+                active.engine.reload_catalog(
+                    catalog, source=str(active.models_file), registry=registry
+                )
+            except Exception as error:
+                try:
+                    if previous_content is None:
+                        remove_overlay(active.models_file)
+                    else:
+                        # Preserve the original file bytes during rollback.
+                        restore = path.with_name(f".{path.name}.restore")
+                        try:
+                            restore.write_bytes(previous_content)
+                            os.replace(restore, path)
+                        finally:
+                            restore.unlink(missing_ok=True)
+                    active.engine.reload_catalog(previous_catalog, source=previous_source)
+                except Exception:
+                    logger.exception("routing overlay rollback failed")
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_body("Could not apply routing overlay.", code="overlay_apply_failed"),
+                ) from error
+        return {"applied": True, "warnings": warnings}
+
+    @app.delete("/v1/routing/configuration")
+    def reset_routing_configuration(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_config_write(authorization)
+        with reload_lock:
+            try:
+                baseline = read_models_document(active.models_file)
+                catalog = _resolve_storage_path(
+                    catalog_from_document(baseline, str(active.models_file)), active.models_file
+                )
+                registry = active.engine.prepare_catalog_reload(catalog)
+                if catalog.storage != active.engine.catalog.storage:
+                    raise ValueError("Storage settings require a process restart.")
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise invalid_configuration(error) from error
+            path = overlay_path(active.models_file)
+            try:
+                previous_content = path.read_bytes()
+            except FileNotFoundError:
+                previous_content = None
+            except OSError as error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_body("Could not read the previous routing overlay.", code="overlay_apply_failed"),
+                ) from error
+            previous_catalog = active.engine.catalog
+            previous_source = active.engine.config_source
+            try:
+                removed = remove_overlay(active.models_file)
+                active.engine.reload_catalog(
+                    catalog, source=str(active.models_file), registry=registry
+                )
+            except Exception as error:
+                try:
+                    if previous_content is not None:
+                        restore = path.with_name(f".{path.name}.restore")
+                        try:
+                            restore.write_bytes(previous_content)
+                            os.replace(restore, path)
+                        finally:
+                            restore.unlink(missing_ok=True)
+                    active.engine.reload_catalog(previous_catalog, source=previous_source)
+                except Exception:
+                    logger.exception("routing overlay rollback failed")
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_body("Could not reset routing overlay.", code="overlay_apply_failed"),
+                ) from error
+        return {"applied": True, "overlay_removed": removed, "warnings": []}
+
     @app.post("/v1/routing/reload", response_model=None)
     def reload_routing(
         authorization: str | None = Header(default=None),
@@ -674,7 +952,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         try:
             load_dotenv(active.models_file.parent / ".env", override=True)
             catalog = _resolve_storage_path(
-                load_catalog(active.models_file), active.models_file
+                load_catalog_with_overlay(active.models_file), active.models_file
             )
         except (TypeError, ValueError, RuntimeError) as error:
             raise HTTPException(
@@ -1117,6 +1395,12 @@ def run_gateway() -> None:
 
     settings = app.state.jev_config.engine.catalog.gateway
     suppress_litellm_debug_prints()
+    if static_directory().is_dir():
+        # The dashboard ships with the service: same process, no second server.
+        logger.info(
+            "dashboard available",
+            extra={"dashboard_url": dashboard_url(settings.host, settings.port)},
+        )
     uvicorn.run(
         app,
         host=settings.host,

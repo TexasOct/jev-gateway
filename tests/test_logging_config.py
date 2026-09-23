@@ -151,8 +151,32 @@ def test_run_gateway_passes_logging_options(monkeypatch) -> None:
     monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: calls.append(kwargs))
     monkeypatch.setattr(logging, "suppress_litellm_debug_prints", lambda: None)
     gateway.run_gateway()
-    assert calls[0]["host"] == "127.0.0.1"
+    # Assert the forwarding, not whichever models.json this machine happens to
+    # have: the local file may bind a different host than the built-in default.
+    settings = gateway.app.state.jev_config.engine.catalog.gateway
+    assert calls[0]["host"] == settings.host
     assert calls[0]["access_log"] is False
     assert calls[0]["log_level"] == "info"
     assert calls[0]["log_config"]["disable_existing_loggers"] is False
     assert calls[0]["log_config"]["formatters"]["console"]["log_format"] == "pretty"
+
+
+@pytest.mark.parametrize("log_format", ["pretty", "compact", "json"])
+def test_dashboard_url_field_renders_in_every_format(
+    log_format: Literal["pretty", "compact", "json"],
+) -> None:
+    from jev_gateway.logging import GatewayFormatter
+
+    record = logging.LogRecord(
+        "jev_gateway.gateway", logging.INFO, __file__, 1,
+        "dashboard available", (), None,
+    )
+    record.dashboard_url = "http://127.0.0.1:8000/dashboard"
+    formatter = GatewayFormatter(
+        "%(levelname)s %(name)s | %(message)s",
+        use_colors=False,
+        log_format=log_format,
+    )
+    rendered = formatter.format(record)
+    assert "http://127.0.0.1:8000/dashboard" in rendered
+    assert "dashboard available" in rendered

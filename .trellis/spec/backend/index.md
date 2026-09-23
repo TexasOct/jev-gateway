@@ -19,6 +19,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | [Directory structure](./directory-structure.md) | Module ownership, extension points, imports, and naming | Complete |
 | [Decision providers](./decision-providers.md) | Decision config, protocol adapters, compatibility, failover, and validation | Complete |
 | [Database guidelines](./database-guidelines.md) | SQLite schema, writer queue, migrations, and retention | Complete |
+| [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes, assets, and packaging | Complete |
 | [Error handling](./error-handling.md) | Domain exceptions, OpenAI error envelopes, and degradation | Complete |
 | [Quality guidelines](./quality-guidelines.md) | Types, tests, forbidden patterns, and verification | Complete |
 | [Logging guidelines](./logging-guidelines.md) | Structured fields, formats, levels, and sensitive data | Complete |

@@ -20,7 +20,7 @@ FIELDS = (
     "decision_id", "request_id", "session_id", "strategy", "requested_model",
     "route", "provider", "model", "label", "tier", "mode", "reason",
     "reasoning_effort", "reasoning_effort_source", "switched_from", "capability_gap",
-    "ok", "latency_ms", "error_type", "record_kind",
+    "ok", "latency_ms", "error_type", "record_kind", "dashboard_url",
 )
 LEVEL_COLORS = {
     logging.DEBUG: "\033[2;37m",
@@ -48,6 +48,7 @@ PRETTY_FIELD_GROUPS = (
     ("reasoning", ("reasoning_effort", "reasoning_effort_source")),
     ("outcome", ("ok", "latency_ms", "error_type")),
     ("record", ("record_kind",)),
+    ("service", ("dashboard_url",)),
 )
 
 

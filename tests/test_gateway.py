@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 import threading
 import types
@@ -860,20 +861,39 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     assert shell.headers["cache-control"] == "no-store"
     assert shell.headers["x-content-type-options"] == "nosniff"
     assert shell.headers["referrer-policy"] == "no-referrer"
-    assert "default-src 'none'" in shell.headers["content-security-policy"]
-    assert "Retained outcomes, last 15 minutes" in shell.text
-    assert "id=\"providers\"" in shell.text
-    assert "provider.has_api_key" in shell.text
-    assert "await loadProviders()" in shell.text
-    # The provider table labels every cell so narrow screens can stack rows
-    # instead of clipping the last columns behind a hidden scrollbar.
-    assert "cell.dataset.label" in shell.text
-    assert "attr(data-label)" in shell.text
-    assert "align-content:start" in shell.text
-    assert "localStorage" not in shell.text
-    assert "sessionStorage" not in shell.text
-    assert "document.cookie" not in shell.text
-    assert "Authorization='Bearer '+apiKey" in shell.text
+    policy = shell.headers["content-security-policy"]
+    assert "default-src 'none'" in policy
+    # The bundled app needs no inline script, which the old inline page did.
+    assert "script-src 'self'" in policy
+    assert "script-src 'self' 'unsafe-inline'" not in policy
+    # The shell carries no session, evidence, or credential data of its own.
+    assert 'id="root"' in shell.text
+    for forbidden in ("localStorage", "sessionStorage", "document.cookie"):
+        assert forbidden not in shell.text
+    asset_urls = re.findall(r'(?:src|href)="([^"]+)"', shell.text)
+    assert asset_urls
+    assert all(url.startswith("/dashboard/assets/") for url in asset_urls)
+
+    # Hashed assets are cacheable; the document is not.
+    asset = request(app, "GET", asset_urls[0])
+    assert asset.status_code == 200
+    assert "immutable" in asset.headers["cache-control"]
+    assert asset.headers["content-security-policy"] == policy
+
+    # The credential stays in browser memory, so the bundle must not reach for
+    # any persistent browser store.
+    bundle_url = next(url for url in asset_urls if url.endswith(".js"))
+    bundle = request(app, "GET", bundle_url)
+    assert bundle.status_code == 200
+    for forbidden in ("localStorage", "sessionStorage", "document.cookie"):
+        assert forbidden not in bundle.text
+
+    # Narrow screens stack provider rows instead of hiding columns.
+    style_url = next(url for url in asset_urls if url.endswith(".css"))
+    stylesheet = request(app, "GET", style_url)
+    assert stylesheet.status_code == 200
+    assert "attr(data-label)" in stylesheet.text
+
     assert request(app, "GET", "/v1/routing/sessions").status_code == 401
     assert request(
         app,
@@ -889,6 +909,132 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     )
     assert allowed.status_code == 200
     assert allowed.json()["data"] == []
+
+
+def test_dashboard_theme_round_trip_reset_and_write_guard(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    install_completion(monkeypatch)
+    config = make_config(
+        gateway_api_key="client-key", models_file=tmp_path / "models.json"
+    )
+    app = gateway.create_app(config)
+    auth = {"Authorization": "Bearer client-key"}
+    theme_file = tmp_path / "dashboard-theme.json"
+
+    # No file yet: the default seed is reported and nothing is created.
+    default = request(app, "GET", "/v1/dashboard/theme", headers=auth).json()
+    assert default == {"version": 1, "seed": "#3b66d9", "read_error": None}
+    assert not theme_file.exists()
+
+    saved = request(
+        app, "PUT", "/v1/dashboard/theme", headers=auth,
+        json={"version": 1, "seed": "#0F766E"},
+    )
+    assert saved.status_code == 200
+    assert saved.json() == {"version": 1, "seed": "#0f766e"}
+    written = theme_file.read_text(encoding="utf-8")
+    assert json.loads(written) == {"version": 1, "seed": "#0f766e"}
+    # The file holds a color string and nothing else.
+    assert "client-key" not in written
+    assert request(app, "GET", "/v1/dashboard/theme", headers=auth).json()["seed"] == "#0f766e"
+
+    removed = request(app, "DELETE", "/v1/dashboard/theme", headers=auth)
+    assert removed.status_code == 200
+    assert removed.json()["seed"] == "#3b66d9"
+    assert not theme_file.exists()
+    config.engine.close()
+
+
+def test_dashboard_theme_rejects_invalid_payloads(tmp_path: Path, monkeypatch) -> None:
+    install_completion(monkeypatch)
+    config = make_config(
+        gateway_api_key="client-key", models_file=tmp_path / "models.json"
+    )
+    app = gateway.create_app(config)
+    auth = {"Authorization": "Bearer client-key"}
+    payloads = [
+        {"version": 1, "seed": "blue"},
+        {"version": 1, "seed": "#12"},
+        {"version": 2, "seed": "#3b66d9"},
+        {"version": 1, "seed": "#3b66d9", "api_key": "smuggled"},
+    ]
+    for payload in payloads:
+        response = request(app, "PUT", "/v1/dashboard/theme", headers=auth, json=payload)
+        assert response.status_code == 400, payload
+        assert response.json()["error"]["code"] == "invalid_theme"
+    assert not (tmp_path / "dashboard-theme.json").exists()
+    config.engine.close()
+
+
+def test_dashboard_theme_reports_unreadable_file(tmp_path: Path, monkeypatch) -> None:
+    install_completion(monkeypatch)
+    config = make_config(
+        gateway_api_key="client-key", models_file=tmp_path / "models.json"
+    )
+    app = gateway.create_app(config)
+    (tmp_path / "dashboard-theme.json").write_text("{not json", encoding="utf-8")
+    payload = request(
+        app, "GET", "/v1/dashboard/theme",
+        headers={"Authorization": "Bearer client-key"},
+    ).json()
+    assert payload["seed"] == "#3b66d9"
+    assert payload["read_error"] is not None
+    config.engine.close()
+
+
+def test_dashboard_theme_writes_need_a_configured_gateway_key(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    install_completion(monkeypatch)
+    open_config = make_config(models_file=tmp_path / "models.json")
+    app = gateway.create_app(open_config)
+
+    # Reads keep today's behavior; mutations refuse to inherit it.
+    assert request(app, "GET", "/v1/dashboard/theme").status_code == 200
+    for method in ("PUT", "DELETE"):
+        blocked = request(
+            app, method, "/v1/dashboard/theme", json={"version": 1, "seed": "#3b66d9"}
+        )
+        assert blocked.status_code == 403
+        assert blocked.json()["error"]["code"] == "config_writes_disabled"
+    assert not (tmp_path / "dashboard-theme.json").exists()
+    open_config.engine.close()
+
+    secured = make_config(
+        gateway_api_key="client-key", models_file=tmp_path / "models.json"
+    )
+    secured_app = gateway.create_app(secured)
+    body = {"version": 1, "seed": "#3b66d9"}
+    assert request(secured_app, "GET", "/v1/dashboard/theme").status_code == 401
+    assert request(secured_app, "PUT", "/v1/dashboard/theme", json=body).status_code == 401
+    assert request(
+        secured_app, "PUT", "/v1/dashboard/theme",
+        headers={"Authorization": "Bearer wrong"}, json=body,
+    ).status_code == 401
+    ok = request(
+        secured_app, "PUT", "/v1/dashboard/theme",
+        headers={"Authorization": "Bearer client-key"}, json=body,
+    )
+    assert ok.status_code == 200
+    secured.engine.close()
+
+
+def test_dashboard_url_is_browsable_for_every_bind() -> None:
+    import ipaddress
+
+    from jev_gateway.dashboard import browsable_host, dashboard_url
+
+    assert browsable_host("127.0.0.1") == "127.0.0.1"
+    assert browsable_host("gateway.internal") == "gateway.internal"
+    # An unspecified bind serves every interface, which nobody can open, so both
+    # address families are displayed as loopback.
+    unspecified = (str(ipaddress.IPv4Address(0)), str(ipaddress.IPv6Address(0)))
+    for host in unspecified:
+        assert browsable_host(host) == "127.0.0.1"
+        assert browsable_host(f"[{host}]") == "127.0.0.1"
+        assert dashboard_url(host, 8000) == "http://127.0.0.1:8000/dashboard"
+    assert dashboard_url("127.0.0.1", 9000) == "http://127.0.0.1:9000/dashboard"
 
 
 def test_provider_summary_reports_retained_attempts_and_zero_traffic_providers(
@@ -1618,6 +1764,206 @@ def test_auth_failure_uses_the_openai_error_shape(monkeypatch) -> None:
     assert response.json()["error"]["type"] == "invalid_request_error"
     assert response.json()["error"]["code"] == "invalid_api_key"
     assert "param" in response.json()["error"]
+
+
+def matrix_config(tmp_path: Path, *, key: str | None = "client-key") -> gateway.GatewayConfig:
+    """Use a real editable matrix catalog with a temporary baseline file."""
+    from tests.test_routing_overlay import matrix_document
+
+    models_file = tmp_path / "models.json"
+    document = matrix_document()
+    models_file.write_text(json.dumps(document), encoding="utf-8")
+    catalog = catalog_from_document(document, str(models_file))
+    return gateway.GatewayConfig(
+        engine=RoutingEngine(catalog, config_source=str(models_file)),
+        gateway_api_key=key,
+        session_strategy="derived",
+        models_file=models_file,
+    )
+
+
+def reordered_rules() -> dict[str, Any]:
+    from tests.test_routing_overlay import matrix_document
+
+    return {
+        "version": 1,
+        "strategy": "task_aware",
+        "rules": list(reversed(matrix_document()["strategies"]["task_aware"]["options"]["rules"])),
+    }
+
+
+def test_configuration_put_persists_and_delete_restores_baseline(tmp_path: Path) -> None:
+    from jev_gateway.routing_overlay import overlay_path
+
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    before = config.engine.policy_snapshot()
+    baseline_bytes = config.models_file.read_bytes()
+    auth = {"Authorization": "Bearer client-key"}
+
+    applied = request(app, "PUT", "/v1/routing/configuration", json=reordered_rules(), headers=auth)
+    assert applied.status_code == 200, applied.text
+    assert applied.json() == {"applied": True, "warnings": []}
+    assert config.engine.policy_snapshot() != before
+    assert config.engine.policy_snapshot()["strategies"][0]["options"]["rules"][0]["when"] == {"scale": "large"}
+    assert config.models_file.read_bytes() == baseline_bytes
+    assert overlay_path(config.models_file).exists()
+
+    surface = request(app, "GET", "/v1/routing/configuration", headers=auth).json()
+    assert surface["overlay"]["applied"] is True
+    assert surface["rules"][0]["index"] == 0
+    assert surface["rules"][0]["when"] == {"scale": "large"}
+    assert surface["questions"]["scale"]["criteria"]["large"] == "Large."
+    assert surface["labels"][0]["resolution"] == "models"
+    assert surface["models"][0]["baseline_priority"] == 10
+
+    removed = request(app, "DELETE", "/v1/routing/configuration", headers=auth)
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["overlay_removed"] is True
+    assert config.engine.policy_snapshot() == before
+    assert config.models_file.read_bytes() == baseline_bytes
+    assert not overlay_path(config.models_file).exists()
+    config.engine.close()
+
+
+def test_configuration_validate_and_invalid_put_never_swap_catalog(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    before = config.engine.policy_snapshot()
+    auth = {"Authorization": "Bearer client-key"}
+    valid = request(app, "POST", "/v1/routing/configuration/validate", json=reordered_rules(), headers=auth)
+    assert valid.status_code == 200, valid.text
+    assert valid.json()["valid"] is True
+    assert valid.json()["diff"] == {"rules": 2, "models": 0}
+    assert config.engine.policy_snapshot() == before
+    empty = request(app, "PUT", "/v1/routing/configuration", json={}, headers=auth)
+    assert empty.status_code == 400
+    assert empty.json()["error"]["code"] == "invalid_configuration"
+    assert config.engine.policy_snapshot() == before
+    invalid = request(app, "PUT", "/v1/routing/configuration", json={
+        "version": 1, "strategy": "task_aware", "rules": [
+            {"when": {"scale": "unknown"}, "select": {"label": "simple"}}
+        ]
+    }, headers=auth)
+    assert invalid.status_code == 400
+    assert invalid.json()["error"]["code"] == "invalid_configuration"
+    assert "scale" in invalid.json()["error"]["message"]
+    assert config.engine.policy_snapshot() == before
+    assert not (tmp_path / "routing-overrides.json").exists()
+    config.engine.close()
+
+
+def test_configuration_rejects_unknown_keys_and_empty_label_pool(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    auth = {"Authorization": "Bearer client-key"}
+    before = config.engine.policy_snapshot()
+    payload = {"version": 1, "strategy": "task_aware", "rules": [], "storage": {"path": "other"}}
+    response = request(app, "PUT", "/v1/routing/configuration", json=payload, headers=auth)
+    assert response.status_code == 400
+    assert "storage" in response.json()["error"]["message"]
+    assert config.engine.policy_snapshot() == before
+    config.engine.close()
+
+
+def test_configuration_rejects_storage_change_without_swapping(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    before = config.engine.policy_snapshot()
+    document = json.loads(config.models_file.read_text(encoding="utf-8"))
+    document["storage"] = {"enabled": True, "path": str(tmp_path / "other.sqlite3")}
+    config.models_file.write_text(json.dumps(document), encoding="utf-8")
+    response = request(app, "PUT", "/v1/routing/configuration", json=reordered_rules(),
+                       headers={"Authorization": "Bearer client-key"})
+    assert response.status_code == 400
+    assert "restart" in response.json()["error"]["message"]
+    assert config.engine.policy_snapshot() == before
+    assert not (tmp_path / "routing-overrides.json").exists()
+    config.engine.close()
+
+
+def test_configuration_writes_require_a_configured_and_correct_key(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    wrong = request(app, "PUT", "/v1/routing/configuration", json=reordered_rules(),
+                    headers={"Authorization": "Bearer wrong"})
+    assert wrong.status_code == 401
+    assert wrong.json()["error"]["code"] == "invalid_api_key"
+    config.engine.close()
+
+    config = matrix_config(tmp_path, key=None)
+    app = gateway.create_app(config)
+    for method, path in (("PUT", "/v1/routing/configuration"),
+                         ("POST", "/v1/routing/configuration/validate"),
+                         ("DELETE", "/v1/routing/configuration")):
+        response = request(app, method, path, json=reordered_rules())
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "config_writes_disabled"
+    surface = request(app, "GET", "/v1/routing/configuration")
+    assert surface.status_code == 200
+    assert surface.json()["write_available"] is False
+    assert surface.json()["write_disabled_reason"] == "gateway_key_not_configured"
+    config.engine.close()
+
+
+def test_configuration_restores_previous_bytes_after_reload_failure(tmp_path: Path, monkeypatch) -> None:
+    from jev_gateway.routing_overlay import overlay_path, write_overlay
+
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    initial = {"version": 1, "strategy": "task_aware", "rules": []}
+    write_overlay(config.models_file, initial)
+    saved = overlay_path(config.models_file).read_bytes()
+    before = config.engine.policy_snapshot()
+    original = config.engine.reload_catalog
+    attempts = 0
+
+    def fail_once(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("simulated reload failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(config.engine, "reload_catalog", fail_once)
+    response = request(
+        app, "PUT", "/v1/routing/configuration", json=reordered_rules(),
+        headers={"Authorization": "Bearer client-key"},
+    )
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "overlay_apply_failed"
+    assert overlay_path(config.models_file).read_bytes() == saved
+    assert config.engine.policy_snapshot() == before
+    config.engine.close()
+
+
+def test_reload_reapplies_overlay_after_baseline_changes(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path, key=None)
+    app = gateway.create_app(config)
+    from jev_gateway.routing_overlay import write_overlay
+
+    write_overlay(config.models_file, reordered_rules())
+    baseline = json.loads(config.models_file.read_text(encoding="utf-8"))
+    baseline["models"][0]["priority"] = 99
+    config.models_file.write_text(json.dumps(baseline), encoding="utf-8")
+    reloaded = request(app, "POST", "/v1/routing/reload")
+    assert reloaded.status_code == 200, reloaded.text
+    assert config.engine.catalog.profiles[0].priority == 99
+    assert config.engine.policy_snapshot()["strategies"][0]["options"]["rules"][0]["when"] == {"scale": "large"}
+    config.engine.close()
+
+
+def test_startup_and_reload_without_overlay_preserve_baseline(tmp_path: Path) -> None:
+    config = matrix_config(tmp_path, key=None)
+    app = gateway.create_app(config)
+    snapshot = config.engine.policy_snapshot()
+    assert request(app, "POST", "/v1/routing/reload").status_code == 200
+    assert config.engine.policy_snapshot() == snapshot
+    assert not (tmp_path / "routing-overrides.json").exists()
+    loaded = gateway.load_gateway_config(config.models_file)
+    assert loaded.engine.policy_snapshot() == snapshot
+    loaded.engine.close()
+    config.engine.close()
 
 
 def test_reload_endpoint_swaps_the_catalog(tmp_path, monkeypatch) -> None:

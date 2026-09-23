@@ -1,8 +1,8 @@
 {
-  "id": "gateway-session-dashboard",
-  "name": "gateway-session-dashboard",
-  "title": "Build gateway session dashboard",
-  "description": "Add a lightweight built-in dashboard for session model usage and per-session routing/upstream request evidence.",
+  "id": "modern-dashboard-routing",
+  "name": "modern-dashboard-routing",
+  "title": "Modern dashboard and visual routing configuration",
+  "description": "Build a minimal modern dashboard with retained monitoring and drag-and-drop routing configuration.",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -18,10 +18,8 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [
-    "09-23-modern-dashboard-routing"
-  ],
-  "parent": null,
+  "children": [],
+  "parent": "09-23-gateway-session-dashboard",
   "relatedFiles": [],
   "notes": "",
   "meta": {}

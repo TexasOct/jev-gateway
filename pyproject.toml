@@ -26,6 +26,9 @@ where = ["."]
 include = ["jev_gateway*"]
 exclude = ["tests*"]
 
+[tool.setuptools.package-data]
+jev_gateway = ["static/**/*", "static/*"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
