@@ -1,4 +1,4 @@
-"""Multi-question JEV routing with locally validated, deterministic rules."""
+"""Multi-question decision routing with locally validated, deterministic rules."""
 
 from __future__ import annotations
 
@@ -12,24 +12,22 @@ from jev_gateway.catalog import (
     Catalog,
     RoutingMode,
     RoutingPolicy,
-    StrategyDefinition,
 )
-from jev_gateway.decision_provider import DecisionClient
 
-from .contracts import RoutingRequest, StrategyOutcome
+from .contracts import DecisionMaker, RoutingRequest, StrategyOutcome
 from .policy import PolicyStrategy
 
-__all__ = ["JevMatrixStrategy", "build_jev_matrix_strategy"]
+__all__ = ["DecisionMatrixStrategy"]
 
 
-class JevMatrixStrategy(PolicyStrategy):
-    """Interpret typed JEV answers as a policy choice, never as a model ID."""
+class DecisionMatrixStrategy(PolicyStrategy):
+    """Interpret typed decision answers as a policy choice, never as a model ID."""
 
     def __init__(
         self,
         name: str,
         policy: RoutingPolicy,
-        client: DecisionClient,
+        client: DecisionMaker,
         options: Mapping[str, Any],
         description: str | None = None,
     ) -> None:
@@ -40,9 +38,9 @@ class JevMatrixStrategy(PolicyStrategy):
 
     def describe(self) -> dict[str, Any]:
         payload = super().describe()
-        payload["type"] = "jev_matrix"
+        payload["type"] = "decision_matrix"
         payload["options"] = deepcopy(self.options)
-        payload["decision"] = self.client.settings.as_dict()
+        payload["decision"] = self.client.describe()
         return payload
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
@@ -84,7 +82,7 @@ class JevMatrixStrategy(PolicyStrategy):
         outcome = PolicyStrategy(self.name, policy, self.description).decide(
             replace(request, signals=signals), catalog
         )
-        evidence = f"jev_matrix:{source or 'local'}:{reason}"
+        evidence = f"decision_matrix:{source or 'local'}:{reason}"
         return replace(outcome, reason=f"{evidence}:{outcome.reason}")
 
     @staticmethod
@@ -150,15 +148,15 @@ def _validate_options(
     options: Mapping[str, Any], policy: RoutingPolicy,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, str]]:
     if set(options) - {"questions", "rules", "fallback"}:
-        raise ValueError("jev_matrix options contain unknown fields.")
+        raise ValueError("decision_matrix options contain unknown fields.")
     questions = options.get("questions")
     if not isinstance(questions, dict) or not questions:
-        raise ValueError("jev_matrix options.questions must be a non-empty object.")
+        raise ValueError("decision_matrix options.questions must be a non-empty object.")
     choices: dict[str, set[str]] = {}
     for key, question in questions.items():
         if not isinstance(key, str) or not key or not isinstance(question, dict):
             raise ValueError(
-                "jev_matrix question names and definitions must be objects."
+                "decision_matrix question names and definitions must be objects."
             )
         criteria = question.get("criteria")
         if (
@@ -174,12 +172,12 @@ def _validate_options(
             )
         ):
             raise ValueError(
-                f"jev_matrix question {key!r} must be a choice with instructions and at least two criteria."
+                f"decision_matrix question {key!r} must be a choice with instructions and at least two criteria."
             )
         choices[key] = set(criteria)
     raw_rules = options.get("rules", [])
     if not isinstance(raw_rules, list):
-        raise TypeError("jev_matrix options.rules must be an array.")
+        raise TypeError("decision_matrix options.rules must be an array.")
     rules: list[dict[str, Any]] = []
     for index, rule in enumerate(raw_rules):
         if (
@@ -189,7 +187,7 @@ def _validate_options(
             or not rule["when"]
         ):
             raise ValueError(
-                f"jev_matrix rule {index + 1} needs when and select objects."
+                f"decision_matrix rule {index + 1} needs when and select objects."
             )
         predicates: dict[str, frozenset[str]] = {}
         for key, value in rule["when"].items():
@@ -200,7 +198,7 @@ def _validate_options(
                 or any(not isinstance(v, str) or v not in choices[key] for v in values)
             ):
                 raise ValueError(
-                    f"jev_matrix rule {index + 1} has an invalid condition for {key!r}."
+                    f"decision_matrix rule {index + 1} has an invalid condition for {key!r}."
                 )
             predicates[key] = frozenset(values)
         rules.append(
@@ -224,15 +222,3 @@ def _checked_answers(
             return None
         answers[key] = value
     return answers
-
-
-def build_jev_matrix_strategy(
-    definition: StrategyDefinition, catalog: Catalog
-) -> JevMatrixStrategy:
-    return JevMatrixStrategy(
-        definition.name,
-        definition.policy,
-        DecisionClient(catalog.decision),
-        definition.options,
-        definition.description,
-    )

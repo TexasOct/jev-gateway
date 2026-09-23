@@ -41,8 +41,6 @@ __all__ = [
     "EscalationPolicy",
     "GatewaySettings",
     "HysteresisPolicy",
-    "JevSettings",
-    "JevSource",
     "ModelCapabilities",
     "ModelCost",
     "ModelProfile",
@@ -346,16 +344,6 @@ class DecisionSettings:
     timeout_seconds: float = 1.5
     providers: tuple[DecisionProvider, ...] = ()
 
-    @property
-    def default_source(self) -> str | None:
-        """Deprecated alias for callers using the old Python contract."""
-        return self.default_provider
-
-    @property
-    def sources(self) -> tuple[DecisionProvider, ...]:
-        """Deprecated alias for callers using the old Python contract."""
-        return self.providers
-
     def as_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
@@ -363,26 +351,6 @@ class DecisionSettings:
             "timeout_seconds": self.timeout_seconds,
             "providers": [provider.as_dict() for provider in self.providers],
         }
-
-
-@dataclass(frozen=True)
-class JevSource(DecisionProvider):
-    """Deprecated Python constructor retaining the old model default."""
-
-    model: str | None = "typesafe/jev-1.13"
-
-
-class JevSettings(DecisionSettings):
-    """Deprecated Python constructor for legacy source arguments."""
-
-    def __init__(
-        self,
-        enabled: bool = False,
-        default_source: str | None = None,
-        timeout_seconds: float = 1.5,
-        sources: tuple[DecisionProvider, ...] = (),
-    ) -> None:
-        super().__init__(enabled, default_source, timeout_seconds, sources)
 
 
 @dataclass(frozen=True)
@@ -593,11 +561,6 @@ class Catalog:
     storage: StorageSettings = field(default_factory=StorageSettings)
     decision: DecisionSettings = field(default_factory=DecisionSettings)
     signals: SignalsSettings = field(default_factory=SignalsSettings)
-
-    @property
-    def jev(self) -> DecisionSettings:
-        """Deprecated Python alias; snapshots use decision instead."""
-        return self.decision
 
     def by_name(self, name: str | None) -> ModelProfile | None:
         """Look up a model by its provider-qualified catalog id."""
@@ -1509,15 +1472,15 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
     return settings
 
 
-def decision_from_dict(value: Any, source: str, *, legacy: bool = False) -> DecisionSettings:
-    """Validate canonical settings, translating legacy sources only here."""
-    label = "jev" if legacy else "decision"
+def decision_from_dict(value: Any, source: str) -> DecisionSettings:
+    """Validate canonical decision-provider settings."""
+    label = "decision"
     if value is None:
         return DecisionSettings()
     if not isinstance(value, dict):
         raise TypeError(f"{source} {label} must be an object.")
-    provider_key = "sources" if legacy else "providers"
-    default_key = "default_source" if legacy else "default_provider"
+    provider_key = "providers"
+    default_key = "default_provider"
     unknown = set(value) - {"enabled", "timeout_seconds", default_key, provider_key}
     if unknown:
         raise ValueError(f"{source} {label} has unknown keys: {', '.join(sorted(unknown))}.")
@@ -1532,9 +1495,7 @@ def decision_from_dict(value: Any, source: str, *, legacy: bool = False) -> Deci
         subject = f"{source} {label} {provider_key}[{index}]"
         if not isinstance(item, dict):
             raise TypeError(f"{subject} must be an object.")
-        allowed = {"id", "api_base", "api_key_env", "model"}
-        if not legacy:
-            allowed.add("protocol")
+        allowed = {"id", "protocol", "api_base", "api_key_env", "model"}
         unknown = set(item) - allowed
         if unknown:
             raise ValueError(f"{subject} has unknown keys: {', '.join(sorted(unknown))}.")
@@ -1542,10 +1503,10 @@ def decision_from_dict(value: Any, source: str, *, legacy: bool = False) -> Deci
         if name in names:
             raise ValueError(f"{source} configures decision provider {name!r} more than once.")
         names.add(name)
-        protocol = "system_one" if legacy else _required_text(item.get("protocol"), f"{subject} protocol")
+        protocol = _required_text(item.get("protocol"), f"{subject} protocol")
         if protocol not in registered_protocols():
             raise ValueError(f"{subject} protocol {protocol!r} is not supported.")
-        model_value = item.get("model", "typesafe/jev-1.13" if legacy else None)
+        model_value = item.get("model")
         model = _required_text(model_value, f"{subject} model") if model_value is not None else None
         providers.append(DecisionProvider(
             name=name,
@@ -1570,11 +1531,6 @@ def decision_from_dict(value: Any, source: str, *, legacy: bool = False) -> Deci
     if enabled and not providers:
         raise ValueError(f"{source} {label} enabled requires at least one provider.")
     return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers))
-
-
-def jev_from_dict(value: Any, source: str) -> DecisionSettings:
-    """Deprecated parser for the legacy catalog key."""
-    return decision_from_dict(value, source, legacy=True)
 
 
 def signals_from_dict(value: Any, source: str) -> SignalsSettings:
@@ -1843,6 +1799,8 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
     """Build a catalog from a parsed models.json document."""
     if not isinstance(document, dict):
         raise TypeError(f"{source} must contain a JSON object.")
+    if "jev" in document:
+        raise ValueError(f"{source} has unknown keys: jev.")
     raw_providers = document.get("providers")
     if not isinstance(raw_providers, list):
         raise TypeError(f"{source} providers must be a list.")
@@ -1917,8 +1875,6 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
             for definition in strategies
             if definition.name == default_strategy
         )
-    if "decision" in document and "jev" in document:
-        raise ValueError(f"{source} cannot declare both decision and jev.")
     return _build_catalog(
         providers,
         profiles,
@@ -1927,11 +1883,7 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         strategies,
         default_strategy,
         storage_from_dict(document.get("storage"), source),
-        decision_from_dict(
-            document.get("jev" if "jev" in document else "decision"),
-            source,
-            legacy="jev" in document,
-        ),
+        decision_from_dict(document.get("decision"), source),
         signals,
     )
 

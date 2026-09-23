@@ -245,25 +245,38 @@ name in `model` and omit `strategy` to preview only that strategy. The response
 is `{"default": "task_aware", "preview": [...]}`. It never serves an upstream call,
 writes a decision, or mutates session state.
 
-The optional strategy `kind` defaults to `auto`: it constructs `JevStrategy`
-when decision providers are configured, otherwise `PolicyStrategy`. Explicit built-in
-kinds are `policy`, `jev`, and `jev_matrix`; the latter two retain compatibility names.
-Top-level `decision` configures ordered providers, an optional `default_provider`,
-and an explicit protocol (`system_one` is currently supported). A provider's
-`model` is optional and is sent only when specified. Legacy `jev` documents are
-normalized to `decision`, retaining their former model default; declaring both
-keys is invalid. Decision protocols normalize typed choice answers before routing
-rules inspect them. This configuration value is separate
-from the retired request model name `auto`. Strategy-specific `options` work in
-both compact and `definitions` configuration formats.
+The optional strategy `kind` defaults to `auto`: it constructs `DecisionStrategy`
+when decision providers are configured, otherwise `PolicyStrategy`. Explicit
+built-in kinds are `policy`, `decision`, and `decision_matrix`. The previous `jev` and
+`jev_matrix` kinds are removed; catalogs still declaring either must be updated
+before startup. Top-level `decision` configures ordered providers, an optional
+`default_provider`, and an explicit protocol (`system_one` is currently supported).
+A provider's `model` is optional and is sent only when specified. The former
+top-level `jev` key and its Python helpers (`JevSettings`, `JevSource`,
+`jev_from_dict`, and `Catalog.jev`) are removed. `JevClient`, `JevClassifier`,
+`JevStrategy`, `JevMatrixStrategy`, and the `DecisionSettings.default_source` /
+`.sources` accessors are also gone. Legacy endpoints relying on an implicit
+model need an explicit `model` in the new configuration. Decision
+protocols normalize typed choice answers before routing rules inspect them. This
+configuration value is separate from the retired request model name `auto`. Strategy-specific
+`options` work in both compact and `definitions` configuration formats.
 
-`jev_matrix` sends the prompt, extracted requirements, and a small session summary
-as question state to the configured decision provider. Do not put sensitive material in question
-descriptions. Its `reason` records the source and matching rule, not the full
-answers. When a strategy declares label-specific reasoning levels, its chosen
+`decision_matrix` sends the prompt, extracted requirements, and a small session
+summary as question state to the configured decision provider. Do not put
+sensitive material in question descriptions. Its `reason` records the source
+and matching rule, not the full answers. When a strategy declares label-specific reasoning levels, its chosen
 label also determines the target effort; omitted reasoning fields inherit from
 the top-level policy. `fresh` evaluates every turn, while `cached` reuses the first
 live turn's label and model to keep the upstream prompt cache more stable.
+
+The strategy implementations depend only on the `DecisionMaker` protocol:
+`evaluate(state, questions, valid=...)`, `enabled`, and `describe()`. Only
+`strategy/registry.py` constructs a concrete `DecisionClient`; its typed answers
+are normalized before either strategy reads them. `DecisionClassifier` records
+`decision:<provider>:<label>` in signal reasons, and `DecisionMatrixStrategy`
+records `decision_matrix:<provider|local>:<rule_N|default|fallback>` in routing
+reasons. These replace the former `jev:` and `jev_matrix:` prefixes, including
+in stored evidence and `X-JEV-Reason` values. The header name does not change.
 
 ### Custom strategy kinds
 
@@ -271,11 +284,11 @@ Strategy code lives under `jev_gateway/strategy/`:
 
 ```text
 strategy/
-├── contracts.py  # RoutingStrategy, RoutingRequest, StrategyOutcome
+├── contracts.py  # RoutingStrategy, DecisionMaker, request/outcome types
 ├── policy.py     # policy-based selection, escalation, hysteresis
-├── jev.py        # JevClient, JevClassifier, and JevStrategy
-├── matrix.py     # multi-question decision strategy and local rules
-└── registry.py   # kind factories, registration, name resolution
+├── classifier.py # DecisionClassifier and DecisionStrategy
+├── matrix.py     # DecisionMatrixStrategy and local rules
+└── registry.py   # kind factories, concrete decision-client construction
 ```
 
 Implement `RoutingStrategy`, expose a `StrategyFactory`, and register it before

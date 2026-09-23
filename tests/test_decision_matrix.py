@@ -1,17 +1,24 @@
-"""Multi-question JEV strategy configuration and routing."""
+"""Multi-question decision strategy configuration and routing."""
 
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 import pytest
 
 from jev_gateway.catalog import catalog_from_document
+from jev_gateway.decision_provider.base import DecisionResult
 from jev_gateway.sessions import SessionState
 from jev_gateway.signals import extract_signals
-from jev_gateway.strategy import RoutingRequest, StrategyRegistry
+from jev_gateway.strategy import (
+    DecisionMaker,
+    DecisionMatrixStrategy,
+    RoutingRequest,
+    StrategyRegistry,
+)
 from tests.helpers import CATALOG_DOCUMENT, LARGE_MODEL_ID, SMALL_MODEL_ID
 
 
@@ -33,7 +40,7 @@ def document() -> dict[str, Any]:
         "default": "matrix",
         "definitions": {
             "matrix": {
-                "kind": "jev_matrix",
+                "kind": "decision_matrix",
                 "policy": config.pop("policy"),
                 "options": {
                     "questions": {
@@ -80,6 +87,39 @@ def decide(config: dict[str, Any]):
     return outcome, strategy
 
 
+def test_matrix_accepts_a_settings_free_decision_maker() -> None:
+    class FakeDecisionMaker:
+        enabled = True
+
+        def describe(self) -> dict[str, Any]:
+            return {"enabled": True, "providers": []}
+
+        def evaluate(
+            self,
+            state: str | dict[str, Any],
+            questions: dict[str, Any],
+            *,
+            valid: Callable[[dict[str, Any]], bool] | None = None,
+        ) -> DecisionResult:
+            answers = {"risk": {"choice": "high"}, "objective": {"choice": "quality"}}
+            assert set(questions) == set(answers)
+            assert valid is not None and valid(answers)
+            return DecisionResult("fake", answers)
+
+    maker: DecisionMaker = FakeDecisionMaker()
+    catalog = catalog_from_document(document(), "fake matrix")
+    definition = catalog.strategies[0]
+    strategy = DecisionMatrixStrategy(
+        definition.name, definition.policy, maker, definition.options
+    )
+    signals = extract_signals([{"role": "user", "content": "hello"}])
+    outcome = strategy.decide(RoutingRequest(signals, None, None, 1, 0.0), catalog)
+
+    assert outcome.model == LARGE_MODEL_ID
+    assert outcome.reason.startswith("decision_matrix:fake:rule_1:")
+    assert strategy.describe()["decision"] == {"enabled": True, "providers": []}
+
+
 def test_matrix_routes_multiple_answers_and_sends_structured_state(monkeypatch) -> None:
     monkeypatch.setenv("TEST_MATRIX_KEY", "key")
     seen: dict[str, Any] = {}
@@ -98,10 +138,10 @@ def test_matrix_routes_multiple_answers_and_sends_structured_state(monkeypatch) 
     outcome, strategy = decide(document())
     assert outcome.model == LARGE_MODEL_ID
     assert outcome.tier == "complex"
-    assert outcome.reason.startswith("jev_matrix:primary:rule_1:")
+    assert outcome.reason.startswith("decision_matrix:primary:rule_1:")
     assert seen["state"]["prompt"] == "hello"
     assert set(seen["questions"]) == {"risk", "objective"}
-    assert strategy.describe()["type"] == "jev_matrix"
+    assert strategy.describe()["type"] == "decision_matrix"
     assert "decision" in strategy.describe()
     assert "jev" not in strategy.describe()
 
@@ -135,18 +175,18 @@ def test_matrix_retries_next_source_after_invalid_answers(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "post", post)
     outcome, _ = decide(config)
     assert outcome.model == LARGE_MODEL_ID
-    assert outcome.reason.startswith("jev_matrix:secondary:rule_1:")
+    assert outcome.reason.startswith("decision_matrix:secondary:rule_1:")
     assert calls == [
         "https://primary.example/systemone",
         "https://secondary.example/systemone",
     ]
 
 
-def test_matrix_respects_manual_model_without_calling_jev(monkeypatch) -> None:
+def test_matrix_respects_manual_model_without_calling_decision_provider(monkeypatch) -> None:
     monkeypatch.setenv("TEST_MATRIX_KEY", "key")
 
     def post(url: str, **kwargs: Any) -> httpx.Response:
-        raise AssertionError("Manual requests must not call JEV")
+        raise AssertionError("Manual requests must not call decision providers")
 
     monkeypatch.setattr(httpx, "post", post)
     catalog = catalog_from_document(document(), "manual matrix")
@@ -212,12 +252,12 @@ def test_matrix_falls_back_when_source_or_answers_fail(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "post", post)
     outcome, _ = decide(document())
     assert outcome.model == SMALL_MODEL_ID
-    assert outcome.reason.startswith("jev_matrix:local:fallback:")
+    assert outcome.reason.startswith("decision_matrix:local:fallback:")
 
     monkeypatch.delenv("TEST_MATRIX_KEY")
     outcome, _ = decide(document())
     assert outcome.model == SMALL_MODEL_ID
-    assert outcome.reason.startswith("jev_matrix:local:fallback:")
+    assert outcome.reason.startswith("decision_matrix:local:fallback:")
 
 
 @pytest.mark.parametrize(
@@ -232,5 +272,5 @@ def test_matrix_rejects_invalid_options_at_startup(change) -> None:
     config = document()
     change(config["strategies"]["definitions"]["matrix"]["options"])
     catalog = catalog_from_document(config, "test matrix")
-    with pytest.raises(ValueError, match="jev_matrix|rule"):
+    with pytest.raises(ValueError, match="decision_matrix|rule"):
         StrategyRegistry.from_catalog(catalog)

@@ -1,4 +1,4 @@
-"""Tests for JEV classification inside the strategy package."""
+"""Tests for decision classification inside the strategy package."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from typing import Any
 import httpx
 
 from jev_gateway.catalog import (
-    JevSettings,
-    JevSource,
+    DecisionProvider,
+    DecisionSettings,
     RoutingMode,
     RoutingPolicy,
     catalog_from_document,
@@ -18,21 +18,23 @@ from jev_gateway.catalog import (
 from jev_gateway.sessions import SessionState
 from jev_gateway.signals import extract_signals
 from jev_gateway.strategy import RoutingRequest
-from jev_gateway.strategy.jev import JevClassifier, JevStrategy
+from jev_gateway.decision_provider import DecisionClient
+from jev_gateway.decision_provider.base import DecisionResult
+from jev_gateway.strategy.classifier import DecisionClassifier, DecisionStrategy
 from tests.helpers import CATALOG_DOCUMENT, LARGE_MODEL_ID, SMALL_MODEL_ID
 
 
-def settings(*sources: JevSource) -> JevSettings:
-    return JevSettings(
+def settings(*sources: DecisionProvider) -> DecisionSettings:
+    return DecisionSettings(
         enabled=True,
-        default_source=sources[0].name if sources else None,
+        default_provider=sources[0].name if sources else None,
         timeout_seconds=1.0,
-        sources=sources,
+        providers=sources,
     )
 
 
-def source(name: str = "primary") -> JevSource:
-    return JevSource(
+def source(name: str = "primary") -> DecisionProvider:
+    return DecisionProvider(
         name=name,
         api_base=f"https://{name}.example/systemone",
         api_key_env=f"TEST_{name.upper()}_KEY",
@@ -49,6 +51,43 @@ def response(choice: str) -> httpx.Response:
     )
 
 
+class FakeDecisionMaker:
+    """A settings-free decision maker for direct strategy injection tests."""
+
+    enabled = True
+
+    def __init__(self, choice: str | None = "complex") -> None:
+        self.choice = choice
+        self.calls = 0
+
+    def describe(self) -> dict[str, Any]:
+        return {"enabled": self.enabled, "providers": []}
+
+    def evaluate(
+        self,
+        state: str | dict[str, Any],
+        questions: dict[str, Any],
+        *,
+        valid: Any = None,
+    ) -> DecisionResult | None:
+        self.calls += 1
+        if self.choice is None:
+            return None
+        answers = {"routing_tier": {"choice": self.choice}}
+        return DecisionResult("fake", answers) if valid is None or valid(answers) else None
+
+
+def test_classifier_accepts_settings_free_decision_maker() -> None:
+    maker = FakeDecisionMaker()
+    classifier = DecisionClassifier(maker)
+    signals = extract_signals([{"role": "user", "content": "hello"}])
+    refined = classifier.refine(signals)
+    assert maker.calls == 1
+    assert refined.route_label == "complex"
+    assert refined.reasons[-1] == "decision:fake:complex"
+    assert classifier.client.describe() == {"enabled": True, "providers": []}
+
+
 def test_classifier_refines_the_tier(monkeypatch) -> None:
     monkeypatch.setenv("TEST_PRIMARY_KEY", "key")
     seen: dict[str, Any] = {}
@@ -59,7 +98,7 @@ def test_classifier_refines_the_tier(monkeypatch) -> None:
         return response("complex")
 
     monkeypatch.setattr(httpx, "post", post)
-    classifier = JevClassifier(settings(source()))
+    classifier = DecisionClassifier(DecisionClient(settings(source())))
     signals = extract_signals([{"role": "user", "content": "hello"}])
 
     refined = classifier.refine(signals)
@@ -67,7 +106,7 @@ def test_classifier_refines_the_tier(monkeypatch) -> None:
     assert refined.tier == "complex"
     assert refined.base_tier == "complex"
     assert refined.score_tier == "complex"
-    assert refined.reasons[-1] == "jev:primary:complex"
+    assert refined.reasons[-1] == "decision:primary:complex"
     assert seen["url"] == "https://primary.example/systemone"
     assert seen["headers"] == {"Authorization": "Bearer key"}
     assert seen["timeout"] == 1.0
@@ -86,7 +125,7 @@ def test_classifier_falls_back_to_the_next_source(monkeypatch) -> None:
         return response("standard")
 
     monkeypatch.setattr(httpx, "post", post)
-    classifier = JevClassifier(settings(source(), source("secondary")))
+    classifier = DecisionClassifier(DecisionClient(settings(source(), source("secondary"))))
     signals = extract_signals([{"role": "user", "content": "hello"}])
 
     refined = classifier.refine(signals)
@@ -106,16 +145,16 @@ def test_classifier_keeps_signals_when_every_source_fails(monkeypatch) -> None:
         raise httpx.TimeoutException("timeout", request=request)
 
     monkeypatch.setattr(httpx, "post", post)
-    classifier = JevClassifier(settings(source()))
+    classifier = DecisionClassifier(DecisionClient(settings(source())))
     signals = extract_signals([{"role": "user", "content": "hello"}])
 
     assert classifier.refine(signals) is signals
 
 
-def test_cached_jev_strategy_classifies_only_the_first_turn() -> None:
-    class CountingClassifier(JevClassifier):
+def test_cached_decision_strategy_classifies_only_the_first_turn() -> None:
+    class CountingClassifier(DecisionClassifier):
         def __init__(self) -> None:
-            super().__init__(JevSettings())
+            super().__init__(FakeDecisionMaker())
             self.calls = 0
 
         def refine(self, signals):
@@ -124,7 +163,7 @@ def test_cached_jev_strategy_classifies_only_the_first_turn() -> None:
 
     catalog = catalog_from_document(CATALOG_DOCUMENT, "test catalog")
     classifier = CountingClassifier()
-    strategy = JevStrategy(
+    strategy = DecisionStrategy(
         "cached",
         RoutingPolicy(
             mode=RoutingMode.CACHED,
@@ -182,7 +221,7 @@ def test_classifier_rejects_a_non_object_response(monkeypatch) -> None:
         return httpx.Response(200, request=request, content=json.dumps([]).encode())
 
     monkeypatch.setattr(httpx, "post", post)
-    classifier = JevClassifier(settings(source()))
+    classifier = DecisionClassifier(DecisionClient(settings(source())))
     signals = extract_signals([{"role": "user", "content": "hello"}])
 
     assert classifier.refine(signals) is signals

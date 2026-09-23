@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend contract review and documentation conventions"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Boundary and facade review"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "Provider neutrality, secrecy, and failure behavior"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Tests and type-check review"}

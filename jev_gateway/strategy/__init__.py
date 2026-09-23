@@ -6,14 +6,15 @@ Adding a strategy type does not require editing the engine. Implement
 """
 
 from .contracts import (
+    DecisionMaker,
     RoutingRequest,
     RoutingStrategy,
     StrategyContractError,
     StrategyOutcome,
     UnknownStrategyError,
 )
-from .jev import JevClassifier, JevClient, JevStrategy
-from .matrix import JevMatrixStrategy
+from .classifier import DecisionClassifier, DecisionStrategy
+from .matrix import DecisionMatrixStrategy
 from .policy import DEFAULT_OUTPUT_TOKENS, PolicyStrategy
 from .registry import (
     StrategyFactory,
@@ -24,10 +25,10 @@ from .registry import (
 
 __all__ = [
     "DEFAULT_OUTPUT_TOKENS",
-    "JevClassifier",
-    "JevClient",
-    "JevMatrixStrategy",
-    "JevStrategy",
+    "DecisionClassifier",
+    "DecisionMaker",
+    "DecisionMatrixStrategy",
+    "DecisionStrategy",
     "PolicyStrategy",
     "RoutingRequest",
     "RoutingStrategy",

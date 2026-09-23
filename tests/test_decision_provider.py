@@ -9,10 +9,9 @@ import httpx
 from jev_gateway.catalog import (
     DecisionProvider,
     DecisionSettings,
-    catalog_from_document,
 )
 from jev_gateway.decision_provider import DecisionClient
-from tests.helpers import single_route_document
+from jev_gateway.strategy import DecisionMaker
 
 QUESTIONS = {"risk": {"type": "choice", "instructions": "Choose.", "criteria": {"low": "Low", "high": "High"}}}
 
@@ -47,6 +46,20 @@ def test_system_one_sends_only_configured_model_and_normalizes_answer(monkeypatc
     assert seen[1]["json"]["model"] == "routing-model"
 
 
+def test_client_reports_enabled_state_and_a_secret_free_description(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_PRIMARY_KEY", "private-token")
+    client = DecisionClient(settings())
+    maker: DecisionMaker = client
+
+    assert maker.enabled is True
+    described = maker.describe()
+    assert described["providers"][0]["api_key_env"] == "TEST_PRIMARY_KEY"
+    assert described["providers"][0]["has_api_key"] is True
+    assert "private-token" not in repr(described)
+
+    assert DecisionClient(DecisionSettings()).enabled is False
+
+
 def test_decision_failover_rejects_malformed_envelopes_and_invalid_answers(monkeypatch) -> None:
     monkeypatch.setenv("TEST_PRIMARY_KEY", "primary-token")
     monkeypatch.setenv("TEST_SECONDARY_KEY", "secondary-token")
@@ -76,7 +89,7 @@ def test_decision_failover_rejects_malformed_envelopes_and_invalid_answers(monke
     assert len(calls) == 2
 
 
-def test_preferred_provider_runs_first_and_legacy_model_is_sent(monkeypatch) -> None:
+def test_preferred_provider_runs_first(monkeypatch) -> None:
     monkeypatch.setenv("TEST_SECONDARY_KEY", "key")
     calls: list[dict[str, Any]] = []
 
@@ -89,11 +102,6 @@ def test_preferred_provider_runs_first_and_legacy_model_is_sent(monkeypatch) -> 
     assert result is not None and result.provider == "secondary"
     assert len(calls) == 1
 
-    document = single_route_document()
-    document["jev"] = {"enabled": True, "sources": [{"id": "secondary", "api_base": "https://secondary.example/decision", "api_key_env": "TEST_SECONDARY_KEY"}]}
-    legacy = catalog_from_document(document, "legacy").decision
-    DecisionClient(legacy).evaluate("prompt", QUESTIONS)
-    assert calls[1]["json"]["model"] == "typesafe/jev-1.13"
 
 
 def test_transport_failure_falls_through_and_disabled_or_keyless_clients_stay_local(monkeypatch) -> None:

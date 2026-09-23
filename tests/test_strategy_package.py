@@ -9,7 +9,10 @@ import pytest
 from jev_gateway.catalog import Catalog, StrategyDefinition, catalog_from_document
 from jev_gateway.signals import ScoringPolicy, extract_signals
 from jev_gateway.strategy import (
-    JevClassifier,
+    DecisionClassifier,
+    DecisionMaker,
+    DecisionMatrixStrategy,
+    DecisionStrategy,
     PolicyStrategy,
     RoutingRequest,
     RoutingStrategy,
@@ -40,7 +43,24 @@ def test_strategy_package_preserves_public_imports() -> None:
     assert issubclass(PolicyStrategy, object)
     assert RoutingRequest.__module__ == "jev_gateway.strategy.contracts"
     assert StrategyOutcome.__module__ == "jev_gateway.strategy.contracts"
-    assert JevClassifier.__module__ == "jev_gateway.strategy.jev"
+    assert DecisionClassifier.__module__ == "jev_gateway.strategy.classifier"
+    assert DecisionStrategy.__module__ == "jev_gateway.strategy.classifier"
+    assert DecisionMatrixStrategy.__module__ == "jev_gateway.strategy.matrix"
+    assert DecisionMaker.__module__ == "jev_gateway.strategy.contracts"
+
+
+@pytest.mark.parametrize("kind", ["jev", "jev_matrix"])
+def test_retired_strategy_kinds_are_rejected(kind: str) -> None:
+    catalog = catalog_from_document(document_with_kind(kind), "test catalog")
+    with pytest.raises(ValueError, match=f"unknown kind '{kind}'"):
+        StrategyRegistry.from_catalog(catalog)
+
+
+def test_retired_strategy_names_are_not_exported() -> None:
+    import jev_gateway.strategy as strategy
+
+    for name in ("JevClassifier", "JevClient", "JevStrategy", "JevMatrixStrategy"):
+        assert not hasattr(strategy, name)
 
 
 def test_strategy_kind_defaults_to_auto() -> None:
