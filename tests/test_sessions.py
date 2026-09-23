@@ -199,6 +199,27 @@ def test_prune_drops_only_expired_sessions() -> None:
     assert store.get("fresh") is not None
 
 
+def test_snapshots_prune_expired_sessions_and_return_detached_values() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(ttl_seconds=10, clock=clock)
+    expired = make_state("expired", clock())
+    expired.events = [{"type": "decision", "route": "small"}]
+    store.put(expired)
+    clock.advance(11)
+    fresh = make_state("fresh", clock())
+    fresh.events = [{"type": "decision", "route": "large"}]
+    store.put(fresh)
+
+    snapshots = store.snapshots()
+
+    assert [snapshot["session_id"] for snapshot in snapshots] == ["fresh"]
+    snapshots[0]["events"][0]["route"] = "changed"
+    stored = store.snapshot("fresh")
+    assert stored is not None
+    assert stored["events"][0]["route"] == "large"
+    assert len(store) == 1
+
+
 def test_clear_removes_every_session() -> None:
     clock = FakeClock()
     store = MemorySessionStore(clock=clock)

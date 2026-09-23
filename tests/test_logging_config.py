@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import types
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -110,6 +110,29 @@ def test_compact_and_json_formats_keep_logs_machine_safe() -> None:
     assert payload["reason"] == "line1\nline2"
     assert payload["ok"] is True
     assert payload["latency_ms"] == 12.5
+
+
+@pytest.mark.parametrize("log_format", ["pretty", "compact", "json"])
+def test_traceback_formatter_hides_untrusted_exception_text(
+    log_format: Literal["pretty", "compact", "json"],
+) -> None:
+    try:
+        raise RuntimeError("Authorization: Bearer test-key-small")
+    except RuntimeError:
+        record = logging.LogRecord(
+            "jev_gateway.gateway", logging.DEBUG, __file__, 1,
+            "upstream failure details", (), sys.exc_info(),
+        )
+    formatter = GatewayFormatter(
+        "%(levelname)s %(name)s | %(message)s",
+        use_colors=False,
+        log_format=log_format,
+    )
+    output = formatter.format(record)
+    assert "test-key-small" not in output
+    assert "Bearer" not in output
+    assert "[REDACTED]" in output
+    assert "RuntimeError" in output
 
 
 def test_litellm_hint_is_disabled_without_silencing_warnings(monkeypatch) -> None:

@@ -235,7 +235,9 @@ Here `task_aware` states its own `labels` block, so the
 label a rule selects also fixes the thinking level: docs and small edits run on
 the small model at low effort, and coding or reverse-engineering work on the
 top model at high effort. A strategy that omits these fields inherits them from
-the top-level policy. Local policy selection still checks model capabilities,
+the top-level policy. The table the repository actually ships is documented under
+"The shipped `task_aware` table" in `docs/routing-design.md`. Local policy
+selection still checks model capabilities,
 context, output limits, and session switching rules. With `mode: "fresh"`, JEV
 is queried on every turn so a session that changes purpose changes model;
 `cached` queries only the first live session turn. The question/answer state
@@ -323,8 +325,12 @@ The optional top-level `storage` object controls the SQLite record store:
 ```
 
 When enabled, the gateway queues the inbound request, decision evidence,
-upstream outcome, active config snapshot, and provider continuation metadata. A dedicated `jev-record-writer`
-thread performs all SQLite I/O. Request threads enqueue without waiting for disk;
+a sanitized copy of the final LiteLLM request, the upstream outcome, the active
+config snapshot, and provider continuation metadata. The LiteLLM request is
+captured after provider message preparation and reasoning-effort selection, but
+resolved credentials, authorization headers, and credential-shaped fields are
+redacted before enqueueing. A dedicated `jev-record-writer` thread performs all
+SQLite I/O. Request threads enqueue without waiting for disk;
 `queue_size` is bounded (default 4096). A full queue or failed writer drops the
 record and writes a structured warning; neither case changes the gateway
 response. `record_store.flush()` waits for queued writes to commit; `close()`
@@ -334,8 +340,9 @@ appear in `/healthz` as `storage.error`. A stream outcome follows the same
 best-effort rule.
 
 `capture_content: false` stores a prompt digest and signal counts instead of
-prompt text. `max_requests: null` keeps all request records; setting a number opts
-into pruning. Provider continuation rows contain a session ID, an assistant
+prompt text, and replaces messages, prompts, tools, and response-format bodies in
+the LiteLLM evidence with omission metadata. `max_requests: null` keeps all
+request records; setting a number opts into pruning. Provider continuation rows contain a session ID, an assistant
 message hash, the source provider type, and an opaque provider-owned JSON payload.
 They do not contain the public assistant message, tool arguments, or prompt.
 `max_continuations_per_session` and `max_continuation_sessions` bound this state.
@@ -348,6 +355,38 @@ gateway also queues malformed JSON
 and requests rejected by Pydantic, but requests rejected before the handler for
 authorization are not stored.
 
+Upstream failures return `502` with `error.code: upstream_error`, a bounded
+exception `error.type`, and the fixed message `Upstream provider request failed.`
+New outcome rows store the exception type but leave `error_message` NULL.
+DEBUG logs retain traceback locations without exception wording or source lines;
+credential-shaped text is masked in the gateway formatter. These rules do not
+remove raw error messages stored in databases by older gateway versions.
+
+## Session dashboard
+
+Open `http://127.0.0.1:8000/dashboard` to inspect sessions that are currently
+live in the gateway process. The page lists the latest routed model for each
+session and shows retained inbound requests, routing decisions, sanitized
+LiteLLM requests, and outcomes. The provider table shows submitted attempts,
+completed outcomes, failures, and average observed duration for every configured
+provider in a fixed rolling 15-minute window. These are retained, best-effort
+observations, not a provider health check or a count of active requests. Missing
+outcomes are marked as incomplete evidence. Use Refresh to update the provider
+table and session views; the page does not poll automatically.
+
+When gateway authentication is enabled, the page asks for the same API key after
+a data request returns 401. The key stays in JavaScript memory and is sent only
+in the `Authorization: Bearer` header. It is not stored in a URL, cookie, local
+storage, or session storage.
+
+The live session list works when SQLite storage is disabled or degraded. Retained
+request timelines and provider metrics require `storage.enabled: true`;
+`capture_content: false` keeps request and upstream content hidden. With storage
+disabled or degraded, configured providers remain visible but their derived
+metrics are unavailable, not zero. Retention, queue loss, and process failure
+can leave the recorded totals incomplete. Expired, evicted, and historical-only
+sessions are not listed.
+
 ## Run
 
 For local installation choices, persistent runtime data, Homebrew-assisted setup, and Docker, see [`docs/local-install.md`](docs/local-install.md).
@@ -359,10 +398,11 @@ uv sync --all-groups
 uv run jev-gateway
 ```
 
-The gateway provides `GET /healthz`, `GET /v1/models`,
+The gateway provides `GET /healthz`, `GET /dashboard`, `GET /v1/models`,
 `GET /v1/routing/policy`, `GET /v1/routing/strategies`,
 `POST /v1/routing/preview`, `GET /v1/routing/decisions/{decision_id}`,
-`GET /v1/routing/sessions/{session_id}`, and OpenAI-compatible
+`GET /v1/routing/sessions`, `GET /v1/routing/sessions/{session_id}`,
+`GET /v1/routing/sessions/{session_id}/requests`, and OpenAI-compatible
 `POST /v1/chat/completions`.
 
 Use `model: "task_aware"` for the default routing behavior. To select a

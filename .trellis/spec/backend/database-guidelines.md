@@ -77,7 +77,8 @@ remain free of database I/O.
 | --- | --- |
 | `requests` | Inbound request metadata plus optional prompt, messages, tools, and response format content |
 | `decisions` | Selected strategy, route, provider, model, label, mode, signals, candidates, and reasoning effort |
-| `outcomes` | Upstream success or error, token usage, cost, latency, and returned model |
+| `outcomes` | Upstream success or error type, token usage, cost, latency, and returned model |
+| `upstream_requests` | Sanitized LiteLLM submission payload and provider identity, keyed by decision |
 | `config_versions` | Content-addressed snapshots of the catalog used by decisions |
 | `assistant_continuations` | Provider-owned continuation payloads keyed by session and assistant message |
 | `decision_evidence` | Read view joining decisions with request and outcome evidence |
@@ -106,8 +107,9 @@ Preserve this convention for new schema fields.
   content digest.
 - Continuation reads are ordered newest first for the SQL limit, then reversed
   before returning so callers receive chronological order.
-- `counts()` and continuation reads run on the writer through `_submit(...,
-  wait=True)`. This keeps all access ordered relative to queued writes.
+- `counts()`, continuation reads, session evidence, and provider summaries run on
+  the writer through `_submit(..., wait=True)`. This keeps all access ordered
+  relative to queued writes.
 
 `flush()` submits a no-op with `wait=True`. Its completion proves that all jobs
 accepted before it have finished. A successful nonblocking enqueue alone is not
@@ -137,8 +139,8 @@ an unknown partial database failure can create misleading evidence.
 
 - `max_requests: null` retains all request evidence.
 - When a numeric request limit is set, pruning runs every `PRUNE_INTERVAL` writes
-  and removes the oldest requests plus decisions and outcomes that reference
-  removed requests.
+  and removes the oldest requests plus decisions, outcomes, and upstream requests
+  that reference removed requests.
 - Provider continuation state is bounded on every continuation write by both
   `max_continuations_per_session` and `max_continuation_sessions`.
 - `capture_content: false` retains request metadata and prompt digests but omits
@@ -162,6 +164,61 @@ For a backward-compatible column addition, update the table DDL, add an explicit
 migration, and update any view that exposes the field. Drop and recreate views
 when their selected columns change because `CREATE VIEW IF NOT EXISTS` does not
 update an existing view. Add migration coverage to `tests/test_records.py`.
+
+## Scenario: retained provider observations
+
+### 1. Scope / trigger
+
+The dashboard aggregates recent evidence by configured provider. This is an
+operational view of retained submissions, not a provider health probe or a
+lossless traffic counter.
+
+### 2. Signatures
+
+`RecordStore.provider_summary(*, window_start: float, window_end: float) ->
+dict[str, dict[str, Any]]` is implemented by the SQLite, disabled, and
+unavailable stores. `GET /v1/routing/providers/summary` is Bearer-protected.
+The SQL reads `upstream_requests` through the existing writer queue. Index
+`idx_upstream_requests_created_at` covers the window predicate.
+
+### 3. Contracts
+
+The API fixes its rolling window at 900 seconds. `window.start <=
+upstream_requests.created_at < window.end`; the response reports both bounds
+and `basis: "upstream_requests.created_at"`. Rows include provider ID and type,
+`configured`, `has_api_key`, attempts, completed, succeeded, failed,
+`incomplete_evidence`, average duration in ms, last completed outcome time and
+result, and `observed_condition`. No new environment keys or settings exist.
+Only the active catalog supplies provider rows; SQLite supplies their metrics.
+
+### 4. Validation & error matrix
+
+| State | API behavior |
+| --- | --- |
+| Missing or incorrect Bearer key when configured | 401 |
+| Enabled recorder, no retained attempts | Zero counts, null durations/latest result, `no_recent_data` |
+| Attempts without outcomes | Count as incomplete evidence, never as active work |
+| Disabled or degraded recorder | Catalog metadata remains; derived metrics and condition are null, `evidence_available: false` |
+
+### 5. Good / base / bad cases
+
+Good: one submitted attempt with an outcome contributes one attempt and one
+completed result. Base: a configured provider with no retained attempt has zero
+counts. Bad: queue loss, retention, and process interruption can create gaps;
+never call these numbers total traffic or uptime.
+
+### 6. Tests required
+
+Assert window start inclusion and end exclusion, provider grouping, null average
+when completed outcomes lack latency, newest completed outcome, zero-traffic
+catalog entries, streaming completion timing, auth, disabled/degraded nulls,
+and no secrets or request content in the summary.
+
+### 7. Wrong vs correct
+
+Wrong: query SQLite from a request thread and label missing outcomes `active`.
+Correct: submit the aggregate query with `wait=True` and label those rows
+`incomplete_evidence`.
 
 ## Common mistakes
 

@@ -468,6 +468,7 @@ def test_enabled_storage_records_request_decision_and_outcome(
         "requests": 1,
         "decisions": 1,
         "outcomes": 1,
+        "upstream_requests": 1,
         "config_versions": 1,
         "assistant_continuations": 1,
     }
@@ -540,6 +541,7 @@ class _FailingStore:
 
     enabled = True
     continuation_limit = 40
+    settings = StorageSettings(enabled=True)
 
     def __init__(self, fail_on: str) -> None:
         self.fail_on = fail_on
@@ -560,6 +562,25 @@ class _FailingStore:
     def record_outcome(self, record: OutcomeRecord) -> None:
         if self.fail_on == "outcome":
             raise RuntimeError("outcome write failed")
+
+    def record_upstream_request(self, record: Any) -> None:
+        if self.fail_on == "upstream_request":
+            raise RuntimeError("upstream request write failed")
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        return {}
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        return []
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        return {}
 
     def record_assistant_continuation(
         self, record: AssistantContinuationRecord
@@ -627,6 +648,32 @@ def test_decision_write_failure_does_not_block_upstream(monkeypatch, caplog) -> 
     assert len(calls) == 1
     assert any(
         getattr(record, "record_kind", None) == "decision"
+        for record in caplog.records
+    )
+
+
+def test_upstream_request_write_failure_does_not_block_upstream(
+    monkeypatch, caplog
+) -> None:
+    calls = install_completion(monkeypatch)
+    app = make_app(
+        make_engine(catalog_document(), record_store=_FailingStore("upstream_request"))
+    )
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert any(
+        getattr(record, "record_kind", None) == "upstream_request"
         for record in caplog.records
     )
 

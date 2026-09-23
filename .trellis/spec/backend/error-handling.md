@@ -104,7 +104,9 @@ The LiteLLM call in `gateway.py` follows this sequence:
 4. Log `routing failed` at warning level with identifiers, model fields,
    `error_type`, and latency.
 5. Log the traceback at debug level.
-6. Raise HTTP 502 with code `upstream_error`, preserving exception chaining.
+6. Raise HTTP 502 with code `upstream_error` and a fixed gateway-authored
+   message. Do not chain the untrusted upstream exception into the public
+   error path.
 
 There is no same-request retry or alternate-model fallback after the selected
 upstream fails. Do not add an implicit retry in a route handler. Such a change
@@ -112,12 +114,64 @@ would alter cost, latency, session continuation, and evidence semantics and need
 a separate routing design.
 
 Streaming failures occur after headers may have been sent. They are logged as
-`routing stream failed`, recorded as failed outcomes, and re-raised rather than
-converted to a new JSON response.
+`routing stream failed`, recorded as failed outcomes, and raised as a
+fixed-message exception rather than converted to a new JSON response. The
+original upstream exception text must not reach the ASGI error handler.
 
 The external JEV classifier is a separate fallback chain. Its client catches
 network and response-validation failures, tries the next configured source, and
 falls back to local scoring after all sources fail.
+
+## Scenario: untrusted upstream exception text
+
+### 1. Scope / trigger
+
+Provider exceptions may embed credentials or request content. Their raw text
+must not reach a client response, outcome row, dashboard, or gateway log.
+
+### 2. Signatures
+
+`_safe_error_type(error: BaseException) -> str` bounds the class name to
+`[A-Za-z0-9_]{1,64}`, falling back to `Exception`. The upstream handler
+returns HTTP 502 with `code: upstream_error` and the fixed message
+`Upstream provider request failed.`
+
+### 3. Contracts
+
+`outcomes.error_type` stores the bounded class name;
+`outcomes.error_message` stays NULL for new upstream failures. The column is
+retained for compatibility, and old rows are not scrubbed. DEBUG diagnosis
+contains only traceback frame locations and a bounded type, not exception
+wording or source lines. There is no new configuration or environment key.
+
+### 4. Validation & error matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Upstream call raises | Record failed outcome best effort; return fixed 502 text, bounded type, and `upstream_error` code |
+| Stream iterator raises after headers | Record failed outcome, log safe frame locations, and raise a fixed-message error |
+| Exception class name is not bounded | Use `Exception` as the exposed type |
+| Evidence writer fails | Chat availability remains independent of evidence |
+
+### 5. Good / base / bad cases
+
+Good: `RuntimeError("Authorization: Bearer ...")` becomes safe 502 text and a
+NULL stored message. Base: ordinary upstream errors have the same public
+shape. Bad: raw `str(error)` in HTTP, SQLite, or traceback output can disclose
+an unknown credential format; no free-text redactor can guarantee its removal.
+
+### 6. Tests required
+
+Check hostile exception text against the 502 body, SQLite bytes, dashboard
+output, and logs in all three formats. Verify a streamed exception records a
+failed outcome without persisting its message. Keep an assertion that the
+error code and bounded type remain available to clients.
+
+### 7. Wrong vs correct
+
+Wrong: pass `str(error)` to `record_outcome` and the HTTP error envelope.
+Correct: store only the bounded exception type and return a gateway-authored
+constant message.
 
 ## Best-effort storage failures
 

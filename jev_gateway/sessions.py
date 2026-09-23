@@ -152,6 +152,18 @@ class MemorySessionStore:
             session = self._get_locked(session_id)
             return session.snapshot() if session is not None else None
 
+    def snapshots(self) -> list[dict[str, Any]]:
+        """Return detached serializable views of every non-expired session."""
+        with self._lock:
+            expired = [
+                session_id
+                for session_id, session in self._sessions.items()
+                if self._expired(session)
+            ]
+            for session_id in expired:
+                self._sessions.pop(session_id, None)
+            return [session.snapshot() for session in self._sessions.values()]
+
     def prune(self) -> int:
         """Drop expired sessions and report how many were removed."""
         with self._lock:

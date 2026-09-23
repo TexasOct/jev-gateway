@@ -245,6 +245,45 @@ name in `model` and omit `strategy` to preview only that strategy. The response
 is `{"default": "task_aware", "preview": [...]}`. It never serves an upstream call,
 writes a decision, or mutates session state.
 
+## The shipped `task_aware` table
+
+The repository's `task_aware` strategy asks System One three questions: `workload`
+(research, docs, small_change, coding, reverse), `scale` (bounded, moderate,
+large, cross_domain), and `rigor` (draft, exacting). Seven ordered rules map those
+answers onto five labels:
+
+| Label | Reached when | Pool | Effort |
+| --- | --- | --- | --- |
+| `draft` | coding at `draft` rigor; or research/docs/small_change at `draft` rigor | `deepseek-flash` | `low` |
+| `review` | research/docs/small_change at `exacting` rigor | `deepseek-flash` | `medium` |
+| `craft` | coding at `exacting` rigor with bounded or moderate scale | `gpt-6-luna` | `medium` |
+| `engineering` | `reverse`; or coding with `large` scale | `gpt-6-sol`, with `gpt-6-luna` as the constraint fallback | `high` |
+| `ultra` | `cross_domain` scale with a `coding` or `reverse` workload | `gpt-6-astra` | `xhigh` |
+
+The split gives each model one job. DeepSeek takes research, documentation,
+review, and the coding that does not have to ship. Luna takes small and mid-sized
+coding that does. Sol takes large coding and reverse engineering. `ultra` is
+reachable only from the cross-domain rule, so a hard single-domain task stays on
+Sol however large it is.
+
+Rule 1 also requires a `coding` or `reverse` workload, so researching or
+documenting a cross-domain subject stays on DeepSeek instead of being promoted by
+the topic alone.
+
+`gpt-5.6-terra` carries no `task_aware` tag. It remains in the `quality/analysis`
+pool only for compatibility. The GPT-6 family has no Terra tier, and returning
+this old route to a task-aware pool would let it compete with Luna on cost.
+
+### Reserving Astra
+
+The configured provider serves `gpt-6`, `gpt-6-astra`, `gpt-6-sol`, and
+`gpt-6-luna`, although its collection endpoint currently omits the GPT-6 aliases.
+The catalog therefore records the explicit aliases, not the incomplete list.
+
+Astra has only the `task_aware/ultra` tag. `ultra` selects with `quality_first`,
+but no everyday label includes that tag. Only rule 1, which requires a
+cross-domain coding or reverse-engineering workload, can select Astra.
+
 ## Sessions and observability
 
 Sessions store the selected canonical model ID, so provider and model changes
@@ -285,10 +324,17 @@ The optional top-level `storage` object configures a SQLite store:
 ```
 
 When enabled, the gateway queues an inbound request, a decision with its
-signals and candidate evidence, and the upstream outcome. A config-version
-snapshot records the routing policy used for that decision; SQLite's
-`decision_evidence` view joins these records by request and decision ID. The
-gateway also queues malformed JSON and requests rejected by Pydantic.
+signals and candidate evidence, a sanitized copy of the final LiteLLM request,
+and the upstream outcome. The LiteLLM record is created after provider message
+preparation and reasoning-effort selection, immediately before the upstream
+call, so failed calls retain the submitted request evidence. Resolved API keys,
+authorization and header fields, credential-shaped fields, and every parameter
+sourced from `providers[].param_env` are redacted before enqueueing. Unsupported
+runtime values become type markers without calling `repr()`.
+
+A config-version snapshot records the routing policy used for that decision;
+SQLite's `decision_evidence` view joins request, decision, and outcome records.
+The gateway also queues malformed JSON and requests rejected by Pydantic.
 
 The enabled SQLite recorder uses a dedicated `jev-record-writer` thread.
 Request threads only enqueue immutable snapshots into a bounded queue and do not
@@ -302,11 +348,60 @@ guarantee the record survived a crash. Later worker failures appear in
 `/healthz` under `storage.error`, and subsequent submissions are dropped.
 Stream outcomes are enqueued after the stream ends under the same rule.
 
+Upstream errors return a fixed `502` message (`Upstream provider request failed.`)
+with `error.code: upstream_error` and a bounded exception `error.type`. The
+outcome retains `error_type` but not upstream exception wording:
+`outcomes.error_message` is NULL for new upstream failures, and the dashboard
+does not serialize that column. DEBUG logs keep traceback locations but omit
+untrusted exception messages and source lines. Credential-shaped text is
+masked by the gateway formatter. Existing databases may contain raw upstream
+error messages from earlier gateway versions; no migration scrubs those rows.
+
 `queue_size` defaults to 4096. `max_requests: null` keeps every request; set a
 number only if you explicitly want to prune old evidence. `capture_content:
-false` keeps the prompt digest, character counts, and extracted signals while
-dropping the prompt text and message payloads. SQLite initialization runs in
-the writer thread at startup; the process waits once for it to finish.
+false` keeps the prompt digest, character counts, extracted signals, models,
+timing, and safe structural metadata. It drops inbound prompt and message
+content and replaces content-bearing LiteLLM fields with omission descriptors.
+SQLite initialization runs in the writer thread at startup; the process waits
+once for it to finish.
+
+## Session dashboard
+
+`GET /dashboard` serves a self-contained HTML, CSS, and JavaScript shell with no
+session evidence embedded in it. The shell fetches three Bearer-protected data
+endpoints:
+
+- `GET /v1/routing/sessions` lists every non-expired session in the current
+  process and enriches it with the latest retained request and routed decision.
+- `GET /v1/routing/sessions/{session_id}/requests` returns the live session
+  snapshot and all retained requests newest first, with nullable decision,
+  sanitized upstream request, and outcome stages.
+- `GET /v1/routing/providers/summary` returns every configured provider and
+  retained attempts submitted to LiteLLM in a fixed rolling 15-minute window.
+  The window is inclusive at the start and exclusive at the end, using
+  `upstream_requests.created_at`. It has no range parameters.
+
+`MemorySessionStore` remains the authority for what is current. SQLite-only,
+expired, and evicted sessions are not listed. Session evidence reads run on the
+record-store writer thread behind earlier queued writes. When storage is disabled
+or degraded, the list falls back to the live canonical route and catalog provider
+metadata; the detail response contains the live snapshot, an empty request list,
+and the storage state. The provider summary reads through the same writer queue
+and merges its results with the active provider catalog, including providers
+with no retained traffic. It counts completed, successful, failed, and
+incomplete-evidence attempts. Average observed duration covers completed
+outcomes with recorded latency; streams include their full lifetime. A missing
+outcome is not evidence of an active request. Its neutral observed condition
+describes retained results only: no recent data, all observed attempts
+succeeded, mixed outcomes, or all observed attempts failed. The data is best
+effort and may have gaps after retention pruning, queue loss, or process
+failure. Disabled or degraded storage returns null metrics and condition rather
+than zero; configured provider metadata stays visible.
+
+The dashboard asks for the gateway API key only after a 401 response. It keeps
+the key in JavaScript memory and sends it in the `Authorization` header. It does
+not use query-string credentials, cookies, local storage, or session storage.
+Refresh is manual.
 
 ## Reload
 

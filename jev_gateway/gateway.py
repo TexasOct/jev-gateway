@@ -6,6 +6,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import threading
 import time
 import warnings
@@ -31,6 +32,8 @@ from jev_gateway.decision import (
     UnknownModelError,
     UnknownStrategyError,
 )
+from jev_gateway.dashboard import create_dashboard_router
+from jev_gateway.logging.config import safe_traceback
 from jev_gateway.provider import adapter_for
 from jev_gateway.reasoning import leaves_payload_alone
 from jev_gateway.records import (
@@ -39,6 +42,7 @@ from jev_gateway.records import (
     RequestRecord,
     StorageUnavailableError,
     record_store_from_settings,
+    sanitize_upstream_payload,
 )
 from jev_gateway.sessions import (
     SESSION_HEADER,
@@ -49,8 +53,14 @@ from jev_gateway.sessions import (
 from jev_gateway.signals import content_text, estimate_tokens, latest_user_text
 
 logger = logging.getLogger(__name__)
+UPSTREAM_FAILURE_MESSAGE = "Upstream provider request failed."
 
-# A router has no creation time of its own, and OpenAI requires the field on
+
+def _safe_error_type(error: BaseException) -> str:
+    name = type(error).__name__
+    return name if re.fullmatch(r"[A-Za-z0-9_]{1,64}", name) else "Exception"
+
+
 # every model entry, so report when this process started.
 MODEL_CREATED_AT = coerce_int(time.time())
 
@@ -391,6 +401,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     reload_lock = threading.Lock()
     app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0")
     app.state.jev_config = active
+    app.include_router(create_dashboard_router(active, require_gateway_key))
 
     @app.exception_handler(StarletteHTTPException)
     async def openai_error_response(
@@ -911,25 +922,48 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         try:
             from litellm import completion
 
-            response = completion(
-                **completion_payload(
-                    body,
-                    profile,
-                    decision,
-                    session,
-                    active.engine.record_store,
-                )
+            payload = completion_payload(
+                body,
+                profile,
+                decision,
+                session,
+                active.engine.record_store,
             )
+            if active.engine.record_store.enabled:
+                try:
+                    provider = active.engine.catalog.provider_for(profile)
+                    capture_content = (
+                        active.engine.record_store.settings.capture_content
+                    )
+                    sanitized = sanitize_upstream_payload(
+                        payload,
+                        secret_fields={"api_key", *provider.param_env.keys()},
+                        capture_content=capture_content,
+                    )
+                    active.engine.record_upstream_request(
+                        decision,
+                        payload=sanitized,
+                        capture_content=capture_content,
+                    )
+                except Exception as error:
+                    logger.warning(
+                        "routing record dropped",
+                        extra={
+                            "record_kind": "upstream_request",
+                            "error_type": _safe_error_type(error),
+                        },
+                    )
+            response = completion(**payload)
         except HTTPException:
             raise
         except Exception as error:
             latency_ms = (time.perf_counter() - started) * 1000
+            error_type = _safe_error_type(error)
             active.engine.record_outcome(
                 decision,
                 ok=False,
                 latency_ms=latency_ms,
-                error_type=type(error).__name__,
-                error_message=str(error),
+                error_type=error_type,
             )
             logger.warning(
                 "routing failed",
@@ -938,21 +972,29 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     "provider": decision.provider,
                     "model": decision.model,
                     "ok": False,
-                    "error_type": type(error).__name__,
+                    "error_type": error_type,
                     "latency_ms": round(latency_ms, 2),
                 },
             )
-            logger.debug("upstream failure details", exc_info=True)
+            logger.debug(
+                "upstream failure details\n%s",
+                safe_traceback((type(error), error, error.__traceback__)),
+            )
+            # The upstream exception stays inside this boundary. A parent logger
+            # must not render its untrusted cause on a 502 path.
+            error.__traceback__ = None
+            error.__cause__ = None
+            error.__context__ = None
             raise HTTPException(
                 status_code=502,
                 detail={
                     "error": {
-                        "message": str(error),
-                        "type": type(error).__name__,
+                        "message": UPSTREAM_FAILURE_MESSAGE,
+                        "type": error_type,
                         "code": "upstream_error",
                     }
                 },
-            ) from error
+            ) from None
 
         headers = decision_headers(decision)
         echoed_model = body.model if active.echo_requested_model else None
@@ -980,7 +1022,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     )
                 except Exception as error:
                     ok = False
-                    error_type = type(error).__name__
+                    error_type = _safe_error_type(error)
                     logger.error(
                         "routing stream failed",
                         extra={
@@ -990,8 +1032,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                             "error_type": error_type,
                         },
                     )
-                    logger.debug("stream failure details", exc_info=True)
-                    raise
+                    logger.debug(
+                        "stream failure details\n%s",
+                        safe_traceback((type(error), error, error.__traceback__)),
+                    )
+                    # Streaming headers are already sent. Replace the untrusted
+                    # cause so ASGI error handlers cannot print the provider text.
+                    error.__traceback__ = None
+                    error.__cause__ = None
+                    error.__context__ = None
+                    raise RuntimeError(UPSTREAM_FAILURE_MESSAGE) from None
                 finally:
                     response_capture.finish()
                     active.engine.record_outcome(
