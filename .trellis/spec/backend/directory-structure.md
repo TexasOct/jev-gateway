@@ -51,6 +51,7 @@ tests/
 docs/
 ├── routing-design.md        # Routing behavior and contracts
 ├── models-config.md         # models.json reference
+├── http-api.md              # HTTP endpoints, headers, errors, reload
 └── local-install.md         # Installation and operations
 ```
 

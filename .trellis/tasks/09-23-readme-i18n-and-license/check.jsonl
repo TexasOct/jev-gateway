@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Verifies the finished document split still matches the stated ownership boundary between README.md and docs/, and that no product contract was dropped during the rewrite."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Supplies the acceptance evidence for the documentation-update checklist item and the packaging gate, including the uv build check that confirms the SPDX license expression lands in wheel metadata."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Confirms the docs/ and repository root file listing is accurate after adding LICENSE, README.zh-CN.md, and docs/http-api.md."}

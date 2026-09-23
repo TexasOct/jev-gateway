@@ -3,6 +3,8 @@ name = "jev-gateway"
 version = "0.1.0"
 description = "Session-aware OpenAI-compatible model-routing gateway powered by JEV"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "TexasOct" }]
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
@@ -16,7 +18,7 @@ dependencies = [
 jev-gateway = "jev_gateway.gateway:run_gateway"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
