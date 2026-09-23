@@ -36,6 +36,8 @@ __all__ = [
     "SELECTION_MODES",
     "BudgetPolicy",
     "Catalog",
+    "DecisionProvider",
+    "DecisionSettings",
     "EscalationPolicy",
     "GatewaySettings",
     "HysteresisPolicy",
@@ -54,6 +56,7 @@ __all__ = [
     "SignalsSettings",
     "StrategyDefinition",
     "catalog_from_document",
+    "decision_from_dict",
     "load_catalog",
     "policy_from_dict",
     "profile_from_dict",
@@ -314,17 +317,19 @@ class GatewaySettings:
 
 
 @dataclass(frozen=True)
-class JevSource:
-    """One System One-compatible Jev endpoint."""
+class DecisionProvider:
+    """One configured decision endpoint and its wire protocol."""
 
     name: str
     api_base: str
     api_key_env: str
-    model: str = "typesafe/jev-1.13"
+    model: str | None = None
+    protocol: str = "system_one"
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.name,
+            "protocol": self.protocol,
             "api_base": self.api_base,
             "api_key_env": self.api_key_env,
             "has_api_key": bool(os.getenv(self.api_key_env)),
@@ -333,21 +338,51 @@ class JevSource:
 
 
 @dataclass(frozen=True)
-class JevSettings:
-    """Optional external System One classifier used before model routing."""
+class DecisionSettings:
+    """Ordered decision providers used before model routing."""
 
     enabled: bool = False
-    default_source: str | None = None
+    default_provider: str | None = None
     timeout_seconds: float = 1.5
-    sources: tuple[JevSource, ...] = ()
+    providers: tuple[DecisionProvider, ...] = ()
+
+    @property
+    def default_source(self) -> str | None:
+        """Deprecated alias for callers using the old Python contract."""
+        return self.default_provider
+
+    @property
+    def sources(self) -> tuple[DecisionProvider, ...]:
+        """Deprecated alias for callers using the old Python contract."""
+        return self.providers
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
-            "default_source": self.default_source,
+            "default_provider": self.default_provider,
             "timeout_seconds": self.timeout_seconds,
-            "sources": [source.as_dict() for source in self.sources],
+            "providers": [provider.as_dict() for provider in self.providers],
         }
+
+
+@dataclass(frozen=True)
+class JevSource(DecisionProvider):
+    """Deprecated Python constructor retaining the old model default."""
+
+    model: str | None = "typesafe/jev-1.13"
+
+
+class JevSettings(DecisionSettings):
+    """Deprecated Python constructor for legacy source arguments."""
+
+    def __init__(
+        self,
+        enabled: bool = False,
+        default_source: str | None = None,
+        timeout_seconds: float = 1.5,
+        sources: tuple[DecisionProvider, ...] = (),
+    ) -> None:
+        super().__init__(enabled, default_source, timeout_seconds, sources)
 
 
 @dataclass(frozen=True)
@@ -556,8 +591,13 @@ class Catalog:
     strategies: tuple[StrategyDefinition, ...] = ()
     default_strategy: str = "task_aware"
     storage: StorageSettings = field(default_factory=StorageSettings)
-    jev: JevSettings = field(default_factory=JevSettings)
+    decision: DecisionSettings = field(default_factory=DecisionSettings)
     signals: SignalsSettings = field(default_factory=SignalsSettings)
+
+    @property
+    def jev(self) -> DecisionSettings:
+        """Deprecated Python alias; snapshots use decision instead."""
+        return self.decision
 
     def by_name(self, name: str | None) -> ModelProfile | None:
         """Look up a model by its provider-qualified catalog id."""
@@ -654,7 +694,7 @@ class Catalog:
             "strategies": [definition.as_dict() for definition in self.strategies],
             "signals": self.signals.as_dict(),
             "storage": self.storage.as_dict(),
-            "jev": self.jev.as_dict(),
+            "decision": self.decision.as_dict(),
             "providers": [provider.as_dict() for provider in self.providers],
             "models": [profile.as_dict() for profile in self.profiles],
         }
@@ -1469,63 +1509,72 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
     return settings
 
 
-def jev_from_dict(value: Any, source: str) -> JevSettings:
-    """Build optional System One routing-classifier settings from the catalog."""
+def decision_from_dict(value: Any, source: str, *, legacy: bool = False) -> DecisionSettings:
+    """Validate canonical settings, translating legacy sources only here."""
+    label = "jev" if legacy else "decision"
     if value is None:
-        return JevSettings()
+        return DecisionSettings()
     if not isinstance(value, dict):
-        raise TypeError(f"{source} jev must be an object.")
-    raw_sources = value.get("sources", [])
-    if not isinstance(raw_sources, list):
-        raise TypeError(f"{source} jev sources must be a list.")
-    sources: list[JevSource] = []
-    source_names: set[str] = set()
-    for index, item in enumerate(raw_sources):
+        raise TypeError(f"{source} {label} must be an object.")
+    provider_key = "sources" if legacy else "providers"
+    default_key = "default_source" if legacy else "default_provider"
+    unknown = set(value) - {"enabled", "timeout_seconds", default_key, provider_key}
+    if unknown:
+        raise ValueError(f"{source} {label} has unknown keys: {', '.join(sorted(unknown))}.")
+    raw_providers = value.get(provider_key, [])
+    if not isinstance(raw_providers, list):
+        raise TypeError(f"{source} {label} {provider_key} must be a list.")
+    providers: list[DecisionProvider] = []
+    names: set[str] = set()
+    from jev_gateway.decision_provider import registered_protocols
+
+    for index, item in enumerate(raw_providers):
+        subject = f"{source} {label} {provider_key}[{index}]"
         if not isinstance(item, dict):
-            raise TypeError(f"{source} jev sources[{index}] must be an object.")
-        name = _required_text(item.get("id"), f"{source} jev sources[{index}] id")
-        if name in source_names:
-            raise ValueError(f"{source} configures Jev source {name!r} more than once.")
-        source_names.add(name)
-        sources.append(
-            JevSource(
-                name=name,
-                api_base=_required_text(
-                    item.get("api_base"), f"{source} jev sources[{index}] api_base"
-                ),
-                api_key_env=_required_text(
-                    item.get("api_key_env"),
-                    f"{source} jev sources[{index}] api_key_env",
-                ),
-                model=str(item.get("model", "typesafe/jev-1.13")),
-            )
-        )
-    default_source_value = value.get("default_source")
-    default_source = (
-        _required_text(default_source_value, f"{source} jev default_source")
-        if default_source_value is not None
-        else None
+            raise TypeError(f"{subject} must be an object.")
+        allowed = {"id", "api_base", "api_key_env", "model"}
+        if not legacy:
+            allowed.add("protocol")
+        unknown = set(item) - allowed
+        if unknown:
+            raise ValueError(f"{subject} has unknown keys: {', '.join(sorted(unknown))}.")
+        name = _required_text(item.get("id"), f"{subject} id")
+        if name in names:
+            raise ValueError(f"{source} configures decision provider {name!r} more than once.")
+        names.add(name)
+        protocol = "system_one" if legacy else _required_text(item.get("protocol"), f"{subject} protocol")
+        if protocol not in registered_protocols():
+            raise ValueError(f"{subject} protocol {protocol!r} is not supported.")
+        model_value = item.get("model", "typesafe/jev-1.13" if legacy else None)
+        model = _required_text(model_value, f"{subject} model") if model_value is not None else None
+        providers.append(DecisionProvider(
+            name=name,
+            protocol=protocol,
+            api_base=_required_text(item.get("api_base"), f"{subject} api_base"),
+            api_key_env=_required_text(item.get("api_key_env"), f"{subject} api_key_env"),
+            model=model,
+        ))
+    default_value = value.get(default_key)
+    default_provider = (
+        _required_text(default_value, f"{source} {label} {default_key}")
+        if default_value is not None else None
     )
-    if default_source is not None and default_source not in source_names:
-        raise ValueError(
-            f"{source} jev default_source {default_source!r} is not configured."
-        )
+    if default_provider is not None and default_provider not in names:
+        raise ValueError(f"{source} {label} {default_key} {default_provider!r} is not configured.")
     enabled = value.get("enabled", False)
     if not isinstance(enabled, bool):
-        raise TypeError(f"{source} jev enabled must be a boolean.")
-    timeout_seconds = _document_float(
-        value.get("timeout_seconds", 1.5), f"{source} jev timeout_seconds"
-    )
-    if timeout_seconds <= 0:
-        raise ValueError(f"{source} jev timeout_seconds must be positive.")
-    if enabled and not sources:
-        raise ValueError(f"{source} jev enabled requires at least one source.")
-    return JevSettings(
-        enabled=enabled,
-        default_source=default_source,
-        timeout_seconds=timeout_seconds,
-        sources=tuple(sources),
-    )
+        raise TypeError(f"{source} {label} enabled must be a boolean.")
+    timeout_seconds = _document_float(value.get("timeout_seconds", 1.5), f"{source} {label} timeout_seconds")
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise ValueError(f"{source} {label} timeout_seconds must be positive and finite.")
+    if enabled and not providers:
+        raise ValueError(f"{source} {label} enabled requires at least one provider.")
+    return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers))
+
+
+def jev_from_dict(value: Any, source: str) -> DecisionSettings:
+    """Deprecated parser for the legacy catalog key."""
+    return decision_from_dict(value, source, legacy=True)
 
 
 def signals_from_dict(value: Any, source: str) -> SignalsSettings:
@@ -1755,7 +1804,7 @@ def _build_catalog(
     strategies: tuple[StrategyDefinition, ...],
     default_strategy: str,
     storage: StorageSettings,
-    jev: JevSettings,
+    decision: DecisionSettings,
     signals: SignalsSettings,
 ) -> Catalog:
     """Attach reusable provider connections to each concrete model."""
@@ -1783,7 +1832,7 @@ def _build_catalog(
         strategies=strategies,
         default_strategy=default_strategy,
         storage=storage,
-        jev=jev,
+        decision=decision,
         signals=signals,
     )
     catalog.validate()
@@ -1868,6 +1917,8 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
             for definition in strategies
             if definition.name == default_strategy
         )
+    if "decision" in document and "jev" in document:
+        raise ValueError(f"{source} cannot declare both decision and jev.")
     return _build_catalog(
         providers,
         profiles,
@@ -1876,7 +1927,11 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         strategies,
         default_strategy,
         storage_from_dict(document.get("storage"), source),
-        jev_from_dict(document.get("jev"), source),
+        decision_from_dict(
+            document.get("jev" if "jev" in document else "decision"),
+            source,
+            legacy="jev" in document,
+        ),
         signals,
     )
 

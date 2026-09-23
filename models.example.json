@@ -8,15 +8,15 @@
     "max_continuations_per_session": 40,
     "max_continuation_sessions": 2048
   },
-  "jev": {
+  "decision": {
     "enabled": false,
     "timeout_seconds": 5,
-    "sources": [
+    "providers": [
       {
-        "id": "openrouter",
-        "api_base": "https://openrouter.ai/api/v1/systemone",
-        "api_key_env": "JEV_OPENROUTER_API_KEY",
-        "model": "typesafe/jev-1.13"
+        "id": "decision-example",
+        "protocol": "system_one",
+        "api_base": "https://decision.example/v1/evaluate",
+        "api_key_env": "DECISION_API_KEY"
       }
     ]
   },

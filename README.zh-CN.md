@@ -12,7 +12,7 @@ JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置
 
 - 提供 `POST /v1/chat/completions`；客户端配置网关地址及目录模型名或策略名后即可接入。
 - 可按任务类型、规模与严格程度分类，再从配置的模型池中选择。
-- 可选用 System One 分类器回答带类型的单选题，不可用时采用本地评分或配置的回退规则。
+- 可选用配置的决策提供方回答带类型的单选题，不可用时采用本地评分或配置的回退规则。
 - 支持会话固定模型和逐轮选择；随仓库提供的 `task_aware` 策略使用 `fresh` 模式。
 - 为每条路由推导 `reasoning_effort` 档位，并收敛到该路由实际接受的取值。
 - 将请求、决策、结果和提供方续写状态写入 SQLite，记录失败不影响正常请求。
@@ -64,7 +64,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
   -d '{"model": "task_aware", "messages": [{"role": "user", "content": "总结一下这份设计。"}]}'
 ```
 
-模板默认关闭 System One，启用前 `task_aware` 使用配置的回退规则。
+模板默认关闭外部决策，启用 `decision` 前 `task_aware` 使用配置的回退规则。兼容端点的 `decision.providers[].protocol` 设为 `system_one`；仅在端点需要时填写 `model`。
 `GET /healthz` 可以确认进程已启动。长期运行、容器与 wheel 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
@@ -93,7 +93,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 {"model": "quality", "messages": [{"role": "user", "content": "评审一下这份设计。"}]}
 ```
 
-每个策略从顶层 `policy` 块继承设置，并可按需覆盖 `selection`、`mode`、`labels` 与推理规则。内置模式有 `sticky`、`cached`、`escalate`、`adaptive` 和 `fresh`；可显式选择 `policy`、`jev` 和 `jev_matrix` 这三种内置策略类型。写入 `openai/gpt-5.6-sol` 这样的完整目录模型 ID，则直接选择该模型。省略 `kind` 时使用 `auto` 分派，详见设计文档。
+每个策略从顶层 `policy` 块继承设置，并可按需覆盖 `selection`、`mode`、`labels` 与推理规则。内置模式有 `sticky`、`cached`、`escalate`、`adaptive` 和 `fresh`；可显式选择 `policy`、`jev` 和 `jev_matrix` 这三种内置策略类型（后两者是决策型策略的兼容名称）。写入 `openai/gpt-5.6-sol` 这样的完整目录模型 ID，则直接选择该模型。省略 `kind` 时使用 `auto` 分派，详见设计文档。
 
 只有请求体的 `model` 字段能选择策略：`?strategy=` 会返回 `400`，请求头 `X-JEV-Strategy` 不参与选择。设计与配置细节见 [`docs/routing-design.md`](docs/routing-design.md)。
 

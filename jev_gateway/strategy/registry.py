@@ -33,13 +33,13 @@ def _jev_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStr
     return JevStrategy(
         definition.name,
         definition.policy,
-        JevClassifier(catalog.jev),
+        JevClassifier(catalog.decision),
         definition.description,
     )
 
 
 def _auto_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStrategy:
-    factory = _jev_factory if catalog.jev.sources else _policy_factory
+    factory = _jev_factory if catalog.decision.providers else _policy_factory
     return factory(definition, catalog)
 
 

@@ -17,11 +17,12 @@ from tests.helpers import CATALOG_DOCUMENT, LARGE_MODEL_ID, SMALL_MODEL_ID
 
 def document() -> dict[str, Any]:
     config = copy.deepcopy(CATALOG_DOCUMENT)
-    config["jev"] = {
+    config["decision"] = {
         "enabled": True,
-        "sources": [
+        "providers": [
             {
                 "id": "primary",
+                "protocol": "system_one",
                 "api_base": "https://primary.example/systemone",
                 "api_key_env": "TEST_MATRIX_KEY",
                 "model": "typesafe/jev-test",
@@ -101,15 +102,18 @@ def test_matrix_routes_multiple_answers_and_sends_structured_state(monkeypatch) 
     assert seen["state"]["prompt"] == "hello"
     assert set(seen["questions"]) == {"risk", "objective"}
     assert strategy.describe()["type"] == "jev_matrix"
+    assert "decision" in strategy.describe()
+    assert "jev" not in strategy.describe()
 
 
 def test_matrix_retries_next_source_after_invalid_answers(monkeypatch) -> None:
     monkeypatch.setenv("TEST_MATRIX_KEY", "key")
     monkeypatch.setenv("TEST_MATRIX_SECONDARY_KEY", "key-2")
     config = document()
-    config["jev"]["sources"].append(
+    config["decision"]["providers"].append(
         {
             "id": "secondary",
+            "protocol": "system_one",
             "api_base": "https://secondary.example/systemone",
             "api_key_env": "TEST_MATRIX_SECONDARY_KEY",
             "model": "typesafe/jev-test",

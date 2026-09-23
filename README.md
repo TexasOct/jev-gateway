@@ -14,7 +14,7 @@ keep a session on one route or reconsider it each turn.
 
 - Serves `POST /v1/chat/completions` for clients configured with the gateway URL and a catalog model or strategy name.
 - Can classify work by task type, scale, and rigor, then select from configured model pools.
-- Optionally asks a System One classifier typed choice questions, with local scoring or a configured fallback when unavailable.
+- Optionally asks configured decision providers typed choice questions, with local scoring or a configured fallback when unavailable.
 - Supports session pinning and per-turn selection; the shipped `task_aware` strategy uses `fresh` mode.
 - Derives a `reasoning_effort` level per route and clamps it to the levels that route accepts.
 - Records requests, decisions, outcomes, and provider continuation state in SQLite; recording failures do not fail chat requests.
@@ -67,7 +67,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
   -d '{"model": "task_aware", "messages": [{"role": "user", "content": "Summarize this design."}]}'
 ```
 
-The template disables System One, so `task_aware` uses its configured fallback until you enable it.
+The template disables external decisions, so `task_aware` uses its configured fallback until you enable `decision`. Set `decision.providers[].protocol` to `system_one` for a compatible endpoint; supply `model` only if that endpoint requires it.
 `GET /healthz` confirms the process is up. For persistent, container, and wheel installs, see
 [`docs/local-install.md`](docs/local-install.md).
 
@@ -102,7 +102,7 @@ Every named strategy is also a virtual model name. Send the strategy name in the
 
 Each strategy inherits its settings from the top-level `policy` block and can override `selection`,
 `mode`, `labels`, and reasoning rules. Built-in modes are `sticky`, `cached`, `escalate`,
-`adaptive`, and `fresh`. Explicit built-in strategy kinds are `policy`, `jev`, and `jev_matrix`. A concrete
+`adaptive`, and `fresh`. Explicit built-in strategy kinds are `policy`, `jev`, and `jev_matrix` (the latter two are compatibility names for decision-backed strategies). A concrete
 catalog model ID such as `openai/gpt-5.6-sol` selects that model directly. Omitted `kind` uses `auto` dispatch; see the design reference.
 
 Only the request-body `model` field selects a strategy. `?strategy=` returns `400`, and the

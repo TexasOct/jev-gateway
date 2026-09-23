@@ -54,8 +54,8 @@ strategy; a concrete catalog model ID is previewed across all registered strateg
 as a manual selection. Unknown model IDs still return `404`. It returns
 `{"default": "<name>", "preview": [...]}` without serving a chat completion or
 recording a request, decision, or outcome. Routing uses detached session snapshots;
-looking up an expired session can evict it. Enabled JEV-backed strategies can call
-the external System One classifier, including during preview.
+looking up an expired session can evict it. Enabled decision-backed strategies can call
+the configured decision provider, including during preview.
 
 The dashboard reads `GET /v1/routing/sessions`,
 `GET /v1/routing/sessions/{session_id}/requests`, and
