@@ -19,8 +19,12 @@ from pydantic import BaseModel
 from jev_gateway import gateway
 from jev_gateway.catalog import catalog_from_document
 from jev_gateway.decision import RoutingEngine
-from jev_gateway.records import SqliteRecordStore, StorageSettings
-from jev_gateway.sessions import MemorySessionStore
+from jev_gateway.records import (
+    SqliteRecordStore,
+    StorageSettings,
+    record_store_from_settings,
+)
+from jev_gateway.sessions import MemorySessionStore, SessionState
 from tests.helpers import (
     COMPLEX_PROMPT,
     SIMPLE_PROMPT,
@@ -85,6 +89,33 @@ def install_completion(monkeypatch) -> list[dict[str, Any]]:
         sys.modules, "litellm", types.SimpleNamespace(completion=completion)
     )
     return calls
+
+
+def make_stored_config(
+    tmp_path: Path,
+    *,
+    capture_content: bool = True,
+    gateway_api_key: str | None = None,
+    document: dict[str, Any] | None = None,
+) -> gateway.GatewayConfig:
+    document = document or catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(tmp_path / "records.sqlite3"),
+        "capture_content": capture_content,
+    }
+    catalog = catalog_from_document(document, "test catalog")
+    clock = FakeClock()
+    return gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(clock=clock),
+            clock=clock,
+            record_store=record_store_from_settings(catalog.storage),
+        ),
+        gateway_api_key=gateway_api_key,
+        session_strategy="derived",
+    )
 
 
 def test_response_data_silences_litellm_usage_serializer_mismatch() -> None:
@@ -696,7 +727,7 @@ def test_gateway_api_key_is_enforced(monkeypatch) -> None:
 
 def test_upstream_failure_becomes_a_gateway_error(monkeypatch) -> None:
     def completion(**kwargs):
-        raise RuntimeError("upstream exploded")
+        raise RuntimeError("Authorization: Bearer test-key-small")
 
     monkeypatch.setitem(
         sys.modules, "litellm", types.SimpleNamespace(completion=completion)
@@ -711,8 +742,724 @@ def test_upstream_failure_becomes_a_gateway_error(monkeypatch) -> None:
     )
 
     assert response.status_code == 502
-    assert response.json()["error"]["code"] == "upstream_error"
-    assert "exploded" in response.json()["error"]["message"]
+    error = response.json()["error"]
+    assert error["code"] == "upstream_error"
+    assert error["type"] == "RuntimeError"
+    assert error["message"] == "Upstream provider request failed."
+    assert "test-key-small" not in response.text
+    assert "Bearer" not in response.text
+
+
+def test_upstream_failure_bounds_exception_type(monkeypatch) -> None:
+    unsafe_error = type("Secret-Type", (RuntimeError,), {})
+
+    def completion(**kwargs):
+        raise unsafe_error("Authorization: Bearer test-key-small")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    response = request(gateway.create_app(make_config()), "POST", "/v1/chat/completions",
+                       json={"model": "task_aware", "messages": [
+                           {"role": "user", "content": SIMPLE_PROMPT},
+                       ]})
+    assert response.status_code == 502
+    assert response.json()["error"]["type"] == "Exception"
+    assert "Secret-Type" not in response.text
+    assert "test-key-small" not in response.text
+
+
+def test_upstream_failure_does_not_persist_or_log_provider_exception_text(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+    import sqlite3
+
+    def completion(**kwargs):
+        raise RuntimeError("Authorization: Bearer test-key-small")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    caplog.set_level(logging.DEBUG, logger="jev_gateway.gateway")
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "hostile-error"},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": "Hi"}]},
+    )
+    detail = request(app, "GET", "/v1/routing/sessions/hostile-error/requests")
+    path = Path(config.engine.record_store.settings.path)
+    with sqlite3.connect(path) as database:
+        row = database.execute(
+            "SELECT error_message, error_type FROM outcomes"
+        ).fetchone()
+
+    assert response.status_code == 502
+    assert row == (None, "RuntimeError")
+    assert "error_message" not in detail.text
+    assert "test-key-small" not in detail.text
+    assert "Bearer" not in detail.text
+    assert b"test-key-small" not in path.read_bytes()
+    assert all("test-key-small" not in record.getMessage() for record in caplog.records)
+    assert all(record.exc_info is None for record in caplog.records)
+    config.engine.close()
+
+
+def test_stream_failure_has_safe_logs_and_null_persisted_message(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+    import sqlite3
+
+    def completion(**kwargs):
+        def chunks():
+            yield {"id": "one", "choices": [{"delta": {"content": "ok"}}]}
+            raise RuntimeError("Authorization: Bearer test-key-small")
+
+        return chunks()
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    caplog.set_level(logging.DEBUG, logger="jev_gateway.gateway")
+    with pytest.raises(RuntimeError, match="Upstream provider request failed"):
+        request(
+            app, "POST", "/v1/chat/completions",
+            headers={"X-JEV-Session-Id": "stream-error"},
+            json={"model": "task_aware", "stream": True,
+                  "messages": [{"role": "user", "content": "Hi"}]},
+        )
+
+    path = Path(config.engine.record_store.settings.path)
+    config.engine.record_store.flush()
+    with sqlite3.connect(path) as database:
+        assert database.execute(
+            "SELECT error_message, error_type FROM outcomes"
+        ).fetchone() == (None, "RuntimeError")
+    assert b"test-key-small" not in path.read_bytes()
+    assert all("test-key-small" not in record.getMessage() for record in caplog.records)
+    assert all(record.exc_info is None for record in caplog.records)
+    config.engine.close()
+
+
+def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
+    monkeypatch,
+) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config(gateway_api_key="client-key"))
+
+    shell = request(app, "GET", "/dashboard")
+
+    assert shell.status_code == 200
+    assert shell.headers["cache-control"] == "no-store"
+    assert shell.headers["x-content-type-options"] == "nosniff"
+    assert shell.headers["referrer-policy"] == "no-referrer"
+    assert "default-src 'none'" in shell.headers["content-security-policy"]
+    assert "Retained outcomes, last 15 minutes" in shell.text
+    assert "id=\"providers\"" in shell.text
+    assert "provider.has_api_key" in shell.text
+    assert "await loadProviders()" in shell.text
+    assert "localStorage" not in shell.text
+    assert "sessionStorage" not in shell.text
+    assert "document.cookie" not in shell.text
+    assert "Authorization='Bearer '+apiKey" in shell.text
+    assert request(app, "GET", "/v1/routing/sessions").status_code == 401
+    assert request(
+        app,
+        "GET",
+        "/v1/routing/sessions",
+        headers={"Authorization": "Bearer wrong"},
+    ).status_code == 401
+    allowed = request(
+        app,
+        "GET",
+        "/v1/routing/sessions",
+        headers={"Authorization": "Bearer client-key"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["data"] == []
+
+
+def test_provider_summary_reports_retained_attempts_and_zero_traffic_providers(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from jev_gateway import dashboard
+
+    install_completion(monkeypatch)
+    monkeypatch.setattr(dashboard.time, "time", lambda: 1100.0)
+    config = make_stored_config(tmp_path, gateway_api_key="client-key")
+    app = gateway.create_app(config)
+    auth = {"Authorization": "Bearer client-key"}
+    assert request(app, "GET", "/v1/routing/providers/summary").status_code == 401
+    assert request(app, "GET", "/v1/routing/providers/summary",
+                   headers={"Authorization": "Bearer wrong"}).status_code == 401
+    empty = request(app, "GET", "/v1/routing/providers/summary", headers=auth).json()
+    assert empty["window"] == {
+        "seconds": 900, "start": 200.0, "end": 1100.0,
+        "basis": "upstream_requests.created_at",
+    }
+    assert {item["id"] for item in empty["providers"]} == {
+        "small-provider", "large-provider",
+    }
+    assert all(item["attempts"] == 0 and
+               item["observed_condition"] == "no_recent_data"
+               for item in empty["providers"])
+    assert all(item["configured"] is True and isinstance(item["has_api_key"], bool)
+               for item in empty["providers"])
+
+    first = request(app, "POST", "/v1/chat/completions", headers={
+        **auth, "X-JEV-Session-Id": "provider-summary",
+    }, json={"model": "task_aware", "messages": [
+        {"role": "user", "content": SIMPLE_PROMPT},
+    ]})
+    assert first.status_code == 200
+    summary = request(app, "GET", "/v1/routing/providers/summary", headers=auth)
+    assert summary.status_code == 200
+    data = summary.json()
+    assert data["evidence_available"] is True
+    by_id = {item["id"]: item for item in data["providers"]}
+    assert by_id["small-provider"]["attempts"] == 1
+    assert by_id["small-provider"]["completed"] == 1
+    assert by_id["small-provider"]["succeeded"] == 1
+    assert by_id["small-provider"]["failed"] == 0
+    assert by_id["small-provider"]["incomplete_evidence"] == 0
+    assert by_id["small-provider"]["average_latency_ms"] is not None
+    assert by_id["small-provider"]["last_outcome_ok"] is True
+    assert by_id["small-provider"]["observed_condition"] == (
+        "all_observed_attempts_succeeded"
+    )
+    assert by_id["large-provider"]["attempts"] == 0
+    assert by_id["large-provider"]["average_latency_ms"] is None
+    assert by_id["large-provider"]["last_outcome_at"] is None
+    assert "test-key-small" not in summary.text
+    assert SIMPLE_PROMPT not in summary.text
+    assert "api_base" not in summary.text
+    assert "param_env" not in summary.text
+    assert "error_message" not in summary.text
+    config.engine.close()
+
+
+def test_provider_summary_observed_condition_tracks_completed_outcomes(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from jev_gateway import dashboard
+
+    monkeypatch.setattr(dashboard.time, "time", lambda: 1100.0)
+    calls = [True, False, True]
+
+    def completion(**kwargs):
+        if not calls.pop(0):
+            raise RuntimeError("provider failure")
+        return {
+            "id": "chatcmpl-test", "model": kwargs["model"],
+            "choices": [{"message": {"role": "assistant", "content": "ok"},
+                         "finish_reason": "stop"}],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+
+    def observed() -> dict[str, Any]:
+        summary = request(app, "GET", "/v1/routing/providers/summary").json()
+        return next(row for row in summary["providers"]
+                    if row["id"] == "small-provider")
+
+    for index, expected in enumerate((
+        "all_observed_attempts_succeeded", "mixed_outcomes", "mixed_outcomes"
+    )):
+        response = request(app, "POST", "/v1/chat/completions", headers={
+            "X-JEV-Session-Id": f"provider-status-{index}",
+        }, json={"model": SMALL_ID, "messages": [
+            {"role": "user", "content": SIMPLE_PROMPT},
+        ]})
+        assert response.status_code == (502 if index == 1 else 200)
+        row = observed()
+        assert row["observed_condition"] == expected
+        assert row["attempts"] == index + 1
+        assert row["completed"] == index + 1
+        assert row["failed"] == (1 if index >= 1 else 0)
+    config.engine.close()
+
+
+def test_provider_summary_all_observed_attempts_failed(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from jev_gateway import dashboard
+
+    monkeypatch.setattr(dashboard.time, "time", lambda: 1100.0)
+
+    def completion(**kwargs):
+        raise RuntimeError("provider failure")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    failed = request(app, "POST", "/v1/chat/completions", headers={
+        "X-JEV-Session-Id": "failed-provider",
+    }, json={"model": SMALL_ID, "messages": [
+        {"role": "user", "content": SIMPLE_PROMPT},
+    ]})
+    summary = request(app, "GET", "/v1/routing/providers/summary").json()
+    provider = next(row for row in summary["providers"]
+                    if row["id"] == "small-provider")
+
+    assert failed.status_code == 502
+    assert provider["attempts"] == provider["completed"] == provider["failed"] == 1
+    assert provider["succeeded"] == 0
+    assert provider["observed_condition"] == "all_observed_attempts_failed"
+    config.engine.close()
+
+
+def test_provider_summary_counts_stream_only_after_completion(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from jev_gateway import dashboard
+
+    monkeypatch.setattr(dashboard.time, "time", lambda: 1100.0)
+    inside_stream: list[dict[str, Any]] = []
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+
+    def completion(**kwargs):
+        def chunks():
+            summary = request(app, "GET", "/v1/routing/providers/summary").json()
+            inside_stream.append(next(row for row in summary["providers"]
+                                      if row["id"] == "small-provider"))
+            yield {"id": "one", "choices": [{"delta": {"content": "ok"}}]}
+        return chunks()
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    response = request(app, "POST", "/v1/chat/completions", headers={
+        "X-JEV-Session-Id": "provider-stream",
+    }, json={"model": SMALL_ID, "stream": True, "messages": [
+        {"role": "user", "content": SIMPLE_PROMPT},
+    ]})
+    after = request(app, "GET", "/v1/routing/providers/summary").json()
+    provider = next(row for row in after["providers"]
+                    if row["id"] == "small-provider")
+
+    assert response.status_code == 200
+    assert inside_stream[0]["attempts"] == 1
+    assert inside_stream[0]["completed"] == 0
+    assert inside_stream[0]["incomplete_evidence"] == 1
+    assert provider["attempts"] == provider["completed"] == 1
+    assert provider["incomplete_evidence"] == 0
+    config.engine.close()
+
+
+def test_provider_summary_disabled_and_degraded_storage_have_null_metrics(
+    monkeypatch, tmp_path: Path
+) -> None:
+    install_completion(monkeypatch)
+    disabled = gateway.create_app(make_config())
+    disabled_response = request(disabled, "GET", "/v1/routing/providers/summary").json()
+    assert disabled_response["evidence_available"] is False
+    assert disabled_response["providers"]
+    for provider in disabled_response["providers"]:
+        assert provider["configured"] is True
+        for name in ("attempts", "completed", "succeeded", "failed",
+                     "incomplete_evidence", "average_latency_ms",
+                     "last_outcome_at", "last_outcome_ok", "observed_condition"):
+            assert provider[name] is None
+
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    config.engine.record_store.close()
+    degraded_response = request(app, "GET", "/v1/routing/providers/summary").json()
+    assert degraded_response["evidence_available"] is False
+    assert degraded_response["providers"][0]["attempts"] is None
+    assert degraded_response["providers"][0]["observed_condition"] is None
+
+
+def test_dashboard_lists_only_live_sessions_and_returns_retained_stages(
+    monkeypatch, tmp_path: Path
+) -> None:
+    install_completion(monkeypatch)
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+
+    completion = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "live-session"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": SIMPLE_PROMPT}],
+        },
+    )
+    config.engine.record_request(
+        request_id="historical-only",
+        session_id="not-live",
+        meta=gateway.RequestMeta(),
+        messages=[{"role": "user", "content": "stored only"}],
+    )
+
+    listing = request(app, "GET", "/v1/routing/sessions")
+    detail = request(
+        app, "GET", "/v1/routing/sessions/live-session/requests"
+    )
+
+    assert completion.status_code == 200
+    assert listing.status_code == 200
+    assert listing.json()["evidence_available"] is True
+    assert [item["session_id"] for item in listing.json()["data"]] == [
+        "live-session"
+    ]
+    listed = listing.json()["data"][0]
+    assert listed["route"] == SMALL_ID
+    assert listed["provider"] == "small-provider"
+    assert listed["upstream_model"] == "vendor/small-model"
+    assert listed["latest_request"]["prompt"] == SIMPLE_PROMPT
+    assert listed["latest_request"]["ok"] is True
+    assert detail.status_code == 200
+    assert detail.json()["session"]["session_id"] == "live-session"
+    assert len(detail.json()["requests"]) == 1
+    retained = detail.json()["requests"][0]
+    assert retained["request"]["prompt"] == SIMPLE_PROMPT
+    assert retained["decision"]["route"] == SMALL_ID
+    assert retained["upstream_request"]["model"] == "openai/vendor/small-model"
+    assert retained["upstream_request"]["payload"]["messages"] == [
+        {"role": "user", "content": SIMPLE_PROMPT}
+    ]
+    assert retained["outcome"]["ok"] is True
+    assert "test-key-small" not in json.dumps(detail.json())
+    assert request(
+        app, "GET", "/v1/routing/sessions/not-live/requests"
+    ).json()["error"]["code"] == "unknown_session"
+    config.engine.close()
+
+
+def test_dashboard_sorts_sessions_by_latest_request_then_live_update(
+    monkeypatch, tmp_path: Path
+) -> None:
+    install_completion(monkeypatch)
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    clock = config.engine._clock
+    assert isinstance(clock, FakeClock)
+
+    first = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "older-request"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "First"}],
+        },
+    )
+    clock.advance(1)
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "newer-request"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "Second"}],
+        },
+    )
+    clock.advance(1)
+    config.engine.store.put(
+        SessionState(
+            session_id="memory-only",
+            route=SMALL_ID,
+            tier="simple",
+            strategy="task_aware",
+            created_at=clock(),
+            updated_at=clock(),
+            switched_at=clock(),
+        )
+    )
+
+    listing = request(app, "GET", "/v1/routing/sessions").json()["data"]
+
+    assert first.status_code == second.status_code == 200
+    assert [item["session_id"] for item in listing] == [
+        "newer-request",
+        "older-request",
+        "memory-only",
+    ]
+    assert listing[0]["latest_request"]["received_at"] > listing[1][
+        "latest_request"
+    ]["received_at"]
+    assert listing[2]["latest_request"] is None
+    config.engine.close()
+
+
+def test_dashboard_detail_supports_session_ids_with_slashes(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    completion = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "tenant/conversation"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "Hello"}],
+        },
+    )
+    detail = request(
+        app,
+        "GET",
+        "/v1/routing/sessions/tenant%2Fconversation/requests",
+    )
+
+    assert completion.status_code == 200
+    assert detail.status_code == 200
+    assert detail.json()["session"]["session_id"] == "tenant/conversation"
+
+
+def test_dashboard_captures_transformed_payload_and_redacts_provider_secrets(
+    monkeypatch, tmp_path: Path
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "First answer.",
+                    "reasoning_content": "Provider reasoning.",
+                },
+                "finish_reason": "stop",
+            }],
+        }
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    monkeypatch.setenv("TEST_PROVIDER_TOKEN", "provider-token-value")
+    document = catalog_document()
+    document["providers"][0]["type"] = "deepseek"
+    document["providers"][0]["param_env"] = {
+        "custom_credential": "TEST_PROVIDER_TOKEN"
+    }
+    document["models"][0]["capabilities"].update({
+        "reasoning": True,
+        "reasoning_effort": ["none", "low"],
+    })
+    config = make_stored_config(tmp_path, document=document)
+    app = gateway.create_app(config)
+
+    first = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "transformed"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "First turn."}],
+        },
+    )
+    clock = config.engine._clock
+    assert isinstance(clock, FakeClock)
+    clock.advance(1)
+    second = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "transformed"},
+        json={
+            "model": "task_aware",
+            "messages": [
+                {"role": "user", "content": "First turn."},
+                {"role": "assistant", "content": "First answer."},
+                {"role": "user", "content": "Continue."},
+            ],
+        },
+    )
+    detail = request(
+        app, "GET", "/v1/routing/sessions/transformed/requests"
+    ).json()
+
+    assert first.status_code == second.status_code == 200
+    newest_payload = detail["requests"][0]["upstream_request"]["payload"]
+    assert newest_payload["messages"][1]["reasoning_content"] == "Provider reasoning."
+    assert newest_payload["reasoning_effort"] == "low"
+    assert newest_payload["custom_credential"] == "[REDACTED]"
+    assert newest_payload["api_key"] == "[REDACTED]"
+    serialized = json.dumps(detail)
+    assert "provider-token-value" not in serialized
+    assert "test-key-small" not in serialized
+    config.engine.close()
+
+
+def test_dashboard_content_opt_out_and_failed_upstream_keep_safe_evidence(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def completion(**kwargs):
+        raise RuntimeError("upstream exploded")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    config = make_stored_config(tmp_path, capture_content=False)
+    app = gateway.create_app(config)
+
+    failed = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "failed-session"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "Private prompt"}],
+            "tools": [{"type": "function", "function": {"name": "private_tool"}}],
+        },
+    )
+    detail = request(
+        app, "GET", "/v1/routing/sessions/failed-session/requests"
+    ).json()
+
+    assert failed.status_code == 502
+    retained = detail["requests"][0]
+    assert retained["request"]["content_captured"] is False
+    assert retained["request"]["prompt"] is None
+    assert retained["request"]["messages"] is None
+    assert retained["upstream_request"]["payload"]["messages"] == {
+        "omitted": True,
+        "kind": "array",
+        "count": 1,
+    }
+    assert retained["upstream_request"]["payload"]["tools"] == {
+        "omitted": True,
+        "kind": "array",
+        "count": 1,
+    }
+    assert retained["outcome"]["ok"] is False
+    assert "Private prompt" not in json.dumps(detail)
+    assert "private_tool" not in json.dumps(detail)
+    config.engine.close()
+
+
+def test_dashboard_sanitizer_failure_does_not_gate_upstream(
+    monkeypatch, tmp_path: Path
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "model": kwargs["model"],
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": "ok"},
+                "finish_reason": "stop",
+            }],
+        }
+
+    def fail_sanitizer(*args, **kwargs):
+        raise RuntimeError("sanitizer failed")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    monkeypatch.setattr(gateway, "sanitize_upstream_payload", fail_sanitizer)
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+
+    response = request(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "sanitizer-failure"},
+        json={
+            "model": "task_aware",
+            "messages": [{"role": "user", "content": "Hello"}],
+        },
+    )
+    detail = request(
+        app,
+        "GET",
+        "/v1/routing/sessions/sanitizer-failure/requests",
+    ).json()
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert detail["requests"][0]["upstream_request"] is None
+    assert detail["requests"][0]["outcome"]["ok"] is True
+    config.engine.close()
+
+
+def test_dashboard_uses_live_fallback_when_storage_is_disabled_or_degraded(
+    monkeypatch, tmp_path: Path
+) -> None:
+    install_completion(monkeypatch)
+    disabled_config = make_config()
+    disabled_app = gateway.create_app(disabled_config)
+    request(
+        disabled_app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "memory-only"},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": "Hi"}]},
+    )
+
+    disabled = request(disabled_app, "GET", "/v1/routing/sessions").json()
+    disabled_detail = request(
+        disabled_app, "GET", "/v1/routing/sessions/memory-only/requests"
+    ).json()
+
+    assert disabled["evidence_available"] is False
+    assert disabled["data"][0]["route"] == SMALL_ID
+    assert disabled["data"][0]["provider"] == "small-provider"
+    assert disabled_detail["requests"] == []
+
+    document = catalog_document()
+    document["storage"] = {
+        "enabled": True,
+        "path": str(tmp_path / "missing" / "records.sqlite3"),
+    }
+    catalog = catalog_from_document(document, "test catalog")
+    degraded_config = gateway.GatewayConfig(
+        engine=RoutingEngine(
+            catalog,
+            MemorySessionStore(),
+            record_store=record_store_from_settings(catalog.storage),
+        ),
+        gateway_api_key=None,
+        session_strategy="derived",
+    )
+    degraded_app = gateway.create_app(degraded_config)
+    served = request(
+        degraded_app,
+        "POST",
+        "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "degraded"},
+        json={"model": "task_aware", "messages": [{"role": "user", "content": "Hi"}]},
+    )
+    degraded = request(degraded_app, "GET", "/v1/routing/sessions").json()
+
+    assert served.status_code == 200
+    assert degraded["evidence_available"] is False
+    assert degraded["storage"]["error"]
+    assert degraded["data"][0]["route"] == SMALL_ID
+    degraded_config.engine.close()
 
 
 def test_sse_chunks_silences_only_litellm_usage_serializer_warning() -> None:

@@ -28,6 +28,7 @@ from jev_gateway.records import (
     RecordStore,
     RequestMeta,
     RequestRecord,
+    UpstreamRequestRecord,
     build_config_hash,
 )
 from jev_gateway.sessions import MemorySessionStore, SessionState
@@ -331,6 +332,30 @@ class RoutingEngine:
         }
 
     # Outcomes
+
+    def record_upstream_request(
+        self,
+        decision: Decision,
+        *,
+        payload: dict[str, Any],
+        capture_content: bool,
+    ) -> None:
+        """Persist the sanitized LiteLLM arguments before the upstream call."""
+        model = payload.get("model")
+        record = UpstreamRequestRecord(
+            decision_id=decision.decision_id,
+            request_id=decision.request_id,
+            provider=decision.provider,
+            model=model if isinstance(model, str) else decision.model,
+            stream=bool(payload.get("stream")),
+            capture_content=capture_content,
+            payload=payload,
+            created_at=self._clock(),
+        )
+        self._store(
+            lambda: self.record_store.record_upstream_request(record),
+            "upstream_request",
+        )
 
     def record_outcome(
         self,

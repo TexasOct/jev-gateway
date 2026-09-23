@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development checklist and quality gate."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Module ownership, FastAPI composition root, and extension boundaries."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"SQLite writer-thread, schema evolution, query, retention, and availability rules."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"OpenAI error envelope, authentication boundary, and degraded-storage behavior."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Structured logging allowlist and sensitive-data restrictions."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Typing, testing, verification, and forbidden patterns."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/current-data-surfaces.md","reason":"Verified live-session, evidence, authentication, and UI integration constraints."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/provider-load-service-status.md","reason":"Defines the smallest retained-evidence provider observation MVP, its fixed window, neutral wording, and recorder-degradation limits."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/credential-safe-error-policy.md","reason":"Defines the credential-safe upstream-error policy: fixed 502 message, NULL outcome message, formatter masking across pretty/compact/JSON, shared redact_secret_text helper, error_type clamping, and the regression tests to land before provider-summary work."}

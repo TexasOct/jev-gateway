@@ -14,9 +14,10 @@ import json
 import logging
 import os
 import queue
+import re
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -36,8 +37,11 @@ __all__ = [
     "SqliteRecordStore",
     "StorageSettings",
     "StorageUnavailableError",
+    "UpstreamRequestRecord",
     "build_config_hash",
     "record_store_from_settings",
+    "redact_secret_text",
+    "sanitize_upstream_payload",
 ]
 
 PRUNE_INTERVAL = 256
@@ -113,6 +117,17 @@ CREATE TABLE IF NOT EXISTS outcomes (
     recorded_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS upstream_requests (
+    decision_id TEXT PRIMARY KEY,
+    request_id TEXT,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    stream INTEGER NOT NULL DEFAULT 0,
+    capture_content INTEGER NOT NULL DEFAULT 0,
+    payload_json TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS config_versions (
     config_hash TEXT PRIMARY KEY,
     captured_at REAL NOT NULL,
@@ -136,6 +151,10 @@ CREATE INDEX IF NOT EXISTS idx_decisions_session ON decisions (session_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_strategy ON decisions (strategy);
 CREATE INDEX IF NOT EXISTS idx_decisions_config ON decisions (config_hash);
 CREATE INDEX IF NOT EXISTS idx_outcomes_request ON outcomes (request_id);
+CREATE INDEX IF NOT EXISTS idx_upstream_requests_request
+    ON upstream_requests (request_id);
+CREATE INDEX IF NOT EXISTS idx_upstream_requests_created_at
+    ON upstream_requests (created_at);
 CREATE INDEX IF NOT EXISTS idx_assistant_continuations_session
     ON assistant_continuations (session_id, continuation_id);
 """
@@ -316,6 +335,20 @@ class OutcomeRecord:
     error_message: str | None = None
 
 
+@dataclass(frozen=True)
+class UpstreamRequestRecord:
+    """Sanitized arguments submitted to LiteLLM for one routing decision."""
+
+    decision_id: str
+    request_id: str | None
+    provider: str
+    model: str
+    stream: bool
+    capture_content: bool
+    payload: dict[str, Any]
+    created_at: float
+
+
 class RecordStore(Protocol):
     """The storage contract the engine and gateway depend on."""
 
@@ -337,6 +370,28 @@ class RecordStore(Protocol):
 
     def record_outcome(self, record: OutcomeRecord) -> None:
         """Persist the upstream result for one decision."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def record_upstream_request(self, record: UpstreamRequestRecord) -> None:
+        """Persist one sanitized LiteLLM request."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        """Return latest request and routed-decision evidence for live sessions."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        """Return retained requests and joined stages for one live session."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        """Summarize retained upstream attempts within a submission-time window."""
         raise RuntimeError("RecordStore protocol method called directly")
 
     def record_assistant_continuation(
@@ -390,6 +445,126 @@ def _json(value: Any) -> str | None:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+_SECRET_PARTS = re.compile(r"(^|_)(token|secret|password|credential)s?($|_)")
+_SAFE_TOKEN_COUNT_FIELDS = {
+    "completion_tokens",
+    "max_completion_tokens",
+    "max_tokens",
+    "prompt_tokens",
+    "total_tokens",
+}
+_CONTENT_FIELDS = {
+    "content",
+    "functions",
+    "function_call",
+    "input",
+    "metadata",
+    "messages",
+    "prediction",
+    "prompt",
+    "response_format",
+    "stop",
+    "tool_choice",
+    "tools",
+}
+
+_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)(?<![\w-])([\w-]+)(\s*[:=]\s*)([\"']?)([^\s,;\"'}]+)([\"']?)"
+)
+_AUTH_HEADER = re.compile(r"(?i)\bAuthorization\s*:\s*(?:Bearer\s+)?[^\s,;\"']+")
+_BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[^\s,;\"']+")
+_SK_KEY = re.compile(r"(?i)\bsk-[a-z0-9_-]+\b")
+
+
+def redact_secret_text(text: str) -> str:
+    """Mask recognizable credentials in diagnostic text, not arbitrary prose."""
+    def mask_assignment(match: re.Match[str]) -> str:
+        name, separator, quote, value, closing = match.groups()
+        if not _secret_field(name, frozenset()):
+            return match.group(0)
+        return f"{name}{separator}{quote}[REDACTED]{closing}"
+
+    text = _AUTH_HEADER.sub("Authorization: [REDACTED]", text)
+    text = _SECRET_ASSIGNMENT.sub(mask_assignment, text)
+    text = _BEARER_VALUE.sub("Bearer [REDACTED]", text)
+    return _SK_KEY.sub("[REDACTED]", text)
+
+
+def _secret_field(name: str, explicit: frozenset[str]) -> bool:
+    normalized = name.casefold().replace("-", "_")
+    if normalized in _SAFE_TOKEN_COUNT_FIELDS:
+        return False
+    return (
+        normalized in explicit
+        or normalized in {"api_key", "authorization", "header", "headers", "key"}
+        or normalized.endswith("_key")
+        or "authorization" in normalized
+        or "credential" in normalized
+        or "header" in normalized
+        or "password" in normalized
+        or "secret" in normalized
+        or "token" in normalized
+        or _SECRET_PARTS.search(normalized) is not None
+    )
+
+
+def _omission(value: Any) -> dict[str, Any]:
+    try:
+        if isinstance(value, Mapping):
+            return {"omitted": True, "kind": "object", "count": len(value)}
+        if isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            return {"omitted": True, "kind": "array", "count": len(value)}
+    except Exception:
+        # Runtime objects can implement hostile collection protocols. Their type
+        # is useful evidence; invoking their string representation is not safe.
+        return {"omitted": True, "kind": type(value).__name__}
+    return {"omitted": True, "kind": type(value).__name__}
+
+
+def sanitize_upstream_payload(
+    payload: Mapping[str, Any],
+    *,
+    secret_fields: set[str] | frozenset[str] = frozenset(),
+    capture_content: bool,
+) -> dict[str, Any]:
+    """Copy a LiteLLM payload without credentials or opted-out content."""
+    explicit = frozenset(name.casefold().replace("-", "_") for name in secret_fields)
+
+    def clean(value: Any, field: str | None = None) -> Any:
+        normalized = field.casefold().replace("-", "_") if field else None
+        if normalized is not None and _secret_field(normalized, explicit):
+            return "[REDACTED]"
+        if normalized in _CONTENT_FIELDS and not capture_content:
+            return _omission(value)
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, Mapping):
+            try:
+                return {
+                    key if isinstance(key, str) else f"[{type(key).__name__}]": clean(
+                        item, key if isinstance(key, str) else None
+                    )
+                    for key, item in value.items()
+                }
+            except Exception:
+                return f"[{type(value).__name__}]"
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            try:
+                return [clean(item) for item in value]
+            except Exception:
+                return f"[{type(value).__name__}]"
+        return f"[{type(value).__name__}]"
+
+    return {
+        key if isinstance(key, str) else f"[{type(key).__name__}]": clean(
+            value, key if isinstance(key, str) else None
+        )
+        for key, value in payload.items()
+    }
+
+
 class NullRecordStore:
     """The disabled store: computes hashes but writes nothing."""
 
@@ -411,6 +586,24 @@ class NullRecordStore:
     def record_outcome(self, record: OutcomeRecord) -> None:
         return None
 
+    def record_upstream_request(self, record: UpstreamRequestRecord) -> None:
+        return None
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        return {}
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        return []
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        return {}
+
     def record_assistant_continuation(
         self, record: AssistantContinuationRecord
     ) -> None:
@@ -426,6 +619,7 @@ class NullRecordStore:
             "requests": 0,
             "decisions": 0,
             "outcomes": 0,
+            "upstream_requests": 0,
             "config_versions": 0,
             "assistant_continuations": 0,
         }
@@ -472,6 +666,24 @@ class _UnavailableRecordStore:
     def record_outcome(self, record: OutcomeRecord) -> None:
         self._unavailable()
 
+    def record_upstream_request(self, record: UpstreamRequestRecord) -> None:
+        self._unavailable()
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        self._unavailable()
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        self._unavailable()
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        self._unavailable()
+
     def record_assistant_continuation(
         self, record: AssistantContinuationRecord
     ) -> None:
@@ -487,6 +699,7 @@ class _UnavailableRecordStore:
             "requests": 0,
             "decisions": 0,
             "outcomes": 0,
+            "upstream_requests": 0,
             "config_versions": 0,
             "assistant_continuations": 0,
         }
@@ -562,6 +775,98 @@ def _migrate_decision_columns(connection: sqlite3.Connection) -> None:
         connection.execute(_DECISION_COLUMN_MIGRATIONS[name])
     connection.execute("DROP VIEW IF EXISTS decision_evidence")
     connection.executescript(DECISION_EVIDENCE_VIEW)
+
+
+def _decoded_json(value: Any, fallback: Any) -> Any:
+    if not isinstance(value, str):
+        return fallback
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _optional_bool(value: Any) -> bool | None:
+    return None if value is None else bool(value)
+
+
+def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
+    request = {
+        "request_id": row["request_id"],
+        "received_at": row["received_at"],
+        "session_id": row["session_id"],
+        "strategy": row["strategy"],
+        "requested_model": row["requested_model"],
+        "endpoint": row["endpoint"],
+        "client": row["client"],
+        "user_agent": row["user_agent"],
+        "stream": bool(row["stream"]),
+        "max_tokens": row["max_tokens"],
+        "has_tools": bool(row["has_tools"]),
+        "has_vision": bool(row["has_vision"]),
+        "wants_json": bool(row["wants_json"]),
+        "prompt_chars": row["prompt_chars"],
+        "prompt_tokens": row["prompt_tokens"],
+        "conversation_tokens": row["conversation_tokens"],
+        "turn_index": row["turn_index"],
+        "content_captured": bool(row["capture_content"]),
+        "prompt_digest": row["prompt_digest"],
+        "prompt": row["prompt"],
+        "messages": _decoded_json(row["messages_json"], None),
+        "tools": _decoded_json(row["tools_json"], None),
+        "response_format": _decoded_json(row["response_format_json"], None),
+    }
+    decision = None
+    if row["decision_id"] is not None:
+        decision = {
+            "decision_id": row["decision_id"],
+            "strategy": row["decision_strategy"],
+            "config_hash": row["config_hash"],
+            "route": row["route"],
+            "provider": row["provider"],
+            "upstream_model": row["upstream_model"],
+            "label": row["tier"],
+            "reason": row["reason"],
+            "mode": row["mode"],
+            "turn_index": row["decision_turn_index"],
+            "switched_from": row["switched_from"],
+            "blocked_by": row["blocked_by"],
+            "reasoning_effort": row["reasoning_effort"],
+            "reasoning_effort_source": row["reasoning_effort_source"],
+            "candidates": _decoded_json(row["candidates_json"], []),
+            "signals": _decoded_json(row["signals_json"], {}),
+            "created_at": row["decision_created_at"],
+        }
+    upstream = None
+    if row["payload_json"] is not None:
+        upstream = {
+            "provider": row["submitted_provider"],
+            "model": row["submitted_model"],
+            "stream": bool(row["submitted_stream"]),
+            "content_captured": bool(row["submitted_capture_content"]),
+            "payload": _decoded_json(row["payload_json"], {}),
+            "created_at": row["submitted_at"],
+        }
+    outcome = None
+    if row["recorded_at"] is not None:
+        outcome = {
+            "ok": bool(row["ok"]),
+            "finish_reason": row["finish_reason"],
+            "prompt_tokens": row["outcome_prompt_tokens"],
+            "completion_tokens": row["completion_tokens"],
+            "total_tokens": row["total_tokens"],
+            "cost_usd": row["cost_usd"],
+            "latency_ms": row["latency_ms"],
+            "returned_model": row["returned_model"],
+            "error_type": row["error_type"],
+            "recorded_at": row["recorded_at"],
+        }
+    return {
+        "request": request,
+        "decision": decision,
+        "upstream_request": upstream,
+        "outcome": outcome,
+    }
 
 
 class _SqliteBackend:
@@ -715,6 +1020,193 @@ class _SqliteBackend:
             ),
         )
 
+    def record_upstream_request(self, record: UpstreamRequestRecord) -> None:
+        with self._transaction() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO upstream_requests ("
+                "decision_id, request_id, provider, model, stream, capture_content, "
+                "payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    record.decision_id,
+                    record.request_id,
+                    record.provider,
+                    record.model,
+                    record.stream,
+                    record.capture_content,
+                    _json(record.payload) or "{}",
+                    record.created_at,
+                ),
+            )
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        if not session_ids:
+            return {}
+        connection = self._connection
+        if connection is None:
+            return {}
+        with self._lock:
+            rows = connection.execute(
+                """
+                WITH live(session_id) AS (
+                    SELECT value FROM json_each(?)
+                ),
+                latest_requests AS (
+                    SELECT r.*, r.rowid AS request_rowid,
+                        (SELECT o.ok FROM decisions dx
+                         LEFT JOIN outcomes o ON o.decision_id = dx.decision_id
+                         WHERE dx.request_id = r.request_id
+                         ORDER BY dx.created_at DESC, dx.rowid DESC LIMIT 1
+                        ) AS request_ok,
+                        ROW_NUMBER() OVER (
+                        PARTITION BY r.session_id
+                        ORDER BY r.received_at DESC, r.rowid DESC
+                    ) AS rank
+                    FROM requests r JOIN live ON live.session_id = r.session_id
+                ),
+                latest_decisions AS (
+                    SELECT d.*, o.ok, ROW_NUMBER() OVER (
+                        PARTITION BY d.session_id
+                        ORDER BY d.created_at DESC, d.rowid DESC
+                    ) AS rank
+                    FROM decisions d
+                    JOIN live ON live.session_id = d.session_id
+                    LEFT JOIN outcomes o ON o.decision_id = d.decision_id
+                )
+                SELECT live.session_id,
+                    r.request_id, r.received_at, r.capture_content, r.prompt,
+                    r.prompt_digest, r.prompt_chars,
+                    d.decision_id, d.strategy, d.route, d.provider,
+                    d.upstream_model, d.tier, r.request_ok, d.ok AS decision_ok
+                FROM live
+                LEFT JOIN latest_requests r
+                    ON r.session_id = live.session_id AND r.rank = 1
+                LEFT JOIN latest_decisions d
+                    ON d.session_id = live.session_id AND d.rank = 1
+                """,
+                (_json(session_ids) or "[]",),
+            ).fetchall()
+        evidence: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            latest_request = None
+            if row["request_id"] is not None:
+                latest_request = {
+                    "request_id": row["request_id"],
+                    "received_at": row["received_at"],
+                    "content_captured": bool(row["capture_content"]),
+                    "prompt": row["prompt"],
+                    "prompt_digest": row["prompt_digest"],
+                    "prompt_chars": row["prompt_chars"],
+                    "ok": _optional_bool(row["request_ok"]),
+                }
+            decision = None
+            if row["decision_id"] is not None:
+                decision = {
+                    "decision_id": row["decision_id"],
+                    "strategy": row["strategy"],
+                    "route": row["route"],
+                    "provider": row["provider"],
+                    "upstream_model": row["upstream_model"],
+                    "label": row["tier"],
+                    "ok": _optional_bool(row["decision_ok"]),
+                }
+            evidence[row["session_id"]] = {
+                "latest_request": latest_request,
+                "latest_decision": decision,
+            }
+        return evidence
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        connection = self._connection
+        if connection is None:
+            return []
+        with self._lock:
+            rows = connection.execute(
+                """
+                SELECT
+                    r.*,
+                    d.decision_id, d.strategy AS decision_strategy,
+                    d.config_hash, d.route, d.provider, d.upstream_model,
+                    d.tier, d.reason, d.mode, d.turn_index AS decision_turn_index,
+                    d.switched_from, d.blocked_by, d.reasoning_effort,
+                    d.reasoning_effort_source, d.candidates_json, d.signals_json,
+                    d.created_at AS decision_created_at,
+                    u.provider AS submitted_provider, u.model AS submitted_model,
+                    u.stream AS submitted_stream,
+                    u.capture_content AS submitted_capture_content,
+                    u.payload_json, u.created_at AS submitted_at,
+                    o.ok, o.finish_reason, o.prompt_tokens AS outcome_prompt_tokens,
+                    o.completion_tokens, o.total_tokens, o.cost_usd, o.latency_ms,
+                    o.returned_model, o.error_type, o.recorded_at
+                FROM requests r
+                LEFT JOIN decisions d ON d.request_id = r.request_id
+                LEFT JOIN upstream_requests u ON u.decision_id = d.decision_id
+                LEFT JOIN outcomes o ON o.decision_id = d.decision_id
+                WHERE r.session_id = ?
+                ORDER BY r.received_at DESC, r.rowid DESC
+                """,
+                (session_id,),
+            ).fetchall()
+        return [_evidence_row(row) for row in rows]
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        connection = self._connection
+        if connection is None:
+            return {}
+        with self._lock:
+            rows = connection.execute(
+                """
+                SELECT u.provider,
+                    COUNT(*) AS attempts,
+                    COUNT(o.decision_id) AS completed,
+                    COALESCE(SUM(CASE WHEN o.ok = 1 THEN 1 ELSE 0 END), 0) AS succeeded,
+                    COALESCE(SUM(CASE WHEN o.ok = 0 THEN 1 ELSE 0 END), 0) AS failed,
+                    AVG(CASE WHEN o.decision_id IS NOT NULL THEN o.latency_ms END)
+                        AS average_latency_ms
+                FROM upstream_requests u
+                LEFT JOIN outcomes o ON o.decision_id = u.decision_id
+                WHERE u.created_at >= ? AND u.created_at < ?
+                GROUP BY u.provider
+                """,
+                (window_start, window_end),
+            ).fetchall()
+            latest = connection.execute(
+                """
+                SELECT provider, recorded_at, ok FROM (
+                    SELECT u.provider, o.recorded_at, o.ok,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY u.provider
+                            ORDER BY o.recorded_at DESC, o.rowid DESC
+                        ) AS rank
+                    FROM upstream_requests u
+                    JOIN outcomes o ON o.decision_id = u.decision_id
+                    WHERE u.created_at >= ? AND u.created_at < ?
+                ) WHERE rank = 1
+                """,
+                (window_start, window_end),
+            ).fetchall()
+        latest_by_provider = {row["provider"]: row for row in latest}
+        result: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            provider = row["provider"]
+            recent = latest_by_provider.get(provider)
+            result[provider] = {
+                "attempts": row["attempts"],
+                "completed": row["completed"],
+                "succeeded": row["succeeded"],
+                "failed": row["failed"],
+                "incomplete_evidence": row["attempts"] - row["completed"],
+                "average_latency_ms": row["average_latency_ms"],
+                "last_outcome_at": recent["recorded_at"] if recent else None,
+                "last_outcome_ok": bool(recent["ok"]) if recent else None,
+            }
+        return result
+
     def record_assistant_continuation(
         self, record: AssistantContinuationRecord
     ) -> None:
@@ -773,6 +1265,7 @@ class _SqliteBackend:
                 "requests": 0,
                 "decisions": 0,
                 "outcomes": 0,
+                "upstream_requests": 0,
                 "config_versions": 0,
                 "assistant_continuations": 0,
             }
@@ -780,6 +1273,9 @@ class _SqliteBackend:
             requests = connection.execute("SELECT COUNT(*) FROM requests").fetchone()
             decisions = connection.execute("SELECT COUNT(*) FROM decisions").fetchone()
             outcomes = connection.execute("SELECT COUNT(*) FROM outcomes").fetchone()
+            upstream_requests = connection.execute(
+                "SELECT COUNT(*) FROM upstream_requests"
+            ).fetchone()
             versions = connection.execute("SELECT COUNT(*) FROM config_versions").fetchone()
             continuations = connection.execute(
                 "SELECT COUNT(*) FROM assistant_continuations"
@@ -788,6 +1284,9 @@ class _SqliteBackend:
             "requests": requests[0] if requests is not None else 0,
             "decisions": decisions[0] if decisions is not None else 0,
             "outcomes": outcomes[0] if outcomes is not None else 0,
+            "upstream_requests": (
+                upstream_requests[0] if upstream_requests is not None else 0
+            ),
             "config_versions": versions[0] if versions is not None else 0,
             "assistant_continuations": (
                 continuations[0] if continuations is not None else 0
@@ -843,7 +1342,7 @@ class _SqliteBackend:
             return
         connection.execute(
             "DELETE FROM requests WHERE request_id IN ("
-            "SELECT request_id FROM requests ORDER BY received_at DESC "
+            "SELECT request_id FROM requests ORDER BY received_at DESC, rowid DESC "
             "LIMIT -1 OFFSET ?)",
             (limit,),
         )
@@ -853,6 +1352,10 @@ class _SqliteBackend:
         )
         connection.execute(
             "DELETE FROM outcomes WHERE request_id IS NOT NULL "
+            "AND request_id NOT IN (SELECT request_id FROM requests)"
+        )
+        connection.execute(
+            "DELETE FROM upstream_requests WHERE request_id IS NOT NULL "
             "AND request_id NOT IN (SELECT request_id FROM requests)"
         )
 
@@ -964,6 +1467,34 @@ class SqliteRecordStore:
 
     def record_outcome(self, record: OutcomeRecord) -> None:
         self._submit(lambda backend: backend.record_outcome(record))
+
+    def record_upstream_request(self, record: UpstreamRequestRecord) -> None:
+        snapshot = copy.deepcopy(record)
+        self._submit(lambda backend: backend.record_upstream_request(snapshot))
+
+    def latest_session_evidence(
+        self, session_ids: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        return self._submit(
+            lambda backend: backend.latest_session_evidence(session_ids), wait=True
+        )
+
+    def session_request_evidence(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        return self._submit(
+            lambda backend: backend.session_request_evidence(session_id), wait=True
+        )
+
+    def provider_summary(
+        self, *, window_start: float, window_end: float
+    ) -> dict[str, dict[str, Any]]:
+        return self._submit(
+            lambda backend: backend.provider_summary(
+                window_start=window_start, window_end=window_end
+            ),
+            wait=True,
+        )
 
     def record_assistant_continuation(
         self, record: AssistantContinuationRecord

@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from copy import copy
+from pathlib import Path
 from typing import Any, Literal
+
+from jev_gateway.records import redact_secret_text
+
+_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 LOG_FORMATS = ("pretty", "json", "compact")
@@ -56,6 +62,30 @@ def display_logger_name(name: str) -> str:
     return name
 
 
+def safe_traceback(exc_info: tuple[type[BaseException], BaseException, Any]) -> str:
+    """Render frame locations without exception wording or source lines."""
+    kind = type(exc_info[1]).__name__
+    kind = kind if re.fullmatch(r"[A-Za-z0-9_]{1,64}", kind) else "Exception"
+    # Walk frames directly: extract_tb() reads source text, which can contain
+    # literal credentials and is not needed for a safe location-only trace.
+    frames = []
+    current = exc_info[2]
+    while current is not None:
+        frames.append(current)
+        current = current.tb_next
+    lines = ["Traceback (most recent call last):"]
+    for frame in frames:
+        try:
+            source = str(Path(frame.tb_frame.f_code.co_filename).resolve().relative_to(_PACKAGE_ROOT))
+        except ValueError:
+            source = "[external]"
+        name = frame.tb_frame.f_code.co_name
+        function = name if re.fullmatch(r"[A-Za-z0-9_]{1,64}", name) else "[external]"
+        lines.append(f'  File "{source}", line {frame.tb_lineno}, in {function}')
+    lines.append(f"{kind}: [REDACTED]")
+    return redact_secret_text("\n".join(lines))
+
+
 class GatewayFormatter(logging.Formatter):
     """Render allowlisted routing fields for terminals or structured log sinks."""
 
@@ -88,6 +118,17 @@ class GatewayFormatter(logging.Formatter):
         else:
             formatted = self._format_compact(message, fields)
         return self._colorize_level(formatted, record)
+
+    def formatException(self, ei: tuple[type[BaseException] | None, BaseException | None, Any]) -> str:
+        """Keep traceback locations without rendering untrusted exception text.
+
+        Standard traceback formatting includes exception messages, chained causes,
+        and source lines, any of which can contain credentials or prompt content.
+        Frame locations and a bounded type are enough for operator diagnosis.
+        """
+        if ei[0] is None or ei[1] is None:
+            return "Traceback unavailable: [REDACTED]"
+        return safe_traceback((ei[0], ei[1], ei[2]))
 
     def _fields(self, record: logging.LogRecord) -> dict[str, Any]:
         return {

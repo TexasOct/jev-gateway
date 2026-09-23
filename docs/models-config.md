@@ -48,10 +48,12 @@ uv run jev-gateway
 | `models[].capabilities.reasoning` | 布尔值；默认 `false` | 推理能力标记，推理升级时可用于筛选。 |
 | `models[].capabilities.reasoning_effort` | 字符串数组；默认 `[]` | 该路由接受的 `reasoning_effort` 取值；`[]` 表示未声明，网关不会为它推导任何档位。 |
 | `models[].capabilities.temperature` | 布尔值；默认 `true` | 是否支持 temperature；向上游转发时用于处理该参数。 |
-| `models[].cost.input_per_million` | 数值；默认 `0` | 每百万输入 token 的美元单价，用于估算请求与会话成本。 |
-| `models[].cost.output_per_million` | 数值；默认 `0` | 每百万输出 token 的美元单价。 |
+| `models[].cost.input_per_million` | 数值；默认 `0` | 每百万未命中输入 token 的美元估算单价，用于估算请求与会话成本。 |
+| `models[].cost.output_per_million` | 数值；默认 `0` | 每百万输出 token 的美元估算单价。 |
 
 模型的唯一 ID 由 `<provider>/<upstream_model>` 自动生成。例如 `deepseek` + `deepseek-flash` 对应 `deepseek/deepseek-flash`。`type` 只控制 LiteLLM 上游适配器，不改变这个 ID。手动指定请求 `model` 时使用完整 ID。自动分流由 `models[].tags` 建池；一个模型可以同时属于多个策略和标签。不要在模型里写 `id`、`api_base`、`api_key` 或 `api_key_env`；连接信息由 provider 提供，明文 `api_key` 也不能写在 provider 中。`capabilities` 不接受表中以外的字段。
+
+`cost` 只支持一个输入价，不能表达缓存命中、批量模式或按时段计费。它应取最保守且可复现的输入单价，用于路由排序与记录估算，不是账单结算。仓库当前 `deepseek-flash` 用中国大陆官方高峰价：缓存未命中输入 2 元、输出 8 元 / 百万 token，按 2026-09-23 人民币中间价 6.7468 元 / 美元换算为约 $0.2964 / $1.1857。DeepSeek 高峰是北京时间工作日（不含法定节假日）9:00-12:00、14:00-18:00；其余时间价格减半。
 
 ## `policy` 和 `strategies`
 
@@ -230,6 +232,30 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 `mode: "cached"` 只在会话首轮提问，后续轮次直接复用会话已存的标签与模型；手动指定模型的请求不提问，直接走策略原本的选择逻辑。`options` 在加载时校验：问题必须是非空的 `choice` 对象且至少两个 `criteria`，规则必须是恰好含 `when` 和 `select` 的对象，`when` 的键必须是已声明的问题、值必须是该问题的标签，`select.label`（或兼容的 `select.tier`）必须属于当前策略，`selection` 必须是已支持的排序方式。任一项写错都会在加载时直接报错。
 
+### 仓库当前使用的 `task_aware` 分流表
+
+`models.json` 用三道题描述一次请求：`workload`（research / docs / small_change / coding / reverse）、`scale`（bounded / moderate / large / cross_domain）、`rigor`（draft / exacting）。七条规则按顺序命中，落成五个标签：
+
+| 标签 | 命中条件 | 模型池 | 思考档位 |
+| --- | --- | --- | --- |
+| `draft` | 编码且 `rigor: draft`；或研究/文档/小改且 `rigor: draft` | `deepseek-flash` | `low` |
+| `review` | 研究/文档/小改且 `rigor: exacting` | `deepseek-flash` | `medium` |
+| `craft` | 编码、`rigor: exacting`，`scale` 为 bounded 或 moderate | `gpt-6-luna` | `medium` |
+| `engineering` | `workload: reverse`；或编码且 `scale: large` | `gpt-6-sol`，`gpt-6-luna` 作为约束回退 | `high` |
+| `ultra` | `scale: cross_domain` 且 `workload` 为 coding 或 reverse | `gpt-6-astra` | `xhigh` |
+
+分工依据：DeepSeek 承接调研、文档查看与编写、review，以及中小规模编码中不要求交付的那一部分；Luna 承接要求交付的中小规模编码，并在 `engineering` 池里作为 Sol 的能力/上下文回退；Sol 承接大规模编码与逆向；`ultra` 只由跨领域超高复杂任务触发，再大的单领域难题也留在 `engineering`。
+
+规则 1 额外要求 `workload` 为 `coding` 或 `reverse`，所以“调研一个跨领域课题”或“为跨领域课题写文档”仍走 DeepSeek，不会因为话题本身难而被抬到最高档。
+
+JEV 不可用、调用失败，或回答缺少任一问题时使用 `fallback`，当前是 `review` + `cheapest_adequate`，落在 DeepSeek 上。`gpt-5.6-terra` 不再带任何 `task_aware` 标签，只保留 `quality/analysis`：GPT-6 一代已经没有中间档，它的位置由 Luna 承担。重新把它放进某个标签池会让它和 Luna 在成本排序上竞争，谁胜出完全取决于该 provider 配置的价格。
+
+#### `ultra` 与 Astra
+
+`ultra` 只挂 `gpt-6-astra`，并使用 `quality_first`。它只会被规则 1 命中，规则 1 同时要求 `scale: cross_domain` 和 `workload` 为 coding 或 reverse。因此普通难题、单领域工程任务、调研和文档工作都不会进入 Astra 的候选池。
+
+上游的 `/v1/models` 集合接口目前未列出 GPT-6 别名，但模型详情与实际 chat/responses 请求已确认 `gpt-6`、`gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna` 可用，且 `gpt-6` 是 Astra 别名；`gpt-6-terra` 返回 `404 model_not_found`。目录使用显式别名而不是不完整的集合结果。
+
 ## `gateway`
 
 | 字段 | 默认值 | 含义 |
@@ -254,12 +280,12 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | --- | --- | --- |
 | `enabled` | `false` | 是否启用 SQLite 记录。 |
 | `path` | `jev-records.sqlite3` | SQLite 文件路径。 |
-| `capture_content` | `true` | 是否保存请求内容；关闭后保存摘要及信号统计，不保存完整提示文本。 |
+| `capture_content` | `true` | 是否保存请求与最终 LiteLLM 请求的内容；关闭后保留摘要、信号统计、模型、时序和安全的结构信息，不保存消息、提示词、工具或响应格式正文。 |
 | `max_requests` | `null` | 最多保留的请求数；`null` 不剪裁，非负整数启用清理。 |
 | `busy_timeout_ms` | `5000` | SQLite 忙等待时间，须为非负整数。 |
 | `queue_size` | `4096` | 异步写入队列容量，至少为 1；满队列会拒绝新请求。 |
 
-启用后请求、决策、上游结果与配置快照写入 SQLite。写入先进入队列，进程异常退出前尚未提交的数据可能丢失。
+启用后，请求、决策、脱敏后的最终 LiteLLM 请求、上游结果与配置快照写入 SQLite。最终 LiteLLM 请求在 provider 消息转换和 reasoning effort 应用后记录；`api_key`、Authorization/header、凭据特征字段以及 `providers[].param_env` 提供的字段会在入队前脱敏。写入先进入队列，进程异常退出前尚未提交的数据可能丢失。会话仪表盘的保留请求时间线依赖此存储；关闭或降级时仍可查看当前进程中的活动会话和路由信息。
 
 ## `jev`
 

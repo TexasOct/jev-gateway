@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Full backend quality check entry point."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Verify module boundaries and router integration."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify SQLite ownership, migrations, queue ordering, privacy, and failure behavior."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify authentication and storage failure responses."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify no credentials or request content enter logs."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify tests, types, compatibility, and completion commands."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/current-data-surfaces.md","reason":"Check the implementation against verified repository constraints."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/provider-load-service-status.md","reason":"Check the fixed-window provider summary against retained-evidence, neutral-wording, queue, privacy, and degraded-storage constraints."}
+{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/credential-safe-error-policy.md","reason":"Check the fixed upstream-error 502 message, NULL outcomes.error_message, formatter credential masking in pretty/compact/JSON, redact_secret_text behavior, error_type clamping, dashboard serialization, and the deliberate test expectation change against every leak surface."}

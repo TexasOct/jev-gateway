@@ -176,6 +176,8 @@ real warnings through the `LiteLLM` logger.
 - Do not assume arbitrary `extra` keys will be rendered. Add intentional fields
   to the formatter contract and tests.
 - Do not log the exception message if it may contain upstream request content or
-  credentials. Prefer `error_type` and a debug traceback.
+  credentials. Prefer bounded `error_type` and a DEBUG frame-location traceback
+  without exception wording or source lines. A formatter that merely masks
+  recognizable token patterns cannot make arbitrary provider prose safe.
 - Do not call `logging.basicConfig()` from package modules.
 - Do not claim reload applied logging settings. They take effect after restart.
