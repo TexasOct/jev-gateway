@@ -10,7 +10,8 @@ import re
 import threading
 import time
 import warnings
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from json import JSONDecodeError
 from pathlib import Path
@@ -420,7 +421,21 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     """Create the gateway app. Supplying a config makes the app easy to test."""
     active = config or load_gateway_config()
     reload_lock = threading.Lock()
-    app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # Runs after Uvicorn applies the configured formatters, so the operator
+        # actually sees where the dashboard is. Logging this before
+        # ``uvicorn.run`` would be dropped by the default root level.
+        settings = active.engine.catalog.gateway
+        if static_directory().is_dir():
+            logger.info(
+                "dashboard available",
+                extra={"dashboard_url": dashboard_url(settings.host, settings.port)},
+            )
+        yield
+
+    app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0", lifespan=lifespan)
     app.state.jev_config = active
 
     @app.exception_handler(StarletteHTTPException)
@@ -1395,12 +1410,6 @@ def run_gateway() -> None:
 
     settings = app.state.jev_config.engine.catalog.gateway
     suppress_litellm_debug_prints()
-    if static_directory().is_dir():
-        # The dashboard ships with the service: same process, no second server.
-        logger.info(
-            "dashboard available",
-            extra={"dashboard_url": dashboard_url(settings.host, settings.port)},
-        )
     uvicorn.run(
         app,
         host=settings.host,

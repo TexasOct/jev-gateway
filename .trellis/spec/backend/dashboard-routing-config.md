@@ -187,7 +187,10 @@ the bundle. `npm --prefix frontend run lint|test|build` are the frontend gates.
 - `pyproject.toml` declares `[tool.setuptools.package-data]` for
   `jev_gateway/static/**`; the `Dockerfile` rebuilds the bundle in a Node stage
   before `uv build`.
-- `run_gateway()` announces the address with the `dashboard_url` logging field.
+- Startup announces the address through the `dashboard_url` logging field. It must
+  be emitted from the app lifespan: a log call before `uvicorn.run` happens
+  before Uvicorn applies the configured formatters and is dropped by the default
+  root level.
 
 ### 4. Validation & Error Matrix
 
@@ -271,5 +274,10 @@ if assets.is_dir():
 - Do not run `npm ci` in build scripts or images. Vite's rolldown optional native
   bindings are pruned to the platform that generated the lockfile, so `npm ci`
   fails on a different OS/libc. Use `npm install`.
+- Do not log startup announcements before Uvicorn applies `log_config`. Emit them
+  from the lifespan handler, or the operator never sees them.
 - Do not commit a changed `frontend/src` without rebuilding and committing
   `jev_gateway/static/`; `--check` is what catches it.
+- Do not let `frontend/node_modules` reach the Docker build context. `COPY
+  frontend/ ./` would replace the container's musl native bindings with the
+  host's and break the image build, so `.dockerignore` excludes it.

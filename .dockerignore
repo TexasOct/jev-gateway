@@ -14,3 +14,7 @@ dist
 .pi
 .agents
 .venv
+# The image installs its own dependencies; copying the host tree would replace
+# the container's musl native bindings with the host's and break the build.
+frontend/node_modules
+frontend/dist
