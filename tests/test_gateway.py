@@ -865,6 +865,11 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     assert "id=\"providers\"" in shell.text
     assert "provider.has_api_key" in shell.text
     assert "await loadProviders()" in shell.text
+    # The provider table labels every cell so narrow screens can stack rows
+    # instead of clipping the last columns behind a hidden scrollbar.
+    assert "cell.dataset.label" in shell.text
+    assert "attr(data-label)" in shell.text
+    assert "align-content:start" in shell.text
     assert "localStorage" not in shell.text
     assert "sessionStorage" not in shell.text
     assert "document.cookie" not in shell.text
