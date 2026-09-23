@@ -24,13 +24,30 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 
 ## Product references
 
-- [`README.md`](../../../README.md): public API, runtime behavior, and examples
+- [`README.md`](../../../README.md): product entry point, quick start, endpoint
+  quick reference, and documentation index
+- [`README.zh-CN.md`](../../../README.zh-CN.md): Simplified Chinese mirror of
+  `README.md`
 - [`docs/routing-design.md`](../../../docs/routing-design.md): routing contracts,
   strategy behavior, sessions, reasoning, and evidence semantics
 - [`docs/models-config.md`](../../../docs/models-config.md): complete
   `models.json` field reference
+- [`docs/http-api.md`](../../../docs/http-api.md): HTTP endpoint contracts, response
+  headers, error codes, and reload semantics
 - [`docs/local-install.md`](../../../docs/local-install.md): installation and
   operational checks
+
+## Documentation conventions
+
+`README.md` is the canonical English entry point, and `README.zh-CN.md` mirrors
+it. Keep the two in step: identical heading order and levels, identical code
+blocks except translated comments, and identical relative link targets. Change
+the English file first, then follow with the Chinese one.
+
+Deep configuration and behavior detail belongs under `docs/`, one topic per file.
+`README.md` carries the positioning, the quick start, and the shortest useful
+reference, then links out. Keep a topic in exactly one place so the two languages
+cannot drift apart.
 
 ## Pre-development checklist
 
@@ -57,8 +74,8 @@ Before considering a backend change complete:
   relevant.
 - Run `uv run pytest -q` and `uvx pyright`.
 - Run `uv build` when packaging, dependencies, or the entry point may be affected.
-- Update `README.md` or `docs/` when the public routing or configuration contract
-  changes.
+- Update `README.md`, `README.zh-CN.md`, or `docs/` when the public routing or
+  configuration contract changes.
 
 All Trellis spec documentation is written in English to match code comments,
 docstrings, log messages, and errors.

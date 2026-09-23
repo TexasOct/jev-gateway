@@ -107,6 +107,43 @@ configuration field, cover parsing, serialization, runtime behavior, and invalid
 input. For schema evolution, test a database created with the earlier shape.
 For streaming behavior, test both stream consumption and final outcome recording.
 
+## Packaging
+
+`pyproject.toml` declares `license = "AGPL-3.0-or-later"` as a PEP 639 SPDX
+string. That syntax needs `setuptools>=77`, so `build-system.requires` must stay
+at 77 or higher.
+
+> **Warning**: `uv build` runs in an isolated environment that resolves the
+> newest setuptools, so a mismatched floor passes locally and fails for anyone
+> building with a pinned or constrained setuptools. On setuptools 76 the build
+> dies in `build_sdist` with `project.license` must be `file` or `text`.
+
+When you touch the license, the build backend, or the build requirement floor,
+prove the metadata rather than trusting the build exit code:
+
+```bash
+uv build
+python3 - <<'PY'
+import glob, zipfile
+whl = sorted(glob.glob("dist/*.whl"))[-1]
+with zipfile.ZipFile(whl) as z:
+    meta = z.read([n for n in z.namelist() if n.endswith("METADATA")][0]).decode()
+    print("\n".join(l for l in meta.splitlines() if l.startswith("License")))
+    print([n for n in z.namelist() if "LICENSE" in n.upper()])
+PY
+```
+
+The wheel must report `License-Expression: AGPL-3.0-or-later` and package the
+`LICENSE` file. Do not add a `License ::` Trove classifier; PEP 639 deprecates it
+and setuptools 77 or newer rejects it alongside the SPDX `license` field.
+
+To exercise the floor without editing `pyproject.toml`, build with a constraint:
+
+```bash
+printf 'setuptools==76.1.0\n' > /tmp/bc.txt
+uv build --build-constraints /tmp/bc.txt
+```
+
 ## Verification commands
 
 Run commands from the repository root.
