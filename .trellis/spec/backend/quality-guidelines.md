@@ -160,6 +160,22 @@ commands. Pyright is configured by `pyrightconfig.json` for Python 3.10 and
 includes both `jev_gateway` and `tests`. It may be run through `uvx` because it is
 not declared in the development dependency group.
 
+When the change touches `frontend/`, `jev_gateway/static/`, `pyproject.toml`, or
+the `Dockerfile`, add the frontend gates:
+
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run test
+scripts/build-frontend.sh --check
+```
+
+`scripts/build-frontend.sh --check` fails when the committed bundle under
+`jev_gateway/static/` is older than `frontend/src`, which is the guard against
+shipping a stale UI. Run `scripts/build-frontend.sh` (no flag) to rebuild and
+commit the result. See
+[Dashboard and routing configuration](./dashboard-routing-config.md) for the
+serving, CSP, and packaging contracts.
+
 Ruff is not currently configured. You may use `uvx ruff check` as an additional
 local diagnostic, but do not make it a completion requirement or run automatic
 formatting without a repository configuration and an explicit project decision.

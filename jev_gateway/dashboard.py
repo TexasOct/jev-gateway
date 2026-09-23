@@ -1,13 +1,20 @@
-"""Read-only dashboard routes for live sessions and retained routing evidence."""
+"""Read-only dashboard routes and the static asset mount for the operator UI."""
 
 from __future__ import annotations
 
+import ipaddress
+import json
+import os
+import re
+import tempfile
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Protocol
 
 from fastapi import APIRouter, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, Response
+from starlette.staticfiles import StaticFiles
 
 from jev_gateway.records import StorageUnavailableError
 
@@ -16,47 +23,80 @@ class DashboardState(Protocol):
     """Mutable gateway state consumed without importing the composition root."""
 
     gateway_api_key: str | None
+    models_file: Path
     engine: Any
 
 
 Authorize = Callable[[str | None, str | None], None]
+RequireWrite = Callable[[str | None], None]
 
 
 PROVIDER_WINDOW_SECONDS = 900
+DEFAULT_THEME_SEED = "#3b66d9"
+THEME_FILENAME = "dashboard-theme.json"
+_HEX_SEED = re.compile(r"^#[0-9a-f]{3}(?:[0-9a-f]{3})?$", re.IGNORECASE)
+
+# The bundled app needs no inline script, so the script directive stays strict.
+# React writes style attributes and CSS variables, which keeps style-src inline.
+_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+    "connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": _CONTENT_SECURITY_POLICY,
+}
+_IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
+_NO_STORE = "no-store"
 
 
-_DASHBOARD_HTML = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JEV gateway sessions</title>
-<style>
-:root{color-scheme:light dark;--bg:#f5f7fa;--panel:#fff;--text:#17202a;--muted:#637083;--line:#d8dee8;--accent:#3b66d9;--good:#207a4b;--bad:#b33b3b;--code:#edf1f7}
-@media(prefers-color-scheme:dark){:root{--bg:#11151b;--panel:#1a2029;--text:#edf2f7;--muted:#9aa8ba;--line:#344050;--accent:#8da9ff;--good:#65d69c;--bad:#ff8e8e;--code:#111820}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,sans-serif}header{display:flex;gap:1rem;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}h1,h2,h3{margin:.2rem 0}button,input{font:inherit}button{padding:.55rem .8rem;border:1px solid var(--line);border-radius:.45rem;background:var(--panel);color:var(--text);cursor:pointer}button:hover{border-color:var(--accent)}main{display:grid;grid-template-columns:minmax(280px,36%) minmax(0,1fr);gap:1rem;padding:1rem;align-items:start;align-content:start}section{min-width:0}.provider-panel{grid-column:1/-1}.provider-table-wrap{overflow-x:auto}.provider-table{border-collapse:collapse;width:100%;text-align:left}.provider-table th,.provider-table td{padding:.5rem .6rem;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.provider-table th{color:var(--muted);font-weight:600}.provider-table td:first-child{min-width:8rem;overflow-wrap:anywhere}.panel,.card{background:var(--panel);border:1px solid var(--line);border-radius:.7rem;padding:1rem}.sessions{display:grid;grid-template-columns:minmax(0,1fr);gap:.65rem;margin-top:.8rem}.session{display:block;width:100%;min-width:0;overflow:hidden;text-align:left;padding:.8rem}.session.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.route{color:var(--accent);font-weight:650;overflow-wrap:anywhere}.meta,.empty,.storage{color:var(--muted);overflow-wrap:anywhere}.preview{margin:.35rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status-ok{color:var(--good)}.status-bad{color:var(--bad)}.timeline{display:grid;grid-template-columns:minmax(0,1fr);gap:.8rem;margin-top:.8rem}.stage{margin-top:.55rem}details{border-top:1px solid var(--line);padding:.55rem 0}summary{cursor:pointer;font-weight:650}pre{overflow:auto;background:var(--code);padding:.7rem;border-radius:.4rem;white-space:pre-wrap;overflow-wrap:anywhere}.auth{display:none;gap:.5rem;align-items:center}.auth.visible{display:flex}.auth input{min-width:14rem;padding:.55rem;border:1px solid var(--line);border-radius:.4rem;background:var(--panel);color:var(--text)}@media(max-width:760px){main{grid-template-columns:1fr}header{align-items:flex-start;flex-wrap:wrap}.auth{width:100%}.auth input{min-width:0;flex:1}.provider-table thead{display:none}.provider-table tr{display:block;border-bottom:1px solid var(--line);padding:.5rem 0}.provider-table td{display:flex;gap:.75rem;justify-content:space-between;border:0;padding:.2rem 0;min-width:0}.provider-table td::before{content:attr(data-label);color:var(--muted);font-weight:600}}
-</style>
-</head>
-<body>
-<header><div><h1>Gateway sessions</h1><div class="meta">Live process state and retained routing evidence</div></div><form id="auth" class="auth"><input id="key" type="password" autocomplete="off" placeholder="Gateway API key" aria-label="Gateway API key"><button type="submit">Connect</button></form><button id="refresh" type="button">Refresh</button></header>
-<main><section class="panel provider-panel"><h2>Retained outcomes, last 15 minutes</h2><p class="meta">Best-effort evidence may be incomplete after retention, queue loss, or restart. Missing outcomes are not active requests.</p><div id="provider-storage" class="storage"></div><div class="provider-table-wrap"><table class="provider-table"><thead><tr><th>Provider</th><th>Key</th><th>Attempts</th><th>Completed</th><th>Succeeded</th><th>Failed</th><th>Incomplete</th><th>Avg. duration</th><th>Latest result</th><th>Observed</th></tr></thead><tbody id="providers"><tr><td colspan="10">Loading…</td></tr></tbody></table></div></section><section class="panel"><h2>Current sessions</h2><div id="storage" class="storage"></div><div id="sessions" class="sessions"><div class="empty">Loading…</div></div></section><section class="panel"><h2 id="detail-title">Select a session</h2><div id="detail-storage" class="storage"></div><div id="timeline" class="timeline"><div class="empty">Choose a live session to inspect retained requests.</div></div></section></main>
-<script>
-(()=>{'use strict';let apiKey=null,selected=null;const auth=document.getElementById('auth'),key=document.getElementById('key'),sessions=document.getElementById('sessions'),timeline=document.getElementById('timeline'),storage=document.getElementById('storage'),detailStorage=document.getElementById('detail-storage'),detailTitle=document.getElementById('detail-title');
-const text=(tag,value,cls)=>{const node=document.createElement(tag);if(cls)node.className=cls;node.textContent=value;return node};
-const request=async path=>{const headers={};if(apiKey!==null)headers.Authorization='Bearer '+apiKey;const response=await fetch(path,{headers,cache:'no-store'});if(response.status===401){auth.classList.add('visible');key.focus();throw new Error('Authentication required');}if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error?.message||('Request failed: '+response.status));}auth.classList.remove('visible');return response.json()};
-const PROVIDER_COLUMNS=['Provider','Key','Attempts','Completed','Succeeded','Failed','Incomplete','Avg. duration','Latest result','Observed'];
-const storageText=data=>data.evidence_available?'Retained evidence available':('Evidence unavailable'+(data.storage?.error?': '+data.storage.error:''));
-const renderProviders=data=>{const body=document.getElementById('providers');document.getElementById('provider-storage').textContent=storageText(data);body.replaceChildren();if(!data.providers.length){const row=document.createElement('tr');const cell=text('td','No configured providers.','empty');cell.colSpan=10;row.append(cell);body.append(row);return}const conditions={no_recent_data:'No recent data',all_observed_attempts_succeeded:'All observed attempts succeeded',mixed_outcomes:'Mixed outcomes',all_observed_attempts_failed:'All observed attempts failed'};for(const provider of data.providers){const row=document.createElement('tr');const latest=provider.last_outcome_at===null?'—':new Date(provider.last_outcome_at*1000).toLocaleString()+' · '+(provider.last_outcome_ok?'succeeded':'failed');for(const value of [provider.id+' ('+provider.type+')',provider.has_api_key?'Resolved':'Not resolved',provider.attempts,provider.completed,provider.succeeded,provider.failed,provider.incomplete_evidence,provider.average_latency_ms===null?'—':provider.average_latency_ms.toFixed(1)+' ms',latest,provider.observed_condition===null?'Evidence unavailable':conditions[provider.observed_condition]]){const cell=text('td',value===null?'—':String(value));cell.dataset.label=PROVIDER_COLUMNS[row.children.length];row.append(cell)}body.append(row)}};
-const loadProviders=async()=>{try{renderProviders(await request('/v1/routing/providers/summary'))}catch(error){const body=document.getElementById('providers');const row=document.createElement('tr');const cell=text('td',error.message,'empty');cell.colSpan=10;row.append(cell);body.replaceChildren(row)}};
-const showJSON=(name,value,open=false)=>{const box=document.createElement('details');box.open=open;box.append(text('summary',name));box.append(text('pre',value===null?'Not recorded':JSON.stringify(value,null,2)));return box};
-const renderDetail=data=>{detailTitle.textContent=data.session.session_id;detailStorage.textContent=storageText(data);timeline.replaceChildren();if(!data.evidence_available){timeline.append(text('div','Live session data is available, but retained request evidence cannot be queried.','empty'));return}if(!data.requests.length){timeline.append(text('div','No retained requests for this live session.','empty'));return}for(const item of data.requests){const card=text('article','', 'card');const req=item.request;card.append(text('h3',new Date(req.received_at*1000).toLocaleString()));card.append(text('div',req.request_id+' · '+(item.outcome===null?'pending':item.outcome.ok?'succeeded':'failed'),'meta'));card.append(showJSON('1. Inbound request',req,true));card.append(showJSON('2. Routing decision',item.decision));card.append(showJSON('3. LiteLLM request',item.upstream_request));card.append(showJSON('Outcome',item.outcome));timeline.append(card)}};
-const loadDetail=async()=>{if(!selected)return;try{renderDetail(await request('/v1/routing/sessions/'+encodeURIComponent(selected)+'/requests'))}catch(error){timeline.replaceChildren(text('div',error.message,'empty'))}};
-const renderSessions=data=>{storage.textContent=storageText(data);sessions.replaceChildren();if(!data.data.length){sessions.append(text('div','No live sessions.','empty'));return}for(const session of data.data){const button=text('button','', 'session'+(session.session_id===selected?' active':''));button.type='button';button.append(text('div',session.route||'Route unavailable','route'));button.append(text('div',session.session_id,'meta'));const latest=session.latest_request;button.append(text('div',latest?(latest.content_captured?(latest.prompt||'Empty user message'):'Content not captured'):'No retained request','preview'));button.append(text('div',[session.strategy||'strategy unavailable',session.label||'label unavailable',session.provider&&session.upstream_model?session.provider+'/'+session.upstream_model:'provider unavailable',session.turn_count+' turn'+(session.turn_count===1?'':'s'),latest?.ok===true?'succeeded':latest?.ok===false?'failed':'pending'].join(' · '),'meta'));button.addEventListener('click',()=>{selected=session.session_id;renderSessions(data);loadDetail()});sessions.append(button)}};
-const refresh=async()=>{await loadProviders();try{const data=await request('/v1/routing/sessions');if(selected&&!data.data.some(item=>item.session_id===selected)){selected=null;detailTitle.textContent='Select a session';timeline.replaceChildren(text('div','The selected session is no longer live.','empty'))}renderSessions(data);await loadDetail()}catch(error){sessions.replaceChildren(text('div',error.message,'empty'))}};
-auth.addEventListener('submit',event=>{event.preventDefault();apiKey=key.value;key.value='';refresh()});document.getElementById('refresh').addEventListener('click',refresh);refresh();})();
-</script>
-</body>
-</html>"""
+class DashboardStatic(StaticFiles):
+    """Serve the built frontend with tightened headers and a split cache policy.
+
+    Vite emits content-hashed asset names, so those can be cached forever while
+    ``index.html`` must never be, or a new build would never reach a browser.
+    """
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        for name, value in _SECURITY_HEADERS.items():
+            response.headers[name] = value
+        response.headers["Cache-Control"] = (
+            _NO_STORE if _is_document(path) else _IMMUTABLE_CACHE
+        )
+        return response
+
+
+def _is_document(path: str) -> bool:
+    normalized = path.replace("\\", "/").lstrip("/")
+    return normalized in {"", ".", "index.html"} or normalized.endswith("/index.html")
+
+
+def static_directory() -> Path:
+    """Return the packaged build directory for the dashboard assets."""
+    return Path(__file__).resolve().parent / "static"
+
+
+def browsable_host(host: str) -> str:
+    """Return a host an operator can actually open in a browser.
+
+    A bind to an unspecified address (IPv4 or IPv6) serves every interface, which
+    is not a browsable address, so it is displayed as loopback.
+    """
+    candidate = host.strip().strip("[]")
+    try:
+        if ipaddress.ip_address(candidate).is_unspecified:
+            return "127.0.0.1"
+    except ValueError:
+        return host
+    return host
+
+
+def dashboard_url(host: str, port: int) -> str:
+    """Return the dashboard address for the bound host and port."""
+    return f"http://{browsable_host(host)}:{port}/dashboard"
 
 
 def _storage_state(state: DashboardState) -> tuple[dict[str, Any], bool]:
@@ -94,25 +134,100 @@ def _unknown_session(session_id: str) -> HTTPException:
     )
 
 
-def create_dashboard_router(state: DashboardState, authorize: Authorize) -> APIRouter:
+def theme_path(models_file: Path) -> Path:
+    """Return the theme file beside the active models file."""
+    return models_file.parent / THEME_FILENAME
+
+
+def read_theme(models_file: Path) -> tuple[dict[str, Any], str | None]:
+    """Return the stored theme, or the default, plus an unreadable-file reason."""
+    path = theme_path(models_file)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"version": 1, "seed": DEFAULT_THEME_SEED}, None
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {"version": 1, "seed": DEFAULT_THEME_SEED}, "Could not load dashboard theme."
+    try:
+        validated = validate_theme_shape(document)
+    except (TypeError, ValueError):
+        return {"version": 1, "seed": DEFAULT_THEME_SEED}, "Invalid dashboard theme."
+    return validated, None
+
+
+def validate_theme_shape(value: Any) -> dict[str, Any]:
+    """Reject unknown keys and anything that is not a hex seed."""
+    if not isinstance(value, dict):
+        raise TypeError("Theme payload must be an object.")
+    unknown = set(value) - {"version", "seed"}
+    if unknown:
+        raise ValueError(f"Theme payload has unknown keys: {', '.join(sorted(unknown))}.")
+    version = value.get("version", 1)
+    if type(version) is not int or version != 1:
+        raise ValueError("Theme payload version must be 1.")
+    seed = value.get("seed")
+    if not isinstance(seed, str) or not _HEX_SEED.match(seed.strip()):
+        raise ValueError("Theme seed must be a hex color such as #3b66d9.")
+    return {"version": 1, "seed": seed.strip().lower()}
+
+
+def write_theme(models_file: Path, seed: str) -> dict[str, Any]:
+    """Persist one seed atomically next to the active models file."""
+    document = validate_theme_shape({"version": 1, "seed": seed})
+    path = theme_path(models_file)
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent,
+            prefix=f".{path.name}.", delete=False,
+        ) as stream:
+            temporary = stream.name
+            stream.write(json.dumps(document, ensure_ascii=False, indent=2) + "\n")
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+    return document
+
+
+def remove_theme(models_file: Path) -> bool:
+    """Delete the theme file, reporting whether one was present."""
+    path = theme_path(models_file)
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def create_dashboard_router(
+    state: DashboardState, authorize: Authorize, require_write: RequireWrite
+) -> APIRouter:
     """Create dashboard routes bound to mutable gateway state."""
     router = APIRouter()
 
-    @router.get("/dashboard", response_class=HTMLResponse)
-    def dashboard() -> HTMLResponse:
-        return HTMLResponse(
-            _DASHBOARD_HTML,
-            headers={
-                "Cache-Control": "no-store",
-                "X-Content-Type-Options": "nosniff",
-                "Referrer-Policy": "no-referrer",
-                "Content-Security-Policy": (
-                    "default-src 'none'; style-src 'unsafe-inline'; "
-                    "script-src 'unsafe-inline'; connect-src 'self'; "
-                    "img-src 'self'; base-uri 'none'; form-action 'self'; "
-                    "frame-ancestors 'none'"
-                ),
-            },
+    @router.get("/dashboard", response_class=FileResponse)
+    def dashboard_shell() -> FileResponse:
+        """Serve the built shell without the trailing-slash redirect.
+
+        The static mount serves hashed assets under /dashboard/assets; this route
+        keeps GET /dashboard itself a 200, as it was before the bundled build.
+        """
+        index = static_directory() / "index.html"
+        if not index.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": {
+                        "message": "Dashboard assets are not built in this install.",
+                        "type": "invalid_request_error",
+                        "param": None,
+                        "code": "dashboard_not_built",
+                    }
+                },
+            )
+        return FileResponse(
+            index, headers={**_SECURITY_HEADERS, "Cache-Control": _NO_STORE}
         )
 
     @router.get("/v1/routing/providers/summary", response_model=None)
@@ -242,5 +357,53 @@ def create_dashboard_router(state: DashboardState, authorize: Authorize) -> APIR
             "evidence_available": evidence_available,
             "requests": retained if evidence_available else [],
         }
+
+    @router.get("/v1/dashboard/theme", response_model=None)
+    def dashboard_theme(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        authorize(state.gateway_api_key, authorization)
+        document, error = read_theme(state.models_file)
+        return {**document, "read_error": error}
+
+    @router.put("/v1/dashboard/theme", response_model=None)
+    def save_dashboard_theme(
+        body: dict[str, Any],
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_write(authorization)
+        try:
+            document = validate_theme_shape(body)
+            write_theme(state.models_file, document["seed"])
+        except (TypeError, ValueError) as error:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": {
+                        "message": str(error),
+                        "type": "invalid_request_error",
+                        "param": "seed",
+                        "code": "invalid_theme",
+                    }
+                },
+            ) from error
+        except OSError as error:
+            raise HTTPException(
+                status_code=500,
+                detail={"error": {
+                    "message": "Could not save dashboard theme.",
+                    "type": "invalid_request_error", "param": None,
+                    "code": "theme_write_failed",
+                }},
+            ) from error
+        return document
+
+    @router.delete("/v1/dashboard/theme", response_model=None)
+    def reset_dashboard_theme(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_write(authorization)
+        removed = remove_theme(state.models_file)
+        return {"version": 1, "seed": DEFAULT_THEME_SEED, "removed": removed}
 
     return router

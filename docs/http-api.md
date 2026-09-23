@@ -30,7 +30,7 @@ returns `401`, keeps it in JavaScript memory, and sends it through the
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness and configuration snapshot: status, catalog names, policy mode, default strategy, registered strategies, session strategy, storage state, live session count. |
-| `GET` | `/dashboard` | Self-contained HTML dashboard shell. |
+| `GET` | `/dashboard` | Bundled operator UI (a Vite build shipped inside the package) served by the gateway process itself. |
 | `GET` | `/v1/models` | OpenAI model list: registered strategy names first, then concrete catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot plus `session_strategy`. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and their policies. |
@@ -41,6 +41,13 @@ returns `401`, keeps it in JavaScript memory, and sends it through the
 | `GET` | `/v1/routing/sessions/{session_id}` | Live snapshot for one session. |
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | Live snapshot plus retained request evidence, newest first. |
 | `GET` | `/v1/routing/providers/summary` | Configured providers and retained attempts in a fixed rolling 15-minute window. |
+| `GET` | `/v1/routing/configuration` | Editable routing surface: rule order, labels and their pools, every model with tags and priority, plus overlay state. |
+| `POST` | `/v1/routing/configuration/validate` | Validate an overlay payload against the full catalog pipeline without applying it. |
+| `PUT` | `/v1/routing/configuration` | Validate an overlay payload, write it beside `models.json`, and reload. |
+| `DELETE` | `/v1/routing/configuration` | Remove the overlay and reload the baseline `models.json`. |
+| `GET` | `/v1/dashboard/theme` | Stored theme seed, or the default when no file exists. |
+| `PUT` | `/v1/dashboard/theme` | Store one hex seed for the dashboard palette. |
+| `DELETE` | `/v1/dashboard/theme` | Remove the stored seed and return to the default palette. |
 | `POST` | `/v1/chat/completions` | OpenAI-compatible chat completion, routed through a strategy. |
 
 `GET /healthz` returns HTTP `200` with `status: "degraded"` when the record store
@@ -64,6 +71,42 @@ The dashboard reads `GET /v1/routing/sessions`,
 session list still shows live state, and session detail returns an empty request
 list when evidence is unavailable. The requests route accepts slashes in session
 IDs (`{session_id:path}` internally); the single-session snapshot route does not.
+
+The built app is mounted at `/dashboard` and comes up with the service: the same
+process serves it, there is no second server to start. `GET /dashboard` returns
+the shell with `Cache-Control: no-store`; hashed assets under
+`/dashboard/assets/` are immutable. The page needs no inline script, so
+`Content-Security-Policy` keeps `script-src 'self'`. Its browser bundle keeps the
+gateway key in memory only and never writes it to a URL, cookie, or browser
+store. When the assets are missing from the install, `/dashboard` returns `404`
+with `dashboard_not_built` and startup logs a warning.
+
+## Configuration writes
+
+`POST /v1/routing/reload` rereads the catalog and any existing overlay; it keeps
+its existing authentication behavior and does not write either file. The routing
+`PUT`/`DELETE` routes change live routing and write or remove
+`routing-overrides.json` beside the active `models.json`. Theme `PUT`/`DELETE`
+routes write or remove `dashboard-theme.json` in the same directory.
+`models.json` is never rewritten by the gateway.
+
+Routing overlays are validated before they touch disk. The overlay is merged into the
+`models.json` document and passed through the normal parser and strategy
+registry, so an edit that would leave a label without a model, name an unknown
+label or selection mode, or change storage settings is rejected with the parser's
+own message and the active catalog is left alone. A write that fails after the
+file was replaced restores the previous content and reloads the previous catalog,
+then returns `500 overlay_apply_failed`. Each applied change registers a
+`config_versions` row, so the applied catalog is auditable by hash.
+
+Dashboard routing and theme writes require a configured `gateway.api_key_env`.
+Without one, these write routes return `403 config_writes_disabled`; this is deliberate,
+because the Bearer check is a no-op when no key is configured and would otherwise
+let any reachable client mutate routing. Read routes keep working without a key,
+as they do today.
+
+The overlay shape and merge rules are documented in
+[`models-config.md`](./models-config.md).
 
 ## Strategy selection
 
@@ -131,13 +174,17 @@ Errors use the OpenAI envelope:
 | `400` | `unknown_strategy` | Preview's `strategy` array is empty or names an unregistered strategy. |
 | `400` | `missing_user_message` | No non-empty user message is present. |
 | `400` | `null` | Malformed JSON or Pydantic request validation failed. |
-| `400` | `invalid_configuration` | Reload rejects the file contents. |
+| `400` | `invalid_configuration` | Reload, validate, or apply rejected the file contents. |
+| `400` | `invalid_theme` | Theme payload is not a hex seed, or carries unknown keys. |
 | `400` | `restart_required` | Reload changes storage settings. |
 | `401` | `invalid_api_key` | Missing or wrong Bearer token. |
+| `403` | `config_writes_disabled` | A configuration write was attempted with no `gateway.api_key_env` configured. |
+| `404` | `dashboard_not_built` | The dashboard assets are absent from this install. |
 | `404` | `model_not_found` | `model` is neither a strategy nor a catalog model. |
 | `404` | `unknown_decision` | Decision ID is not in the in-memory log. |
 | `404` | `unknown_session` | Session ID is not live. |
 | `500` | `catalog_mismatch` | A routed model disappeared from the catalog. |
+| `500` | `overlay_apply_failed` | The overlay could not be written or applied; the previous catalog was restored. |
 | `502` | `upstream_error` | Upstream call failed before a response began; `type` is a bounded exception type. |
 | `503` | `storage_unavailable` | Reload cannot reach the record store. |
 
