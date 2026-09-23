@@ -5,15 +5,17 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from jev_gateway.catalog import Catalog, StrategyDefinition
+from jev_gateway.decision_provider import DecisionClient
 
 from .contracts import RoutingStrategy, UnknownStrategyError
-from .jev import JevClassifier, JevStrategy
-from .matrix import build_jev_matrix_strategy
+from .classifier import DecisionClassifier, DecisionStrategy
+from .matrix import DecisionMatrixStrategy
 from .policy import PolicyStrategy
 
 __all__ = [
     "StrategyFactory",
     "StrategyRegistry",
+    "build_decision_matrix_strategy",
     "register_strategy_kind",
     "registered_strategy_kinds",
 ]
@@ -29,25 +31,34 @@ def _policy_factory(
     )
 
 
-def _jev_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStrategy:
-    return JevStrategy(
+def _decision_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStrategy:
+    return DecisionStrategy(
         definition.name,
         definition.policy,
-        JevClassifier(catalog.decision),
+        DecisionClassifier(DecisionClient(catalog.decision)),
         definition.description,
     )
 
 
+def build_decision_matrix_strategy(
+    definition: StrategyDefinition, catalog: Catalog
+) -> DecisionMatrixStrategy:
+    return DecisionMatrixStrategy(
+        definition.name, definition.policy, DecisionClient(catalog.decision),
+        definition.options, definition.description,
+    )
+
+
 def _auto_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStrategy:
-    factory = _jev_factory if catalog.decision.providers else _policy_factory
+    factory = _decision_factory if catalog.decision.providers else _policy_factory
     return factory(definition, catalog)
 
 
 _FACTORIES: dict[str, StrategyFactory] = {
     "auto": _auto_factory,
     "policy": _policy_factory,
-    "jev": _jev_factory,
-    "jev_matrix": build_jev_matrix_strategy,
+    "decision": _decision_factory,
+    "decision_matrix": build_decision_matrix_strategy,
 }
 
 

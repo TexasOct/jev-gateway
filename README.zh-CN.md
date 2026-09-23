@@ -93,7 +93,9 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 {"model": "quality", "messages": [{"role": "user", "content": "评审一下这份设计。"}]}
 ```
 
-每个策略从顶层 `policy` 块继承设置，并可按需覆盖 `selection`、`mode`、`labels` 与推理规则。内置模式有 `sticky`、`cached`、`escalate`、`adaptive` 和 `fresh`；可显式选择 `policy`、`jev` 和 `jev_matrix` 这三种内置策略类型（后两者是决策型策略的兼容名称）。写入 `openai/gpt-5.6-sol` 这样的完整目录模型 ID，则直接选择该模型。省略 `kind` 时使用 `auto` 分派，详见设计文档。
+每个策略从顶层 `policy` 块继承设置，并可按需覆盖 `selection`、`mode`、`labels` 与推理规则。内置模式有 `sticky`、`cached`、`escalate`、`adaptive` 和 `fresh`；可显式选择 `policy`、`decision` 和 `decision_matrix` 这三种内置策略类型。旧的 `jev` 和 `jev_matrix` 类型已移除，现有配置需在启动前更新。写入 `openai/gpt-5.6-sol` 这样的完整目录模型 ID，则直接选择该模型。省略 `kind` 时使用 `auto` 分派，详见设计文档。
+
+这是旧配置与 Python 调用方需要处理的破坏性变更：顶层 `jev` 必须改为 `decision`，`sources` / `default_source` 改为 `providers` / `default_provider`，并显式填写协议。`JevSettings`、`JevSource`、`jev_from_dict`、`Catalog.jev`、`JevClient`、`JevClassifier`、`JevStrategy`、`JevMatrixStrategy`，以及 `DecisionSettings.default_source` / `.sources` 访问器均已移除。记录原因的前缀从 `jev:`、`jev_matrix:` 改为 `decision:`、`decision_matrix:`，`X-JEV-Reason` 响应头名称不变。迁移细节见[配置文档](docs/models-config.md)。
 
 只有请求体的 `model` 字段能选择策略：`?strategy=` 会返回 `400`，请求头 `X-JEV-Strategy` 不参与选择。设计与配置细节见 [`docs/routing-design.md`](docs/routing-design.md)。
 

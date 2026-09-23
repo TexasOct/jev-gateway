@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend ownership and public documentation conventions"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Strategy module ownership and registry import boundary"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "Normalized decision contract and failover semantics"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Python typing and required verification"}

@@ -90,7 +90,7 @@ uv run jev-gateway
 | `budget.context_pressure_ratio` | `0.75` | 当前模型上下文使用量超过窗口的该比例时，触发上下文压力检查。 |
 | `reasoning` | 见下文 | 选定模型之后如何决定思考档位。 |
 
-紧凑格式中，`strategies` 的每个同级键都是策略名和 OpenAI API 的虚拟模型名。`strategies.task_aware` 必须存在，并且是默认虚拟模型；例如 `model: "quality"` 选择 `strategies.quality`，`model: "task_aware"` 选择默认策略。provider 限定的具体模型 ID 仍表示手动指定。可以同时定义任意多个策略，每个策略只写与顶层策略不同的字段，并可声明自己的完整标签集合。每项还可选填 `description` 和 `kind`。请求只能通过 JSON body 的 `model` 字段选择策略；`?strategy=` 会返回 `400 unsupported_parameter`，`X-JEV-Strategy` 请求头不参与选择。已废除的 `auto`、`jev-auto` 仍是保留名称，不能配置为策略名；请求它们会返回 `404 model_not_found`。策略名也不得与具体模型 ID 重名。旧的 `default`/`definitions` 包装格式仍可读取，但默认项省略时使用 `task_aware`。
+紧凑格式中，`strategies` 的每个同级键都是策略名和 OpenAI API 的虚拟模型名。`strategies.task_aware` 必须存在，并且是默认虚拟模型；例如 `model: "quality"` 选择 `strategies.quality`，`model: "task_aware"` 选择默认策略。provider 限定的具体模型 ID 仍表示手动指定。可以同时定义任意多个策略，每个策略只写与顶层策略不同的字段，并可声明自己的完整标签集合。每项还可选填 `description` 和 `kind`：显式类型为 `policy`、`decision` 或 `decision_matrix`，省略时使用 `auto`。请求只能通过 JSON body 的 `model` 字段选择策略；`?strategy=` 会返回 `400 unsupported_parameter`，`X-JEV-Strategy` 请求头不参与选择。已废除的 `auto`、`jev-auto` 仍是保留名称，不能配置为策略名；请求它们会返回 `404 model_not_found`。策略名也不得与具体模型 ID 重名。旧的 `default`/`definitions` 包装格式仍可读取，但默认项省略时使用 `task_aware`。
 
 ### `scoring` 与 `signals`
 
@@ -172,9 +172,9 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 `capabilities.reasoning` 与 `capabilities.reasoning_effort` 回答两个不同的问题：前者用于筛选需要推理的请求，后者只描述该路由认得的档位。想在不被当作“推理模型”的便宜路由上压低思考开销时，只填 `reasoning_effort`（例如 `["none"]`）即可。
 
-### `jev_matrix`：如何定义规则
+### `decision_matrix`：如何定义规则
 
-`kind: "jev_matrix"` 的策略把配置放在 `strategies.<名称>.options` 里，只接受 `questions`、`rules`、`fallback` 三个键，多写一个键会在加载时报错。它把决策提供方的回答当作策略选择，而不是模型名：每个问题是一道单选题，`rules` 按顺序把答案映射成 `label` 和/或 `selection`。
+`kind: "decision_matrix"` 的策略把配置放在 `strategies.<名称>.options` 里，只接受 `questions`、`rules`、`fallback` 三个键，多写一个键会在加载时报错。它把决策提供方的回答当作策略选择，而不是模型名：每个问题是一道单选题，`rules` 按顺序把答案映射成 `label` 和/或 `selection`。
 
 | 字段 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -194,7 +194,7 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 ```json
 {
-  "kind": "jev_matrix",
+  "kind": "decision_matrix",
   "options": {
     "questions": {
       "risk": {
@@ -232,7 +232,7 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 匹配从第一条规则开始，命中即停止，`reason` 按顺序记为 `rule_1`、`rule_2`。`when` 里没提到的问题不参与判断。所有规则都不命中时 `reason` 为 `default`，选择回落到本地信号等级和策略原本的 `selection`。`fallback` 只在拿不到可用答案时生效：决策提供方未启用或调用失败，或者回答缺少任一问题、给了 `criteria` 之外的标签，整组答案作废并记为 `fallback`。
 
-`select.label` 设置本次策略标签，`select.tier` 只是它的输入兼容别名；两者都不会改写本地兼容信号里的 `tier`、`base_tier` 或 `score_tier`。`select.selection` 只替换这个策略本次的排序方式。所选标签的模型池仍会经过能力、上下文窗口和输出上限筛选。决策记录与 `X-JEV-Reason` 以 `jev_matrix:<来源>:<rule_N|default|fallback>` 开头，后面接实际选择原因，来源取命中的 `decision.providers[].id` 或 `local`。
+`select.label` 设置本次策略标签，`select.tier` 只是它的输入兼容别名；两者都不会改写本地兼容信号里的 `tier`、`base_tier` 或 `score_tier`。`select.selection` 只替换这个策略本次的排序方式。所选标签的模型池仍会经过能力、上下文窗口和输出上限筛选。决策记录与 `X-JEV-Reason` 以 `decision_matrix:<来源>:<rule_N|default|fallback>` 开头，后面接实际选择原因，来源取命中的 `decision.providers[].id` 或 `local`。
 
 `mode: "cached"` 只在会话首轮提问，后续轮次直接复用会话已存的标签与模型；手动指定模型的请求不提问，直接走策略原本的选择逻辑。`options` 在加载时校验：问题必须是非空的 `choice` 对象且至少两个 `criteria`，规则必须是恰好含 `when` 和 `select` 的对象，`when` 的键必须是已声明的问题、值必须是该问题的标签，`select.label`（或兼容的 `select.tier`）必须属于当前策略，`selection` 必须是已支持的排序方式。任一项写错都会在加载时直接报错。
 
@@ -314,7 +314,7 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 例如，`models.example.json` 禁用外部决策并使用不带模型名的通用端点。启用时按实际端点填写地址和密钥环境变量；若端点要求模型名，再显式设置 `model`。不要把密钥明文放进 JSON。
 
-旧顶层键 `jev` 仍可读取：`sources` 和 `default_source` 分别转换为 `providers` 和 `default_provider`，协议为 `system_one`；旧来源省略 `model` 时保留原有默认模型。不能同时声明 `decision` 和 `jev`。配置快照只显示规范化的 `decision`。
+旧顶层键 `jev` 已移除，配置中必须使用 `decision`：将 `sources` 改为 `providers`、`default_source` 改为 `default_provider`，并为每个提供方显式填写 `protocol: "system_one"`。若旧端点依赖原先省略 `model` 时的默认值，还需显式填写 `model`；新配置不会代填。旧策略类型 `jev`、`jev_matrix` 也已移除，分别改用 `decision`、`decision_matrix`。旧分类器前缀 `jev:` 和矩阵前缀 `jev_matrix:` 分别改为 `decision:` 和 `decision_matrix:`；`X-JEV-Reason` 响应头名称不变。
 
 ## 检查配置
 

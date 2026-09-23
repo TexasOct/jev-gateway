@@ -8,12 +8,13 @@ from dataclasses import replace
 import httpx
 import pytest
 
-from jev_gateway.catalog import JevSettings, JevSource, catalog_from_document
+from jev_gateway.catalog import DecisionSettings, DecisionProvider, catalog_from_document
 from jev_gateway.decision import RoutingEngine
+from jev_gateway.decision_provider import DecisionClient
 from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.signals import extract_signals
 from jev_gateway.strategy import (
-    JevClassifier,
+    DecisionClassifier,
     PolicyStrategy,
     RoutingRequest,
     StrategyRegistry,
@@ -227,11 +228,11 @@ def test_fresh_mode_updates_label_when_model_does_not_change() -> None:
     assert second.switched_from is None
 
 
-def test_jev_criteria_use_active_labels(monkeypatch) -> None:
+def test_decision_criteria_use_active_labels(monkeypatch) -> None:
     document = custom_document()
     catalog = catalog_from_document(document, "test")
-    settings = JevSettings(True, sources=(JevSource("test", "https://example.com", "JEV_TEST_KEY"),))
-    classifier = JevClassifier(settings)
+    settings = DecisionSettings(True, providers=(DecisionProvider("test", "https://example.com", "JEV_TEST_KEY"),))
+    classifier = DecisionClassifier(DecisionClient(settings))
     classifier.policy = catalog.policy
     monkeypatch.setenv("JEV_TEST_KEY", "token")
     seen = []

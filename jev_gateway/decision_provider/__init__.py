@@ -29,6 +29,14 @@ class DecisionClient:
     def __init__(self, settings: DecisionSettings) -> None:
         self.settings = settings
 
+    @property
+    def enabled(self) -> bool:
+        return self.settings.enabled
+
+    def describe(self) -> dict[str, Any]:
+        """Return non-secret decision settings for strategy descriptions."""
+        return self.settings.as_dict()
+
     def evaluate(
         self,
         state: str | dict[str, Any],

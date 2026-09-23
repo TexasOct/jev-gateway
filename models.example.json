@@ -26,7 +26,7 @@
   },
   "strategies": {
     "task_aware": {
-      "kind": "jev_matrix",
+      "kind": "decision_matrix",
       "mode": "fresh",
       "description": "Routes by purpose and scale: research, documentation, review, and bounded coding run on DeepSeek, shippable small and mid-size coding runs on Luna, large coding and reverse engineering run on Sol, and only cross-domain ultra-complex work reaches the reserved ultra tier.",
       "reasoning": {

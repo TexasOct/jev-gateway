@@ -102,8 +102,10 @@ Every named strategy is also a virtual model name. Send the strategy name in the
 
 Each strategy inherits its settings from the top-level `policy` block and can override `selection`,
 `mode`, `labels`, and reasoning rules. Built-in modes are `sticky`, `cached`, `escalate`,
-`adaptive`, and `fresh`. Explicit built-in strategy kinds are `policy`, `jev`, and `jev_matrix` (the latter two are compatibility names for decision-backed strategies). A concrete
+`adaptive`, and `fresh`. Explicit built-in strategy kinds are `policy`, `decision`, and `decision_matrix`. The former `jev` and `jev_matrix` kinds have been removed; update existing catalogs before starting the gateway. A concrete
 catalog model ID such as `openai/gpt-5.6-sol` selects that model directly. Omitted `kind` uses `auto` dispatch; see the design reference.
+
+This is a breaking change for old catalogs and Python callers. Replace the top-level `jev` key with `decision` and update `sources` / `default_source` to `providers` / `default_provider` with an explicit protocol. `JevSettings`, `JevSource`, `jev_from_dict`, `Catalog.jev`, `JevClient`, `JevClassifier`, `JevStrategy`, `JevMatrixStrategy`, and the `DecisionSettings.default_source` / `.sources` accessors are gone. Recorded reasons now use `decision:` or `decision_matrix:` instead of `jev:` or `jev_matrix:`; the `X-JEV-Reason` header name is unchanged. See [the configuration migration notes](docs/models-config.md).
 
 Only the request-body `model` field selects a strategy. `?strategy=` returns `400`, and the
 `X-JEV-Strategy` request header is ignored for selection. Design and configuration details:

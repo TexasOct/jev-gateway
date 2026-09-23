@@ -3,19 +3,39 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from jev_gateway.catalog import Catalog, ModelProfile
+from jev_gateway.decision_provider.base import DecisionResult
 from jev_gateway.sessions import SessionState
 from jev_gateway.signals import RequestSignals, ScoringPolicy
 
 __all__ = [
+    "DecisionMaker",
     "RoutingRequest",
     "RoutingStrategy",
     "StrategyContractError",
     "StrategyOutcome",
     "UnknownStrategyError",
 ]
+
+
+class DecisionMaker(Protocol):
+    """Provider-neutral typed-answer capability consumed by strategies."""
+
+    @property
+    def enabled(self) -> bool: ...
+
+    def describe(self) -> dict[str, Any]: ...
+
+    def evaluate(
+        self,
+        state: str | dict[str, Any],
+        questions: dict[str, Any],
+        *,
+        valid: Callable[[dict[str, Any]], bool] | None = None,
+    ) -> DecisionResult | None: ...
 
 
 class UnknownStrategyError(ValueError):

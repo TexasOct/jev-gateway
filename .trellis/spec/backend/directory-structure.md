@@ -41,11 +41,11 @@ jev_gateway/
 │   └── deepseek.py          # DeepSeek continuation adapter
 └── strategy/
     ├── __init__.py          # Strategy facade
-    ├── contracts.py         # RoutingStrategy and immutable request/outcome types
-    ├── registry.py          # Strategy kind registration and construction
+    ├── contracts.py         # RoutingStrategy, DecisionMaker, request/outcome types
+    ├── registry.py          # Strategy kinds and concrete client construction
     ├── policy.py            # Built-in policy strategy
-    ├── jev.py               # Classifier and legacy JevClient wrapper
-    └── matrix.py            # Typed-choice matrix strategy
+    ├── classifier.py        # DecisionClassifier and DecisionStrategy
+    └── matrix.py            # DecisionMatrixStrategy and local rules
 
 tests/
 ├── conftest.py              # Shared pytest fixtures
@@ -85,8 +85,8 @@ handlers.
 2. Implement the `RoutingStrategy` contract from `strategy/contracts.py`.
 3. Register its `kind` through `strategy/registry.py`.
 4. Re-export public contracts from `strategy/__init__.py` when callers need them.
-5. Add focused tests such as `tests/test_jev_strategy.py` or
-   `tests/test_jev_matrix.py`.
+5. Add focused tests such as `tests/test_decision_strategy.py` or
+   `tests/test_decision_matrix.py`.
 
 `RoutingEngine` imports the `strategy` facade rather than concrete strategy
 modules. A new strategy must not require strategy-specific branches in the
@@ -101,8 +101,10 @@ engine.
 4. Add transport, malformed-response, and failover tests in
    `tests/test_decision_provider.py`.
 
-`DecisionClient` owns provider ordering and credentials. Strategies consume
-`DecisionResult` and must not parse a provider's HTTP response themselves.
+`DecisionClient` owns provider ordering and credentials. The registry is the
+sole strategy-side construction point for it. Classifier and matrix strategies
+consume only the `DecisionMaker` protocol and normalized `DecisionResult`, never
+provider settings or raw HTTP responses.
 The `provider/` package below is for chat continuation, not routing decisions.
 
 ### Add a provider continuation adapter
@@ -125,9 +127,10 @@ record store.
 
 ## Import boundaries
 
-- `strategy/*` may depend on catalog types because strategies compare catalog
-  models and policy settings. Strategies call the `decision_provider` facade,
-  not individual protocol adapters.
+- Strategies may depend on catalog models and policy settings. Decision-backed
+  strategies use `DecisionMaker` from `strategy/contracts.py`; only
+  `strategy/registry.py` constructs `DecisionClient`. No strategy imports
+  individual protocol adapters.
 - `decision.py` consumes the public `strategy` facade.
 - `gateway.py` consumes `RoutingEngine` and the public `provider` facade. It does
   not select concrete strategy or provider implementations directly.
@@ -145,7 +148,7 @@ record store.
   `_resolve_storage_path()`, `_FACTORIES`, and `_ADAPTERS`.
 - Canonical model IDs use `provider/upstream_model`.
 - Strategy `kind` values use lowercase snake case, for example `policy` and
-  `jev_matrix`.
+  `decision_matrix`. Old `jev` and `jev_matrix` kinds are not registered.
 - Tests use `tests/test_<module-or-feature>.py` and function names beginning with
   `test_` that state the expected behavior.
 

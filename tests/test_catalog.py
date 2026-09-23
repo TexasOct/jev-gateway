@@ -10,6 +10,7 @@ import pytest
 
 from jev_gateway.catalog import (
     Catalog,
+    DecisionSettings,
     ModelProfile,
     RoutingMode,
     catalog_from_document,
@@ -50,21 +51,28 @@ def test_decision_providers_parse_without_implicit_model_and_serialize_safely(mo
     assert "private-decision-token" not in repr(catalog.decision)
 
 
-def test_legacy_decision_alias_preserves_effective_model() -> None:
+@pytest.mark.parametrize("alongside_decision", [False, True])
+def test_legacy_decision_key_is_rejected(alongside_decision: bool) -> None:
     document = single_route_document()
-    document["jev"] = {"enabled": True, "default_source": "primary", "sources": [
-        {"id": "primary", "api_base": "https://decision.example/evaluate", "api_key_env": "TEST_DECISION_KEY"}
-    ]}
-    catalog = catalog_from_document(document, "test catalog")
-    assert catalog.jev is catalog.decision
-    assert catalog.decision.providers[0].protocol == "system_one"
-    assert catalog.decision.providers[0].model == "typesafe/jev-1.13"
-    assert catalog.as_dict()["decision"]["default_provider"] == "primary"
-    assert "jev" not in catalog.as_dict()
+    document["jev"] = {}
+    if alongside_decision:
+        document["decision"] = {}
+    with pytest.raises(ValueError, match="unknown keys: jev"):
+        catalog_from_document(document, "test catalog")
+
+
+def test_legacy_catalog_python_names_are_removed() -> None:
+    import jev_gateway.catalog as catalog_module
+
+    for name in ("JevSettings", "JevSource", "jev_from_dict"):
+        assert not hasattr(catalog_module, name)
+    assert not hasattr(Catalog, "jev")
+    assert not hasattr(DecisionSettings, "default_source")
+    assert not hasattr(DecisionSettings, "sources")
 
 
 @pytest.mark.parametrize("change, error", [
-    (lambda doc: doc.update(jev={}), "both decision and jev"),
+    (lambda doc: doc.update(jev={}), "unknown keys: jev"),
     (lambda doc: doc["decision"]["providers"][0].pop("protocol"), "protocol is required"),
     (lambda doc: doc["decision"]["providers"][0].update(protocol="unknown"), "protocol 'unknown' is not supported"),
     (lambda doc: doc["decision"].update(default_provider="missing"), "not configured"),

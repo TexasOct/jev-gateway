@@ -1,75 +1,42 @@
-"""JEV classification and the JEV-backed routing strategy."""
+"""Decision classification and the decision-backed routing strategy."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-from jev_gateway.catalog import (
-    Catalog,
-    DecisionSettings,
-    RouteLabel,
-    RoutingMode,
-    RoutingPolicy,
-)
-from jev_gateway.decision_provider import DecisionClient
+from jev_gateway.catalog import Catalog, RouteLabel, RoutingMode, RoutingPolicy
 from jev_gateway.signals import RequestSignals
 
-from .contracts import RoutingRequest, StrategyOutcome
+from .contracts import DecisionMaker, RoutingRequest, StrategyOutcome
 from .policy import PolicyStrategy
 
-__all__ = ["JevClassifier", "JevClient", "JevStrategy"]
+__all__ = ["DecisionClassifier", "DecisionStrategy"]
 
 
-class JevClient:
-    """Deprecated client preserving the former tuple return value."""
+class DecisionClassifier:
+    """Refine request signals through an injected typed-answer capability."""
 
-    def __init__(self, settings: DecisionSettings) -> None:
-        self.settings = settings
-        self._client = DecisionClient(settings)
-
-    def evaluate(
-        self,
-        state: str | dict[str, Any],
-        questions: dict[str, Any],
-        *,
-        valid: Callable[[dict[str, Any]], bool] | None = None,
-    ) -> tuple[str, dict[str, Any]] | None:
-        result = self._client.evaluate(state, questions, valid=valid)
-        return (result.provider, dict(result.answers)) if result is not None else None
-
-
-class JevClassifier:
-    """Refine request signals through configured decision providers."""
-
-    def __init__(self, settings: DecisionSettings) -> None:
-        self.settings = settings
-        self.client = DecisionClient(settings)
+    def __init__(self, client: DecisionMaker) -> None:
+        self.client = client
         self.policy: RoutingPolicy | None = None
 
     def refine(self, signals: RequestSignals) -> RequestSignals:
         """Return a label chosen from the active policy, or the local signals."""
-        if not self.settings.enabled:
+        if not self.client.enabled:
             return signals
         active = self.policy
         labels = active.labels if active is not None else {
             "simple": RouteLabel(score=0, description="Direct bounded work"),
             "standard": RouteLabel(score=0.35, description="Multi-step work"),
-            "complex": RouteLabel(
-                score=0.65,
-                description="Deep analysis or architecture",
-            ),
+            "complex": RouteLabel(score=0.65, description="Deep analysis or architecture"),
         }
         if not labels:
             return signals
         questions = {
             "routing_tier": {
                 "type": "choice",
-                "instructions": (
-                    "Choose the least capable routing label that can answer the "
-                    "request correctly."
-                ),
+                "instructions": "Choose the least capable routing label that can answer the request correctly.",
                 "criteria": {name: route.description or name for name, route in labels.items()},
             }
         }
@@ -93,18 +60,18 @@ class JevClassifier:
             tier=tier if active is None else signals.tier,
             base_tier=tier if active is None else signals.base_tier,
             score_tier=tier if active is None else signals.score_tier,
-            reasons=(*signals.reasons, f"jev:{result.provider}:{tier}"),
+            reasons=(*signals.reasons, f"decision:{result.provider}:{tier}"),
         )
 
 
-class JevStrategy(PolicyStrategy):
-    """Policy strategy whose task tier comes from decision providers."""
+class DecisionStrategy(PolicyStrategy):
+    """Policy strategy whose task label comes from a decision maker."""
 
     def __init__(
         self,
         name: str,
         policy: RoutingPolicy,
-        classifier: JevClassifier,
+        classifier: DecisionClassifier,
         description: str | None = None,
     ) -> None:
         super().__init__(name, policy, description)
@@ -113,12 +80,12 @@ class JevStrategy(PolicyStrategy):
 
     def describe(self) -> dict[str, Any]:
         payload = super().describe()
-        payload["type"] = "jev"
-        payload["decision"] = self.classifier.settings.as_dict()
+        payload["type"] = "decision"
+        payload["decision"] = self.classifier.client.describe()
         return payload
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
-        """Classify cached sessions once; other modes retain per-turn JEV behavior."""
+        """Classify cached sessions once; other modes retain per-turn behavior."""
         signals = request.signals
         if request.is_first_turn or self.policy.mode is not RoutingMode.CACHED:
             signals = self.classifier.refine(signals)
