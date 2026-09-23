@@ -1020,6 +1020,32 @@ def test_dashboard_theme_writes_need_a_configured_gateway_key(
     secured.engine.close()
 
 
+def test_startup_announces_the_dashboard_url(tmp_path: Path, caplog) -> None:
+    import asyncio
+    import logging as logging_module
+
+    config = make_config(
+        gateway_api_key="client-key", models_file=tmp_path / "models.json"
+    )
+    app = gateway.create_app(config)
+
+    async def run_startup() -> None:
+        async with app.router.lifespan_context(app):
+            pass
+
+    with caplog.at_level(logging_module.INFO, logger="jev_gateway.gateway"):
+        asyncio.run(run_startup())
+
+    announced = [
+        record for record in caplog.records if record.getMessage() == "dashboard available"
+    ]
+    assert announced, "startup must announce the dashboard"
+    # A log emitted before uvicorn applies its formatter never renders, so this
+    # has to come from the startup phase.
+    assert getattr(announced[0], "dashboard_url", "").endswith("/dashboard")
+    config.engine.close()
+
+
 def test_dashboard_url_is_browsable_for_every_bind() -> None:
     import ipaddress
 
