@@ -14,9 +14,9 @@ from jev_gateway.catalog import (
     RoutingPolicy,
     StrategyDefinition,
 )
+from jev_gateway.decision_provider import DecisionClient
 
 from .contracts import RoutingRequest, StrategyOutcome
-from .jev import JevClient
 from .policy import PolicyStrategy
 
 __all__ = ["JevMatrixStrategy", "build_jev_matrix_strategy"]
@@ -29,7 +29,7 @@ class JevMatrixStrategy(PolicyStrategy):
         self,
         name: str,
         policy: RoutingPolicy,
-        client: JevClient,
+        client: DecisionClient,
         options: Mapping[str, Any],
         description: str | None = None,
     ) -> None:
@@ -42,7 +42,7 @@ class JevMatrixStrategy(PolicyStrategy):
         payload = super().describe()
         payload["type"] = "jev_matrix"
         payload["options"] = deepcopy(self.options)
-        payload["jev"] = self.client.settings.as_dict()
+        payload["decision"] = self.client.settings.as_dict()
         return payload
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
@@ -59,8 +59,8 @@ class JevMatrixStrategy(PolicyStrategy):
         answers: dict[str, str] | None = None
         source: str | None = None
         if result is not None:
-            source, raw = result
-            answers = _checked_answers(raw, self.questions)
+            source = result.provider
+            answers = _checked_answers(result.answers, self.questions)
 
         choice: Mapping[str, str] = self.fallback
         reason = "fallback"
@@ -232,7 +232,7 @@ def build_jev_matrix_strategy(
     return JevMatrixStrategy(
         definition.name,
         definition.policy,
-        JevClient(catalog.jev),
+        DecisionClient(catalog.decision),
         definition.options,
         definition.description,
     )

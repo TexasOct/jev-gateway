@@ -9,8 +9,8 @@ the repository root. There is no `src/` directory and no separate application,
 domain, or infrastructure package. Keep new code within the existing module
 boundaries instead of introducing a second package layout.
 
-The project separates HTTP transport, routing decisions, strategy extensions,
-provider-specific continuation handling, and evidence storage. `gateway.py` is
+The project separates HTTP transport, routing decisions, decision-provider protocols,
+strategy extensions, provider-specific continuation handling, and evidence storage. `gateway.py` is
 the composition root. It creates the FastAPI application, wires the routing
 engine and record store, and performs upstream LiteLLM calls.
 
@@ -22,6 +22,10 @@ jev_gateway/
 ├── catalog.py               # Catalog types and models.json parsing/validation
 ├── config.py                # Shared scalar and URL coercion helpers
 ├── decision.py              # Session-aware routing orchestration
+├── decision_provider/       # Decision protocol adapters and failover facade
+│   ├── __init__.py          # DecisionClient and protocol registry
+│   ├── base.py              # DecisionAdapter and normalized DecisionResult
+│   └── system_one.py        # System One wire adapter
 ├── gateway.py               # FastAPI schemas, routes, auth, streaming, reload
 ├── reasoning.py             # reasoning_effort derivation and clamping
 ├── records.py               # SQLite evidence store and writer queue
@@ -40,8 +44,8 @@ jev_gateway/
     ├── contracts.py         # RoutingStrategy and immutable request/outcome types
     ├── registry.py          # Strategy kind registration and construction
     ├── policy.py            # Built-in policy strategy
-    ├── jev.py               # System One classifier client
-    └── matrix.py            # JEV matrix strategy
+    ├── jev.py               # Classifier and legacy JevClient wrapper
+    └── matrix.py            # Typed-choice matrix strategy
 
 tests/
 ├── conftest.py              # Shared pytest fixtures
@@ -61,6 +65,7 @@ docs/
 | --- | --- | --- |
 | `catalog.py` | Immutable catalog-domain objects and strict configuration parsing | `Catalog`, `RoutingPolicy`, `StrategyDefinition`, `catalog_from_document()`, `load_catalog()` |
 | `decision.py` | Turn-level routing, session interaction, strategy invocation, and best-effort evidence submission | `Decision`, `RoutingEngine` |
+| `decision_provider/` | Decision-protocol transport, normalized answers, and ordered failover | `DecisionClient`, `DecisionAdapter`, `DecisionResult`, `registered_protocols()` |
 | `gateway.py` | HTTP boundary, request models, route handlers, authentication, LiteLLM transport, streaming, and reload | `ChatCompletionRequest`, `GatewayConfig`, `create_app()`, `run_gateway()` |
 | `signals.py` | Convert chat messages and request features into `RequestSignals` | `ScoringPolicy`, `RequestSignals`, `extract_signals()` |
 | `reasoning.py` | Choose and clamp a legal reasoning effort after a model is selected | `derive_effort()`, `effort_for()`, `clamp_effort()` |
@@ -87,6 +92,19 @@ handlers.
 modules. A new strategy must not require strategy-specific branches in the
 engine.
 
+### Add a decision protocol adapter
+
+1. Implement `DecisionAdapter` in `jev_gateway/decision_provider/`.
+2. Register its protocol in `_ADAPTERS` in `decision_provider/__init__.py`.
+3. Keep `registered_protocols()` aligned with that registry so catalog parsing
+   rejects unsupported protocols before startup or reload swaps live state.
+4. Add transport, malformed-response, and failover tests in
+   `tests/test_decision_provider.py`.
+
+`DecisionClient` owns provider ordering and credentials. Strategies consume
+`DecisionResult` and must not parse a provider's HTTP response themselves.
+The `provider/` package below is for chat continuation, not routing decisions.
+
 ### Add a provider continuation adapter
 
 1. Add a module under `jev_gateway/provider/`.
@@ -108,7 +126,8 @@ record store.
 ## Import boundaries
 
 - `strategy/*` may depend on catalog types because strategies compare catalog
-  models and policy settings.
+  models and policy settings. Strategies call the `decision_provider` facade,
+  not individual protocol adapters.
 - `decision.py` consumes the public `strategy` facade.
 - `gateway.py` consumes `RoutingEngine` and the public `provider` facade. It does
   not select concrete strategy or provider implementations directly.

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Check package ownership and project-wide validation requirements."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Review abstraction placement and conformance to extension boundaries."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check strict config validation, compatibility tests, static analysis, and documentation coverage."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Check failover, local fallback, reload safety, and secret-safe error handling."}
+{"file":".trellis/tasks/09-23-provider-neutral-decisions/research/current-decision-flow.md","reason":"Compare changed behavior to the observed routing and config contracts."}

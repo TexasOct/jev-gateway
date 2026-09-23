@@ -17,6 +17,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | Guide | Description | Status |
 | --- | --- | --- |
 | [Directory structure](./directory-structure.md) | Module ownership, extension points, imports, and naming | Complete |
+| [Decision providers](./decision-providers.md) | Decision config, protocol adapters, compatibility, failover, and validation | Complete |
 | [Database guidelines](./database-guidelines.md) | SQLite schema, writer queue, migrations, and retention | Complete |
 | [Error handling](./error-handling.md) | Domain exceptions, OpenAI error envelopes, and degradation | Complete |
 | [Quality guidelines](./quality-guidelines.md) | Types, tests, forbidden patterns, and verification | Complete |
@@ -59,7 +60,8 @@ cannot drift apart.
    tests.
 4. For routing or configuration behavior, read the relevant product reference
    and trace the contract through catalog parsing, strategy selection, gateway
-   presentation, evidence recording, and tests.
+   presentation, evidence recording, and tests. For decision-provider changes,
+   also read [Decision providers](./decision-providers.md).
 5. Search for an existing helper, registry, protocol, or test builder before
    adding another implementation.
 

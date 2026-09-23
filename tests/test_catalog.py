@@ -28,6 +28,59 @@ def profile(catalog: Catalog, model_id: str) -> ModelProfile:
     return found
 
 
+def test_decision_providers_parse_without_implicit_model_and_serialize_safely(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_DECISION_KEY", "private-decision-token")
+    document = single_route_document()
+    document["decision"] = {
+        "enabled": True,
+        "default_provider": "secondary",
+        "providers": [
+            {"id": name, "protocol": "system_one", "api_base": f"https://{name}.example/decide", "api_key_env": "TEST_DECISION_KEY"}
+            for name in ("primary", "secondary")
+        ],
+    }
+    catalog = catalog_from_document(document, "test catalog")
+    assert catalog.decision.providers[0].model is None
+    assert catalog.decision.default_provider == "secondary"
+    snapshot = catalog.routing_snapshot()
+    assert "jev" not in snapshot
+    assert snapshot["decision"]["providers"][0]["model"] is None
+    assert snapshot["decision"]["providers"][0]["has_api_key"] is True
+    assert "private-decision-token" not in json.dumps(snapshot)
+    assert "private-decision-token" not in repr(catalog.decision)
+
+
+def test_legacy_decision_alias_preserves_effective_model() -> None:
+    document = single_route_document()
+    document["jev"] = {"enabled": True, "default_source": "primary", "sources": [
+        {"id": "primary", "api_base": "https://decision.example/evaluate", "api_key_env": "TEST_DECISION_KEY"}
+    ]}
+    catalog = catalog_from_document(document, "test catalog")
+    assert catalog.jev is catalog.decision
+    assert catalog.decision.providers[0].protocol == "system_one"
+    assert catalog.decision.providers[0].model == "typesafe/jev-1.13"
+    assert catalog.as_dict()["decision"]["default_provider"] == "primary"
+    assert "jev" not in catalog.as_dict()
+
+
+@pytest.mark.parametrize("change, error", [
+    (lambda doc: doc.update(jev={}), "both decision and jev"),
+    (lambda doc: doc["decision"]["providers"][0].pop("protocol"), "protocol is required"),
+    (lambda doc: doc["decision"]["providers"][0].update(protocol="unknown"), "protocol 'unknown' is not supported"),
+    (lambda doc: doc["decision"].update(default_provider="missing"), "not configured"),
+    (lambda doc: doc["decision"]["providers"].append(doc["decision"]["providers"][0].copy()), "more than once"),
+    (lambda doc: doc["decision"]["providers"][0].update(api_key="literal"), "unknown keys: api_key"),
+])
+def test_decision_rejects_invalid_configuration(change, error: str) -> None:
+    document = single_route_document()
+    document["decision"] = {"enabled": True, "providers": [{
+        "id": "primary", "protocol": "system_one", "api_base": "https://decision.example/evaluate", "api_key_env": "TEST_DECISION_KEY",
+    }]}
+    change(document)
+    with pytest.raises(ValueError, match=error):
+        catalog_from_document(document, "test catalog")
+
+
 def test_catalog_indexes_models_by_provider_and_upstream_model() -> None:
     catalog = catalog_from_document(CATALOG_DOCUMENT, "test catalog")
 

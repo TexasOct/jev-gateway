@@ -8,7 +8,7 @@ JEV separates provider transport from concrete model metadata.
 | --- | --- | --- |
 | Provider | `provider.id` | LiteLLM `type` and its transport parameters |
 | Model | `provider/upstream_model` | Capabilities, context and output limits, quality, priority, cost, and scoped tags |
-| Label | `policy.labels[label]` | Score boundary, JEV description, and the tag that selects eligible models |
+| Label | `policy.labels[label]` | Score boundary, decision description, and the tag that selects eligible models |
 
 `provider/upstream_model` is the canonical model ID. JEV rejects a bare
 upstream model name for manual selection because multiple providers may expose
@@ -135,7 +135,7 @@ has a model:
 | Mode | Later-turn behavior |
 | --- | --- |
 | `sticky` (default) | Hold the first turn's model until a reason listed in `policy.pin.break_on` releases it |
-| `cached` | As `sticky`, but a JEV-backed strategy classifies only the first turn of a live session and reuses its stored tier and model afterward |
+| `cached` | As `sticky`, but a decision-backed strategy classifies only the first turn of a live session and reuses its stored tier and model afterward |
 | `escalate` | Follow hard requirements and escalation signals, and never lower the tier on complexity alone |
 | `adaptive` | As `escalate`, and return to a lower tier once `escalation.settle_window` turns score below `scoring.standard_threshold` |
 | `fresh` | Re-run selection every turn, ignoring the session's model |
@@ -246,13 +246,19 @@ is `{"default": "task_aware", "preview": [...]}`. It never serves an upstream ca
 writes a decision, or mutates session state.
 
 The optional strategy `kind` defaults to `auto`: it constructs `JevStrategy`
-when JEV sources are configured, otherwise `PolicyStrategy`. Explicit built-in
-kinds are `policy`, `jev`, and `jev_matrix`. This configuration value is separate
+when decision providers are configured, otherwise `PolicyStrategy`. Explicit built-in
+kinds are `policy`, `jev`, and `jev_matrix`; the latter two retain compatibility names.
+Top-level `decision` configures ordered providers, an optional `default_provider`,
+and an explicit protocol (`system_one` is currently supported). A provider's
+`model` is optional and is sent only when specified. Legacy `jev` documents are
+normalized to `decision`, retaining their former model default; declaring both
+keys is invalid. Decision protocols normalize typed choice answers before routing
+rules inspect them. This configuration value is separate
 from the retired request model name `auto`. Strategy-specific `options` work in
 both compact and `definitions` configuration formats.
 
 `jev_matrix` sends the prompt, extracted requirements, and a small session summary
-as question state to System One. Do not put sensitive material in question
+as question state to the configured decision provider. Do not put sensitive material in question
 descriptions. Its `reason` records the source and matching rule, not the full
 answers. When a strategy declares label-specific reasoning levels, its chosen
 label also determines the target effort; omitted reasoning fields inherit from
@@ -268,7 +274,7 @@ strategy/
 ├── contracts.py  # RoutingStrategy, RoutingRequest, StrategyOutcome
 ├── policy.py     # policy-based selection, escalation, hysteresis
 ├── jev.py        # JevClient, JevClassifier, and JevStrategy
-├── matrix.py     # multi-question JEV strategy and local rules
+├── matrix.py     # multi-question decision strategy and local rules
 └── registry.py   # kind factories, registration, name resolution
 ```
 
@@ -289,7 +295,7 @@ reload endpoint.
 
 ## The shipped `task_aware` table
 
-The repository's `task_aware` strategy asks System One three questions: `workload`
+The repository's `task_aware` strategy asks a decision provider three questions: `workload`
 (research, docs, small_change, coding, reverse), `scale` (bounded, moderate,
 large, cross_domain), and `rigor` (draft, exacting). Seven ordered rules map those
 answers onto five labels:
@@ -332,7 +338,7 @@ Sessions store the selected canonical model ID, so provider and model changes
 stay visible in session state. In the default `sticky` mode the first turn's
 model is also the session's pin: later turns keep it until a reason in
 `policy.pin.break_on` releases it. `cached` follows the same pin rule and avoids
-per-turn JEV classification. A strategy configured with `mode: "escalate"`,
+per-turn decision classification. A strategy configured with `mode: "escalate"`,
 `"adaptive"`, or `"fresh"` reconsiders the model on its own terms.
 
 Decision records and response headers distinguish the catalog model from the

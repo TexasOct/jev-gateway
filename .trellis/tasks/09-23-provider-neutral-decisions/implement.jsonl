@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend ownership, cross-layer contract checklist, and required verification commands."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Follow existing package boundaries and adapter registry/facade conventions."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Immutable catalog contracts, strict config parsing, adapter tests, compatibility and secret-handling requirements."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Preserve classifier failover and local degradation semantics without leaking upstream errors or credentials."}
+{"file":".trellis/tasks/09-23-provider-neutral-decisions/research/current-decision-flow.md","reason":"Repository-backed current decision contract and affected code/tests/docs."}

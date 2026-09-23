@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-import httpx
-
 from jev_gateway.catalog import (
     Catalog,
-    JevSettings,
-    JevSource,
+    DecisionSettings,
     RouteLabel,
     RoutingMode,
     RoutingPolicy,
 )
+from jev_gateway.decision_provider import DecisionClient
 from jev_gateway.signals import RequestSignals
 
 from .contracts import RoutingRequest, StrategyOutcome
@@ -26,10 +23,11 @@ __all__ = ["JevClassifier", "JevClient", "JevStrategy"]
 
 
 class JevClient:
-    """Evaluate typed System One questions with ordered source failover."""
+    """Deprecated client preserving the former tuple return value."""
 
-    def __init__(self, settings: JevSettings) -> None:
+    def __init__(self, settings: DecisionSettings) -> None:
         self.settings = settings
+        self._client = DecisionClient(settings)
 
     def evaluate(
         self,
@@ -38,57 +36,16 @@ class JevClient:
         *,
         valid: Callable[[dict[str, Any]], bool] | None = None,
     ) -> tuple[str, dict[str, Any]] | None:
-        """Return the source name and answers, or None when no source succeeds."""
-        if not self.settings.enabled:
-            return None
-        for source in self._ordered_sources():
-            api_key = os.getenv(source.api_key_env)
-            if not api_key:
-                continue
-            try:
-                response = httpx.post(
-                    source.api_base,
-                    json={
-                        "model": source.model,
-                        "state": state,
-                        "questions": questions,
-                    },
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=self.settings.timeout_seconds,
-                )
-                response.raise_for_status()
-                payload = response.json()
-                if not isinstance(payload, dict) or not isinstance(
-                    payload.get("answers"), dict
-                ):
-                    continue
-                answers = payload["answers"]
-                if valid is not None and not valid(answers):
-                    continue
-                return source.name, answers
-            except (httpx.HTTPError, OSError, TypeError, ValueError):
-                continue
-        return None
-
-    def _ordered_sources(self) -> tuple[JevSource, ...]:
-        default = self.settings.default_source
-        if default is None:
-            return self.settings.sources
-        preferred = tuple(
-            source for source in self.settings.sources if source.name == default
-        )
-        fallbacks = tuple(
-            source for source in self.settings.sources if source.name != default
-        )
-        return (*preferred, *fallbacks)
+        result = self._client.evaluate(state, questions, valid=valid)
+        return (result.provider, dict(result.answers)) if result is not None else None
 
 
 class JevClassifier:
-    """Refine request signals through configured System One sources."""
+    """Refine request signals through configured decision providers."""
 
-    def __init__(self, settings: JevSettings) -> None:
+    def __init__(self, settings: DecisionSettings) -> None:
         self.settings = settings
-        self.client = JevClient(settings)
+        self.client = DecisionClient(settings)
         self.policy: RoutingPolicy | None = None
 
     def refine(self, signals: RequestSignals) -> RequestSignals:
@@ -126,8 +83,7 @@ class JevClassifier:
         )
         if result is None:
             return signals
-        source, answers = result
-        answer = answers.get("routing_tier")
+        answer = result.answers.get("routing_tier")
         tier = answer.get("choice") if isinstance(answer, dict) else None
         if tier not in labels:
             return signals
@@ -137,12 +93,12 @@ class JevClassifier:
             tier=tier if active is None else signals.tier,
             base_tier=tier if active is None else signals.base_tier,
             score_tier=tier if active is None else signals.score_tier,
-            reasons=(*signals.reasons, f"jev:{source}:{tier}"),
+            reasons=(*signals.reasons, f"jev:{result.provider}:{tier}"),
         )
 
 
 class JevStrategy(PolicyStrategy):
-    """Policy strategy whose task tier comes from configured JEV sources."""
+    """Policy strategy whose task tier comes from decision providers."""
 
     def __init__(
         self,
@@ -158,7 +114,7 @@ class JevStrategy(PolicyStrategy):
     def describe(self) -> dict[str, Any]:
         payload = super().describe()
         payload["type"] = "jev"
-        payload["jev"] = self.classifier.settings.as_dict()
+        payload["decision"] = self.classifier.settings.as_dict()
         return payload
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
