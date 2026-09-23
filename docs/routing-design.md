@@ -245,6 +245,48 @@ name in `model` and omit `strategy` to preview only that strategy. The response
 is `{"default": "task_aware", "preview": [...]}`. It never serves an upstream call,
 writes a decision, or mutates session state.
 
+The optional strategy `kind` defaults to `auto`: it constructs `JevStrategy`
+when JEV sources are configured, otherwise `PolicyStrategy`. Explicit built-in
+kinds are `policy`, `jev`, and `jev_matrix`. This configuration value is separate
+from the retired request model name `auto`. Strategy-specific `options` work in
+both compact and `definitions` configuration formats.
+
+`jev_matrix` sends the prompt, extracted requirements, and a small session summary
+as question state to System One. Do not put sensitive material in question
+descriptions. Its `reason` records the source and matching rule, not the full
+answers. When a strategy declares label-specific reasoning levels, its chosen
+label also determines the target effort; omitted reasoning fields inherit from
+the top-level policy. `fresh` evaluates every turn, while `cached` reuses the first
+live turn's label and model to keep the upstream prompt cache more stable.
+
+### Custom strategy kinds
+
+Strategy code lives under `jev_gateway/strategy/`:
+
+```text
+strategy/
+├── contracts.py  # RoutingStrategy, RoutingRequest, StrategyOutcome
+├── policy.py     # policy-based selection, escalation, hysteresis
+├── jev.py        # JevClient, JevClassifier, and JevStrategy
+├── matrix.py     # multi-question JEV strategy and local rules
+└── registry.py   # kind factories, registration, name resolution
+```
+
+Implement `RoutingStrategy`, expose a `StrategyFactory`, and register it before
+the gateway constructs its strategy registry:
+
+```python
+from jev_gateway.strategy import register_strategy_kind
+
+register_strategy_kind("my-kind", build_my_strategy)
+```
+
+A definition can then set `"kind": "my-kind"`. The factory receives the parsed
+`StrategyDefinition` and active `Catalog`, must return a strategy with the same
+`name`, and must not mutate either input. Restart the gateway after changing
+Python strategy code; JSON configuration can be reloaded through the routing
+reload endpoint.
+
 ## The shipped `task_aware` table
 
 The repository's `task_aware` strategy asks System One three questions: `workload`
@@ -336,6 +378,17 @@ A config-version snapshot records the routing policy used for that decision;
 SQLite's `decision_evidence` view joins request, decision, and outcome records.
 The gateway also queues malformed JSON and requests rejected by Pydantic.
 
+Requests rejected by the authorization check before routing are not stored.
+
+Provider continuation rows contain a session ID, an assistant message hash, the
+source provider type, and an opaque provider-owned JSON payload. They do not
+contain the public assistant message, tool arguments, or prompt. Provider adapters
+capture and restore their own payload, supporting DeepSeek reasoning content and
+future provider signatures through the same store without provider-specific
+gateway branches. `storage.max_continuations_per_session` defaults to `40`, and
+`storage.max_continuation_sessions` defaults to `2048`; these bound the retained
+continuation state independently of request retention.
+
 The enabled SQLite recorder uses a dedicated `jev-record-writer` thread.
 Request threads only enqueue immutable snapshots into a bounded queue and do not
 wait for disk writes. The worker opens the database and writes records in queue
@@ -412,3 +465,8 @@ its next request receives a fresh initial selection. If its pinned strategy is
 gone, it falls back to the default strategy. The record-store path is read at
 startup; a reload re-registers the configuration snapshot but does not reopen
 the database.
+
+All `storage` fields require a restart, including retention, capture, and queue
+settings; reload rejects changes with `400 restart_required`. Gateway host, port,
+and logging settings also require a restart. See the [HTTP API reference](http-api.md)
+for reload responses and failure codes.

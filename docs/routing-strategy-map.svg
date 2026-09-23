@@ -1,160 +1,113 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="940" viewBox="0 0 1220 940" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="540" viewBox="0 0 1440 540" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="JEV routing flow from request model to final catalog route">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
     </marker>
+    <marker id="arrowBypass" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b"/>
+    </marker>
   </defs>
 
-  <rect x="0" y="0" width="1220" height="940" fill="#ffffff"/>
+  <rect x="0" y="0" width="1440" height="540" fill="#ffffff"/>
 
-  <text x="40" y="46" font-size="23" font-weight="700" fill="#0f172a">JEV 路由策略 / 模型透传映射</text>
-  <text x="40" y="72" font-size="13" fill="#64748b">来源：models.json 与 jev_gateway（catalog.py · strategy/registry.py · gateway.py · decision.py）。kind 为 auto 的实例在配置了 JEV source 时构造为 JevStrategy，否则为 PolicyStrategy。</text>
+  <text x="40" y="44" font-size="24" font-weight="700" fill="#0f172a">JEV routing: request model to final route</text>
+  <text x="40" y="70" font-size="13" fill="#64748b">One request resolves to one catalog model. Session mode can pin that route, or reconsider it on later turns.</text>
 
-  <!-- Band 1 -->
-  <text x="40" y="112" font-size="15" font-weight="700" fill="#1d4ed8">① 客户端传入的 model 决定入口</text>
+  <!-- Bypass lane: a full catalog model ID skips strategy and label selection. -->
+  <path d="M 120 132 L 120 100 L 1320 100 L 1320 132" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowBypass)"/>
+  <rect x="520" y="86" width="400" height="30" rx="8" fill="#fffbeb" stroke="#fbbf24"/>
+  <text x="720" y="106" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Full catalog ID in body.model: lock that model</text>
 
-  <rect x="40" y="124" width="360" height="76" rx="10" fill="#eef4ff" stroke="#7aa2f7"/>
-  <text x="54" y="146" font-size="13" font-weight="700" fill="#111827">默认入口 → task_aware</text>
-  <text x="54" y="167" font-size="12" fill="#334155">model: "task_aware"</text>
-  <text x="54" y="186" font-size="12" fill="#334155">命中同名策略，由 task_aware 选路由</text>
+  <!-- Main flow: seven steps, left to right. -->
+  <rect x="36" y="132" width="168" height="94" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="52" y="166" font-size="13" font-weight="700" fill="#1e3a8a">Request</text>
+  <text x="52" y="188" font-size="11" fill="#475569">body.model</text>
+  <text x="52" y="205" font-size="11" fill="#475569">strategy or model ID</text>
 
-  <rect x="430" y="124" width="360" height="76" rx="10" fill="#eef4ff" stroke="#7aa2f7"/>
-  <text x="444" y="146" font-size="13" font-weight="700" fill="#111827">策略名 → 同名策略</text>
-  <text x="444" y="167" font-size="12" fill="#334155">model: "quality" / "economy" / "task_aware"</text>
-  <text x="444" y="186" font-size="12" fill="#334155">命中同名策略，内部 manual = None</text>
+  <path d="M 204 179 L 232 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="820" y="124" width="360" height="76" rx="10" fill="#eef4ff" stroke="#7aa2f7"/>
-  <text x="834" y="146" font-size="13" font-weight="700" fill="#111827">完整模型 ID → 手工锁定</text>
-  <text x="834" y="167" font-size="12" fill="#334155">model: "openai/gpt-5.6-sol"</text>
-  <text x="834" y="186" font-size="12" fill="#334155">manual 命中 catalog，直接锁定该模型</text>
+  <rect x="236" y="132" width="168" height="94" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="252" y="166" font-size="13" font-weight="700" fill="#1e3a8a">Strategy select</text>
+  <text x="252" y="188" font-size="11" fill="#475569">by name, else</text>
+  <text x="252" y="205" font-size="11" fill="#475569">policy default</text>
 
-  <!-- Band 2 -->
-  <text x="40" y="240" font-size="15" font-weight="700" fill="#334155">② 策略选择规则（仅使用 JSON body.model）</text>
+  <path d="M 404 179 L 432 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="40" y="252" width="262" height="52" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
-  <text x="54" y="274" font-size="12" font-weight="700" fill="#111827">1. model 是策略名</text>
-  <text x="54" y="292" font-size="11" fill="#52525b">直接采用该策略</text>
+  <rect x="436" y="132" width="168" height="94" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="452" y="166" font-size="13" font-weight="700" fill="#1e3a8a">Label select</text>
+  <text x="452" y="188" font-size="11" fill="#475569">from the request</text>
+  <text x="452" y="205" font-size="11" fill="#475569">and strategy rules</text>
 
-  <rect x="326" y="252" width="262" height="52" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
-  <text x="340" y="274" font-size="12" font-weight="700" fill="#111827">2. model 是完整模型 ID</text>
-  <text x="340" y="292" font-size="11" fill="#52525b">手工锁定模型</text>
+  <path d="M 604 179 L 632 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="612" y="252" width="262" height="52" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
-  <text x="626" y="274" font-size="12" font-weight="700" fill="#111827">3. session.strategy</text>
-  <text x="626" y="292" font-size="11" fill="#52525b">具体模型请求沿用有效会话策略</text>
+  <rect x="636" y="132" width="168" height="94" rx="10" fill="#faf5ff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="652" y="166" font-size="13" font-weight="700" fill="#6b21a8">Compose tag</text>
+  <text x="652" y="188" font-size="12" font-weight="600" fill="#7e22ce">strategy/label</text>
+  <text x="652" y="205" font-size="11" fill="#475569">exact whole string</text>
 
-  <rect x="898" y="252" width="262" height="52" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
-  <text x="912" y="274" font-size="12" font-weight="700" fill="#111827">4. 默认回退 task_aware</text>
-  <text x="912" y="292" font-size="11" fill="#52525b">无有效 pin 时使用默认策略</text>
+  <path d="M 804 179 L 832 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <text x="610" y="327" text-anchor="middle" font-size="11.5" fill="#64748b">解析出的策略名交给 StrategyRegistry；下面四个卡片是当前可选实例，并非与上方入口逐列对应。</text>
+  <rect x="836" y="132" width="168" height="94" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="852" y="166" font-size="13" font-weight="700" fill="#1e3a8a">Find candidates</text>
+  <text x="852" y="188" font-size="11" fill="#475569">models carrying</text>
+  <text x="852" y="205" font-size="11" fill="#475569">that exact tag</text>
 
-  <!-- Band 3 -->
-  <text x="40" y="342" font-size="15" font-weight="700" fill="#047857">③ 已注册的策略实例与实现类</text>
+  <path d="M 1004 179 L 1032 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="40" y="354" width="270" height="112" rx="10" fill="#ecfdf5" stroke="#34d399"/>
-  <text x="54" y="376" font-size="13" font-weight="700" fill="#065f46">task_aware</text>
-  <text x="54" y="396" font-size="11" fill="#334155">声明：strategies.task_aware</text>
-  <text x="54" y="414" font-size="11" fill="#334155">kind: auto → JevStrategy</text>
-  <text x="54" y="432" font-size="11" fill="#334155">mode: adaptive · selection: balanced</text>
-  <text x="54" y="452" font-size="11" fill="#64748b">对外模型名为 "task_aware"</text>
+  <rect x="1036" y="132" width="168" height="94" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="1052" y="166" font-size="13" font-weight="700" fill="#1e3a8a">Filter and rank</text>
+  <text x="1052" y="188" font-size="11" fill="#475569">capability, context,</text>
+  <text x="1052" y="205" font-size="11" fill="#475569">output, selection</text>
 
-  <rect x="330" y="354" width="270" height="112" rx="10" fill="#ecfdf5" stroke="#34d399"/>
-  <text x="344" y="376" font-size="13" font-weight="700" fill="#065f46">quality</text>
-  <text x="344" y="396" font-size="11" fill="#334155">声明：strategies.quality</text>
-  <text x="344" y="414" font-size="11" fill="#334155">kind: auto → JevStrategy</text>
-  <text x="344" y="432" font-size="11" fill="#334155">mode: cached · selection: quality_first</text>
-  <text x="344" y="452" font-size="11" fill="#64748b">tag 前缀 quality/</text>
+  <path d="M 1204 179 L 1232 179" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="620" y="354" width="270" height="112" rx="10" fill="#ecfdf5" stroke="#34d399"/>
-  <text x="634" y="376" font-size="13" font-weight="700" fill="#065f46">economy</text>
-  <text x="634" y="396" font-size="11" fill="#334155">声明：strategies.economy</text>
-  <text x="634" y="414" font-size="11" fill="#334155">kind: auto → JevStrategy</text>
-  <text x="634" y="432" font-size="11" fill="#334155">mode: cached · selection: cheapest_adequate</text>
-  <text x="634" y="452" font-size="11" fill="#64748b">tag 前缀 economy/</text>
+  <rect x="1236" y="132" width="168" height="94" rx="10" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5"/>
+  <text x="1252" y="166" font-size="13" font-weight="700" fill="#065f46">Final route</text>
+  <text x="1252" y="188" font-size="11" fill="#475569">one canonical</text>
+  <text x="1252" y="205" font-size="11" fill="#475569">catalog model ID</text>
 
-  <rect x="910" y="354" width="270" height="112" rx="10" fill="#ecfdf5" stroke="#34d399"/>
-  <text x="924" y="376" font-size="13" font-weight="700" fill="#065f46">task_aware</text>
-  <text x="924" y="396" font-size="11" fill="#334155">声明：strategies.task_aware</text>
-  <text x="924" y="414" font-size="11" fill="#334155">kind: jev_matrix → JevMatrixStrategy</text>
-  <text x="924" y="432" font-size="11" fill="#334155">mode: fresh · 按 options.rules 匹配</text>
-  <text x="924" y="452" font-size="11" fill="#64748b">JEV 只答选择题，不定模型</text>
+  <!-- Session rules feed back into selection between turns. -->
+  <path d="M 1120 258 L 1120 226" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <rect x="636" y="258" width="568" height="56" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="652" y="282" font-size="13" font-weight="700" fill="#334155">Session rules (policy.mode)</text>
+  <text x="652" y="302" font-size="11" fill="#475569">pin the route, or reconsider it when a break reason fires</text>
 
-  <!-- Band 4 -->
-  <text x="40" y="496" font-size="15" font-weight="700" fill="#0f172a">④ 每个策略内部的 label 池（本地 score 或 JEV 答案决定）</text>
+  <!-- Worked example: names only the abstract strategy and label path. -->
+  <text x="40" y="356" font-size="15" font-weight="700" fill="#0f172a">Worked example</text>
 
-  <rect x="40" y="508" width="270" height="126" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
-  <rect x="52" y="520" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="64" y="541" font-size="12" fill="#111827">quick · score 0</text>
-  <rect x="52" y="556" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="64" y="577" font-size="12" fill="#111827">working · score 0.35</text>
-  <rect x="52" y="592" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="64" y="613" font-size="12" fill="#111827">deep · score 0.65</text>
+  <rect x="32" y="374" width="256" height="84" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="48" y="400" font-size="12" font-weight="700" fill="#0f172a">Request</text>
+  <text x="48" y="422" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#1d4ed8">model: "quality"</text>
+  <text x="48" y="443" font-size="10.5" fill="#64748b">names the quality strategy</text>
 
-  <rect x="330" y="508" width="270" height="126" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
-  <rect x="342" y="520" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="354" y="541" font-size="12" fill="#111827">routine · score 0</text>
-  <rect x="342" y="556" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="354" y="577" font-size="12" fill="#111827">analysis · score 0.35</text>
-  <rect x="342" y="592" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="354" y="613" font-size="12" fill="#111827">critical · score 0.65</text>
+  <path d="M 288 416 L 312 416" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="620" y="508" width="270" height="126" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
-  <rect x="632" y="520" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="644" y="541" font-size="12" fill="#111827">budget · score 0</text>
-  <rect x="632" y="556" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="644" y="577" font-size="12" fill="#111827">extended · score 0.35</text>
-  <rect x="632" y="592" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="644" y="613" font-size="12" fill="#111827">exception · score 0.65</text>
+  <rect x="312" y="374" width="256" height="84" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="328" y="400" font-size="12" font-weight="700" fill="#0f172a">Label</text>
+  <text x="328" y="422" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#1d4ed8">critical</text>
+  <text x="328" y="443" font-size="10.5" fill="#64748b">highest label for this request</text>
 
-  <rect x="910" y="508" width="270" height="126" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
-  <rect x="922" y="520" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="934" y="541" font-size="12" fill="#111827">draft · score 0</text>
-  <rect x="922" y="556" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="934" y="577" font-size="12" fill="#111827">review · score 0.35</text>
-  <rect x="922" y="592" width="246" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="934" y="613" font-size="12" fill="#111827">engineering · score 0.65</text>
+  <path d="M 568 416 L 592 416" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <path d="M 175 634 L 175 652" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M 465 634 L 465 652" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M 755 634 L 755 652" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M 1045 634 L 1045 652" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <rect x="40" y="654" width="1140" height="38" rx="9" fill="#faf5ff" stroke="#c084fc"/>
-  <text x="610" y="678" text-anchor="middle" font-size="12.5" font-weight="700" fill="#6b21a8">精确匹配键：&lt;strategy&gt;/&lt;label&gt;　→　在所有 models[].tags 中查找，得到一个或多个候选模型</text>
-  <path d="M 610 692 L 610 716" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="592" y="374" width="256" height="84" rx="10" fill="#faf5ff" stroke="#c084fc"/>
+  <text x="608" y="400" font-size="12" font-weight="700" fill="#6b21a8">Tag</text>
+  <text x="608" y="422" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#7e22ce">quality/critical</text>
+  <text x="608" y="443" font-size="10.5" fill="#64748b">strategy + label</text>
 
-  <!-- Band 5 -->
-  <text x="40" y="724" font-size="15" font-weight="700" fill="#7e22ce">⑤ 当前模型池与完整 tag 映射</text>
+  <path d="M 848 416 L 872 416" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="40" y="736" width="270" height="140" rx="10" fill="#fdf4ff" stroke="#c084fc"/>
-  <text x="54" y="758" font-size="12" font-weight="700" fill="#581c87">deepseek/deepseek-flash</text>
-  <text x="54" y="779" font-size="11" fill="#334155">task_aware/quick</text>
-  <text x="54" y="796" font-size="11" fill="#334155">task_aware/working</text>
-  <text x="54" y="813" font-size="11" fill="#334155">economy/budget</text>
-  <text x="54" y="830" font-size="11" fill="#334155">economy/extended</text>
-  <text x="54" y="847" font-size="11" fill="#334155">economy/exception</text>
-  <text x="54" y="864" font-size="11" fill="#334155">task_aware/draft</text>
+  <rect x="872" y="374" width="256" height="84" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="888" y="400" font-size="12" font-weight="700" fill="#0f172a">Candidates</text>
+  <text x="888" y="422" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#1d4ed8">[tagged models]</text>
+  <text x="888" y="443" font-size="10.5" fill="#64748b">exact match on quality/critical</text>
 
-  <rect x="330" y="736" width="270" height="140" rx="10" fill="#fdf4ff" stroke="#c084fc"/>
-  <text x="344" y="758" font-size="12" font-weight="700" fill="#581c87">openai/gpt-5.6-luna</text>
-  <text x="344" y="779" font-size="11" fill="#334155">task_aware/quick</text>
-  <text x="344" y="796" font-size="11" fill="#334155">quality/routine</text>
+  <path d="M 1128 416 L 1152 416" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="620" y="736" width="270" height="140" rx="10" fill="#fdf4ff" stroke="#c084fc"/>
-  <text x="634" y="758" font-size="12" font-weight="700" fill="#581c87">openai/gpt-5.6-terra</text>
-  <text x="634" y="779" font-size="11" fill="#334155">task_aware/working</text>
-  <text x="634" y="796" font-size="11" fill="#334155">quality/analysis</text>
-  <text x="634" y="813" font-size="11" fill="#334155">task_aware/review</text>
+  <rect x="1152" y="374" width="256" height="84" rx="10" fill="#ecfdf5" stroke="#34d399"/>
+  <text x="1168" y="400" font-size="12" font-weight="700" fill="#065f46">Selected route</text>
+  <text x="1168" y="422" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#047857">provider/model</text>
+  <text x="1168" y="443" font-size="10.5" fill="#64748b">after filters and selection</text>
 
-  <rect x="910" y="736" width="270" height="140" rx="10" fill="#fdf4ff" stroke="#c084fc"/>
-  <text x="924" y="758" font-size="12" font-weight="700" fill="#581c87">openai/gpt-5.6-sol</text>
-  <text x="924" y="779" font-size="11" fill="#334155">task_aware/deep</text>
-  <text x="924" y="796" font-size="11" fill="#334155">quality/critical</text>
-  <text x="924" y="813" font-size="11" fill="#334155">economy/exception</text>
-  <text x="924" y="830" font-size="11" fill="#334155">task_aware/engineering</text>
-
-  <!-- Footnote -->
-  <rect x="40" y="892" width="1140" height="38" rx="8" fill="#f1f5f9" stroke="#e2e8f0"/>
-  <text x="54" y="908" font-size="11" fill="#334155">出参：X-JEV-Route = canonical catalog ID（provider + "/" + upstream_model） · X-JEV-Model = upstream model · X-JEV-Strategy = 实际策略</text>
-  <text x="54" y="923" font-size="11" fill="#334155">body.model 默认回显客户端原值；LiteLLM 调用使用 provider_type + upstream_model。</text>
+  <text x="40" y="492" font-size="11.5" fill="#64748b">Strategies, labels, and tags are declared in models.json; tag lookup matches the whole string.</text>
+  <text x="40" y="513" font-size="11.5" fill="#64748b">A JEV classifier is optional, and cached or fresh mode reclassifies later turns differently.</text>
 </svg>

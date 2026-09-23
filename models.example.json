@@ -28,13 +28,15 @@
     "task_aware": {
       "kind": "jev_matrix",
       "mode": "fresh",
-      "description": "Routes docs and small edits to a small model, while coding and reverse-engineering use the top model with a higher thinking level.",
+      "description": "Routes by purpose and scale: research, documentation, review, and bounded coding run on DeepSeek, shippable small and mid-size coding runs on Luna, large coding and reverse engineering run on Sol, and only cross-domain ultra-complex work reaches the reserved ultra tier.",
       "reasoning": {
         "mode": "override",
         "effort_by_label": {
           "draft": "low",
           "review": "medium",
-          "engineering": "high"
+          "craft": "medium",
+          "engineering": "high",
+          "ultra": "xhigh"
         }
       },
       "options": {
@@ -43,10 +45,21 @@
             "type": "choice",
             "instructions": "What is the main kind of work this request asks for?",
             "criteria": {
-              "docs": "Documentation, comments, prose, translation, or summarization; no code behavior changes.",
-              "small_change": "A narrow, bounded code or config change: a rename, dependency bump, formatting pass, or single-file tweak.",
-              "coding": "Implement, fix, or refactor behavior in code; the change has to work.",
+              "research": "Investigate, search, read, or summarise existing material: looking things up, reading code or documents, comparing options, or gathering evidence. It produces understanding, not a behaviour change.",
+              "docs": "Write or edit documentation, comments, prose, translations, or release notes.",
+              "small_change": "A narrow, bounded change: a rename, dependency bump, formatting pass, config tweak, or single-file edit.",
+              "coding": "Implement, fix, or refactor behaviour in code; the change has to work.",
               "reverse": "Understand, audit, or reverse-engineer existing code or systems: architecture, protocol or binary analysis, security review, or hard debugging."
+            }
+          },
+          "scale": {
+            "type": "choice",
+            "instructions": "How large and self-contained is the work?",
+            "criteria": {
+              "bounded": "One file or one spot with clear edges; it can be finished in a single short pass.",
+              "moderate": "Several files or steps, but the path is clear: small to mid-sized work.",
+              "large": "Cross-module or long-horizon work that needs architecture judgement, sustained autonomous execution, or repeated experimentation.",
+              "cross_domain": "The request needs several independent high-difficulty professional domains at once, such as 3D modelling together with circuit design, or coupled mechanical, electromagnetic, and thermal engineering. A single hard domain is not this."
             }
           },
           "rigor": {
@@ -61,6 +74,19 @@
         "rules": [
           {
             "when": {
+              "scale": "cross_domain",
+              "workload": [
+                "coding",
+                "reverse"
+              ]
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "ultra"
+            }
+          },
+          {
+            "when": {
               "workload": "reverse"
             },
             "select": {
@@ -70,7 +96,8 @@
           },
           {
             "when": {
-              "workload": "coding"
+              "workload": "coding",
+              "scale": "large"
             },
             "select": {
               "selection": "quality_first",
@@ -79,20 +106,41 @@
           },
           {
             "when": {
+              "workload": "coding",
+              "rigor": "exacting"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "craft"
+            }
+          },
+          {
+            "when": {
+              "workload": "coding"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "draft"
+            }
+          },
+          {
+            "when": {
               "workload": [
+                "research",
                 "docs",
                 "small_change"
               ],
               "rigor": "exacting"
             },
             "select": {
-              "selection": "balanced",
+              "selection": "cheapest_adequate",
               "label": "review"
             }
           },
           {
             "when": {
               "workload": [
+                "research",
                 "docs",
                 "small_change"
               ]
@@ -104,25 +152,35 @@
           }
         ],
         "fallback": {
-          "selection": "balanced",
+          "selection": "cheapest_adequate",
           "label": "review"
         }
       },
       "labels": {
         "draft": {
           "score": 0,
-          "description": "Documentation drafts and bounded edits",
+          "description": "Research, documentation, bounded edits, and quick coding passes",
           "reasoning_effort": "low"
         },
         "review": {
-          "score": 0.35,
-          "description": "Exacting review",
+          "score": 0.25,
+          "description": "Exacting research, documentation, and bounded edits",
+          "reasoning_effort": "medium"
+        },
+        "craft": {
+          "score": 0.45,
+          "description": "Shippable small and mid-sized coding",
           "reasoning_effort": "medium"
         },
         "engineering": {
           "score": 0.65,
-          "description": "Coding and reverse engineering",
+          "description": "Large coding and reverse engineering",
           "reasoning_effort": "high"
+        },
+        "ultra": {
+          "score": 0.85,
+          "description": "Cross-domain ultra-complex work reserved for the top tier",
+          "reasoning_effort": "xhigh"
         }
       }
     },
@@ -243,69 +301,15 @@
         ]
       },
       "cost": {
-        "input_per_million": 0.3,
-        "output_per_million": 1.2
+        "input_per_million": 0.29643682931167364,
+        "output_per_million": 1.1857473172466946
       },
       "tags": [
         "economy/budget",
         "economy/extended",
         "economy/exception",
-        "task_aware/draft"
-      ]
-    },
-    {
-      "provider": "openai",
-      "upstream_model": "gpt-5.6-sol",
-      "priority": 20,
-      "quality": 0.95,
-      "context_window": 1000000,
-      "max_output_tokens": 128000,
-      "capabilities": {
-        "reasoning": true,
-        "temperature": false,
-        "reasoning_effort": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh",
-          "max"
-        ]
-      },
-      "cost": {
-        "input_per_million": 2.0,
-        "output_per_million": 10.0
-      },
-      "tags": [
-        "quality/critical",
-        "economy/exception",
-        "task_aware/engineering"
-      ]
-    },
-    {
-      "provider": "openai",
-      "upstream_model": "gpt-5.6-luna",
-      "priority": 10,
-      "context_window": 1000000,
-      "max_output_tokens": 128000,
-      "capabilities": {
-        "reasoning": true,
-        "temperature": false,
-        "reasoning_effort": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh",
-          "max"
-        ]
-      },
-      "cost": {
-        "input_per_million": 1.0,
-        "output_per_million": 5.0
-      },
-      "tags": [
-        "quality/routine"
+        "task_aware/draft",
+        "task_aware/review"
       ]
     },
     {
@@ -332,8 +336,91 @@
         "output_per_million": 7.5
       },
       "tags": [
-        "quality/analysis",
-        "task_aware/review"
+        "quality/analysis"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-astra",
+      "priority": 5,
+      "quality": 1.0,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 10.0,
+        "output_per_million": 50.0
+      },
+      "tags": [
+        "task_aware/ultra"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-sol",
+      "priority": 20,
+      "quality": 0.95,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 2.0,
+        "output_per_million": 10.0
+      },
+      "tags": [
+        "quality/critical",
+        "economy/exception",
+        "task_aware/engineering"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-luna",
+      "priority": 10,
+      "quality": 0.7,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 0.1,
+        "output_per_million": 0.5
+      },
+      "tags": [
+        "quality/routine",
+        "task_aware/craft",
+        "task_aware/engineering"
       ]
     }
   ]
