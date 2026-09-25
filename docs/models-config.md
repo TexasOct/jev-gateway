@@ -238,21 +238,23 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 ### 仓库当前使用的 `task_aware` 分流表
 
-`models.json` 用三道题描述一次请求：`workload`（research / docs / small_change / coding / reverse）、`scale`（bounded / moderate / large / cross_domain）、`rigor`（draft / exacting）。七条规则按顺序命中，落成五个标签：
+`models.json` 用三道题描述一次请求：`workload`（research / docs / small_change / coding / reverse）、`scale`（bounded / moderate / large / cross_domain）、`rigor`（draft / exacting）。十条规则按顺序命中，落成七个标签：
 
 | 标签 | 命中条件 | 模型池 | 思考档位 |
 | --- | --- | --- | --- |
-| `draft` | 编码且 `rigor: draft`；或研究/文档/小改且 `rigor: draft` | `deepseek-flash` | `low` |
-| `review` | 研究/文档/小改且 `rigor: exacting` | `deepseek-flash` | `medium` |
-| `craft` | 编码、`rigor: exacting`，`scale` 为 bounded 或 moderate | `gpt-6-luna` | `medium` |
-| `engineering` | `workload: reverse`；或编码且 `scale: large` | `gpt-6-sol`，`gpt-6-luna` 作为约束回退 | `high` |
+| `quick` | 小改且 `scale: bounded`、`rigor: draft` | `deepseek-flash` | `minimal` |
+| `draft` | 调研、文档或小改且 `rigor: draft`，且未被前面的规则命中 | `gpt-6-luna`；仅当请求所需输出上限超过 Luna 的上限时回退到 `deepseek-flash` | `low` |
+| `review` | 文档或小改且 `rigor: exacting` | `gpt-6-luna`；仅当请求所需输出上限超过 Luna 的上限时回退到 `deepseek-flash` | `medium` |
+| `investigate` | 调研且 `rigor: exacting` | `deepseek-flash` | `high` |
+| `craft` | 未被前面规则命中的编码：`scale` 非 `large`、非 `cross_domain`，且不是 `moderate` + `exacting` | `gpt-6-luna` | `medium` |
+| `engineering` | `workload: reverse`；或编码且 `scale: large`，或 `scale: moderate` + `rigor: exacting` | `gpt-6-sol`，`gpt-6-luna` 作为约束回退 | `high` |
 | `ultra` | `scale: cross_domain` 且 `workload` 为 coding 或 reverse | `gpt-6-astra` | `xhigh` |
 
-分工依据：DeepSeek 承接调研、文档查看与编写、review，以及中小规模编码中不要求交付的那一部分；Luna 承接要求交付的中小规模编码，并在 `engineering` 池里作为 Sol 的能力/上下文回退；Sol 承接大规模编码与逆向；`ultra` 只由跨领域超高复杂任务触发，再大的单领域难题也留在 `engineering`。
+分工依据：决定模型的是标签归属，而不是质量阈值，`cheapest_adequate` 只在池内按成本挑第一个满足上下文与输出上限的模型。Luna 比 `deepseek-flash` 更便宜，质量分也更高，所以两者共处的池一律选出 Luna。DeepSeek 只保留 Luna 不在的两个池：bounded 的草稿级小改（`quick`）和严格调研（`investigate`）。Luna 承接文档、review，以及不涉及大规模的那部分可交付编码，并在 `engineering` 池里作为 Sol 的能力/上下文回退；Sol 承接大规模编码与逆向；`ultra` 只由跨领域超高复杂任务触发，再大的单领域难题也留在 `engineering`。
 
-规则 1 额外要求 `workload` 为 `coding` 或 `reverse`，所以“调研一个跨领域课题”或“为跨领域课题写文档”仍走 DeepSeek，不会因为话题本身难而被抬到最高档。
+规则 1 额外要求 `workload` 为 `coding` 或 `reverse`，所以“调研一个跨领域课题”或“为跨领域课题写文档”仍留在日常池（`draft` / `review`），不会因为话题本身难而被抬到最高档。
 
-决策提供方不可用、调用失败，或回答缺少任一问题时使用 `fallback`，当前是 `review` + `cheapest_adequate`，落在 DeepSeek 上。`gpt-5.6-terra` 不再带任何 `task_aware` 标签，只保留 `quality/analysis`：GPT-6 一代已经没有中间档，它的位置由 Luna 承担。重新把它放进某个标签池会让它和 Luna 在成本排序上竞争，谁胜出完全取决于该 provider 配置的价格。
+决策提供方不可用、调用失败，或回答缺少任一问题时使用 `fallback`，当前是 `review` + `cheapest_adequate`，落在 Luna 上。`gpt-5.6-terra` 不再带任何 `task_aware` 标签，只保留 `quality/analysis`：GPT-6 一代已经没有中间档，它的位置由 Luna 承担。重新把它放进某个标签池会让它和 Luna 在成本排序上竞争，谁胜出完全取决于该 provider 配置的价格。
 
 #### `ultra` 与 Astra
 
@@ -315,6 +317,46 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 例如，`models.example.json` 禁用外部决策并使用不带模型名的通用端点。启用时按实际端点填写地址和密钥环境变量；若端点要求模型名，再显式设置 `model`。不要把密钥明文放进 JSON。
 
 旧顶层键 `jev` 已移除，配置中必须使用 `decision`：将 `sources` 改为 `providers`、`default_source` 改为 `default_provider`，并为每个提供方显式填写 `protocol: "system_one"`。若旧端点依赖原先省略 `model` 时的默认值，还需显式填写 `model`；新配置不会代填。旧策略类型 `jev`、`jev_matrix` 也已移除，分别改用 `decision`、`decision_matrix`。旧分类器前缀 `jev:` 和矩阵前缀 `jev_matrix:` 分别改为 `decision:` 和 `decision_matrix:`；`X-JEV-Reason` 响应头名称不变。
+
+## 运行时覆盖文件
+
+`models.json` 是基线配置，gateway 从不改写它。面板上的拖拽改动写到与它同目录的两个运行时文件里，重启和 `POST /v1/routing/reload` 都会重新应用。
+
+`routing-overrides.json` 覆盖规则顺序和模型的标签、优先级：
+
+```json
+{
+  "version": 1,
+  "strategy": "task_aware",
+  "rules": [
+    { "when": { "scale": "large" }, "select": { "label": "engineering", "selection": "quality_first" } }
+  ],
+  "models": {
+    "openai/gpt-6-luna": { "tags": ["quality/routine", "task_aware/craft"], "priority": 10 }
+  }
+}
+```
+
+合并规则如下：
+
+- `rules` 整体替换 `strategies.<strategy>.options.rules`，同一策略下的 `questions` 和 `fallback` 仍取自基线文件。
+- `models.<模型 ID>` 整体替换该模型的 `tags`，`priority` 存在时才替换。模型 ID 是 `provider/upstream_model`。
+- 任何层级出现未知键都会被拒绝，因此存储、gateway、provider、decision 段都碰不到，密钥也进不了这个文件。
+- 未知策略名或未知模型 ID 会被拒绝。
+- 标签与模型的绑定靠标签：把模型放入某个标签就是给它加上 `{策略}/{标签}` 标签；改标签时只动这个标签，其它策略的标签（如 `quality/*`、`economy/*`）保持原样。
+
+覆盖文件会先合并进 `models.json` 文档，再走原有的解析与策略注册流程，所以标签没有对应模型、规则指向不存在的标签或选择模式等错误，都会用解析器自己的报错信息被拒绝，现役路由不受影响。写入是原子的：校验通过才落盘，落盘后重新加载；写盘后若加载失败，会恢复上一个文件内容并切回旧目录。每次成功应用都会在 `config_versions` 里留下一条记录。
+
+`dashboard-theme.json` 只存面板主题的种子色，不存派生结果：
+
+```json
+{"version": 1, "seed": "#3b66d9"}
+```
+
+调色板由前端用 chroma-js 从种子推导。删除这两个文件都会回到基线行为，重启或 reload 后生效。默认主题种子 `#3b66d9` 与旧面板的强调色一致。
+
+写入这两个文件都要求配置了 `gateway.api_key_env`，否则写接口返回 `403 config_writes_disabled`；未配置密钥时读接口的行为与之前一致。
+
 
 ## 检查配置
 

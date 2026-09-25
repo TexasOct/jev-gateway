@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Overlay兼容、校验与授权检查"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端/前端回归门槛"}
+{"file": ".trellis/tasks/09-23-modern-dashboard-routing/prd.md", "reason": "已有 editor 配置、授权和保存验收"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "复核完整策略配置验证约束"}
+{"file": ".trellis/tasks/09-24-dashboard-session-list/design.md", "reason": "Ensure whiteboard view preserves monitoring contract"}
+{"file": "docs/http-api.md", "reason": "Check documented endpoint behavior"}

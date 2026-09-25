@@ -1,6 +1,6 @@
 # 本地安装 JEV Gateway
 
-JEV Gateway 支持三种本地安装方式：仓库开发模式、uv 隔离 CLI、容器运行。所有方式使用同一个运行目录：
+JEV Gateway 支持 curl CLI、仓库开发模式、uv 隔离 CLI、容器运行和 wheel 安装。所有方式使用同一个运行目录：
 
 ```text
 $HOME/.jev-gateway/
@@ -17,7 +17,21 @@ export JEV_GATEWAY_HOME="$HOME/.jev-gateway-staging"
 
 网关启动时从该目录加载 `models.json` 和 `.env`。`storage.path` 使用相对路径时，也会相对于该目录保存。因此，配置、密钥和记录不会散落到启动终端所在目录。
 
-## 方案一：uv 开发安装
+## 方案一：curl 安装 CLI
+
+macOS 和 Linux 可直接安装 CLI，无需手动克隆仓库：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes
+```
+
+raw `main` 提供引导脚本；脚本从 GitHub 最新已发布的稳定版 Release 下载 `jev_gateway-X.Y.Z-py3-none-any.whl` 和同名 `.sha256` 文件，校验 SHA256 后才安装。没有稳定版、缺少文件或校验失败时会报错，绝不回退安装 Git `main`。首次公开 Release 尚未由本任务创建，因此发布前默认命令会失败。脚本会安装或使用 `uv`，并通过 `jev install init` 初始化运行目录。重复运行会保留已有的 `models.json`、`.env` 和记录数据库。
+
+已发布版本可以用 `--version X.Y.Z` 固定或回滚；接受可选前缀 `v`，显式选择 `--version 0.2.0rc1` 可安装预发布版。`--ref REF` 仅用于明确要求从 Git 安装的开发场景，不进行 Release 校验，不能与 `--version` 同时使用。其他参数有 `--home DIR`、`--no-init`、`--dry-run`、`--yes`、`--no-uv`。dry-run 不联网、不写入，也无法确认最新版本及校验和。安装后使用 `jev start`、`jev status`、`jev stop` 管理服务，详细命令见 [`cli.md`](cli.md)。
+
+Windows 不支持此安装脚本。可使用下方的源码安装或 Docker 方案。维护者的发版步骤见 [`releasing.md`](releasing.md)。
+
+## 方案二：uv 开发安装
 
 适用于开发、调试策略和运行测试。
 
@@ -62,7 +76,7 @@ cd "$HOME/.jev-gateway"
 uv --directory /path/to/jev-gateway run jev-gateway
 ```
 
-## 方案二：uv 隔离 CLI 安装
+## 方案三：uv 隔离 CLI 安装
 
 适合在本机长期运行，不需要保留开发虚拟环境。
 
@@ -115,9 +129,9 @@ uv tool update-shell
 rm -rf "$HOME/.jev-gateway"
 ```
 
-## 方案三：Homebrew 安装辅助
+## 方案四：Homebrew 安装辅助
 
-当前仓库没有公开 tap 或 release URL，因此不能提供一个会失败的 `brew install jev-gateway` formula。Homebrew 在这里负责安装 uv，随后复用已经验证过的 uv 安装器：
+当前仓库没有公开 Homebrew tap，因此不提供 `brew install jev-gateway` formula。Homebrew 在这里负责安装 uv，随后复用已经验证过的 uv 安装器：
 
 ```bash
 cd /path/to/jev-gateway
@@ -137,7 +151,7 @@ brew install uv
 ./scripts/install-with-brew.sh --editable
 ```
 
-将来发布 GitHub Release 并建立 Homebrew tap 后，可以再补正式的：
+建立 Homebrew tap 后，可以再补正式的：
 
 ```bash
 brew tap <owner>/tap
@@ -146,7 +160,7 @@ brew install jev-gateway
 
 但无论从哪个渠道安装，运行目录都保持为 `$HOME/.jev-gateway`。
 
-## 方案四：Docker 或 Docker Compose
+## 方案五：Docker 或 Docker Compose
 
 容器使用挂载卷持久化 `$HOME/.jev-gateway`。首次启动时，如果宿主目录中缺少配置，entrypoint 会生成：
 
@@ -192,7 +206,7 @@ curl -X POST http://127.0.0.1:8000/v1/routing/reload
 
 Compose 默认只将容器端口绑定到 `127.0.0.1`。如需对局域网开放，请显式修改 `compose.yaml` 的 ports 配置，并在 `models.json` 中评估入站鉴权设置。
 
-## wheel 安装
+## 方案六：wheel 安装
 
 适合把固定版本交付给另一台机器。
 

@@ -9,12 +9,13 @@ The dashboard is a Vite + React + TypeScript app in `frontend/`. Its build outpu
 is committed at `jev_gateway/static/` and served by the gateway process, so there
 is no second server to start and `pip install` needs no Node.
 
-Two files next to the active `models.json` hold runtime edits:
+Three files next to the active `models.json` hold runtime edits:
 
 | File | Holds | Written by |
 | --- | --- | --- |
-| `routing-overrides.json` | rule order, per-model `tags` and `priority` | `PUT`/`DELETE /v1/routing/configuration` |
+| `routing-overrides.json` | question definitions, ordered rules, fallback, per-model `tags` and `priority` | `PUT`/`DELETE /v1/routing/configuration` |
 | `dashboard-theme.json` | one hex seed color | `PUT`/`DELETE /v1/dashboard/theme` |
+| `routing-canvas-layout.json` | node positions and scroll viewport | `PUT /v1/dashboard/canvas-layout` |
 
 `models.json` is the baseline and is never written by the gateway.
 
@@ -60,13 +61,18 @@ Overlay request body:
 {
   "version": 1,
   "strategy": "task_aware",
+  "questions": {"scale": {"type": "choice", "instructions": "...", "criteria": {"small": "...", "large": "..."}}},
   "rules": [{"when": {"scale": "large"}, "select": {"label": "engineering"}}],
+  "fallback": {"label": "routine"},
   "models": {"openai/gpt-6-luna": {"tags": ["quality/routine", "task_aware/craft"], "priority": 10}}
 }
 ```
 
-- `rules` replaces `strategies.<strategy>.options.rules` wholesale; `questions`
-  and `fallback` still come from the baseline file.
+- `rules` replaces `strategies.<strategy>.options.rules` wholesale. Optional
+  `questions` and `fallback` replace the corresponding baseline options when
+  present; old overlays that omit them inherit those values from the baseline.
+  The fully merged catalog must pass the existing parser and cross-reference
+  validation before the overlay is written or activated.
 - `models.<catalog id>` replaces that entry's `tags`, and `priority` when
   present. The catalog id is `provider/upstream_model`.
 - Unknown keys at any level, an unknown strategy name, an unknown catalog id, and
@@ -109,8 +115,9 @@ unauthenticated mutations in the default install.
 
 ### 6. Tests Required
 
-- `tests/test_routing_overlay.py`: rules replacement preserves `questions` and
-  `fallback`; tag and priority override; unknown catalog id, unknown strategy,
+- `tests/test_routing_overlay.py`: rules-only replacement preserves baseline
+  `questions` and `fallback`; explicit question/fallback overrides merge; tag and
+  priority override; unknown catalog id, unknown strategy,
   unknown key, storage key, missing file, malformed JSON; an empty overlay parses
   identically to the baseline; an inert-label warning is reported for a label that
   declares explicit `models`.
@@ -183,7 +190,9 @@ the bundle. `npm --prefix frontend run lint|test|build` are the frontend gates.
 - CSP is `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src
   'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action
   'self'; frame-ancestors 'none'`. The bundled app needs no inline script.
-- The shell contains no session or credential data.
+- The shell contains no session or credential data. The frontend may persist only
+  the selected dashboard locale under a dedicated fixed key; the credential
+  remains module-memory-only.
 - `pyproject.toml` declares `[tool.setuptools.package-data]` for
   `jev_gateway/static/**`; the `Dockerfile` rebuilds the bundle in a Node stage
   before `uv build`.
@@ -216,8 +225,9 @@ the bundle. `npm --prefix frontend run lint|test|build` are the frontend gates.
 - `tests/test_gateway.py`: shell `200` with `no-store`, `nosniff`,
   `referrer-policy`, and a CSP whose `script-src` is exactly `'self'`; the shell
   carries no session data and only `/dashboard/assets/` references; assets are
-  immutable-cacheable; the bundle JS contains no `localStorage`,
-  `sessionStorage`, or `document.cookie`; the stylesheet still stacks table rows
+  immutable-cacheable; the bundle JS never persists or URL-encodes a credential and does not use
+  cookies or session storage; local storage, if present, is limited to the fixed
+  locale key; the stylesheet still stacks table rows
   with `attr(data-label)`; `browsable_host` and `dashboard_url` behavior.
 - `tests/test_logging_config.py`: the `dashboard_url` field renders in pretty,
   compact, and JSON.
@@ -241,12 +251,161 @@ if assets.is_dir():
     app.mount("/dashboard", DashboardStatic(directory=assets, html=True))
 ```
 
+## Scenario: independent canvas layout
+
+### 1. Scope / Trigger
+
+Use this contract when changing whiteboard persistence or its boundary with routing configuration. `jev_gateway/canvas_layout.py` owns file validation and atomic persistence; the dashboard router owns authorization.
+
+### 2. Signatures
+
+```python
+layout_path(models_file: Path) -> Path
+validate_layout(value: Any) -> dict[str, Any]
+read_layout(models_file: Path) -> tuple[dict[str, Any], str | None]
+write_layout(models_file: Path, value: Any) -> dict[str, Any]
+```
+
+`GET /v1/dashboard/canvas-layout` reads the file. `PUT` replaces it after `require_write` succeeds. Neither operation calls the routing engine's reload or config-version registration methods.
+
+### 3. Contracts
+
+The exact write shape is `{version: 1, nodes: {node_id: {x, y}}, viewport: {x, y}}`. Positions are integers with absolute value at most 10000, with at most 256 stored nodes and 65536 encoded bytes. Accept the known node-ID namespaces (`questions`, `fallback`, `rule-N`, `zone::…`, `model::…`), including valid Unicode names, but no control characters. Reject unknown keys. Node IDs identify UI slots or catalog entities, not executable topology.
+
+The layout is shared by browsers connected to the same installation. The API currently uses atomic last-writer-wins replacement, not revision checks. Missing files return empty positions; corrupted/unreadable files return defaults with `read_error`. Write payloads never include `read_error`, credentials, rule bodies, or connections. Routing edges are derived from the draft and changes go through the separate policy validation/review/apply flow.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Wrong configured Bearer key | `401 invalid_api_key` |
+| No configured key on PUT | `403 config_writes_disabled` |
+| Invalid shape, coordinates, node IDs, or bounds | `400 invalid_canvas_layout` |
+| Atomic replacement fails | `500 canvas_layout_write_failed`; previous file remains |
+| Missing/corrupt layout | Defaults; `read_error` only for unreadable/corrupt data |
+| Successful layout PUT | Policy hash, config versions, baseline and overlay unchanged |
+
+### 5. Good/Base/Bad Cases
+
+- Good: dragging a node stores its position separately; moving a routing connection changes only the pending policy draft until reviewed and applied.
+- Base: no layout file gives a usable default arrangement.
+- Bad: saving coordinates inside `routing-overrides.json` or calling engine reload for a layout save.
+
+### 6. Tests Required
+
+- `tests/test_canvas_layout.py`: strict shape, Unicode IDs, limits, corrupt-file fallback, and read-after-write at the byte limit.
+- `tests/test_gateway.py`: configured-key guard, Bearer checks, file failure, unchanged policy hash/version count and unchanged baseline/overlay bytes.
+- `frontend/src/config/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
+- Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works.
+
+### 7. Wrong vs Correct
+
+Wrong: validate compact JSON size, then pretty-print a file larger than the read bound. Correct: validate and write a consistent encoding within the same byte limit.
+
+## Scenario: monitoring lists with cursors and virtual windows
+
+### 1. Scope / Trigger
+
+Use when changing session or request monitoring list response sizes, pagination, or rendering behavior. Live session scope and retained evidence semantics remain unchanged.
+
+### 2. Signatures
+
+`RecordStore.session_request_page(session_id, *, limit, before)` returns `(rows, last_key, has_more)`; SQLite reads continue through the writer thread with `wait=True`. Both monitoring list routes accept bounded `limit` and an optional cursor.
+
+### 3. Contracts
+
+`limit` defaults to 30 and is capped at 100. Preserve `data` and `requests` response arrays; add `page_size`, `has_more`, and `next_cursor`. Session ordering is `(has_retained_request, effective_time, session_id)` descending. Request ordering is `(received_at, rowid)` descending. The request SQL fetches `limit + 1`, selects one latest decision per request, and applies the compound cursor in SQL. Session list queries remain content-free.
+
+Cursor token contains version, endpoint, optional request `session_id`, and ordering key, signed with HMAC-SHA256 using a per-router secret. It is not an authorization credential; each page still uses the gateway Bearer check. Process restart invalidates cursors. Pagination is best-effort, with no cross-request snapshot. New/expired/updated sessions and retention pruning can shift pages; clients deduplicate stable IDs. Old callers that expect the whole list must follow `next_cursor`.
+
+Each monitoring list has its own fixed-height virtual window. `height`, `min-height`, and `max-height` are equal per viewport breakpoint; the request timeline gets more height than the session selector. Only visible rows plus overscan mount. Session selection/refresh resets the request cursor and ignores stale responses. Keep expanded request evidence readable inside its row.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| `limit` outside 1..100 | `400 invalid_limit` |
+| Malformed, tampered, wrong-endpoint, wrong-session or pre-restart cursor | `400 invalid_cursor` |
+| Detail request for a non-live session | `404 unknown_session` |
+| Storage unavailable | Preserve existing live-only/evidence-unavailable behavior |
+
+### 5. Good/Base/Bad Cases
+
+- Good: each cursor continues from the last returned compound key; a concurrent mutation may shift later pages and the UI deduplicates by stable IDs.
+- Base: empty pages still occupy the fixed-height window and display empty/loading states inside it.
+- Bad: loading all retained request bodies and slicing in Python, returning prompt fields in sessions pages, or treating a cursor as a substitute for Bearer authorization.
+
+### 6. Tests Required
+
+- `tests/test_records.py`: equal timestamps, rowid tie-break, `limit + 1`, next key, and no full-history decode before slicing.
+- `tests/test_gateway.py`: both endpoints' limits/cursors, HMAC tamper and endpoint/session scope, Bearer auth on every page, memory-only session pages, no context leakage and storage degradation.
+- Frontend tests: fixed-height values, overscan row bounds, next-page cursor calls, stable-ID dedupe, refresh/session-switch races, retry and expanded evidence.
+- Browser tests must use actual scroll actions and record follow-up network cursor requests; pure windowing tests are not pointer/scroll acceptance.
+
+### 7. Wrong vs Correct
+
+Wrong: `session_request_evidence(id)[:limit]` loads all retained evidence, then slices. Correct: issue a bounded SQL query in `session_request_page` with the compound `(received_at, rowid)` cursor.
+
+## Frontend conventions
+
+### 1. Scope / Trigger
+
+Use for changes to live-session listing, retained request pages or virtualized list rendering. Preserve live-only scope and evidence privacy.
+
+### 2. Signatures
+
+```python
+RecordStore.session_request_page(
+    session_id: str, *, limit: int, before: tuple[float, int] | None
+) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]
+```
+
+Both `GET /v1/routing/sessions` and `GET /v1/routing/sessions/{session_id:path}/requests` accept `limit` and `cursor`.
+
+### 3. Contracts
+
+`limit` defaults to 30 with a maximum of 100. The response retains `data` or `requests` and adds `page_size`, `has_more`, and `next_cursor`. A request without a cursor receives the first bounded page; clients needing all rows must follow cursors.
+
+Sessions sort `(has_request, effective_time, session_id)` descending. Evidence-present and memory-only rows occupy separate groups; monotonic update times are never presented as dates. The session response projects only safe metadata and excludes prompt, messages, event/context bodies, and adapter state.
+
+Requests sort `received_at DESC, rowid DESC`. The writer-thread query binds cursor parameters and fetches `limit + 1`, choosing one latest decision per request. Never fetch/decode all retained bodies to slice in Python.
+
+Cursors contain a version, endpoint, optional session ID, and ordering key. HMAC-SHA256 uses a random per-router secret; restart invalidates tokens. Every page still checks Bearer authorization. Paging is best-effort without cross-request snapshots: concurrent changes may shift pages or cause gaps. Client append deduplicates by stable IDs. Manual refresh starts a new traversal.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Limit outside 1..100 | `400 invalid_limit` |
+| Malformed, forged, other-endpoint/session, or pre-restart cursor | `400 invalid_cursor` |
+| Detail session expired/evicted | `404 unknown_session` |
+| Evidence disabled/degraded | Live session list remains; detail has no evidence rows |
+| Exhausted page | `has_more: false`, `next_cursor: null` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the next page follows the last compound key; the client ignores stale responses after session changes.
+- Base: an empty list keeps its fixed-height window and explanatory state.
+- Bad: offset paging over changing activity order, skipping authorization for a signed cursor, or treating best-effort traversal as a snapshot.
+
+### 6. Tests Required
+
+- Backend: timestamp ties, page bounds, static traversal completeness, signed-token validation, cross-session rejection, slash session IDs, memory-only sessions and storage degradation.
+- Frontend: fixed `height == min-height == max-height`, virtual row bound, duplicate suppression, stale response rejection, refresh during next-page fetch, keyboard focus and visible retry controls.
+- Browser: scroll beyond the first page, inspect network cursor calls, expand request evidence and check that it remains accessible inside the fixed viewport.
+
+### 7. Wrong vs Correct
+
+Wrong: `session_request_evidence(id)[:limit]` loads every retained payload. Correct: call `session_request_page` through the existing writer queue and apply the compound key predicate in SQL.
+
 ## Frontend conventions
 
 - One page, no client-side router. View state switches between monitoring and
   configuration.
 - The gateway credential lives in a module-level variable in `src/api.ts` only.
-  Never `localStorage`, `sessionStorage`, a cookie, or the URL.
+  Never persist it in `localStorage`, `sessionStorage`, a cookie, or the URL.
+  `localStorage` may hold only the validated locale identifier under the fixed
+  dashboard locale key.
 - Pure editor logic belongs in `src/config/draft.ts` and pure palette logic in
   `src/theme/palette.ts`, so both are testable without a DOM. The overlay payload
   compares each model against `baseline_tags` / `baseline_priority`, not against

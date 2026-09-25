@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 import ipaddress
+import base64
+import binascii
+import hashlib
+import hmac
 import json
+import math
 import os
 import re
+import secrets
 import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from starlette.staticfiles import StaticFiles
 
+from jev_gateway.canvas_layout import read_layout, write_layout
 from jev_gateway.records import StorageUnavailableError
 
 
@@ -50,6 +57,64 @@ _SECURITY_HEADERS = {
 }
 _IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 _NO_STORE = "no-store"
+DEFAULT_PAGE_SIZE = 30
+MAX_PAGE_SIZE = 100
+
+
+def _page_size(limit: int) -> int:
+    if limit < 1 or limit > MAX_PAGE_SIZE:
+        raise HTTPException(status_code=400, detail={"error": {
+            "message": f"limit must be between 1 and {MAX_PAGE_SIZE}.",
+            "type": "invalid_request_error", "param": "limit", "code": "invalid_limit",
+        }})
+    return limit
+
+
+def _invalid_cursor() -> HTTPException:
+    return HTTPException(status_code=400, detail={"error": {
+        "message": "Invalid or mismatched pagination cursor.",
+        "type": "invalid_request_error", "param": "cursor", "code": "invalid_cursor",
+    }})
+
+
+def _encode_cursor(secret: bytes, endpoint: str, session_id: str | None, key: list[Any]) -> str:
+    payload = json.dumps([1, endpoint, session_id, key], separators=(",", ":"), ensure_ascii=False).encode()
+    signature = hmac.digest(secret, payload, "sha256")
+    return base64.urlsafe_b64encode(payload + signature).decode().rstrip("=")
+
+
+def _decode_cursor(
+    secret: bytes, cursor: str | None, endpoint: str, session_id: str | None
+) -> list[Any] | None:
+    if cursor is None:
+        return None
+    try:
+        if len(cursor) > 4096 or not re.fullmatch(r"[A-Za-z0-9_-]+", cursor):
+            raise ValueError("cursor encoding")
+        raw = base64.b64decode(cursor + "=" * (-len(cursor) % 4), altchars=b"-_", validate=True)
+        payload, signature = raw[:-32], raw[-32:]
+        if not hmac.compare_digest(hmac.digest(secret, payload, "sha256"), signature):
+            raise ValueError("cursor signature")
+        decoded = json.loads(payload)
+        if not isinstance(decoded, list) or len(decoded) != 4 or decoded[:3] != [1, endpoint, session_id]:
+            raise ValueError("cursor scope")
+        key = decoded[3]
+        if not isinstance(key, list) or len(key) != 3:
+            raise ValueError("cursor key")
+        if endpoint == "sessions":
+            valid = type(key[0]) is int and key[0] in (0, 1) and isinstance(key[2], str)
+        else:
+            valid = type(key[2]) is int and key[2] > 0 and key[0] == "request" and key[1] is not None
+        if (
+            not valid
+            or type(key[1]) not in (int, float)
+            or key[1] is None
+            or not math.isfinite(float(key[1]))
+        ):
+            raise ValueError("cursor key")
+        return key
+    except (ValueError, TypeError, IndexError, UnicodeError, binascii.Error) as error:
+        raise _invalid_cursor() from error
 
 
 class DashboardStatic(StaticFiles):
@@ -205,6 +270,7 @@ def create_dashboard_router(
 ) -> APIRouter:
     """Create dashboard routes bound to mutable gateway state."""
     router = APIRouter()
+    cursor_secret = secrets.token_bytes(32)
 
     @router.get("/dashboard", response_class=FileResponse)
     def dashboard_shell() -> FileResponse:
@@ -286,8 +352,12 @@ def create_dashboard_router(
     @router.get("/v1/routing/sessions", response_model=None)
     def routing_sessions(
         authorization: str | None = Header(default=None),
+        limit: int = Query(default=DEFAULT_PAGE_SIZE),
+        cursor: str | None = Query(default=None),
     ) -> dict[str, Any]:
         authorize(state.gateway_api_key, authorization)
+        size = _page_size(limit)
+        before = _decode_cursor(cursor_secret, cursor, "sessions", None)
         snapshots = state.engine.store.snapshots()
         storage, evidence_available = _storage_state(state)
         evidence: dict[str, dict[str, Any]] = {}
@@ -301,7 +371,11 @@ def create_dashboard_router(
                 evidence_available = False
         data: list[dict[str, Any]] = []
         for snapshot in snapshots:
-            item = dict(snapshot)
+            # The inspection snapshot can contain events. Only project safe list fields.
+            item = {key: snapshot.get(key) for key in (
+                "session_id", "route", "strategy", "label", "turn_count",
+                "updated_at", "first_request_at",
+            )}
             found = evidence.get(snapshot["session_id"], {})
             latest = found.get("latest_request")
             decision = found.get("latest_decision")
@@ -319,35 +393,55 @@ def create_dashboard_router(
                 item["upstream_model"] = profile.model if profile is not None else None
             item["latest_request"] = latest
             data.append(item)
-        data.sort(
-            key=lambda item: (
-                item["latest_request"] is not None,
-                item["latest_request"]["received_at"]
-                if item["latest_request"] is not None
-                else item["updated_at"],
-            ),
-            reverse=True,
+        def order_key(item: dict[str, Any]) -> tuple[int, float, str]:
+            latest = item["latest_request"]
+            return (
+                int(latest is not None),
+                latest["received_at"] if latest is not None else item["updated_at"],
+                item["session_id"],
+            )
+
+        data.sort(key=order_key, reverse=True)
+        if before is not None:
+            data = [item for item in data if order_key(item) < tuple(before)]
+        has_more = len(data) > size
+        data = data[:size]
+        next_cursor = (
+            _encode_cursor(cursor_secret, "sessions", None, list(order_key(data[-1])))
+            if has_more else None
         )
         return {
             "storage": storage,
             "evidence_available": evidence_available,
             "data": data,
+            "page_size": size,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
         }
 
     @router.get("/v1/routing/sessions/{session_id:path}/requests", response_model=None)
     def routing_session_requests(
         session_id: str,
         authorization: str | None = Header(default=None),
+        limit: int = Query(default=DEFAULT_PAGE_SIZE),
+        cursor: str | None = Query(default=None),
     ) -> dict[str, Any]:
         authorize(state.gateway_api_key, authorization)
+        size = _page_size(limit)
+        before = _decode_cursor(cursor_secret, cursor, "requests", session_id)
         snapshot = state.engine.store.snapshot(session_id)
         if snapshot is None:
             raise _unknown_session(session_id)
         storage, evidence_available = _storage_state(state)
         retained: list[dict[str, Any]] = []
+        last_key: tuple[float, int] | None = None
+        has_more = False
         if evidence_available:
             try:
-                retained = state.engine.record_store.session_request_evidence(session_id)
+                retained, last_key, has_more = state.engine.record_store.session_request_page(
+                    session_id, limit=size,
+                    before=(before[1], before[2]) if before is not None else None,
+                )
             except (StorageUnavailableError, RuntimeError, ValueError) as error:
                 storage = {**storage, "error": str(error)}
                 evidence_available = False
@@ -356,7 +450,41 @@ def create_dashboard_router(
             "storage": storage,
             "evidence_available": evidence_available,
             "requests": retained if evidence_available else [],
+            "page_size": size,
+            "has_more": has_more,
+            "next_cursor": (
+                _encode_cursor(cursor_secret, "requests", session_id,
+                               ["request", last_key[0], last_key[1]])
+                if has_more and last_key is not None else None
+            ),
         }
+
+    @router.get("/v1/dashboard/canvas-layout", response_model=None)
+    def dashboard_canvas_layout(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        authorize(state.gateway_api_key, authorization)
+        document, error = read_layout(state.models_file)
+        return {**document, "read_error": error}
+
+    @router.put("/v1/dashboard/canvas-layout", response_model=None)
+    def save_dashboard_canvas_layout(
+        body: Any = Body(...),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_write(authorization)
+        try:
+            return write_layout(state.models_file, body)
+        except (TypeError, ValueError) as error:
+            raise HTTPException(status_code=400, detail={"error": {
+                "message": str(error), "type": "invalid_request_error",
+                "param": "layout", "code": "invalid_canvas_layout",
+            }}) from error
+        except OSError as error:
+            raise HTTPException(status_code=500, detail={"error": {
+                "message": "Could not save canvas layout.", "type": "invalid_request_error",
+                "param": None, "code": "canvas_layout_write_failed",
+            }}) from error
 
     @router.get("/v1/dashboard/theme", response_model=None)
     def dashboard_theme(

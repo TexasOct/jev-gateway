@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+import copy
+import os
+from typing import Any
+
+from dotenv import dotenv_values
+
+from jev_gateway.cli.config_ops import read_document, validate_document, write_document_atomic
+from jev_gateway.cli.output import CliError, ExitCode
+from jev_gateway.cli.paths import RuntimePaths
+from jev_gateway.cli.secrets import remove_env, upsert_env
+
+PRESETS: dict[str, dict[str, str | None]] = {
+    "openai": {"type": "openai", "api_base": "https://api.openai.com/v1", "api_key_env": "OPENAI_API_KEY"},
+    "anthropic": {"type": "anthropic", "api_base": None, "api_key_env": "ANTHROPIC_API_KEY"},
+    "deepseek": {"type": "deepseek", "api_base": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"},
+}
+
+
+def provider_secret_name(document: dict[str, Any], provider_id: str) -> str:
+    for item in document.get("providers", []):
+        if isinstance(item, dict) and item.get("id") == provider_id:
+            name = item.get("api_key_env")
+            if isinstance(name, str) and name:
+                return name
+            raise CliError("provider_has_no_key_reference", f"Provider {provider_id!r} has no api_key_env.", ExitCode.USAGE)
+    preset = PRESETS.get(provider_id)
+    if preset and preset["api_key_env"]:
+        return str(preset["api_key_env"])
+    raise CliError("provider_missing", f"Provider {provider_id!r} does not exist and is not a supported preset.", ExitCode.USAGE)
+
+
+def add_provider(paths: RuntimePaths, *, preset: str, provider_id: str | None, provider_type: str | None, api_base: str | None, api_key_env: str | None, models: list[str], tags: list[str], priority: int | None = None, quality: float | None = None, context_window: int | None = None, max_output_tokens: int | None = None, set_defaults: bool = False, secret: str | None = None, dry_run: bool = False) -> dict[str, Any]:
+    if preset not in {*PRESETS, "custom"}:
+        raise CliError("unknown_preset", f"Unknown provider preset {preset!r}.", ExitCode.USAGE)
+    if not models:
+        raise CliError("model_required", "At least one --model is required.", ExitCode.USAGE)
+    document = read_document(paths.models)
+    identifier = provider_id or preset
+    providers = document.get("providers")
+    entries = document.get("models")
+    if not isinstance(providers, list) or not isinstance(entries, list):
+        raise CliError("invalid_configuration", "Catalog providers and models must be arrays.", ExitCode.INVALID_CONFIG)
+    if any(item.get("id") == identifier for item in providers if isinstance(item, dict)):
+        raise CliError("provider_exists", f"Provider {identifier!r} already exists.", ExitCode.USAGE)
+    template = PRESETS.get(preset, {})
+    kind = provider_type or template.get("type")
+    base = api_base if api_base is not None else template.get("api_base")
+    key_name = api_key_env or str(template.get("api_key_env") or "")
+    if preset == "custom" and (not kind or not base or not key_name):
+        raise CliError("missing_provider_option", "custom requires --type, --api-base, and --api-key-env.", ExitCode.USAGE)
+    if not kind:
+        raise CliError("unsupported_provider_type", "Provider type is required.", ExitCode.USAGE)
+    provider: dict[str, Any] = {"id": identifier, "type": kind}
+    if base:
+        provider["api_base"] = base
+    if key_name:
+        provider["api_key_env"] = key_name
+    candidate = copy.deepcopy(document)
+    candidate["providers"].append(provider)
+    new_ids = []
+    seen_models: set[str] = set()
+    for model in models:
+        if model in seen_models:
+            raise CliError("model_exists", f"Model {identifier}/{model} was specified twice.", ExitCode.USAGE)
+        seen_models.add(model)
+        if any(item.get("provider") == identifier and item.get("upstream_model") == model for item in entries if isinstance(item, dict)):
+            raise CliError("model_exists", f"Model {identifier}/{model} already exists.", ExitCode.USAGE)
+        entry: dict[str, Any] = {"provider": identifier, "upstream_model": model}
+        if tags:
+            entry["tags"] = list(tags)
+        if priority is not None:
+            entry["priority"] = priority
+        if quality is not None:
+            entry["quality"] = quality
+        if context_window is not None:
+            entry["context_window"] = context_window
+        if max_output_tokens is not None:
+            entry["max_output_tokens"] = max_output_tokens
+        if set_defaults:
+            entry.setdefault("capabilities", {"tools": True, "vision": True, "json_mode": True, "reasoning": False, "reasoning_effort": [], "temperature": True})
+        candidate["models"].append(entry)
+        new_ids.append(f"{identifier}/{model}")
+    # The catalog parser resolves credentials while validating. Supply a temporary
+    # sentinel for the new provider only, so adding a reference before login is
+    # possible without weakening validation of existing providers.
+    config_env = dict(os.environ)
+    if paths.env.exists():
+        config_env.update({name: value for name, value in dotenv_values(paths.env).items() if isinstance(name, str) and isinstance(value, str)})
+    if key_name and (secret is not None or not config_env.get(key_name)):
+        config_env[key_name] = secret or "jev-key-not-yet-configured"
+    previous = dict(os.environ)
+    try:
+        os.environ.clear()
+        os.environ.update(config_env)
+        validate_document(candidate, str(paths.models))
+    except (ValueError, TypeError) as exc:
+        raise CliError("invalid_configuration", str(exc), ExitCode.INVALID_CONFIG) from exc
+    finally:
+        os.environ.clear()
+        os.environ.update(previous)
+    if dry_run:
+        return {"providers": [identifier], "models": new_ids, "dry_run": True, "secret_set": secret is not None, "api_key_env": key_name or None}
+    if secret is not None and key_name:
+        upsert_env(paths.env, key_name, secret)
+    write_document_atomic(paths.models, candidate, validate=False)
+    return {"providers": [identifier], "models": new_ids, "api_key_env": key_name or None, "secret_set": secret is not None}
+
+
+def login(paths: RuntimePaths, provider_id: str, name: str, secret: str | None, dry_run: bool = False) -> dict[str, Any]:
+    document = read_document(paths.models) if paths.models.exists() else {"providers": []}
+    destination = provider_secret_name(document, provider_id)
+    if secret is not None and (not secret or any(character in secret for character in "\r\n\x00")):
+        raise CliError("invalid_secret", "Credential must be nonempty and fit on one line.", ExitCode.USAGE)
+    if dry_run:
+        return {"provider": provider_id, "api_key_env": destination, "secret_set": secret is not None, "dry_run": True}
+    if secret is None:
+        raise CliError("secret_missing", "A secret source is required.", ExitCode.USAGE)
+    upsert_env(paths.env, destination, secret)
+    return {"provider": provider_id, "api_key_env": destination, "secret_set": True, "reload_required": True}
+
+
+def logout(paths: RuntimePaths, provider_id: str, dry_run: bool = False) -> dict[str, Any]:
+    document = read_document(paths.models) if paths.models.exists() else {"providers": []}
+    name = provider_secret_name(document, provider_id)
+    removed = False if dry_run else remove_env(paths.env, name)
+    return {"provider": provider_id, "api_key_env": name, "removed": removed, "dry_run": dry_run, "note": "This does not revoke the upstream key or remove exported shell values."}
+
+
+def list_providers(paths: RuntimePaths) -> list[dict[str, Any]]:
+    document = read_document(paths.models)
+    counts: dict[str, int] = {}
+    for model in document.get("models", []):
+        if isinstance(model, dict):
+            provider = model.get("provider")
+            if isinstance(provider, str):
+                counts[provider] = counts.get(provider, 0) + 1
+    local_keys = dotenv_values(paths.env) if paths.env.exists() else {}
+    result = []
+    for provider in document.get("providers", []):
+        if isinstance(provider, dict):
+            key_name = provider.get("api_key_env")
+            provider_id = provider.get("id")
+            public = {key: value for key, value in provider.items() if key != "params"}
+            if "params" in provider:
+                public["params"] = dict.fromkeys(provider["params"], "[configured]") if isinstance(provider["params"], dict) else "[configured]"
+            result.append({**public, "model_count": counts.get(provider_id, 0) if isinstance(provider_id, str) else 0, "key_present": bool(local_keys.get(key_name) or os.getenv(key_name)) if isinstance(key_name, str) else False})
+    return result
+
+
+def remove_provider(paths: RuntimePaths, provider_id: str, force: bool = False, dry_run: bool = False) -> dict[str, Any]:
+    document = read_document(paths.models)
+    providers = document.get("providers", [])
+    models = document.get("models", [])
+    if not any(isinstance(item, dict) and item.get("id") == provider_id for item in providers):
+        raise CliError("provider_missing", f"Provider {provider_id!r} does not exist.", ExitCode.USAGE)
+    owned = [item for item in models if isinstance(item, dict) and item.get("provider") == provider_id]
+    if owned and not force:
+        raise CliError("provider_in_use", f"Provider {provider_id!r} has models; use --force to remove them.", ExitCode.USAGE)
+    affected = sorted({tag for item in owned for tag in item.get("tags", [])})
+    candidate = copy.deepcopy(document)
+    candidate["providers"] = [item for item in candidate["providers"] if item.get("id") != provider_id]
+    candidate["models"] = [item for item in candidate["models"] if item.get("provider") != provider_id]
+    validate_document(candidate, str(paths.models))
+    if not dry_run:
+        write_document_atomic(paths.models, candidate, validate=False)
+    return {"provider": provider_id, "models_removed": len(owned), "affected_tags": affected, "dry_run": dry_run}

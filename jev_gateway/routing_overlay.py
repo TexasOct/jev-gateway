@@ -41,15 +41,15 @@ def validate_overlay_shape(value: Any) -> dict[str, Any]:
     """Reject unrecognized or partial write payloads before they reach disk."""
     if not isinstance(value, dict):
         raise ValueError("Overlay must be an object.")
-    _unknown_keys(value, {"version", "strategy", "rules", "models"}, "Overlay")
+    _unknown_keys(value, {"version", "strategy", "questions", "rules", "fallback", "models"}, "Overlay")
     if not value:
         return {}
     if type(value.get("version")) is not int or value["version"] != 1:
         raise ValueError("Overlay version must be 1.")
     if not isinstance(value.get("strategy"), str) or not value["strategy"].strip():
         raise ValueError("Overlay strategy must be a non-empty string.")
-    if "rules" not in value and "models" not in value:
-        raise ValueError("Overlay requires rules or models.")
+    if not any(key in value for key in ("questions", "rules", "fallback", "models")):
+        raise ValueError("Overlay requires questions, rules, fallback, or models.")
     rules = value.get("rules")
     if "rules" in value:
         if not isinstance(rules, list):
@@ -80,6 +80,34 @@ def validate_overlay_shape(value: Any) -> dict[str, Any]:
                 for item in select.values()
             ):
                 raise ValueError(f"{field}.select must contain non-empty choices.")
+    questions = value.get("questions")
+    if "questions" in value and not isinstance(questions, dict):
+        raise ValueError("Overlay questions must be an object.")
+    if isinstance(questions, dict):
+        for name, question in questions.items():
+            field = f"Overlay questions[{name!r}]"
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("Overlay questions must have non-empty names.")
+            if not isinstance(question, dict):
+                raise ValueError(f"{field} must be an object.")
+            _unknown_keys(question, {"type", "instructions", "criteria"}, field)
+            if not isinstance(question.get("type"), str) or not question["type"].strip():
+                raise ValueError(f"{field}.type must be a non-empty string.")
+            if not isinstance(question.get("instructions"), str):
+                raise ValueError(f"{field}.instructions must be a string.")
+            criteria = question.get("criteria")
+            if not isinstance(criteria, dict) or any(
+                not isinstance(key, str) or not key.strip() or not isinstance(label, str)
+                for key, label in criteria.items()
+            ):
+                raise ValueError(f"{field}.criteria must map non-empty names to strings.")
+    fallback = value.get("fallback")
+    if "fallback" in value:
+        if not isinstance(fallback, dict):
+            raise ValueError("Overlay fallback must be an object.")
+        _unknown_keys(fallback, {"label", "selection"}, "Overlay fallback")
+        if not fallback or any(not isinstance(item, str) or not item.strip() for item in fallback.values()):
+            raise ValueError("Overlay fallback must contain non-empty choices.")
     models = value.get("models")
     if "models" in value:
         if not isinstance(models, dict):
@@ -114,7 +142,7 @@ def read_overlay(models_file: Path) -> tuple[dict[str, Any], str | None]:
     except FileNotFoundError:
         return {}, None
     except (OSError, UnicodeError, ValueError, TypeError):
-        return {}, "Could not load routing overlay."
+        return {}, "Could not load routing overlay; unknown or invalid fields may require a newer gateway version."
 
 
 def _strategy_body(document: dict[str, Any], name: str) -> dict[str, Any]:
@@ -136,11 +164,16 @@ def merge_overlay(document: dict[str, Any], overlay: dict[str, Any]) -> dict[str
         return merged
     strategy = changes["strategy"]
     body = _strategy_body(merged, strategy)
-    if "rules" in changes:
-        options = body.get("options")
-        if not isinstance(options, dict):
-            raise ValueError(f"Overlay strategy {strategy!r} has no options.")
-        options["rules"] = changes["rules"]
+    options = body.get("options")
+    if any(key in changes for key in ("questions", "rules", "fallback")) and not isinstance(options, dict):
+        raise ValueError(f"Overlay strategy {strategy!r} has no options.")
+    if isinstance(options, dict):
+        if "questions" in changes:
+            options["questions"] = changes["questions"]
+        if "fallback" in changes:
+            options["fallback"] = changes["fallback"]
+        if "rules" in changes:
+            options["rules"] = changes["rules"]
     if "models" in changes:
         entries = merged.get("models")
         if not isinstance(entries, list):

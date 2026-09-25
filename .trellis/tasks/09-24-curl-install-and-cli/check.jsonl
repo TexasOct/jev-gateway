@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Review checklist for contract layering, reliability and security, and the required verification commands (pytest, uvx pyright, uv build)."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Quality-check section defining what must hold before a backend change is considered complete."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Import boundaries to confirm the CLI package does not pull in gateway.py or introduce a second package layout."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Checks that command output, error messages, log lines, and written files contain no credential values."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Checks that CLI failures use precise messages and stable error codes rather than broad exception swallows."}
+{"file": "docs/models-config.md", "reason": "Verifies provider and model entries written by the CLI are valid under the documented catalog rules."}

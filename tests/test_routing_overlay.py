@@ -54,6 +54,28 @@ def test_rules_replacement_preserves_questions_and_fallback() -> None:
     assert catalog_from_document(merged, "test catalog")
 
 
+def test_optional_questions_and_fallback_override_and_rules_can_be_omitted() -> None:
+    baseline = matrix_document()
+    overlay = {
+        "version": 1,
+        "strategy": "task_aware",
+        "questions": {"scale": {"type": "choice", "instructions": "Pick scale.", "criteria": {"small": "Small.", "large": "Large."}}},
+        "fallback": {"label": "simple"},
+    }
+    merged = merge_overlay(baseline, overlay)
+    options = merged["strategies"]["task_aware"]["options"]
+    assert options["questions"]["scale"]["instructions"] == "Pick scale."
+    assert options["fallback"] == {"label": "simple"}
+    assert options["rules"] == baseline["strategies"]["task_aware"]["options"]["rules"]
+    assert catalog_from_document(merged, "test catalog")
+
+
+def test_empty_rules_explicitly_disables_conditional_rules() -> None:
+    merged = merge_overlay(matrix_document(), {"version": 1, "strategy": "task_aware", "rules": []})
+    assert merged["strategies"]["task_aware"]["options"]["rules"] == []
+    assert catalog_from_document(merged, "test catalog")
+
+
 def test_tags_and_priority_override_only_target_model() -> None:
     baseline = matrix_document()
     merged = merge_overlay(baseline, {
@@ -73,7 +95,8 @@ def test_tags_and_priority_override_only_target_model() -> None:
     ({"version": 1, "strategy": "task_aware", "models": {SMALL_MODEL_ID: {"api_key": "secret"}}}, "api_key"),
     ({"version": 1, "strategy": "task_aware", "rules": [{"when": {"scale": "small"}, "select": {"label": "simple"}, "secret": "x"}]}, "secret"),
     ({"strategy": "task_aware", "rules": []}, "version"),
-    ({"version": 1, "strategy": "task_aware"}, "rules or models"),
+    ({"version": 1, "strategy": "task_aware"}, "questions, rules, fallback, or models"),
+    ({"version": 1, "strategy": "task_aware", "fallback": {"unknown": "missing"}}, "fallback"),
 ])
 def test_overlay_rejects_invalid_or_partial_payloads(payload: dict[str, Any], message: str) -> None:
     with pytest.raises(ValueError, match=message):
@@ -87,6 +110,17 @@ def test_read_overlay_missing_and_malformed_are_nonfatal(tmp_path: Path) -> None
     value, error = read_overlay(models_file)
     assert value == {} and error is not None and "routing overlay" in error
     models_file.write_text(json.dumps(matrix_document()), encoding="utf-8")
+    assert load_catalog_with_overlay(models_file).as_dict() == load_catalog(models_file).as_dict()
+
+
+def test_new_overlay_fields_from_newer_binary_warn_on_old_binary(tmp_path: Path) -> None:
+    models_file = tmp_path / "models.json"
+    baseline = matrix_document()
+    models_file.write_text(json.dumps(baseline), encoding="utf-8")
+    overlay_path(models_file).write_text(json.dumps({"version": 1, "strategy": "task_aware", "questions": baseline["strategies"]["task_aware"]["options"]["questions"], "rules": [], "future_field": True}), encoding="utf-8")
+    overlay, warning = read_overlay(models_file)
+    assert overlay == {}
+    assert warning is not None and "newer gateway version" in warning
     assert load_catalog_with_overlay(models_file).as_dict() == load_catalog(models_file).as_dict()
 
 

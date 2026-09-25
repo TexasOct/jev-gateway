@@ -37,61 +37,73 @@ CASES: list[tuple[str, dict[str, str], str, str]] = [
         "large coding that ships",
         {"workload": "coding", "scale": "large", "rigor": "exacting"},
         SOL,
-        "rule_4",
+        "rule_3",
     ),
     (
         "reverse engineering",
         {"workload": "reverse", "scale": "moderate", "rigor": "draft"},
         SOL,
-        "rule_3",
+        "rule_2",
+    ),
+    (
+        "large reverse engineering that ships",
+        {"workload": "reverse", "scale": "large", "rigor": "exacting"},
+        SOL,
+        "rule_2",
+    ),
+    (
+        "large reverse engineering draft",
+        {"workload": "reverse", "scale": "large", "rigor": "draft"},
+        SOL,
+        "rule_2",
     ),
     (
         "mid-sized coding that ships",
         {"workload": "coding", "scale": "moderate", "rigor": "exacting"},
         SOL,
-        "rule_5",
+        "rule_4",
     ),
     (
         "bounded coding pass",
         {"workload": "coding", "scale": "bounded", "rigor": "draft"},
         LUNA,
-        "rule_6",
+        "rule_5",
     ),
     (
         "research pass",
         {"workload": "research", "scale": "moderate", "rigor": "draft"},
-        DEEPSEEK,
-        "rule_10",
+        LUNA,
+        "rule_9",
     ),
     (
         "research that gates other work",
         {"workload": "research", "scale": "moderate", "rigor": "exacting"},
         DEEPSEEK,
-        "rule_7",
+        "rule_6",
     ),
     (
         "documentation that ships",
         {"workload": "docs", "scale": "bounded", "rigor": "exacting"},
-        DEEPSEEK,
-        "rule_8",
+        LUNA,
+        "rule_7",
     ),
     (
         "bounded single-file edit",
         {"workload": "small_change", "scale": "bounded", "rigor": "draft"},
         DEEPSEEK,
-        "rule_9",
+        "rule_8",
     ),
     (
         "research about a cross-domain subject",
         {"workload": "research", "scale": "cross_domain", "rigor": "draft"},
-        DEEPSEEK,
-        "rule_10",
+        LUNA,
+        "rule_9",
     ),
     (
         "documenting a cross-domain subject",
         {"workload": "docs", "scale": "cross_domain", "rigor": "exacting"},
-        DEEPSEEK,
-        "rule_8",
+        LUNA,
+        "rule_7",
     ),
 ]
 
@@ -105,11 +117,6 @@ RESERVED_CASES: list[tuple[str, dict[str, str], str]] = [
         "cross-domain audit",
         {"workload": "reverse", "scale": "cross_domain", "rigor": "draft"},
         "rule_1",
-    ),
-    (
-        "large reverse engineering",
-        {"workload": "reverse", "scale": "large", "rigor": "exacting"},
-        "rule_2",
     ),
 ]
 
@@ -165,6 +172,20 @@ def test_reserved_work_reaches_the_top_tier(
     assert f":{rule}:" in outcome.reason
 
 
+@pytest.mark.parametrize("workload", ["research", "docs", "small_change", "coding", "reverse"])
+@pytest.mark.parametrize("scale", ["bounded", "moderate", "large", "cross_domain"])
+@pytest.mark.parametrize("rigor", ["draft", "exacting"])
+def test_astra_requires_cross_domain_coding_or_reverse(
+    monkeypatch, workload, scale, rigor
+) -> None:
+    outcome, _, _ = route(
+        monkeypatch, {"workload": workload, "scale": scale, "rigor": rigor}
+    )
+    reserved = scale == "cross_domain" and workload in {"coding", "reverse"}
+    assert (outcome.model == ASTRA) == reserved
+    assert (outcome.tier == "ultra") == reserved
+
+
 def test_only_reserved_rules_reach_the_reserved_pool(monkeypatch) -> None:
     _, _, catalog = route(
         monkeypatch,
@@ -191,10 +212,32 @@ def test_only_reserved_rules_reach_the_reserved_pool(monkeypatch) -> None:
         )
 
 
+def test_pool_membership_keeps_deepseek_out_of_the_luna_pools(monkeypatch) -> None:
+    """Luna costs less than DeepSeek, so any shared pool resolves to Luna."""
+    _, _, catalog = route(
+        monkeypatch,
+        {"workload": "coding", "scale": "large", "rigor": "exacting"},
+    )
+    strategy = cast(
+        PolicyStrategy,
+        StrategyRegistry.from_catalog(catalog).resolve("task_aware"),
+    )
+
+    def pool(label: str) -> list[str]:
+        return sorted(profile.name for profile in strategy._tier_pool(label, catalog))
+
+    assert pool("quick") == [DEEPSEEK]
+    assert pool("investigate") == [DEEPSEEK]
+    assert pool("draft") == [DEEPSEEK, LUNA]
+    assert pool("review") == [DEEPSEEK, LUNA]
+    assert pool("craft") == [LUNA]
+    assert pool("engineering") == [LUNA, SOL]
+
+
 def test_fallback_keeps_working_when_jev_is_unreachable(monkeypatch) -> None:
     outcome, _, _ = route(monkeypatch, None)
 
-    assert outcome.model == DEEPSEEK
+    assert outcome.model == LUNA
     assert ":fallback:" in outcome.reason
 
 
@@ -232,42 +275,46 @@ def test_labels_are_ordered_and_carry_a_thinking_level(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    ("answers", "label", "effort", "rule"),
+    ("answers", "label", "effort", "rule", "model"),
     [
         (
             {"workload": "small_change", "scale": "bounded", "rigor": "draft"},
             "quick",
             "minimal",
-            "rule_9",
-        ),
-        (
-            {"workload": "docs", "scale": "moderate", "rigor": "draft"},
-            "draft",
-            "low",
-            "rule_10",
-        ),
-        (
-            {"workload": "docs", "scale": "moderate", "rigor": "exacting"},
-            "review",
-            "medium",
             "rule_8",
+            DEEPSEEK,
         ),
         (
             {"workload": "research", "scale": "moderate", "rigor": "exacting"},
             "investigate",
             "high",
+            "rule_6",
+            DEEPSEEK,
+        ),
+        (
+            {"workload": "docs", "scale": "moderate", "rigor": "draft"},
+            "draft",
+            "low",
+            "rule_9",
+            LUNA,
+        ),
+        (
+            {"workload": "docs", "scale": "moderate", "rigor": "exacting"},
+            "review",
+            "medium",
             "rule_7",
+            LUNA,
         ),
     ],
 )
-def test_deepseek_routes_work_at_the_required_thinking_level(
-    monkeypatch, answers, label, effort, rule
+def test_everyday_pools_think_at_the_required_level(
+    monkeypatch, answers, label, effort, rule, model
 ) -> None:
     outcome, strategy, catalog = route(monkeypatch, answers)
-    profile = catalog.by_name(DEEPSEEK)
+    profile = catalog.by_name(model)
     assert profile is not None
 
-    assert outcome.model == DEEPSEEK
+    assert outcome.model == model
     assert outcome.tier == label
     assert f":{rule}:" in outcome.reason
     assert effort_for(

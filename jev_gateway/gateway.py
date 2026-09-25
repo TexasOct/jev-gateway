@@ -854,7 +854,12 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             _catalog, _registry, warnings = prepare_overlay(body)
             return {
                 "valid": True, "warnings": warnings,
-                "diff": {"rules": len(body.get("rules", [])), "models": len(body.get("models", {}))},
+                "diff": {
+                    "questions": len(body.get("questions", {})),
+                    "rules": len(body.get("rules", [])),
+                    "fallback": int("fallback" in body),
+                    "models": len(body.get("models", {})),
+                },
             }
         except (ValueError, TypeError, RuntimeError) as error:
             raise invalid_configuration(error) from error
@@ -1103,6 +1108,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             user=body.user,
             strategy=active.session_strategy,
         )
+        received_at = time.time()
+        active.engine.store.record_intake(session_id, received_at)
         session = (
             active.engine.store.copy(session_id) if session_id is not None else None
         )
@@ -1123,6 +1130,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         active.engine.record_request(
             request_id=request_id,
             session_id=session_id,
+            received_at=received_at,
             meta=RequestMeta(
                 endpoint=str(http_request.url.path),
                 client=http_request.client.host if http_request.client else None,

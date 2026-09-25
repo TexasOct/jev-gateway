@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 jev-gateway = "jev_gateway.gateway:run_gateway"
+jev = "jev_gateway.cli.main:main"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
@@ -27,7 +28,7 @@ include = ["jev_gateway*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-jev_gateway = ["static/**/*", "static/*"]
+jev_gateway = ["static/**/*", "static/*", "templates/*"]
 
 [dependency-groups]
 dev = [

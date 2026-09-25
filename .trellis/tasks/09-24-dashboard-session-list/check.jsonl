@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "检查证据/列表接口与隐私约束"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "检查保留/过期边界和证据查询"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "前后端质量检查"}
+{"file": ".trellis/tasks/09-23-gateway-session-dashboard/prd.md", "reason": "父级会话列表及隐私验收"}

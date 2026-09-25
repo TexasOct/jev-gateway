@@ -36,6 +36,7 @@ class SessionState:
     created_at: float
     updated_at: float
     switched_at: float
+    first_request_at: float | None = None
     strategy: str | None = None
     turn_count: int = 0
     switch_count: int = 0
@@ -72,6 +73,7 @@ class SessionState:
             "recent_scores": [round(score, 4) for score in self.recent_scores],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "first_request_at": self.first_request_at,
             "switched_at": self.switched_at,
             "events": [dict(event) for event in self.events],
         }
@@ -91,7 +93,41 @@ class MemorySessionStore:
         self.max_sessions = max_sessions
         self._clock = clock
         self._sessions: dict[str, SessionState] = {}
+        self._pending_intake: dict[str, tuple[float, float]] = {}
+        self._intake_sequence = 0
+        self._pending_clock: dict[str, float] = {}
         self._lock = threading.RLock()
+
+    def record_intake(self, session_id: str | None, received_at: float) -> None:
+        """Record a bounded pre-routing timestamp for a session candidate."""
+        if session_id is None:
+            return
+        with self._lock:
+            self._prune_pending_locked()
+            session = self._get_locked(session_id)
+            if session is not None:
+                if session.first_request_at is None or received_at < session.first_request_at:
+                    session.first_request_at = received_at
+                return
+            pending = self._pending_intake.get(session_id)
+            if pending is not None:
+                self._pending_intake[session_id] = (min(pending[0], received_at), pending[1])
+                self._pending_clock[session_id] = self._clock()
+                return
+            self._intake_sequence += 1
+            self._pending_intake[session_id] = (received_at, self._intake_sequence)
+            self._pending_clock[session_id] = self._clock()
+            while len(self._pending_intake) > self.max_sessions:
+                oldest = min(self._pending_intake, key=lambda key: self._pending_intake[key][1])
+                del self._pending_intake[oldest]
+                self._pending_clock.pop(oldest, None)
+
+    def _prune_pending_locked(self) -> None:
+        now = self._clock()
+        for session_id, last_seen in tuple(self._pending_clock.items()):
+            if now - last_seen > self.ttl_seconds:
+                self._pending_clock.pop(session_id, None)
+                self._pending_intake.pop(session_id, None)
 
     def _get_locked(self, session_id: str) -> SessionState | None:
         session = self._sessions.get(session_id)
@@ -133,6 +169,11 @@ class MemorySessionStore:
                 if factory is None:
                     return None
                 session = factory()
+                self._prune_pending_locked()
+                pending = self._pending_intake.pop(session_id, None)
+                self._pending_clock.pop(session_id, None)
+                if pending is not None:
+                    session.first_request_at = pending[0]
                 self._sessions[session_id] = session
             update(session)
             if len(self._sessions) > self.max_sessions:
@@ -142,6 +183,10 @@ class MemorySessionStore:
     def put(self, session: SessionState) -> None:
         """Store a session and evict the least recently updated ones."""
         with self._lock:
+            pending = self._pending_intake.pop(session.session_id, None)
+            self._pending_clock.pop(session.session_id, None)
+            if pending is not None:
+                session.first_request_at = pending[0]
             self._sessions[session.session_id] = session
             if len(self._sessions) > self.max_sessions:
                 self._evict()
@@ -180,12 +225,19 @@ class MemorySessionStore:
         """Drop every stored session."""
         with self._lock:
             self._sessions.clear()
+            self._pending_intake.clear()
+            self._pending_clock.clear()
 
     def configure(self, *, ttl_seconds: float, max_sessions: int) -> None:
         """Apply catalog limits while preserving still-valid sessions."""
         with self._lock:
             self.ttl_seconds = ttl_seconds
             self.max_sessions = max_sessions
+            self._prune_pending_locked()
+            while len(self._pending_intake) > self.max_sessions:
+                oldest = min(self._pending_intake, key=lambda key: self._pending_intake[key][1])
+                self._pending_intake.pop(oldest, None)
+                self._pending_clock.pop(oldest, None)
             expired = [
                 session_id
                 for session_id, session in self._sessions.items()

@@ -26,8 +26,8 @@ storage, or logging boundaries.
 ### R1. Built-in page
 
 Serve a responsive dashboard at `GET /dashboard` from the same FastAPI process.
-Use inline HTML, CSS, and native JavaScript. Do not add a frontend build step,
-template engine, CDN, or runtime dependency.
+Use the existing bundled Vite, React, and TypeScript frontend served by the gateway.
+Do not add a second runtime service, CDN, or runtime dependency.
 
 ### R2. Current session list
 
@@ -38,14 +38,15 @@ Each row must show:
 
 - session ID
 - latest request time, when recorded
-- latest user-message preview when content capture permits it, otherwise an
-  explicit content-not-captured state
+- first request time for the current live session, as recorded at request intake
+- compact route and outcome metadata; never request or display prompt/context
+  content in the list
 - current strategy and label
 - canonical routed model
 - provider and upstream model when resolvable
 - turn count and latest outcome status
 
-Historical SQLite-only sessions are not current sessions and must not appear.
+Historical SQLite-only sessions are not current sessions and must not appear. The first-request timestamp is captured before route evaluation in a bounded registry owned by `MemorySessionStore`. Pending entries share the store lock and TTL/capacity lifecycle, are adopted by a subsequently created session, and are discarded on expiry or eviction. Concurrent intake retains the minimum receive timestamp. Requests without a derivable session ID receive no first-request time. The timestamp covers only this process/live-session lifetime.
 
 ### R3. Per-session request timeline
 
@@ -89,7 +90,9 @@ credential check.
 
 After a 401 response, the page asks for the API key and keeps it only in a
 JavaScript memory variable. It must not put the key in a URL, cookie, local
-storage, session storage, persisted HTML, or log field.
+storage, session storage, persisted HTML, or log field. The only permitted
+persistent browser value is the validated dashboard locale identifier under a
+dedicated fixed key.
 
 ### R6. Storage states
 
@@ -160,12 +163,16 @@ them.
 
 ## Acceptance criteria
 
-- [ ] `GET /dashboard` returns a self-contained, responsive page with no external
-      assets or added package dependency.
+- [ ] `GET /dashboard` returns a responsive page served from the bundled frontend,
+      with no external assets, CDN, or added runtime dependency.
 - [ ] The session API returns every non-expired live session and excludes expired,
-      evicted, historical-only, and null-session records.
+      evicted, historical-only, and null-session records. First-request timestamps
+      are captured before routing, adopted across request-intake/session-creation
+      ordering, and cleared with TTL/capacity lifecycle.
 - [ ] Each session row identifies the canonical route used by the latest routed
-      turn and its provider/upstream model when known.
+      turn and its provider/upstream model when known; it shows the first request
+      time for the current live session and session ID, and does not query or
+      display prompt/context content in the list.
 - [ ] Selecting a session displays every retained request in newest-first order,
       including rejected or incomplete requests without a decision or outcome.
 - [ ] Each completed request distinguishes the inbound request, routing decision,
@@ -193,7 +200,9 @@ them.
       while route, model, timing, status, counts, and digests remain available.
 - [ ] Dashboard data endpoints reject a missing or incorrect Bearer token when
       gateway authentication is configured.
-- [ ] The browser never stores or sends the token through the URL.
+- [ ] The browser never stores or sends the token through the URL, cookies, or
+      persistent browser storage. The dashboard may persist only the validated
+      `en` or `zh-CN` locale identifier under one fixed key.
 - [ ] Disabled or degraded storage produces an explicit evidence-unavailable
       state without breaking the live session list or chat endpoints.
 - [ ] One authenticated provider-summary API reports a server-defined rolling
@@ -214,10 +223,15 @@ them.
       response behavior remains backward compatible.
 - [ ] Focused tests, the full pytest suite, Pyright, and package build pass.
 
+## Integration ownership and sequencing
+
+- The parent task owns the existing provider-observation and upstream-error work, including the required R9-before-R8 sequencing and final cross-child acceptance review.
+- Dashboard subtask order: implement the i18n locale provider first; the session-list and workflow tasks consume its API. They may proceed after that interface is available. The parent integrates and validates all three with the retained monitoring/error requirements.
+
 ## Out of scope
 
 - Historical/expired-session browsing
-- Editing, deleting, replaying, or terminating sessions or requests
+- Editing, deleting, replaying, or terminating sessions or requests. Routing configuration edits are handled by the existing dashboard-routing task and its workflow extension.
 - Charts, broader aggregate analytics, cost reports, alerts, exports, or saved
   filters. R8 is the sole narrow provider-summary exception.
 - Automatic polling, WebSockets, server-sent dashboard events, or push updates
@@ -227,6 +241,5 @@ them.
 - Arbitrary time ranges, direct provider probes, synthetic traffic, provider
   status feeds, true concurrency or utilization estimates, long-term analytics,
   controls, costs, alerts, or a new telemetry service
-- A dashboard configuration block, theme selector, frontend framework, or new
-  service
+- A dashboard configuration block or new runtime service
 - A one-time scrub of raw upstream error text already written by earlier versions

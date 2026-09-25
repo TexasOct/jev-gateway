@@ -880,13 +880,20 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     assert "immutable" in asset.headers["cache-control"]
     assert asset.headers["content-security-policy"] == policy
 
-    # The credential stays in browser memory, so the bundle must not reach for
-    # any persistent browser store.
+    # The credential stays in memory. The sole persistent value is the
+    # validated locale identifier under one fixed key.
     bundle_url = next(url for url in asset_urls if url.endswith(".js"))
     bundle = request(app, "GET", bundle_url)
     assert bundle.status_code == 200
-    for forbidden in ("localStorage", "sessionStorage", "document.cookie"):
+    assert "localStorage" in bundle.text
+    assert "jev-dashboard-locale" in bundle.text
+    assert "Routing workflow" in bundle.text
+    assert "first matching rule selects its label" in bundle.text
+    for forbidden in ("sessionStorage", "document.cookie", "indexedDB"):
         assert forbidden not in bundle.text
+    assert "gateway.api_key_env" in bundle.text  # UI configuration copy only
+    assert "Authorization" in bundle.text
+    assert "localStorage.setItem" in bundle.text
 
     # Narrow screens stack provider rows instead of hiding columns.
     style_url = next(url for url in asset_urls if url.endswith(".css"))
@@ -909,6 +916,57 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     )
     assert allowed.status_code == 200
     assert allowed.json()["data"] == []
+
+
+def test_canvas_layout_auth_isolation_and_atomic_failure(tmp_path: Path, monkeypatch) -> None:
+    install_completion(monkeypatch)
+    config = make_config(gateway_api_key="client-key", models_file=tmp_path / "models.json")
+    app = gateway.create_app(config)
+    path = tmp_path / "routing-canvas-layout.json"
+    body = {"version": 1, "nodes": {"rule-0": {"x": 45, "y": 80}}, "viewport": {"x": 0, "y": 0}}
+    endpoint = "/v1/dashboard/canvas-layout"
+    auth = {"Authorization": "Bearer client-key"}
+    assert request(app, "GET", endpoint).status_code == 401
+    assert request(app, "PUT", endpoint, json=body).status_code == 401
+    assert request(app, "GET", endpoint, headers=auth).json()["nodes"] == {}
+    before = config.engine.policy_snapshot()
+    before_hash = config.engine.config_hash
+    before_versions = config.engine.record_store.counts()["config_versions"]
+    saved = request(app, "PUT", endpoint, headers=auth, json=body)
+    assert saved.status_code == 200
+    assert saved.json() == body
+    assert request(app, "GET", endpoint, headers=auth).json()["nodes"] == body["nodes"]
+    assert config.engine.policy_snapshot() == before
+    assert config.engine.config_hash == before_hash
+    assert config.engine.record_store.counts()["config_versions"] == before_versions
+    assert not (tmp_path / "routing-overrides.json").exists()
+    assert not (tmp_path / "models.json").exists()
+    old = path.read_bytes()
+    bad = {**body, "api_key": "secret"}
+    assert request(app, "PUT", endpoint, headers=auth, json=bad).status_code == 400
+    assert path.read_bytes() == old
+    monkeypatch.setattr("jev_gateway.canvas_layout.os.replace", lambda *_args: (_ for _ in ()).throw(OSError("failed")))
+    failure = request(app, "PUT", endpoint, headers=auth, json={**body, "nodes": {}})
+    assert failure.status_code == 500
+    assert failure.json()["error"]["code"] == "canvas_layout_write_failed"
+    assert path.read_bytes() == old
+    assert not list(tmp_path.glob(".routing-canvas-layout.json.*"))
+    assert config.engine.policy_snapshot() == before
+    assert config.engine.config_hash == before_hash
+    assert config.engine.record_store.counts()["config_versions"] == before_versions
+    config.engine.close()
+
+
+def test_canvas_layout_requires_configured_key(tmp_path: Path, monkeypatch) -> None:
+    install_completion(monkeypatch)
+    config = make_config(models_file=tmp_path / "models.json")
+    app = gateway.create_app(config)
+    endpoint = "/v1/dashboard/canvas-layout"
+    assert request(app, "GET", endpoint).status_code == 200
+    blocked = request(app, "PUT", endpoint, json={"version": 1, "nodes": {}, "viewport": {"x": 0, "y": 0}})
+    assert blocked.status_code == 403
+    assert blocked.json()["error"]["code"] == "config_writes_disabled"
+    config.engine.close()
 
 
 def test_dashboard_theme_round_trip_reset_and_write_guard(
@@ -1300,8 +1358,12 @@ def test_dashboard_lists_only_live_sessions_and_returns_retained_stages(
     assert listed["route"] == SMALL_ID
     assert listed["provider"] == "small-provider"
     assert listed["upstream_model"] == "vendor/small-model"
-    assert listed["latest_request"]["prompt"] == SIMPLE_PROMPT
     assert listed["latest_request"]["ok"] is True
+    assert listed["first_request_at"] is not None
+    assert listed["latest_request"]["received_at"] is not None
+    assert "prompt" not in listed["latest_request"]
+    assert SIMPLE_PROMPT not in json.dumps(listing.json())
+    assert "events" not in listed and "recent_scores" not in listed
     assert detail.status_code == 200
     assert detail.json()["session"]["session_id"] == "live-session"
     assert len(detail.json()["requests"]) == 1
@@ -1375,6 +1437,70 @@ def test_dashboard_sorts_sessions_by_latest_request_then_live_update(
         "latest_request"
     ]["received_at"]
     assert listing[2]["latest_request"] is None
+    config.engine.close()
+
+
+def test_dashboard_session_pages_include_memory_only_and_reject_cross_endpoint_cursor(
+    monkeypatch, tmp_path: Path
+) -> None:
+    install_completion(monkeypatch)
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    clock = config.engine._clock
+    assert isinstance(clock, FakeClock)
+    for name in ("a", "b", "c"):
+        config.engine.store.put(SessionState(
+            session_id=name, route=SMALL_ID, tier="simple", strategy="task_aware",
+            created_at=clock(), updated_at=clock(), switched_at=clock(),
+        ))
+    pages = []
+    cursor = None
+    page: dict[str, Any] = {}
+    for _ in range(3):
+        path = "/v1/routing/sessions?limit=1" + (f"&cursor={cursor}" if cursor else "")
+        response = request(app, "GET", path)
+        assert response.status_code == 200
+        page = response.json()
+        assert page["page_size"] == 1
+        pages.extend(row["session_id"] for row in page["data"])
+        cursor = page["next_cursor"]
+    assert pages == ["c", "b", "a"]
+    assert page["has_more"] is False and cursor is None
+    first = request(app, "GET", "/v1/routing/sessions?limit=1").json()["next_cursor"]
+    assert request(app, "GET", f"/v1/routing/sessions/a/requests?cursor={first}").status_code == 400
+    assert request(app, "GET", "/v1/routing/sessions?cursor=broken").json()["error"]["code"] == "invalid_cursor"
+    assert request(app, "GET", "/v1/routing/sessions?limit=101").status_code == 400
+    config.engine.close()
+
+
+def test_dashboard_request_pages_tie_break_and_scope_cursor(monkeypatch, tmp_path: Path) -> None:
+    install_completion(monkeypatch)
+    config = make_stored_config(tmp_path)
+    app = gateway.create_app(config)
+    for name in ("one", "two"):
+        config.engine.store.put(SessionState(
+            session_id=name, route=SMALL_ID, tier="simple", strategy="task_aware",
+            created_at=0, updated_at=0, switched_at=0,
+        ))
+    for index in range(5):
+        config.engine.record_request(
+            request_id=f"tied-{index}", session_id="one", meta=gateway.RequestMeta(),
+            messages=[{"role": "user", "content": "secret content"}],
+            received_at=42.0,
+        )
+    ids = []
+    cursor = None
+    for index in range(3):
+        path = "/v1/routing/sessions/one/requests?limit=2" + (f"&cursor={cursor}" if cursor else "")
+        page = request(app, "GET", path).json()
+        ids.extend(item["request"]["request_id"] for item in page["requests"])
+        cursor = page["next_cursor"]
+        assert page["has_more"] is (index < 2)
+        if index == 0:
+            assert request(app, "GET", f"/v1/routing/sessions/two/requests?cursor={cursor}").status_code == 400
+            assert request(app, "GET", f"/v1/routing/sessions?cursor={cursor}").status_code == 400
+    assert ids == [f"tied-{i}" for i in reversed(range(5))]
+    assert len(set(ids)) == 5 and cursor is None
     config.engine.close()
 
 
@@ -1860,7 +1986,7 @@ def test_configuration_validate_and_invalid_put_never_swap_catalog(tmp_path: Pat
     valid = request(app, "POST", "/v1/routing/configuration/validate", json=reordered_rules(), headers=auth)
     assert valid.status_code == 200, valid.text
     assert valid.json()["valid"] is True
-    assert valid.json()["diff"] == {"rules": 2, "models": 0}
+    assert valid.json()["diff"] == {"questions": 0, "rules": 2, "fallback": 0, "models": 0}
     assert config.engine.policy_snapshot() == before
     empty = request(app, "PUT", "/v1/routing/configuration", json={}, headers=auth)
     assert empty.status_code == 400

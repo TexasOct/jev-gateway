@@ -149,6 +149,7 @@ class RoutingEngine:
         session_id: str | None,
         meta: RequestMeta,
         messages: list[dict[str, Any]],
+        received_at: float | None = None,
         requested_model: str | None = None,
         max_tokens: int | None = None,
         tools: list[Any] | None = None,
@@ -164,7 +165,7 @@ class RoutingEngine:
         )
         record = RequestRecord(
             request_id=request_id,
-            received_at=self._clock(),
+            received_at=self._clock() if received_at is None else received_at,
             session_id=session_id,
             requested_strategy=meta.requested_strategy,
             requested_model=requested_model,
