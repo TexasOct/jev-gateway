@@ -22,7 +22,19 @@ JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置
 
 ## 快速开始
 
-需要 Python 3.10+、[`uv`](https://docs.astral.sh/uv/)，以及所配置上游模型的访问权限。
+macOS 和 Linux 可直接安装 CLI，无需克隆仓库：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes
+```
+
+raw `main` 上的引导脚本会校验 SHA256，并安装最新已发布的稳定版 Release wheel。在稳定版 Release 发布前，安装会失败，不会改装 `main`。版本发布后，可通过 `--version 0.1.0` 固定到该版本或回滚；也可显式选择 `rc` 预发布版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes --version 0.1.0
+```
+
+curl 安装脚本不支持 Windows。Windows 用户可使用下方的源码或 Docker 安装方式，详见 [`docs/local-install.md`](docs/local-install.md)。开发仍需 Python 3.10+、[`uv`](https://docs.astral.sh/uv/) 和上游模型访问权限：
 
 ```bash
 git clone https://github.com/TexasOct/jev-gateway.git
@@ -104,7 +116,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `GET` | `/healthz` | 存活状态与配置快照。 |
-| `GET` | `/dashboard` | 实时会话面板。 |
+| `GET` | `/dashboard` | 内置的运维面板，用于监控与路由配置。 |
 | `GET` | `/v1/models` | 策略名与目录模型 ID。 |
 | `GET` | `/v1/routing/policy` | 当前策略快照。 |
 | `GET` | `/v1/routing/strategies` | 已注册的策略及其策略配置。 |
@@ -115,6 +127,13 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 | `GET` | `/v1/routing/sessions/{session_id}` | 单个实时会话。 |
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | 某个会话保留的请求。 |
 | `GET` | `/v1/routing/providers/summary` | 提供方保留的活动统计。 |
+| `GET` | `/v1/routing/configuration` | 可编辑的路由配置面。 |
+| `POST` | `/v1/routing/configuration/validate` | 校验覆盖内容但不应用。 |
+| `PUT` | `/v1/routing/configuration` | 在 `models.json` 旁应用覆盖内容。 |
+| `DELETE` | `/v1/routing/configuration` | 将路由恢复到基线文件。 |
+| `GET` | `/v1/dashboard/theme` | 面板已保存的主题种子色。 |
+| `PUT` | `/v1/dashboard/theme` | 保存面板主题种子色。 |
+| `DELETE` | `/v1/dashboard/theme` | 重置面板主题。 |
 | `POST` | `/v1/chat/completions` | OpenAI 兼容的对话补全。 |
 
 成功的对话响应会带上 `X-JEV-Route`、`X-JEV-Provider`、`X-JEV-Model`、`X-JEV-Route-Label`、`X-JEV-Task-Type`、`X-JEV-Mode`、`X-JEV-Reason`、`X-JEV-Strategy`、`X-JEV-Decision-Id`，并在适用时附带请求、会话、切换、推理与切换受阻原因的响应头。端点契约、鉴权、错误码与 reload 语义见 [`docs/http-api.md`](docs/http-api.md)。
@@ -123,7 +142,8 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 | 文档 | 内容 |
 | --- | --- |
-| [`docs/local-install.md`](docs/local-install.md) | 本地、容器与 wheel 安装。 |
+| [`docs/local-install.md`](docs/local-install.md) | curl、本地、容器与 wheel 安装。 |
+| [`docs/cli.md`](docs/cli.md) | CLI 命令、提供方设置与生命周期管理。 |
 | [`docs/models-config.md`](docs/models-config.md) | `models.json` 的全部字段。 |
 | [`docs/routing-design.md`](docs/routing-design.md) | 路由契约、策略、会话与证据。 |
 | [`docs/http-api.md`](docs/http-api.md) | 端点、响应头、错误与 reload。 |
@@ -140,4 +160,18 @@ uvx pyright
 uv build
 ```
 
-打包产物名为 `jev-gateway`，并提供 `jev-gateway` 命令行入口。
+`GET /dashboard` 的面板是 `frontend/` 下的 Vite + React 应用。构建产物已提交在包内
+的 `jev_gateway/static/`，因此 `pip install`、`uv build` 和测试套件不需要 Node。改动
+`frontend/` 后需要重新构建：
+
+```bash
+scripts/build-frontend.sh           # 构建到 jev_gateway/static
+scripts/build-frontend.sh --check   # 已提交产物过旧时报错
+npm --prefix frontend run lint
+npm --prefix frontend run test
+```
+
+Dockerfile 会在 `uv build` 之前用 Node 阶段从 `frontend/` 重新构建，因此镜像不会带
+上过期的产物。
+
+打包产物名为 `jev-gateway`，并提供 `jev-gateway`（前台服务）和 `jev`（管理 CLI）两个命令行入口。

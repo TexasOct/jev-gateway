@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+if command -v jev >/dev/null 2>&1; then
+  exec jev uninstall "$@"
+fi
+
 if ! command -v uv >/dev/null 2>&1; then
     echo "error: uv is required (https://docs.astral.sh/uv/)" >&2
     exit 1

@@ -19,7 +19,10 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "09-23-modern-dashboard-routing"
+    "09-23-modern-dashboard-routing",
+    "09-24-dashboard-i18n",
+    "09-24-dashboard-session-list",
+    "09-24-dashboard-routing-workflow"
   ],
   "parent": null,
   "relatedFiles": [],

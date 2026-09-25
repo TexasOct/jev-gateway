@@ -20,6 +20,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | [Decision providers](./decision-providers.md) | Decision config, protocol adapters, compatibility, failover, and validation | Complete |
 | [Database guidelines](./database-guidelines.md) | SQLite schema, writer queue, migrations, and retention | Complete |
 | [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes, assets, and packaging | Complete |
+| [CLI lifecycle](./cli-lifecycle.md) | Curl installation, CLI output, provider credentials, process ownership, and uninstall | Complete |
 | [Error handling](./error-handling.md) | Domain exceptions, OpenAI error envelopes, and degradation | Complete |
 | [Quality guidelines](./quality-guidelines.md) | Types, tests, forbidden patterns, and verification | Complete |
 | [Logging guidelines](./logging-guidelines.md) | Structured fields, formats, levels, and sensitive data | Complete |
@@ -58,7 +59,8 @@ cannot drift apart.
 2. Read the domain guide for the affected boundary: database, error handling, or
    logging.
 3. Read [Quality guidelines](./quality-guidelines.md) before changing Python or
-   tests.
+   tests. For command, installation, or provider credential changes, also read
+   [CLI lifecycle](./cli-lifecycle.md).
 4. For routing or configuration behavior, read the relevant product reference
    and trace the contract through catalog parsing, strategy selection, gateway
    presentation, evidence recording, and tests. For decision-provider changes,

@@ -45,6 +45,8 @@ returns `401`, keeps it in JavaScript memory, and sends it through the
 | `POST` | `/v1/routing/configuration/validate` | Validate an overlay payload against the full catalog pipeline without applying it. |
 | `PUT` | `/v1/routing/configuration` | Validate an overlay payload, write it beside `models.json`, and reload. |
 | `DELETE` | `/v1/routing/configuration` | Remove the overlay and reload the baseline `models.json`. |
+| `GET` | `/v1/dashboard/canvas-layout` | Versioned whiteboard coordinates and viewport, with defaults and `read_error` when the layout is corrupt. |
+| `PUT` | `/v1/dashboard/canvas-layout` | Validate and atomically store whiteboard layout without reloading routing policy. |
 | `GET` | `/v1/dashboard/theme` | Stored theme seed, or the default when no file exists. |
 | `PUT` | `/v1/dashboard/theme` | Store one hex seed for the dashboard palette. |
 | `DELETE` | `/v1/dashboard/theme` | Remove the stored seed and return to the default palette. |
@@ -72,6 +74,23 @@ session list still shows live state, and session detail returns an empty request
 list when evidence is unavailable. The requests route accepts slashes in session
 IDs (`{session_id:path}` internally); the single-session snapshot route does not.
 
+Both monitoring lists accept `limit` (default 30, maximum 100) and an opaque
+`cursor`. Without a cursor, each returns the first page. Responses retain their
+existing `data` or `requests` array and add `page_size`, `has_more`, and
+`next_cursor` (null after the last page). A malformed cursor, a cursor from the
+other endpoint, or one from another session returns `400 invalid_cursor`; Bearer
+authentication follows the existing gateway Bearer rule on every page. Cursors
+are signed with a process-local secret, so a gateway restart invalidates them;
+restart the traversal from the first page after `invalid_cursor`. Clients that
+previously assumed the arrays contained all rows must now follow `next_cursor`.
+Requests sort by `received_at DESC, rowid DESC`.
+Live sessions sort by presence of retained request evidence, then latest request
+time (or live monotonic update time if absent), then session ID, all descending.
+Session list queries do not read prompt or context content. Pages are best effort:
+the server does not keep a cross-request snapshot. New or expired sessions and
+retention pruning can shift later pages, so clients should deduplicate by stable
+session and request IDs; concurrent changes can leave gaps.
+
 The built app is mounted at `/dashboard` and comes up with the service: the same
 process serves it, there is no second server to start. `GET /dashboard` returns
 the shell with `Cache-Control: no-store`; hashed assets under
@@ -88,6 +107,25 @@ its existing authentication behavior and does not write either file. The routing
 `PUT`/`DELETE` routes change live routing and write or remove
 `routing-overrides.json` beside the active `models.json`. Theme `PUT`/`DELETE`
 routes write or remove `dashboard-theme.json` in the same directory.
+The canvas layout `PUT` writes `routing-canvas-layout.json` beside `models.json`.
+Its strict version 1 body contains `nodes` keyed by stable canvas IDs with bounded
+integer `{x, y}` positions and a bounded integer `{x, y}` viewport. Missing or
+invalid layout loads default coordinates with a `read_error` for corrupt data.
+The layout write has the same Bearer and configured-key guard as theme writes;
+it never reloads the engine, registers a config version, or edits the routing
+overlay. The layout is installation-wide: all browsers read the same file, with
+atomic last-writer-wins saves rather than revision-based concurrency protection. Connections remain constrained to the ordered first-match matrix;
+policy changes still use the routing configuration validation and apply routes.
+The whiteboard renders question context, the ordered match/unmatched rule chain,
+fallback, labels, and model pools at the saved coordinates. Reconnecting a match
+edge changes its rule or fallback label; reconnecting an unmatched edge moves a
+later rule immediately after its source. Tag-resolved label edges can add, move,
+or remove model membership, subject to whole-catalog validation; explicit-model
+labels cannot be rewired. The edge list offers keyboard controls, and node
+positions can also be moved with Alt + arrow keys. Layout edits save separately
+from policy edits. Policy edits remain pending until review, validation, and
+confirmation. A failed layout write reports an error and restores the last
+confirmed layout instead of silently claiming that the new coordinates persisted.
 `models.json` is never rewritten by the gateway.
 
 Routing overlays are validated before they touch disk. The overlay is merged into the
@@ -99,7 +137,7 @@ file was replaced restores the previous content and reloads the previous catalog
 then returns `500 overlay_apply_failed`. Each applied change registers a
 `config_versions` row, so the applied catalog is auditable by hash.
 
-Dashboard routing and theme writes require a configured `gateway.api_key_env`.
+Dashboard routing, canvas layout, and theme writes require a configured `gateway.api_key_env`.
 Without one, these write routes return `403 config_writes_disabled`; this is deliberate,
 because the Bearer check is a no-op when no key is configured and would otherwise
 let any reachable client mutate routing. Read routes keep working without a key,
@@ -176,6 +214,9 @@ Errors use the OpenAI envelope:
 | `400` | `null` | Malformed JSON or Pydantic request validation failed. |
 | `400` | `invalid_configuration` | Reload, validate, or apply rejected the file contents. |
 | `400` | `invalid_theme` | Theme payload is not a hex seed, or carries unknown keys. |
+| `400` | `invalid_canvas_layout` | Layout version, node ID, coordinates, size, or key whitelist is invalid. |
+| `400` | `invalid_limit` | Monitoring page size is outside 1..100. |
+| `400` | `invalid_cursor` | Monitoring cursor is malformed, altered, from another endpoint/session, or invalid after restart. |
 | `400` | `restart_required` | Reload changes storage settings. |
 | `401` | `invalid_api_key` | Missing or wrong Bearer token. |
 | `403` | `config_writes_disabled` | A configuration write was attempted with no `gateway.api_key_env` configured. |
@@ -185,6 +226,7 @@ Errors use the OpenAI envelope:
 | `404` | `unknown_session` | Session ID is not live. |
 | `500` | `catalog_mismatch` | A routed model disappeared from the catalog. |
 | `500` | `overlay_apply_failed` | The overlay could not be written or applied; the previous catalog was restored. |
+| `500` | `canvas_layout_write_failed` | Layout persistence failed; routing policy remains untouched. |
 | `502` | `upstream_error` | Upstream call failed before a response began; `type` is a bounded exception type. |
 | `503` | `storage_unavailable` | Reload cannot reach the record store. |
 

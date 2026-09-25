@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Pre-development checklist, spec index, and the per-change quality gate for backend work."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Required code patterns (annotations, frozen dataclasses, no print in runtime code), test organization and isolation rules, packaging rules for entry points, and the exact verification commands."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Module ownership, naming conventions, and import boundaries that decide where jev_gateway/cli/ lives and why it must not import gateway.py."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Existing error-naming and degradation conventions the CLI error codes and messages should follow."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Sensitive-data rules for logs; the background server log and secret handling must not leak credentials."}
+{"file": "docs/models-config.md", "reason": "Authoritative provider and model field rules the CLI must satisfy when adding providers: type validation, api_base/api_key_env requirements, canonical model IDs, tags, and capabilities defaults."}
+{"file": "docs/http-api.md", "reason": "Contracts for /healthz (auth, degraded status) and POST /v1/routing/reload used by jev status and jev config reload."}
+{"file": "docs/local-install.md", "reason": "Current install methods and runtime-directory conventions the curl installer and docs must stay consistent with."}

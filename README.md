@@ -24,7 +24,19 @@ keep a session on one route or reconsider it each turn.
 
 ## Quick start
 
-Needs Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and access to your configured upstream models.
+Install the CLI on macOS or Linux without cloning the repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes
+```
+
+The bootstrap on raw `main` installs the latest published stable Release wheel after checking its SHA256. Until a stable Release is published, it exits without installing `main`. Pin a published version (including `rc` prereleases) or roll back with `--version 0.1.0` after that version has been published:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes --version 0.1.0
+```
+
+Windows is not supported by the curl installer. Use the source checkout or Docker path in [`docs/local-install.md`](docs/local-install.md). For development, you still need Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and access to configured upstream models:
 
 ```bash
 git clone https://github.com/TexasOct/jev-gateway.git
@@ -116,7 +128,7 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness and configuration snapshot. |
-| `GET` | `/dashboard` | Live session dashboard. |
+| `GET` | `/dashboard` | Bundled operator UI for monitoring and routing configuration. |
 | `GET` | `/v1/models` | Strategy names and catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and policies. |
@@ -127,6 +139,13 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | `GET` | `/v1/routing/sessions/{session_id}` | One live session. |
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | Retained requests for a session. |
 | `GET` | `/v1/routing/providers/summary` | Retained provider activity. |
+| `GET` | `/v1/routing/configuration` | Editable routing surface. |
+| `POST` | `/v1/routing/configuration/validate` | Validate an overlay without applying it. |
+| `PUT` | `/v1/routing/configuration` | Apply an overlay beside `models.json`. |
+| `DELETE` | `/v1/routing/configuration` | Reset routing to the baseline file. |
+| `GET` | `/v1/dashboard/theme` | Stored dashboard theme seed. |
+| `PUT` | `/v1/dashboard/theme` | Store a dashboard theme seed. |
+| `DELETE` | `/v1/dashboard/theme` | Reset the dashboard theme. |
 | `POST` | `/v1/chat/completions` | OpenAI-compatible chat completion. |
 
 Successful chat responses carry `X-JEV-Route`, `X-JEV-Provider`, `X-JEV-Model`, `X-JEV-Route-Label`,
@@ -138,7 +157,8 @@ authentication, error codes, and reload semantics: [`docs/http-api.md`](docs/htt
 
 | Document | Contents |
 | --- | --- |
-| [`docs/local-install.md`](docs/local-install.md) | Local, container, and wheel installation. |
+| [`docs/local-install.md`](docs/local-install.md) | Curl, local, container, and wheel installation. |
+| [`docs/cli.md`](docs/cli.md) | CLI commands, provider setup, and lifecycle management. |
 | [`docs/models-config.md`](docs/models-config.md) | Every `models.json` field. |
 | [`docs/routing-design.md`](docs/routing-design.md) | Routing contracts, strategies, sessions, evidence. |
 | [`docs/http-api.md`](docs/http-api.md) | Endpoints, headers, errors, reload. |
@@ -159,4 +179,19 @@ uvx pyright
 uv build
 ```
 
-Packaging builds `jev-gateway` and exposes the `jev-gateway` CLI.
+The dashboard under `GET /dashboard` is a Vite + React app in `frontend/`. Its
+build output is committed inside the package at `jev_gateway/static/`, so `pip
+install`, `uv build`, and the test suite work without Node. After changing
+anything under `frontend/`, rebuild it:
+
+```bash
+scripts/build-frontend.sh           # build into jev_gateway/static
+scripts/build-frontend.sh --check   # fail if the committed bundle is stale
+npm --prefix frontend run lint
+npm --prefix frontend run test
+```
+
+The Dockerfile rebuilds the bundle from `frontend/` in a Node stage before `uv
+build`, so images never ship a stale copy.
+
+Packaging builds `jev-gateway` and exposes both `jev-gateway` (the foreground server) and `jev` (the management CLI).

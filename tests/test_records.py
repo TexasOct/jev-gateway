@@ -287,6 +287,8 @@ def test_session_evidence_includes_incomplete_and_joined_requests(tmp_path: Path
     rows = store.session_request_evidence("session-1")
 
     assert latest["session-1"]["latest_request"]["request_id"] == "req-newer"
+    assert "prompt" not in latest["session-1"]["latest_request"]
+    assert "prompt_digest" not in latest["session-1"]["latest_request"]
     assert latest["session-1"]["latest_decision"]["route"] == "provider/model"
     assert [row["request"]["request_id"] for row in rows] == [
         "req-newer", "req-older"

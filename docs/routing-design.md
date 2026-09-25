@@ -310,26 +310,31 @@ reload endpoint.
 
 The repository's `task_aware` strategy asks a decision provider three questions: `workload`
 (research, docs, small_change, coding, reverse), `scale` (bounded, moderate,
-large, cross_domain), and `rigor` (draft, exacting). Seven ordered rules map those
-answers onto five labels:
+large, cross_domain), and `rigor` (draft, exacting). Nine ordered rules map those
+answers onto seven labels:
 
 | Label | Reached when | Pool | Effort |
 | --- | --- | --- | --- |
-| `draft` | coding at `draft` rigor; or research/docs/small_change at `draft` rigor | `deepseek-flash` | `low` |
-| `review` | research/docs/small_change at `exacting` rigor | `deepseek-flash` | `medium` |
-| `craft` | coding at `exacting` rigor with bounded or moderate scale | `gpt-6-luna` | `medium` |
-| `engineering` | `reverse`; or coding with `large` scale | `gpt-6-sol`, with `gpt-6-luna` as the constraint fallback | `high` |
+| `quick` | `small_change` at `bounded` scale with `draft` rigor | `deepseek-flash` | `minimal` |
+| `draft` | `research`, `docs`, or `small_change` at `draft` rigor, when no earlier rule claims it | `gpt-6-luna`, dropping to `deepseek-flash` only when the request needs more output than Luna's ceiling | `low` |
+| `review` | `docs` or `small_change` at `exacting` rigor | `gpt-6-luna`, dropping to `deepseek-flash` only when the request needs more output than Luna's ceiling | `medium` |
+| `investigate` | `research` at `exacting` rigor | `deepseek-flash` | `high` |
+| `craft` | `coding` the rules above did not claim: not `large` or `cross_domain` scale, and not moderate at `exacting` rigor | `gpt-6-luna` | `medium` |
+| `engineering` | `reverse`; or `coding` at `large` scale, or at moderate scale with `exacting` rigor | `gpt-6-sol`, with `gpt-6-luna` as the constraint fallback | `high` |
 | `ultra` | `cross_domain` scale with a `coding` or `reverse` workload | `gpt-6-astra` | `xhigh` |
 
-The split gives each model one job. DeepSeek takes research, documentation,
-review, and the coding that does not have to ship. Luna takes small and mid-sized
-coding that does. Sol takes large coding and reverse engineering. `ultra` is
-reachable only from the cross-domain rule, so a hard single-domain task stays on
-Sol however large it is.
+Pool membership decides the model, not a quality threshold: `cheapest_adequate`
+picks the cheapest member that fits the request's context and output limits. Luna
+costs less than `deepseek-flash` and scores higher, so wherever the two share a
+pool Luna wins outright. DeepSeek keeps the two pools Luna is not in — bounded
+draft-level edits (`quick`) and exacting investigation (`investigate`). Luna takes
+documentation, review, and the coding that ships without being large. Sol takes
+large coding and reverse engineering. `ultra` is reachable only from the
+cross-domain rule, so a hard single-domain task stays on Sol however large it is.
 
 Rule 1 also requires a `coding` or `reverse` workload, so researching or
-documenting a cross-domain subject stays on DeepSeek instead of being promoted by
-the topic alone.
+documenting a cross-domain subject stays in the everyday pools instead of being
+promoted by the topic alone.
 
 `gpt-5.6-terra` carries no `task_aware` tag. It remains in the `quality/analysis`
 pool only for compatibility. The GPT-6 family has no Terra tier, and returning

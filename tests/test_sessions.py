@@ -229,3 +229,124 @@ def test_clear_removes_every_session() -> None:
     store.clear()
 
     assert len(store) == 0
+
+
+def test_pending_intake_is_adopted_and_uses_earliest_request() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(clock=clock)
+    store.record_intake("session", 50.0)
+    clock.advance(1)
+    store.record_intake("session", 51.0)
+    state = store.mutate(
+        "session", lambda current: None,
+        factory=lambda: make_state("session", clock()),
+    )
+
+    assert state is not None
+    assert state.first_request_at == 50.0
+    snapshot = store.snapshot("session")
+    assert snapshot is not None
+    assert snapshot["first_request_at"] == 50.0
+
+
+def test_pending_intake_is_bounded_expires_and_clears() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(ttl_seconds=5, max_sessions=2, clock=clock)
+    store.record_intake("first", 10.0)
+    clock.advance(1)
+    store.record_intake("second", 11.0)
+    store.record_intake("third", 12.0)
+    state = store.mutate(
+        "first", lambda current: None,
+        factory=lambda: make_state("first", clock()),
+    )
+    assert state is not None
+    assert state.first_request_at is None
+
+    store.record_intake("expired", 13.0)
+    clock.advance(6)
+    state = store.mutate(
+        "expired", lambda current: None,
+        factory=lambda: make_state("expired", clock()),
+    )
+    assert state is not None
+    assert state.first_request_at is None
+
+    store.record_intake("cleared", 20.0)
+    store.clear()
+    state = store.mutate(
+        "cleared", lambda current: None,
+        factory=lambda: make_state("cleared", clock()),
+    )
+    assert state is not None
+    assert state.first_request_at is None
+
+
+def test_intake_without_session_id_is_ignored() -> None:
+    store = MemorySessionStore(clock=FakeClock())
+    store.record_intake(None, 10.0)
+    assert len(store._pending_intake) == 0
+
+
+def test_expired_session_starts_a_new_intake_lifecycle() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(ttl_seconds=5, clock=clock)
+    store.record_intake("same", 100.0)
+    first = store.mutate(
+        "same", lambda current: None,
+        factory=lambda: make_state("same", clock()),
+    )
+    assert first is not None
+    assert first.first_request_at == 100.0
+
+    clock.advance(6)
+    store.record_intake("same", 200.0)
+    second = store.mutate(
+        "same", lambda current: None,
+        factory=lambda: make_state("same", clock()),
+    )
+
+    assert second is not None
+    assert second is not first
+    assert second.first_request_at == 200.0
+
+
+def test_evicted_session_starts_a_new_intake_lifecycle() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(max_sessions=1, clock=clock)
+    store.record_intake("same", 100.0)
+    first = store.mutate(
+        "same", lambda current: None,
+        factory=lambda: make_state("same", clock()),
+    )
+    assert first is not None
+    assert first.first_request_at == 100.0
+
+    store.put(make_state("other", clock()))
+    assert store.get("same") is None
+    store.record_intake("same", 200.0)
+    second = store.mutate(
+        "same", lambda current: None,
+        factory=lambda: make_state("same", clock()),
+    )
+
+    assert second is not None
+    assert second is not first
+    assert second.first_request_at == 200.0
+
+
+def test_rejected_intake_is_adopted_when_session_is_later_created() -> None:
+    clock = FakeClock()
+    store = MemorySessionStore(clock=clock)
+
+    store.record_intake("same", 123.0)
+    assert store.get("same") is None
+    assert store._pending_intake["same"][0] == 123.0
+
+    state = store.mutate(
+        "same", lambda current: None,
+        factory=lambda: make_state("same", clock()),
+    )
+    assert state is not None
+    assert state.first_request_at == 123.0
+    assert "same" not in store._pending_intake

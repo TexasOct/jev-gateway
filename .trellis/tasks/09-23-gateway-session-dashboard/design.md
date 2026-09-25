@@ -2,7 +2,7 @@
 
 ## Architecture
 
-The dashboard is a read-only feature inside the existing FastAPI process.
+The dashboard is the existing bundled Vite + React + TypeScript frontend served by the current FastAPI process. It has no second runtime service. The frontend provides monitoring, routing configuration, bilingual UI, and a content-free shell. API credentials remain in JavaScript memory; only a validated locale identifier may be stored under the fixed locale key.
 
 ```text
 Browser
@@ -19,31 +19,19 @@ MemorySessionStore              RecordStore
                            dedicated SQLite writer thread
 ```
 
-Add `jev_gateway/dashboard.py` for the router, dependency-free page, response
-assembly, and presentation-safe helpers. `gateway.create_app()` includes its
-router and supplies access to the mutable `GatewayConfig`, so catalog reloads,
-record-store health, and API-key changes are reflected without rebuilding the
-router.
-
-The dashboard module must not import `jev_gateway.gateway`, which would create a
-cycle. Its router factory accepts a small protocol for active state and an
-authorization callback.
+The router and API contracts remain as documented below. The existing session monitor and routing editor build on the corresponding live/evidence stores and runtime overlay.
 
 ## Live session contract
 
-Add `MemorySessionStore.snapshots()`:
+`MemorySessionStore.snapshots()` atomically prunes expired entries and returns detached `SessionState.snapshot()` dictionaries. It does not expose adapter state. The dashboard enriches snapshots with safe, non-content evidence. When evidence is absent, it resolves the canonical route through the active catalog to obtain provider and upstream model.
 
-1. acquire the existing reentrant lock
-2. remove every expired session
-3. return detached `SessionState.snapshot()` dictionaries
+The list is sorted by latest recorded request wall-clock timestamp. Entries without recorded evidence follow in live `updated_at` order. It never presents monotonic session timestamps as wall-clock dates.
 
-Do not expose adapter state. The dashboard route enriches each snapshot with
-recorded evidence. When evidence is absent, it resolves the session's canonical
-route through the active catalog to obtain provider and upstream model.
+### First request time and list privacy
 
-The list is sorted by the latest recorded request wall-clock timestamp. Entries
-without recorded evidence follow in live `updated_at` order. The UI does not
-present monotonic session timestamps as wall-clock dates.
+At request intake, before persistence or route evaluation can reject the request, record the wall-clock receive time for the derived session ID in a bounded registry owned by `MemorySessionStore`. The registry shares the store lock and lifecycle. Pending intake entries are capped at `max_sessions`, ordered for capacity eviction by monotonic intake sequence, and removed on expiry, capacity eviction, clear, or reconfiguration. A live session adopts the minimum pending timestamp on creation. Concurrent entries update the minimum timestamp under the same lock. Requests with no session ID have no timestamp. This timestamp is scoped to the current process/live-session lifetime; it does not promise history across restart or eviction.
+
+Session-list evidence SQL selects only safe metadata needed for the row. It must never select prompt, messages, tools, or other context fields. The list response includes `first_request_at` from the live store, latest request timestamp/status when available, and compact route metadata. Full permitted evidence remains available only through the selected-session detail API.
 
 ## Evidence schema
 
@@ -68,9 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_upstream_requests_created_at
     ON upstream_requests (created_at);
 ```
 
-No schema-version table or external migration is needed. Existing databases get
-the table through `CREATE TABLE IF NOT EXISTS`. Request-retention pruning removes
-orphan upstream rows with the same rule used for decisions and outcomes.
+No schema-version table or external migration is needed. Existing databases get the table through `CREATE TABLE IF NOT EXISTS`. Request-retention pruning removes orphan upstream rows with the same rule used for decisions and outcomes.
 
 Add a frozen `UpstreamRequestRecord` and these `RecordStore` operations:
 
@@ -94,9 +80,10 @@ thread.
 
 `latest_session_evidence()` uses one query for all live IDs, not one query per
 session. The query chooses the newest request that has a routing decision and
-also returns the latest request preview/status. `session_request_evidence()`
-starts from `requests` and left-joins decisions, upstream requests, and outcomes
-so rejected and in-flight requests remain visible.
+returns only required non-content metadata for the session list, never prompt,
+messages, tools, or other context fields. `session_request_evidence()` starts
+from `requests` and left-joins decisions, upstream requests, and outcomes so
+rejected and in-flight requests remain visible.
 
 Add `idx_upstream_requests_created_at` and one `provider_summary()` operation to
 all `RecordStore` implementations. `SqliteRecordStore` submits the read with
@@ -174,26 +161,25 @@ over-redacted, and ordinary text stays unchanged. This helper is a defense for
 recognizable diagnostic text, not a substitute for omitting untrusted exception
 wording from upstream failure paths.
 
+Boundary clamping. `error_type` comes from `type(error).__name__` and crosses the
+response, disk, and log boundaries. Clamp it to `[A-Za-z0-9_]{1,64}` before use at each
+site.
+
 Dashboard. No code change. `_evidence_row` and the evidence query keep `error_type` only.
 A regression test locks `error_message` out. The `storage.error` text the dashboard shows
 carries storage failures, not provider exceptions, so it stays outside this repro path
 and in scope only as a general rule.
 
-Boundary clamping. `error_type` comes from `type(error).__name__` and crosses the
-response, disk, and log boundaries. Clamp it to `[A-Za-z0-9_]{1,64}` before use at each
-site.
-
 ## HTTP contracts
 
 ### `GET /dashboard`
 
-Returns `HTMLResponse` with the complete page. Set defensive headers:
+Returns the bundled application shell. Set defensive headers:
 
 - `Cache-Control: no-store`
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: no-referrer`
-- a same-origin Content Security Policy that permits the page's inline script and
-  style but no remote assets
+- same-origin Content Security Policy; no remote assets
 
 ### `GET /v1/routing/sessions`
 
@@ -212,21 +198,14 @@ Protected by the existing Bearer check.
       "strategy": "task_aware",
       "label": "quick",
       "turn_count": 2,
-      "latest_request": {
-        "request_id": "...",
-        "received_at": 0,
-        "prompt": "...",
-        "prompt_digest": "...",
-        "prompt_chars": 12,
-        "ok": true
-      }
+      "first_request_at": 0,
+      "latest_request": {"request_id": "...", "received_at": 0, "ok": true}
     }
   ]
 }
 ```
 
-The exact response uses JSON primitives only and excludes adapter state and raw
-continuation payloads.
+No context fields appear in list rows. The exact response uses JSON primitives and excludes adapter state and raw continuation payloads.
 
 ### `GET /v1/routing/providers/summary`
 
@@ -297,6 +276,10 @@ session is no longer live. Otherwise returns:
 A missing joined stage is `null`. When storage is disabled or degraded,
 `evidence_available` is false and `requests` is empty.
 
+### Configuration workflow
+
+The existing configuration API uses a strict runtime overlay next to `models.json`. Extend the version 1 shape with optional complete `questions` and `fallback` overrides; existing overlays omitting them inherit baseline values. `rules` remain complete replacement, including an explicit empty list. The catalog parser validates the merged full configuration before persistence/activation. Older binaries reject overlays containing unknown extension fields and fall back to baseline with an overlay warning; this is a forward-only configuration change. All edits require the configured gateway key, are reviewed before apply, and preserve rollback on write/reload failure. `models.json` remains unchanged.
+
 ## Browser behavior
 
 The page has a compact provider panel above two responsive columns: current
@@ -311,12 +294,15 @@ route/status colors, and `prefers-color-scheme` for light and dark palettes.
 
 The page loads the provider-summary and session APIs. On 401, it displays an
 API-key form. The key stays in a closure-scoped variable and is sent as an
-`Authorization: Bearer` header. The existing manual Refresh button reloads the
-provider summary, list, and selected timeline. Dynamic values are written through
-`textContent`; user content is never interpolated as HTML. Expandable sections
-show formatted JSON for request, signal, candidate, upstream, and outcome details.
+`Authorization: Bearer` header. The selected `en` or `zh-CN` locale may be stored
+under one fixed localStorage key; no other data, especially credentials, may be
+persisted. The existing manual Refresh button reloads the provider summary, list,
+and selected timeline. Dynamic values are written through text APIs; user content
+is never interpolated as HTML. Expandable sections show formatted JSON for
+request, signal, candidate, upstream, and outcome details. User content and raw
+evidence are not localized.
 
-No automatic polling, charts, search, arbitrary ranges, or mutation controls are
+No automatic polling, charts, search, arbitrary ranges, or health controls are
 included.
 
 ## Compatibility and failure behavior

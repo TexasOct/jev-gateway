@@ -37,8 +37,9 @@ Present the live session list, the per-session retained request timeline, and th
 
 Provide drag-and-drop editing for two surfaces that the engine actually supports:
 
-- Rule priority: reorder `strategies.task_aware.options.rules`, which changes which rule wins.
-- Label-to-model binding: drag a model chip between label columns to add or remove the tag `task_aware/{label}` on that model, preserving tags that belong to other strategies.
+- Workflow visualization and editing for ordered decision-matrix questions, rule conditions and selections, fallback choices, and label-to-model binding. Rule priority remains first-match-wins. Nodes and match/unmatched edges visualize the execution order; no arbitrary graph topology is stored.
+- Label-to-model binding: add or remove the tag `task_aware/{label}` on a model, preserving tags that belong to other strategies.
+- Question definitions, complete rule conditions, and fallback choices are editable in the dashboard workflow and saved through the validated runtime overlay. This extends the earlier narrow editor scope.
 
 Label order is not draggable, because label scores must increase within `[0, 1]` with the first label at 0 (`catalog.py:721`). Pool rank inside a label is shown read-only with its reason, and `priority` is edited as an explicit number rather than inferred from a drop position.
 
@@ -46,7 +47,7 @@ An edit that cannot take effect is reported instead of silently discarded: a lab
 
 ### R6. Configuration persistence and rollback
 
-Write edits to a runtime overlay next to the active catalog file, never to `models.json`. Apply edits only after full validation, with explicit review, save, cancel, and reset-to-baseline controls.
+Write edits to a runtime overlay next to the active catalog file, never to `models.json`. Apply edits only after full validation, with explicit review, save, cancel, and reset-to-baseline controls. Validate question/criteria references across the complete merged strategy before writing or activating any edit.
 
 ### R7. Write authorization
 
@@ -54,7 +55,7 @@ Every configuration write, routing and theme alike, requires a configured `gatew
 
 ### R8. Credential safety
 
-Keep the shell free of session and credential data. Keep the credential in browser memory only, never in a URL, cookie, local storage, or session storage. Reject unknown overlay keys so a credential cannot be smuggled into the overlay file. Preserve every existing redaction guarantee.
+Keep the shell free of session and credential data. Keep the credential in browser memory only, never in a URL, cookie, local storage, or session storage. The selected dashboard locale may be persisted only under the dedicated fixed locale key. Reject unknown overlay keys so a credential cannot be smuggled into the overlay file. Preserve every existing redaction guarantee.
 
 ## Acceptance criteria
 
@@ -62,7 +63,7 @@ Keep the shell free of session and credential data. Keep the credential in brows
 - [ ] The page is usable at narrow widths and every drag interaction has a keyboard path.
 - [ ] chroma-js derives the light and dark palettes from a stored seed; the seed survives restart, resets to the default, and the editor shows a measured contrast ratio that meets 4.5:1 for body text and 3:1 for large text for the default seed.
 - [ ] Session list, per-session timeline, and provider panel render the existing endpoint payloads, including the pending and rejected request states, the evidence-unavailable state, and the four neutral observed conditions.
-- [ ] Reordering rules persists, and the applied catalog reports the new order in `policy_snapshot()`.
+- [ ] Editing questions, rule conditions, fallback, and rule order persists in the validated overlay; the applied catalog and `policy_snapshot()` reflect the effective strategy.
 - [ ] Dragging a model into and out of a label changes that model's `{strategy}/{label}` tag in the overlay and leaves other strategies' tags intact.
 - [ ] Dragging the last model out of a label is rejected with the `_validate_policy` message, and the active catalog stays unchanged.
 - [ ] An edit against a label that declares explicit `models` is reported as inert rather than applied silently.
@@ -71,13 +72,13 @@ Keep the shell free of session and credential data. Keep the credential in brows
 - [ ] With no overlay file present, startup, reload, routing, and all existing endpoints behave exactly as today.
 - [ ] An invalid or partial payload returns 400 and leaves `engine.policy_snapshot()` unchanged.
 - [ ] Write routes return 401 with a wrong key and 403 `config_writes_disabled` with no key configured, and read routes remain reachable without a key as they are today.
-- [ ] No credential value reaches the overlay file, the API output, the page shell, the logs, or test snapshots.
+- [ ] No credential value reaches the overlay file, the API output, the page shell, the logs, browser storage, URL, cookie, or test snapshots; persistent browser storage contains only the validated locale identifier under its fixed key.
 - [ ] The built bundle is inside the wheel, the Docker image rebuilds it, and `scripts/build-frontend.sh --check` fails on a stale bundle.
 - [ ] `uv run pytest -q`, `uvx pyright`, `uv build`, `npm --prefix frontend run lint`, `npm --prefix frontend run build`, and `scripts/build-frontend.sh --check` all pass.
 
 ## Out of scope
 
-- Fallback-chain editing, provider credential editing, adding or removing providers and models, and editing label scores, descriptions, or reasoning effort.
+- Provider credential editing, adding or removing providers and models, and editing label scores, descriptions, or reasoning effort.
 - Any new monitoring indicator or telemetry collection, unbounded telemetry, cost analytics, alerting, and historical or expired-session browsing.
 - Replacing or weakening gateway authentication, and relaxing the new write guard.
 - Editing secrets or exposing resolved credentials in the UI.

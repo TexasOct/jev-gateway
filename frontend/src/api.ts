@@ -95,6 +95,7 @@ export interface SessionRow {
   label?: string | null;
   turn_count?: number;
   updated_at?: number;
+  first_request_at?: number | null;
   latest_request?: LatestRequest | null;
 }
 
@@ -102,6 +103,9 @@ export interface SessionsPayload {
   storage: StorageState;
   evidence_available: boolean;
   data: SessionRow[];
+  page_size: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export type EvidenceSection = Record<string, unknown>;
@@ -118,6 +122,9 @@ export interface SessionRequestsPayload {
   storage: StorageState;
   evidence_available: boolean;
   requests: RetainedRequest[];
+  page_size: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface ProviderRow {
@@ -143,6 +150,13 @@ export interface ProvidersPayload {
   providers: ProviderRow[];
 }
 
+export interface CanvasLayout {
+  version: 1;
+  nodes: Record<string, { x: number; y: number }>;
+  viewport: { x: number; y: number };
+  read_error?: string | null;
+}
+
 export interface ThemePayload {
   version: number;
   seed: string;
@@ -156,7 +170,9 @@ export interface OverlayRulePayload {
 export interface RoutingOverlayPayload {
   version: number;
   strategy: string;
+  questions?: Record<string, Question>;
   rules: OverlayRulePayload[];
+  fallback?: RuleChoice;
   models: Record<string, { tags?: string[]; priority?: number }>;
 }
 
@@ -202,10 +218,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   providers: () => request<ProvidersPayload>("/v1/routing/providers/summary"),
-  sessions: () => request<SessionsPayload>("/v1/routing/sessions"),
-  sessionRequests: (sessionId: string) =>
+  sessions: (cursor?: string, signal?: AbortSignal) => request<SessionsPayload>(
+    `/v1/routing/sessions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    { signal },
+  ),
+  sessionRequests: (sessionId: string, cursor?: string, signal?: AbortSignal) =>
     request<SessionRequestsPayload>(
-      `/v1/routing/sessions/${encodeURIComponent(sessionId)}/requests`,
+      `/v1/routing/sessions/${encodeURIComponent(sessionId)}/requests${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      { signal },
     ),
   configuration: () => request<ConfigurationPayload>("/v1/routing/configuration"),
   validateConfiguration: (payload: RoutingOverlayPayload) =>
@@ -223,6 +243,10 @@ export const api = {
       "/v1/routing/configuration",
       { method: "DELETE" },
     ),
+  canvasLayout: () => request<CanvasLayout>("/v1/dashboard/canvas-layout"),
+  saveCanvasLayout: (layout: CanvasLayout) => request<CanvasLayout>("/v1/dashboard/canvas-layout", {
+    method: "PUT", body: JSON.stringify({ version: layout.version, nodes: layout.nodes, viewport: layout.viewport }),
+  }),
   theme: () => request<ThemePayload>("/v1/dashboard/theme"),
   saveTheme: (seed: string) =>
     request<ThemePayload>("/v1/dashboard/theme", {

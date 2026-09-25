@@ -1,11 +1,12 @@
 # Gateway session dashboard implementation plan
 
-## 1. Extend live-session inspection
+## 1. Extend live-session inspection and first-request tracking
 
 - Add an atomic `MemorySessionStore.snapshots()` method that prunes expired
   entries and returns detached serializable snapshots.
-- Test complete listing, TTL pruning, detached output, and ordering inputs with
-  `FakeClock`.
+- Add a bounded pending-intake registry owned by `MemorySessionStore`; capture request time before routing, adopt the minimum timestamp when a live session is created, and prune pending entries with TTL/capacity/clear lifecycle.
+- Test complete listing, TTL pruning, capacity eviction, detached output, and ordering inputs with `FakeClock`.
+- Test first intake before route rejection, later session adoption, concurrent first requests, no session ID, storage-disabled/degraded operation, and pending-entry cleanup.
 
 ## 2. Add upstream-request evidence
 
@@ -21,7 +22,7 @@
 
 ## 3. Add session-oriented evidence queries
 
-- Add one batched latest-evidence query for a tuple of live session IDs.
+- Add one batched latest-evidence query for a tuple of live session IDs that selects only non-content list metadata; never select prompt/messages/tools for this route.
 - Add a newest-first per-session query based on requests with left joins to
   decisions, upstream requests, and outcomes.
 - Decode stored JSON defensively.
@@ -103,14 +104,14 @@ Land this step before the provider-observation work in step 6.
 
 ## 7. Add the dashboard router and page
 
-- Create `jev_gateway/dashboard.py` with a cycle-free router factory.
-- Add `GET /dashboard`, `GET /v1/routing/providers/summary`,
+- Extend `jev_gateway/dashboard.py` with a cycle-free router factory.
+- Replace the original inline page with the existing bundled frontend. Integrate the new monitoring fields and maintain only a fixed, validated locale identifier in browser storage; credentials remain memory-only.
+- Keep `GET /dashboard`, `GET /v1/routing/providers/summary`,
   `GET /v1/routing/sessions`, and
-  `GET /v1/routing/sessions/{session_id}/requests`.
+  `GET /v1/routing/sessions/{session_id}/requests` contracts aligned with the parent PRD.
 - Include the router from `create_app()` using the active gateway config and
   existing authorization callback.
-- Implement a compact "Retained outcomes, last 15 minutes" provider table above
-  the existing two-column session view. Reuse the existing manual Refresh control,
+- Implement a compact bilingual "Retained outcomes, last 15 minutes" provider table above the two-column session view. The session list shows first request time and compact metadata, never previews or context. Reuse the existing manual Refresh control,
   in-memory Bearer form, empty/error states, session selection, and expandable
   request stages.
 - Write dynamic values through DOM text APIs and add defensive response headers.
@@ -119,7 +120,14 @@ Land this step before the provider-observation work in step 6.
   live-only listing, latest model enrichment and fallback, detail ordering,
   missing session, storage-disabled, and degraded-storage responses.
 
-## 8. Document the feature
+## 8. Integrate routing workflow, localization, and docs
+
+- Extend the routing overlay/configuration API to include optional complete `questions` and `fallback` overrides; preserve old-overlay inheritance, strict unknown-key rejection, full catalog validation, atomic write/rollback, and explicit empty-rules semantics.
+- Build the deterministic workflow view and node editors for questions, rule conditions/choices, fallback, label/model membership, and priority. Keep unsupported fields read-only.
+- Add shared English/Chinese dictionaries, locale provider, fixed-key locale persistence, and ensure all monitor/workflow UI strings and accessibility labels are translated without translating raw evidence/config identifiers.
+- Update `09-23-modern-dashboard-routing` scope and dashboard specs to match the extended contract.
+
+## 9. Document the feature
 
 - Add a concise Dashboard section to `README.md` with URL, authentication flow,
   retained-evidence and privacy limits, and the fixed 15-minute provider summary.
@@ -136,7 +144,7 @@ Land this step before the provider-observation work in step 6.
 - Update backend Trellis specs if implementation reveals a durable convention
   not already captured.
 
-## 9. Validate
+## 10. Validate
 
 Run focused checks while iterating:
 

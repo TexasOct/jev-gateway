@@ -14,6 +14,8 @@ wheels/
 .env
 models.json
 logs/
+*node_modules/
+.vitest/
 
 # Trellis-generated local tooling
 # Regenerate integration files in a fresh clone with: trellis init --pi

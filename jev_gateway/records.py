@@ -388,6 +388,12 @@ class RecordStore(Protocol):
         """Return retained requests and joined stages for one live session."""
         raise RuntimeError("RecordStore protocol method called directly")
 
+    def session_request_page(
+        self, session_id: str, *, limit: int, before: tuple[float, int] | None
+    ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
+        """Return one bounded request page and its last compound ordering key."""
+        raise RuntimeError("RecordStore protocol method called directly")
+
     def provider_summary(
         self, *, window_start: float, window_end: float
     ) -> dict[str, dict[str, Any]]:
@@ -599,6 +605,11 @@ class NullRecordStore:
     ) -> list[dict[str, Any]]:
         return []
 
+    def session_request_page(
+        self, session_id: str, *, limit: int, before: tuple[float, int] | None
+    ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
+        return [], None, False
+
     def provider_summary(
         self, *, window_start: float, window_end: float
     ) -> dict[str, dict[str, Any]]:
@@ -677,6 +688,11 @@ class _UnavailableRecordStore:
     def session_request_evidence(
         self, session_id: str
     ) -> list[dict[str, Any]]:
+        self._unavailable()
+
+    def session_request_page(
+        self, session_id: str, *, limit: int, before: tuple[float, int] | None
+    ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
         self._unavailable()
 
     def provider_summary(
@@ -1053,7 +1069,9 @@ class _SqliteBackend:
                     SELECT value FROM json_each(?)
                 ),
                 latest_requests AS (
-                    SELECT r.*, r.rowid AS request_rowid,
+                    SELECT r.request_id, r.session_id, r.received_at,
+                        r.capture_content,
+                        r.rowid AS request_rowid,
                         (SELECT o.ok FROM decisions dx
                          LEFT JOIN outcomes o ON o.decision_id = dx.decision_id
                          WHERE dx.request_id = r.request_id
@@ -1066,7 +1084,9 @@ class _SqliteBackend:
                     FROM requests r JOIN live ON live.session_id = r.session_id
                 ),
                 latest_decisions AS (
-                    SELECT d.*, o.ok, ROW_NUMBER() OVER (
+                    SELECT d.decision_id, d.session_id, d.created_at,
+                        d.strategy, d.route, d.provider, d.upstream_model,
+                        d.tier, o.ok, ROW_NUMBER() OVER (
                         PARTITION BY d.session_id
                         ORDER BY d.created_at DESC, d.rowid DESC
                     ) AS rank
@@ -1075,8 +1095,7 @@ class _SqliteBackend:
                     LEFT JOIN outcomes o ON o.decision_id = d.decision_id
                 )
                 SELECT live.session_id,
-                    r.request_id, r.received_at, r.capture_content, r.prompt,
-                    r.prompt_digest, r.prompt_chars,
+                    r.request_id, r.received_at, r.capture_content,
                     d.decision_id, d.strategy, d.route, d.provider,
                     d.upstream_model, d.tier, r.request_ok, d.ok AS decision_ok
                 FROM live
@@ -1095,9 +1114,6 @@ class _SqliteBackend:
                     "request_id": row["request_id"],
                     "received_at": row["received_at"],
                     "content_captured": bool(row["capture_content"]),
-                    "prompt": row["prompt"],
-                    "prompt_digest": row["prompt_digest"],
-                    "prompt_chars": row["prompt_chars"],
                     "ok": _optional_bool(row["request_ok"]),
                 }
             decision = None
@@ -1120,14 +1136,20 @@ class _SqliteBackend:
     def session_request_evidence(
         self, session_id: str
     ) -> list[dict[str, Any]]:
+        rows, _, _ = self.session_request_page(session_id, limit=2_147_483_647, before=None)
+        return rows
+
+    def session_request_page(
+        self, session_id: str, *, limit: int, before: tuple[float, int] | None
+    ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
         connection = self._connection
         if connection is None:
-            return []
+            return [], None, False
         with self._lock:
             rows = connection.execute(
                 """
                 SELECT
-                    r.*,
+                    r.rowid AS page_rowid, r.*,
                     d.decision_id, d.strategy AS decision_strategy,
                     d.config_hash, d.route, d.provider, d.upstream_model,
                     d.tier, d.reason, d.mode, d.turn_index AS decision_turn_index,
@@ -1142,15 +1164,25 @@ class _SqliteBackend:
                     o.completion_tokens, o.total_tokens, o.cost_usd, o.latency_ms,
                     o.returned_model, o.error_type, o.recorded_at
                 FROM requests r
-                LEFT JOIN decisions d ON d.request_id = r.request_id
+                LEFT JOIN decisions d ON d.rowid = (
+                    SELECT dx.rowid FROM decisions dx WHERE dx.request_id = r.request_id
+                    ORDER BY dx.created_at DESC, dx.rowid DESC LIMIT 1
+                )
                 LEFT JOIN upstream_requests u ON u.decision_id = d.decision_id
                 LEFT JOIN outcomes o ON o.decision_id = d.decision_id
                 WHERE r.session_id = ?
+                    AND (? IS NULL OR (r.received_at, r.rowid) < (?, ?))
                 ORDER BY r.received_at DESC, r.rowid DESC
+                LIMIT ?
                 """,
-                (session_id,),
+                (session_id, None if before is None else before[0],
+                 None if before is None else before[0],
+                 None if before is None else before[1], limit + 1),
             ).fetchall()
-        return [_evidence_row(row) for row in rows]
+        page = rows[:limit]
+        last = page[-1] if page else None
+        key = (last["received_at"], last["page_rowid"]) if last is not None else None
+        return [_evidence_row(row) for row in page], key, len(rows) > limit
 
     def provider_summary(
         self, *, window_start: float, window_end: float
@@ -1484,6 +1516,14 @@ class SqliteRecordStore:
     ) -> list[dict[str, Any]]:
         return self._submit(
             lambda backend: backend.session_request_evidence(session_id), wait=True
+        )
+
+    def session_request_page(
+        self, session_id: str, *, limit: int, before: tuple[float, int] | None
+    ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
+        return self._submit(
+            lambda backend: backend.session_request_page(session_id, limit=limit, before=before),
+            wait=True,
         )
 
     def provider_summary(

@@ -2,16 +2,30 @@ import { describe, expect, it } from "vitest";
 
 import type { ConfigurationPayload, LabelRow, ModelRow } from "../api";
 import {
+  addCriterion,
+  addQuestion,
+  addRule,
+  removeRule,
   diffSummary,
   draftFromConfiguration,
   labelMembers,
   moveRule,
+  removeCriterion,
+  removeQuestion,
+  renameCriterion,
+  renameQuestion,
   sameTags,
   setLabelMembership,
   setPriority,
   setRuleChoice,
+  setRuleCondition,
+  setFallback,
+  setQuestion,
   toOverlayPayload,
+  toggleRuleCriterion,
+  toggleRuleQuestion,
   unassignedModels,
+  workflowEdges,
 } from "./draft";
 
 function label(name: string, tag: string): LabelRow {
@@ -82,6 +96,52 @@ describe("draft construction", () => {
     ]);
   });
 
+  it("copies questions and fallback and includes edits in the overlay", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large" } } } });
+    let draft = draftFromConfiguration(config);
+    draft = setQuestion(draft, "scale", { ...draft.questions.scale!, instructions: "Pick scale" });
+    draft = setRuleCondition(draft, 0, { scale: "large" });
+    draft = setFallback(draft, { label: "ultra" });
+    const payload = toOverlayPayload(draft, config);
+    expect(payload.questions?.scale?.instructions).toBe("Pick scale");
+    expect(payload.rules[0]?.when).toEqual({ scale: "large" });
+    expect(payload.fallback?.label).toBe("ultra");
+  });
+
+  it("adds, renames, and removes questions while safely updating rule references", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large" } }, workload: { type: "choice", instructions: "Task", criteria: { coding: "Coding", writing: "Writing" } } } });
+    let draft = draftFromConfiguration(config);
+    draft = renameQuestion(draft, "scale", "size");
+    expect(draft.rules[1]?.when).toEqual({ size: "large" });
+    expect(renameQuestion(draft, "size", "workload")).toBe(draft);
+    draft = removeQuestion(draft, "size");
+    expect(draft.rules[1]?.when).toEqual({ size: "large" });
+    expect(removeQuestion(draft, "size")).toBe(draft);
+    draft = removeQuestion(draft, "workload");
+    expect(draft.questions.workload).toBeDefined(); // sole predicate cannot be removed
+    draft = addQuestion(draft, "audience");
+    expect(draft.questions.audience?.criteria).toEqual({ yes: "Yes", no: "No" });
+    const withAudience = toggleRuleQuestion(draft, 0, "audience", true);
+    expect(withAudience.rules[0]?.when.audience).toBe("yes");
+    expect(toggleRuleQuestion(withAudience, 0, "audience", false).rules[0]?.when).toEqual({ workload: "coding" });
+  });
+
+  it("renames criterion references in scalar and OR-array conditions and safely removes criteria", () => {
+    let draft = draftFromConfiguration(configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large", huge: "Huge" } } } }));
+    draft = setRuleCondition(draft, 0, { scale: ["small", "large"] });
+    draft = renameCriterion(draft, "scale", "small", "tiny");
+    expect(draft.rules[0]?.when.scale).toEqual(["tiny", "large"]);
+    draft = toggleRuleCriterion(draft, 0, "scale", "huge", true);
+    expect(draft.rules[0]?.when.scale).toEqual(["tiny", "large", "huge"]);
+    expect(toOverlayPayload(draft, configuration()).rules[0]?.when.scale).toEqual(["tiny", "large", "huge"]);
+    draft = removeCriterion(draft, "scale", "tiny");
+    expect(draft.rules[0]?.when.scale).toEqual(["large", "huge"]);
+    draft = toggleRuleCriterion(draft, 0, "scale", "huge", false);
+    expect(draft.rules[0]?.when.scale).toBe("large");
+    draft = addCriterion(draft, "scale", "medium");
+    expect(draft.questions.scale?.criteria.medium).toBe("medium");
+  });
+
   it("does not mutate the payload it was given", () => {
     const config = configuration();
     const draft = draftFromConfiguration(config);
@@ -122,6 +182,29 @@ describe("label membership", () => {
 });
 
 describe("rule ordering", () => {
+  it("adds rules only from valid existing conditions and labels", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Scale", criteria: { small: "Small", large: "Large" } } } });
+    const draft = draftFromConfiguration(config);
+    const added = addRule(draft, config, "scale", "large", "craft");
+    expect(added.rules).toHaveLength(3);
+    expect(added.rules[2]).toEqual({ when: { scale: "large" }, select: { label: "craft" } });
+    expect(addRule(draft, config, "missing", "large", "craft")).toBe(draft);
+    expect(addRule(draft, config, "scale", "unknown", "craft")).toBe(draft);
+    expect(addRule(draft, config, "scale", "large", "unsupported")).toBe(draft);
+    const explicit = { ...CRAFT, resolution: "models" as const, models: ["openai/gpt-6-luna"] };
+    const explicitConfig = configuration({ labels: [explicit, ULTRA] });
+    expect(addRule(draft, explicitConfig, "scale", "large", "craft").rules).toHaveLength(3);
+    expect(addRule(draft, configuration({ labels: [{ ...explicit, models: ["missing/model"] }, ULTRA] }), "scale", "large", "craft")).toBe(draft);
+  });
+
+  it("removes rules safely including the final rule", () => {
+    const draft = draftFromConfiguration(configuration());
+    expect(removeRule(draft, 1).rules).toHaveLength(1);
+    expect(removeRule(removeRule(draft, 0), 0).rules).toEqual([]);
+    expect(removeRule(draft, -1)).toBe(draft);
+    expect(removeRule(draft, 2)).toBe(draft);
+  });
+
   it("moves a rule to a new position", () => {
     const draft = draftFromConfiguration(configuration());
     const moved = moveRule(draft, 0, 1);
@@ -185,12 +268,79 @@ describe("overlay payload", () => {
 });
 
 describe("diff summary", () => {
+  it("reports question, rule condition/selection, and fallback values", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large" } } } });
+    let draft = draftFromConfiguration(config);
+    draft = setQuestion(draft, "scale", { ...draft.questions.scale!, instructions: "Pick" });
+    draft = setRuleCondition(draft, 0, { scale: ["small", "large"] });
+    draft = setRuleChoice(draft, 0, { selection: "balanced" });
+    draft = setFallback(draft, { label: "ultra" });
+    const diff = diffSummary(draft, config);
+    expect(diff.questions[0]?.after).toContain("instructions");
+    expect(diff.rules[0]?.after).toContain("balanced");
+    expect(diff.fallback[0]?.after).toContain("ultra");
+  });
+
+  it("builds first-match chains for zero, one, and many rules", () => {
+    const base = configuration({ rules: [], questions: {} });
+    expect(workflowEdges(draftFromConfiguration(base), base)[0]).toEqual({ from: "questions", to: "fallback", kind: "context" });
+    const one = draftFromConfiguration(configuration({ rules: configuration().rules.slice(0, 1) }));
+    expect(workflowEdges(one, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["fallback"]);
+    const many = draftFromConfiguration(configuration());
+    expect(workflowEdges(many, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["rule-1", "fallback"]);
+  });
+
+  it("projects match, unmatched, fallback, label pool, and model edges", () => {
+    const config = configuration({ fallback: { label: "craft" } });
+    const edges = workflowEdges(draftFromConfiguration(config), config);
+    expect(edges).toContainEqual({ from: "rule-0", to: "zone::task_aware/craft", kind: "match" });
+    expect(edges).toContainEqual({ from: "rule-0", to: "rule-1", kind: "unmatched" });
+    expect(edges).toContainEqual({ from: "rule-1", to: "fallback", kind: "unmatched" });
+    expect(edges).toContainEqual({ from: "rule-1", to: "zone::task_aware/ultra", kind: "match" });
+    expect(edges).toContainEqual({ from: "fallback", to: "zone::task_aware/craft", kind: "match" });
+    expect(edges).toContainEqual({ from: "zone::task_aware/craft", to: "model::openai/gpt-6-luna", kind: "pool" });
+  });
+
   it("is empty for an untouched draft", () => {
     const config = configuration();
     const diff = diffSummary(draftFromConfiguration(config), config);
     expect(diff.changed).toBe(false);
     expect(diff.rules).toEqual([]);
     expect(diff.models).toEqual([]);
+  });
+
+  it("reports changed questions, rules, fallback, tags, and priority independently", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large" } } } });
+    let draft = draftFromConfiguration(config);
+    draft = renameQuestion(draft, "scale", "size");
+    draft = setRuleCondition(draft, 0, { size: ["small", "large"] });
+    draft = setFallback(draft, { label: "craft" });
+    draft = setLabelMembership(draft, "deepseek/flash", CRAFT.tag, true);
+    draft = setPriority(draft, "deepseek/flash", 2);
+    const diff = diffSummary(draft, config);
+    expect(diff.questions.map((item) => item.subject)).toEqual(["scale", "size"]);
+    expect(diff.rules[0]?.after).toContain("small|large");
+    expect(diff.fallback[0]?.after).toContain("craft");
+    expect(diff.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ subject: "deepseek/flash tags" }),
+      expect.objectContaining({ subject: "deepseek/flash", before: "10", after: "2" }),
+    ]));
+  });
+
+  it("does not emit an invalid selection value for an empty condition edit", () => {
+    const config = configuration({ questions: { scale: { type: "choice", instructions: "Choose", criteria: { small: "Small", large: "Large" } } } });
+    const draft = draftFromConfiguration(config);
+    const selected = toggleRuleQuestion(draft, 0, "scale", true);
+    expect(selected.rules[0]?.when.scale).toBe("small");
+    expect(toggleRuleCriterion(selected, 0, "scale", "small", false)).toBe(selected);
+  });
+
+  it("uses explicit static model pools regardless of tag edits", () => {
+    const staticLabel = { ...CRAFT, resolution: "models" as const, models: ["deepseek/flash"] };
+    const config = configuration({ labels: [staticLabel, ULTRA] });
+    const draft = setLabelMembership(draftFromConfiguration(config), "openai/gpt-6-luna", CRAFT.tag, false);
+    expect(workflowEdges(draft, config)).toContainEqual({ from: `zone::${CRAFT.tag}`, to: "model::deepseek/flash", kind: "pool" });
+    expect(workflowEdges(draft, config)).not.toContainEqual({ from: `zone::${CRAFT.tag}`, to: "model::openai/gpt-6-luna", kind: "pool" });
   });
 
   it("names the models and rules that changed", () => {
@@ -203,7 +353,7 @@ describe("diff summary", () => {
     );
     const diff = diffSummary(draft, config);
     expect(diff.changed).toBe(true);
-    expect(diff.models.join(" ")).toContain("openai/gpt-6-astra");
+    expect(diff.models[0]?.subject).toContain("openai/gpt-6-astra");
   });
 });
 
