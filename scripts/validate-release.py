@@ -7,6 +7,7 @@ import configparser
 import hashlib
 import importlib
 import re
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -26,6 +27,9 @@ def validate(tag: str, wheel_dir: Path) -> tuple[Path, bool]:
     wheel = wheel_dir / f"jev_gateway-{version}-py3-none-any.whl"
     if sorted(wheel_dir.glob("*.whl")) != [wheel]:
         raise ValueError(f"expected exactly one wheel: {wheel.name}")
+    unexpected = {path.name for path in wheel_dir.iterdir() if path.name not in {".gitignore", "install.sh", "install.sh.sha256"}} - {wheel.name, f"jev_gateway-{version}.tar.gz", f"jev_gateway-{version}-py3-none-any.whl.sha256"}
+    if unexpected:
+        raise ValueError(f"unexpected files in release output: {sorted(unexpected)}")
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
         metadata = archive.read(f"jev_gateway-{version}.dist-info/METADATA").decode()
@@ -51,6 +55,16 @@ def validate(tag: str, wheel_dir: Path) -> tuple[Path, bool]:
         for file in ("jev_gateway/templates/models.example.json", "jev_gateway/templates/env.example", "jev_gateway/static/index.html", "jev_gateway/cli/main.py"):
             if file not in expected_files or not Path(file).read_bytes():
                 raise ValueError(f"source package file missing or empty: {file}")
+        shell = Path("jev_gateway/static/index.html").read_text()
+        references = re.findall(r'(?:src|href)=["\'](/dashboard/assets/[^"\']+)["\']', shell)
+        if not any(ref.endswith(".js") for ref in references) or not any(ref.endswith(".css") for ref in references):
+            raise ValueError("dashboard shell must reference bundled JS and CSS")
+        for reference in references:
+            if not re.fullmatch(r"/dashboard/assets/[A-Za-z0-9_-]+\.(?:js|css)", reference):
+                raise ValueError(f"invalid dashboard asset reference: {reference}")
+            asset = Path("jev_gateway/static/assets") / reference.rsplit("/", 1)[1]
+            if not asset.is_file() or not asset.read_bytes():
+                raise ValueError(f"dashboard asset missing or empty: {asset}")
         packaged_files = {name for name in names if name.startswith("jev_gateway/") and not name.endswith("/")}
         if packaged_files != expected_files:
             raise ValueError(f"wheel package contents differ: missing={sorted(expected_files - packaged_files)}, extra={sorted(packaged_files - expected_files)}")
@@ -62,6 +76,17 @@ def validate(tag: str, wheel_dir: Path) -> tuple[Path, bool]:
             raise ValueError("wheel LICENSE differs from source")
         if 'package_version("jev-gateway")' not in archive.read("jev_gateway/cli/main.py").decode():
             raise ValueError("CLI version must read installed distribution metadata")
+    installer_template = Path("scripts/install.sh").read_text()
+    if installer_template.count("__JEV_RELEASE_TAG__") != 1 or re.findall(r"^RELEASE_TAG=(.*)$", installer_template, re.MULTILINE) != ["__JEV_RELEASE_TAG__"]:
+        raise ValueError("installer template must contain exactly one release-tag placeholder assignment")
+    generated = installer_template.replace("__JEV_RELEASE_TAG__", tag)
+    syntax = subprocess.run(["sh", "-n"], input=generated, text=True, capture_output=True)
+    if syntax.returncode:
+        raise ValueError(f"generated installer shell syntax invalid: {syntax.stderr.strip()}")
+    installer = wheel_dir / "install.sh"
+    installer.write_text(generated)
+    installer_digest = hashlib.sha256(installer.read_bytes()).hexdigest()
+    (wheel_dir / "install.sh.sha256").write_text(f"{installer_digest}  install.sh\n")
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     (wheel_dir / f"{wheel.name}.sha256").write_text(f"{digest}  {wheel.name}\n")
     return wheel, bool(re.search(r"(?:a|b|rc)[0-9]+$", version))

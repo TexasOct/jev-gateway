@@ -15,6 +15,7 @@ wheels/
 models.json
 logs/
 *node_modules/
+/jev_gateway/static/
 .vitest/
 
 # Trellis-generated local tooling

@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Preserve gateway, canvas, policy, responsive and security contracts during a visual-only dashboard change."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Frontend gates and worktree verification conventions for visual-only UI edits"}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/monitoring-data-contract.md", "reason": "Verify proposed route animation against actually retained session/request evidence; reject implied real-time stages or retries."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/reference-analysis.md", "reason": "Keep Magpie observations evidence-based and distinguish them from proposed JEV interactions."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/implementation-outline.md", "reason": "Review the proposed production scope for behavioral and data-contract drift."}

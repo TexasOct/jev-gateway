@@ -18,7 +18,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "09-26-release-hosted-curl-installer"
+  ],
   "parent": null,
   "relatedFiles": [],
   "notes": "",

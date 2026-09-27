@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build the dashboard bundle into jev_gateway/static, or check that the
-# committed bundle is not older than the frontend sources it was built from.
+# generated bundle is not older than the frontend sources it was built from.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -8,15 +8,8 @@ frontend="$root/frontend"
 output="$root/jev_gateway/static"
 
 if [ "${1:-}" != "--check" ]; then
-    # `npm ci` refuses a lockfile whose platform-conditional native bindings
-    # were pruned by the platform that generated it (Vite's rolldown ships an
-    # optional binding per OS/libc). Try the strict path, then install.
-    if [ -f "$frontend/package-lock.json" ] && npm --prefix "$frontend" ci; then
-        :
-    else
-        echo "npm ci unavailable for this lockfile; falling back to npm install" >&2
-        npm --prefix "$frontend" install
-    fi
+    # Install platform-specific optional bindings for Vite/rolldown.
+    npm --prefix "$frontend" install
     npm --prefix "$frontend" run build
     echo "dashboard bundle written to $output"
     exit 0
@@ -28,7 +21,8 @@ if [ ! -f "$output/index.html" ]; then
 fi
 
 stale=$(find "$frontend/src" "$frontend/index.html" "$frontend/package.json" \
-    "$frontend/vite.config.ts" -type f -newer "$output/index.html" -print -quit 2>/dev/null || true)
+    "$frontend/package-lock.json" "$frontend/vite.config.ts" "$frontend"/tsconfig*.json \
+    -type f -newer "$output/index.html" -print -quit)
 
 if [ -n "$stale" ]; then
     echo "dashboard bundle is stale: $stale" >&2

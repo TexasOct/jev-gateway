@@ -24,28 +24,47 @@ keep a session on one route or reconsider it each turn.
 
 ## Quick start
 
-Install the CLI on macOS or Linux without cloning the repository:
+Install the CLI on macOS or Linux without cloning the repository. You need
+Python 3.10+ available as `python3` and `curl`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes
+curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
 ```
 
-The bootstrap on raw `main` installs the latest published stable Release wheel after checking its SHA256. Until a stable Release is published, it exits without installing `main`. Pin a published version (including `rc` prereleases) or roll back with `--version 0.1.0` after that version has been published:
+The URL selects the latest stable Release's installer. Each installer embeds its
+own tag and verifies that tag's wheel against its SHA256 sidecar before installing
+it. `--yes` permits installing `uv` if it is missing. To pin a published version
+or roll back, use its tagged installer URL:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes --version 0.1.0
+curl -fsSL https://github.com/TexasOct/jev-gateway/releases/download/v0.1.0/install.sh | sh -s -- --yes
 ```
 
-Windows is not supported by the curl installer. Use the source checkout or Docker path in [`docs/local-install.md`](docs/local-install.md). For development, you still need Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and access to configured upstream models:
+Explicit prerelease tags are supported. Passing `--version 0.1.0` to another
+Release's installer makes it verify and run the target tag's installer once.
+Missing assets or invalid checksums stop installation; there is no fallback to
+`main`. The initial `curl | sh` script runs without a checksum check. For a pinned
+download, review, and verification flow, see
+[`docs/local-install.md`](docs/local-install.md#verify-installer).
+
+Windows is not supported by the curl installer. See the source checkout or
+Docker paths in [`docs/local-install.md`](docs/local-install.md).
+
+For source development, use Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and
+Node.js with npm (the release workflow uses Node.js 22). Build the dashboard
+before installing from the checkout:
 
 ```bash
 git clone https://github.com/TexasOct/jev-gateway.git
 cd jev-gateway
 uv sync --all-groups
+npm --prefix frontend install
+scripts/build-frontend.sh
 ```
 
-Initialize the runtime directory. This copies the public templates once and never overwrites
-existing files:
+For this source checkout, initialize the runtime directory with the local
+installer. The curl installer has already initialized it. Both preserve existing
+configuration and records:
 
 ```bash
 ./scripts/install-local.sh --editable
@@ -65,7 +84,8 @@ DEEPSEEK_API_KEY=replace-with-deepseek-key
 OPENAI_API_KEY=replace-with-openai-key
 ```
 
-Start the gateway:
+After a curl install, start the gateway with `jev start`. For the source install,
+use its local launcher:
 
 ```bash
 ~/.local/bin/jev-gateway-local
@@ -173,25 +193,37 @@ is allowed, but modifications to the covered program cannot remain closed to tho
 
 ## Development
 
+From the repository root, install the dependencies and build the dashboard
+before running the full tests or packaging:
+
 ```bash
+uv sync --all-groups
+npm --prefix frontend install
+scripts/build-frontend.sh
 uv run pytest -q
 uvx pyright
 uv build
 ```
 
 The dashboard under `GET /dashboard` is a Vite + React app in `frontend/`. Its
-build output is committed inside the package at `jev_gateway/static/`, so `pip
-install`, `uv build`, and the test suite work without Node. After changing
-anything under `frontend/`, rebuild it:
+generated output at `jev_gateway/static/` is ignored by Git. Source installs,
+wheel builds, and tests that use the dashboard need the frontend dependencies.
+The session-scoped `dashboard_bundle` pytest fixture rebuilds it once with
+`npm --prefix frontend run build`; it does not install npm dependencies. Installed
+Release wheels already contain the dashboard and need no Node.js.
+
+After changing anything under `frontend/`, rebuild and check it:
 
 ```bash
 scripts/build-frontend.sh           # build into jev_gateway/static
-scripts/build-frontend.sh --check   # fail if the committed bundle is stale
+scripts/build-frontend.sh --check   # fail if the generated bundle is absent or stale
 npm --prefix frontend run lint
 npm --prefix frontend run test
 ```
 
-The Dockerfile rebuilds the bundle from `frontend/` in a Node stage before `uv
-build`, so images never ship a stale copy.
+The Dockerfile builds the bundle from `frontend/` in a Node stage before `uv
+build`. The release workflow also builds it before the Python tests and wheel,
+then validates the wheel's contents. See [`docs/releasing.md`](docs/releasing.md)
+for tagged artifact validation and publication steps.
 
 Packaging builds `jev-gateway` and exposes both `jev-gateway` (the foreground server) and `jev` (the management CLI).

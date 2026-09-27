@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Preserve gateway, canvas, policy, responsive and security contracts during a visual-only dashboard change."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Frontend gates and worktree verification conventions for visual-only UI edits"}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/style-spec.md", "reason": "Implement the reviewed Dashboard typography, surfaces, semantic color and component-state design consistently."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/monitoring-data-contract.md", "reason": "Keep monitoring replay semantics strictly within recorded evidence and preserve unknown/missing fields honestly."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/monitoring-motion-proposal.md", "reason": "Carry approved user-triggered replay interactions and motion/accessibility constraints into product design."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/reference-analysis.md", "reason": "Preserve observed reference behavior and keep visual borrowing distinct from JEV's design decisions."}
+{"file": ".trellis/tasks/09-27-dashboard-visual-language/research/implementation-outline.md", "reason": "Plan a bounded monitoring integration while preserving pagination, privacy, theme and strategy-editor contracts."}

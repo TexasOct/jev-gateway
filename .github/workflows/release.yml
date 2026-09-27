@@ -18,12 +18,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: astral-sh/setup-uv@v5
       - name: Validate tag and build package
         shell: bash
         run: |
           set -euo pipefail
           python scripts/validate-release.py "$GITHUB_REF_NAME"
+          npm --prefix frontend install
+          npm --prefix frontend run lint
+          npm --prefix frontend run test
+          scripts/build-frontend.sh
           scripts/build-frontend.sh --check
           uv run pytest -q
           uvx pyright
@@ -36,8 +43,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A preexisting release, including a draft left by a failed upload,
-          # needs maintainer attention. Never overwrite its assets or republish.
           response=$(mktemp)
           release_endpoint="repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"
           if gh api --include "$release_endpoint" > "$response" 2>&1; then
@@ -49,10 +54,15 @@ jobs:
             head -n 1 "$response" >&2
             exit 1
           fi
+          wheel="dist/jev_gateway-${TAG#v}-py3-none-any.whl"
           if [[ "$TAG" =~ (a|b|rc)[0-9]+$ ]]; then
-            gh release create "$TAG" dist/*.whl dist/*.sha256 \
+            gh release create "$TAG" \
+              dist/install.sh dist/install.sh.sha256 \
+              "$wheel" "$wheel.sha256" \
               --verify-tag --prerelease --latest=false --generate-notes
           else
-            gh release create "$TAG" dist/*.whl dist/*.sha256 \
+            gh release create "$TAG" \
+              dist/install.sh dist/install.sh.sha256 \
+              "$wheel" "$wheel.sha256" \
               --verify-tag --latest --generate-notes
           fi

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,6 +19,19 @@ from tests.helpers import CATALOG_DOCUMENT, FakeClock, catalog_document
 os.environ.setdefault("TEST_SMALL_PROVIDER_KEY", "test-key-small")
 os.environ.setdefault("TEST_LARGE_PROVIDER_KEY", "test-key-large")
 os.environ.setdefault("TEST_PROVIDER_KEY", "test-route-key")
+
+
+@pytest.fixture(scope="session")
+def dashboard_bundle() -> Path:
+    """Build current assets once; never rely on ignored output from an earlier run."""
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        ["npm", "--prefix", "frontend", "run", "build"], cwd=root,
+        capture_output=True, text=True,
+    )
+    if result.returncode:
+        pytest.fail("Dashboard build failed; run npm --prefix frontend install first.\n" + result.stdout + result.stderr)
+    return root / "jev_gateway/static"
 
 
 @pytest.fixture
