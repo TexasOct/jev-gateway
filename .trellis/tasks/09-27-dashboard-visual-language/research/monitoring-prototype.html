@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>JEV Gateway · Monitoring replay concept</title>
+  <link rel="stylesheet" href="./monitoring-prototype.css">
+</head>
+<body>
+  <div class="provenance"><span>LOCAL CONCEPT</span><strong>Illustrative replay of recorded evidence · synthetic sample data</strong><span>No connection to a gateway or upstream service</span></div>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="JEV Gateway monitoring concept"><span class="mark" aria-hidden="true">J</span><span><b>JEV gateway</b><small>Monitoring concept</small></span></a>
+    <nav aria-label="Prototype navigation"><a class="current" href="#monitor">Monitoring</a><a href="#evidence">Evidence</a></nav>
+    <button class="theme-button" id="theme-toggle" type="button" aria-label="Switch to light theme">Light theme</button>
+  </header>
+  <main id="main">
+    <section class="intro" id="monitor">
+      <div><p class="kicker">SESSION TRACE</p><h1>Replay a recorded route</h1><p class="lede">Inspect the recorded request, decision, upstream request and outcome. The moving packet is a visual aid, not a timeline.</p></div>
+      <span class="status-chip"><i aria-hidden="true"></i>Local sample</span>
+    </section>
+
+    <section class="workspace" aria-label="Synthetic session and route replay">
+      <aside class="selector panel">
+        <div class="panel-head"><div><h2>Sample sessions</h2><p>Fixed examples stored in this page</p></div><span class="count">3</span></div>
+        <label for="session-select">Session</label>
+        <select id="session-select" aria-label="Choose a synthetic session"></select>
+        <div class="sample-list" id="request-list" aria-label="Requests in selected session"></div>
+        <p class="small-note">These records are synthetic. Selecting them makes no network request.</p>
+      </aside>
+
+      <section class="trace panel" aria-labelledby="trace-title">
+        <div class="panel-head trace-head"><div><h2 id="trace-title">Recorded route</h2><p id="request-summary">Choose a sample request</p></div><span id="outcome-chip" class="outcome-chip">No selection</span></div>
+        <div class="trace-caption"><span>ROUTE VIEW</span><span>Path reflects selected evidence fields only</span></div>
+        <div class="route-wrap" id="route-wrap">
+          <svg class="route-lines" id="route-svg" viewBox="0 0 760 240" role="img" aria-labelledby="route-svg-title route-svg-desc" preserveAspectRatio="none">
+            <title id="route-svg-title">Illustrative request route</title>
+            <desc id="route-svg-desc">Available synthetic evidence is connected in field order. Dashed gaps mark missing evidence, not activity. Replay is illustrative and has no measured timing.</desc>
+            <g id="route-segments"></g>
+            <circle class="packet" id="packet" r="6" cx="0" cy="0" aria-hidden="true" visibility="hidden" />
+          </svg>
+          <div class="route-nodes">
+            <article class="route-node" data-step="request"><span class="node-index">01</span><span class="node-icon" aria-hidden="true">↳</span><strong>Request</strong><small>Recorded input</small></article>
+            <article class="route-node" data-step="decision"><span class="node-index">02</span><span class="node-icon" aria-hidden="true">⌘</span><strong>Decision</strong><small>Recorded selection</small></article>
+            <article class="route-node" data-step="upstream"><span class="node-index">03</span><span class="node-icon" aria-hidden="true">⇧</span><strong>Upstream request</strong><small>When recorded</small></article>
+            <article class="route-node" data-step="outcome"><span class="node-index">04</span><span class="node-icon" aria-hidden="true">◇</span><strong>Outcome</strong><small>Recorded result</small></article>
+          </div>
+        </div>
+        <div class="trace-controls">
+          <div class="buttons"><button class="primary" id="replay" type="button" disabled>Replay path</button><button id="pause" type="button" disabled>Pause replay</button><button id="reset" type="button" disabled>Reset</button></div>
+          <p id="replay-state" class="replay-state" aria-live="polite" aria-atomic="true">Select a sample request to inspect its evidence.</p>
+        </div>
+        <div class="trace-foot"><span>Route diagram is a visual explanation of available fields.</span><span>Replay speed is illustrative; no recorded timing is inferred.</span></div>
+      </section>
+    </section>
+
+    <section class="evidence panel" id="evidence" aria-labelledby="evidence-title">
+      <div class="panel-head"><div><h2 id="evidence-title">Selected request evidence</h2><p>Only the fields shown below are represented by the diagram.</p></div><span class="evidence-label">Synthetic examples</span></div>
+      <div class="evidence-grid" id="evidence-grid"><p class="empty-evidence">Choose a request to show its evidence.</p></div>
+    </section>
+    <p class="caveat"><strong>About this concept</strong> The replay uses in-memory synthetic samples. It does not read retained production data or connect to the gateway. Moving packets only visualize the field sequence after you press Replay. They do not establish attempt order, per-stage duration, provider health, or real-time activity. A missing field stays marked unavailable.</p>
+  </main>
+  <script>
+    (() => {
+      const samples = [
+        { id: "sess-demo-a", title: "Completion · success", detail: "3 requests · illustrative session", requests: [
+          { id: "req-a1", label: "Request 01 · success",
+            request: { request_id: "sample-a1", received_at: 1000.0, strategy: "task_aware", requested_model: "auto", content_captured: false, endpoint: "/v1/chat/completions" },
+            decision: { decision_id: "synthetic-a1", strategy: "task_aware", label: "balanced", route: "openai/gpt-4.1", provider: "openai", upstream_model: "gpt-4.1", reason: "synthetic sample", mode: "auto", turn_index: 1, switched_from: null, blocked_by: null, candidates: ["openai/gpt-4.1"], signals: {}, created_at: 1001.0 },
+            upstream_request: { provider: "openai", model: "openai/gpt-4.1", stream: false, content_captured: false, payload: {}, created_at: 1002.0 },
+            outcome: { ok: true, finish_reason: "stop", latency_ms: 12.0, returned_model: null, error_type: null, prompt_tokens: 24, completion_tokens: 38, total_tokens: 62, cost_usd: 0.0012, recorded_at: 1002.05 } },
+          { id: "req-a2", label: "Request 02 · outcome missing",
+            request: { request_id: "sample-a2", received_at: 1003.0, strategy: "task_aware", requested_model: "auto", content_captured: false, endpoint: "/v1/chat/completions" },
+            decision: { decision_id: "synthetic-a2", strategy: "task_aware", label: "craft", route: "anthropic/claude-sonnet", provider: "anthropic", upstream_model: "claude-sonnet", reason: "synthetic sample", mode: "auto", turn_index: 1, switched_from: null, blocked_by: null, candidates: ["anthropic/claude-sonnet"], signals: {}, created_at: 1003.5 },
+            upstream_request: { provider: "anthropic", model: "anthropic/claude-sonnet", stream: false, content_captured: false, payload: {}, created_at: 1004.0 }, outcome: null },
+          { id: "req-a3", label: "Request 03 · failure",
+            request: { request_id: "sample-a3", received_at: 1005.0, strategy: "quality_first", requested_model: "auto", content_captured: false, endpoint: "/v1/responses" },
+            decision: { decision_id: "synthetic-a3", strategy: "quality_first", label: "precise", route: "openai/gpt-4.1", provider: "openai", upstream_model: "gpt-4.1", reason: "synthetic sample", mode: "auto", turn_index: 1, switched_from: null, blocked_by: null, candidates: ["openai/gpt-4.1"], signals: {}, created_at: 1005.0 },
+            upstream_request: { provider: "openai", model: "openai/gpt-4.1", stream: false, content_captured: false, payload: {}, created_at: 1006.0 },
+            outcome: { ok: false, finish_reason: null, latency_ms: 420.0, returned_model: null, error_type: "sample_upstream_error", prompt_tokens: null, completion_tokens: null, total_tokens: null, cost_usd: null, recorded_at: 1006.42 } }
+        ] },
+        { id: "sess-demo-b", title: "Chat · decision only", detail: "1 request · illustrative session", requests: [
+          { id: "req-b1", label: "Request 01 · partial evidence",
+            request: { request_id: "sample-b1", received_at: 1007.0, strategy: "task_aware", requested_model: "auto", content_captured: false, endpoint: "/v1/chat/completions" },
+            decision: { decision_id: "synthetic-b1", strategy: "task_aware", label: "routine", route: "openai/gpt-4.1", provider: "openai", upstream_model: "gpt-4.1", reason: "synthetic sample", mode: "auto", turn_index: 1, switched_from: null, blocked_by: null, candidates: ["openai/gpt-4.1"], signals: {}, created_at: 1007.2 }, upstream_request: null, outcome: null }
+        ] },
+        { id: "sess-demo-c", title: "Session · no retained detail", detail: "0 retained requests · illustrative session", requests: [] }
+      ];
+      const sessionSelect = document.querySelector("#session-select");
+      const requestList = document.querySelector("#request-list");
+      const evidenceGrid = document.querySelector("#evidence-grid");
+      const replayButton = document.querySelector("#replay");
+      const pauseButton = document.querySelector("#pause");
+      const resetButton = document.querySelector("#reset");
+      const routeSvg = document.querySelector("#route-svg");
+      const routeSegments = document.querySelector("#route-segments");
+      const packet = document.querySelector("#packet");
+      const replayState = document.querySelector("#replay-state");
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let selectedRequest = null;
+      let frame = null;
+      let playback = "idle";
+      let elapsed = 0;
+      let startedAt = 0;
+      let routePoints = [];
+      const duration = 3600;
+      const nodes = [...document.querySelectorAll(".route-node")];
+      const names = ["request", "decision", "upstream_request", "outcome"];
+      const labels = ["Request", "Decision", "Upstream request", "Outcome"];
+
+      function stopAnimation() {
+        cancelAnimationFrame(frame);
+        frame = null;
+        playback = "idle";
+        elapsed = 0;
+        packet.setAttribute("visibility", "hidden");
+        nodes.forEach(node => node.classList.remove("visited", "active"));
+      }
+      function layoutRoute() {
+        const box = routeSvg.getBoundingClientRect();
+        const vertical = window.matchMedia("(max-width: 650px)").matches;
+        routeSvg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+        routePoints = nodes.map(node => {
+          const rect = node.getBoundingClientRect();
+          return vertical ? { x: 22, y: rect.top - box.top + rect.height / 2 } : { x: rect.left - box.left + rect.width / 2, y: box.height - 32 };
+        });
+        routeSegments.replaceChildren();
+        function line(from, to, available) {
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M${from.x} ${from.y} L${to.x} ${to.y}`);
+          path.setAttribute("class", available ? "route-base" : "route-base route-gap");
+          routeSegments.append(path);
+        }
+        routePoints.forEach((point, index) => {
+          const rect = nodes[index].getBoundingClientRect();
+          const available = selectedRequest?.[names[index]] != null;
+          const end = vertical ? { x: rect.left - box.left, y: point.y } : { x: point.x, y: rect.bottom - box.top };
+          line(point, end, available);
+          if (index > 0) line(routePoints[index - 1], point, available && selectedRequest?.[names[index - 1]] != null);
+        });
+        if (playback === "playing" || playback === "paused") paintReplay();
+      }
+      function paintReplay() {
+        const position = Math.max(0, Math.min(elapsed / duration, 1)) * (nodes.length - 1);
+        const index = Math.floor(position);
+        nodes.forEach((node, i) => {
+          const available = selectedRequest?.[names[i]] != null;
+          node.classList.toggle("active", available && i === index && elapsed < duration);
+          node.classList.toggle("visited", available && (i < index || elapsed >= duration));
+        });
+        const from = routePoints[index];
+        const to = routePoints[Math.min(index + 1, routePoints.length - 1)];
+        const canConnect = selectedRequest?.[names[index]] != null && selectedRequest?.[names[index + 1]] != null;
+        packet.setAttribute("visibility", canConnect && elapsed < duration ? "visible" : "hidden");
+        packet.setAttribute("cx", String(from.x + (to.x - from.x) * (position - index)));
+        packet.setAttribute("cy", String(from.y + (to.y - from.y) * (position - index)));
+      }
+      function tick(now) {
+        if (playback !== "playing") return;
+        elapsed = Math.max(0, Math.min(now - startedAt, duration));
+        paintReplay();
+        if (elapsed < duration) frame = requestAnimationFrame(tick);
+        else {
+          frame = null;
+          setPlaybackControls("completed");
+          replayState.textContent = "Replay complete. Missing evidence stays unavailable; timing was illustrative.";
+        }
+      }
+      function staticReplay() {
+        stopAnimation();
+        nodes.forEach((node, index) => node.classList.toggle("visited", selectedRequest?.[names[index]] != null));
+        setPlaybackControls("completed");
+        replayState.textContent = "Reduced motion is enabled. Available evidence is highlighted without animation; missing fields stay unavailable.";
+      }
+      function jsonValue(value) { return value === null || value === undefined ? "Evidence unavailable" : JSON.stringify(value, null, 2); }
+      function drawEvidence(item) {
+        evidenceGrid.replaceChildren();
+        if (!item) { const empty = document.createElement("p"); empty.className = "empty-evidence"; empty.textContent = "No retained request evidence in this synthetic session."; evidenceGrid.append(empty); return; }
+        names.forEach((name, index) => {
+          const value = item[name];
+          const card = document.createElement("article"); card.className = "evidence-card" + (value == null ? " unavailable" : "");
+          const head = document.createElement("div"); head.className = "evidence-card-head";
+          const title = document.createElement("h3"); title.textContent = labels[index];
+          const state = document.createElement("span"); state.textContent = value == null ? "Unavailable" : "Recorded"; state.className = value == null ? "field-state absent" : "field-state";
+          const pre = document.createElement("pre"); pre.textContent = jsonValue(value); pre.tabIndex = 0; pre.setAttribute("aria-label", labels[index] + " synthetic evidence");
+          head.append(title, state); card.append(head, pre); evidenceGrid.append(card);
+        });
+      }
+      function selectRequest(item) {
+        selectedRequest = item; stopAnimation(); drawEvidence(item);
+        document.querySelector("#request-summary").textContent = item ? item.request.request_id + " · " + item.label : "No retained requests in this synthetic session";
+        const chip = document.querySelector("#outcome-chip");
+        const result = item?.outcome == null ? "missing" : item.outcome.ok ? "success" : "failure";
+        chip.className = "outcome-chip " + result;
+        chip.textContent = result === "success" ? "Recorded success" : result === "failure" ? "Recorded failure" : "Outcome unavailable";
+        document.querySelectorAll(".request-choice").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.requestId === item?.id)));
+        document.querySelectorAll(".route-node").forEach((node, index) => {
+          const available = item?.[names[index]] != null;
+          node.classList.toggle("unavailable", !available);
+          node.querySelector("small").textContent = available ? "Evidence recorded" : "Evidence unavailable";
+        });
+        setPlaybackControls(item ? "ready" : "idle");
+        replayState.textContent = item ? "Ready. Replay highlights available evidence; dashed gaps remain unknown." : "No retained requests. This does not establish active work or a result.";
+        layoutRoute();
+      }
+      function renderRequests() {
+        requestList.replaceChildren();
+        const session = samples.find(item => item.id === sessionSelect.value);
+        session.requests.forEach((item, index) => {
+          const button = document.createElement("button"); button.type = "button"; button.className = "request-choice"; button.dataset.requestId = item.id; button.setAttribute("aria-pressed", "false");
+          const title = document.createElement("strong"); title.textContent = item.label;
+          const sub = document.createElement("span"); sub.textContent = item.request.endpoint;
+          const badge = document.createElement("i"); badge.className = "mini-state " + (item.outcome == null ? "missing" : item.outcome.ok ? "success" : "failure"); badge.setAttribute("aria-hidden", "true");
+          button.append(badge, title, sub); button.addEventListener("click", () => selectRequest(item)); requestList.append(button);
+          if (index === 0 && !selectedRequest) selectRequest(item);
+        });
+        if (!session.requests.length) {
+          const empty = document.createElement("p"); empty.className = "small-note"; empty.textContent = "No retained requests. Storage availability and retention can leave this list empty."; requestList.append(empty);
+          selectRequest(null);
+        }
+        if (selectedRequest && !session.requests.some(item => item.id === selectedRequest.id)) selectRequest(session.requests[0]);
+      }
+      samples.forEach(item => { const option = document.createElement("option"); option.value = item.id; option.textContent = item.title + " · " + item.detail; sessionSelect.append(option); });
+      sessionSelect.addEventListener("change", () => { selectedRequest = null; renderRequests(); });
+      function setPlaybackControls(state) {
+        playback = state;
+        const paused = state === "paused";
+        replayButton.textContent = paused ? "Resume replay" : state === "completed" ? "Replay again" : "Replay path";
+        replayButton.setAttribute("aria-label", paused ? "Resume illustrative route replay" : "Replay illustrative route");
+        replayButton.disabled = !selectedRequest || state === "playing";
+        pauseButton.disabled = state !== "playing";
+        resetButton.disabled = state === "idle";
+      }
+      function reset() { stopAnimation(); setPlaybackControls(selectedRequest ? "ready" : "idle"); replayState.textContent = selectedRequest ? "Replay reset. Press Replay path to animate this illustrative view." : "Select a sample request to inspect its evidence."; }
+      replayButton.addEventListener("click", () => {
+        if (!selectedRequest) return;
+        if (reducedMotion.matches) { staticReplay(); return; }
+        if (playback !== "paused") stopAnimation();
+        layoutRoute();
+        startedAt = performance.now() - elapsed;
+        replayState.textContent = "Illustrative replay running. No elapsed-time data is represented.";
+        setPlaybackControls("playing");
+        frame = requestAnimationFrame(tick);
+      });
+      function pauseReplay() {
+        if (playback !== "playing") return;
+        cancelAnimationFrame(frame); frame = null;
+        elapsed = Math.min(performance.now() - startedAt, duration); paintReplay();
+        setPlaybackControls("paused"); replayState.textContent = "Replay paused. Resume continues from the same position and field highlight.";
+      }
+      pauseButton.addEventListener("click", pauseReplay);
+      resetButton.addEventListener("click", reset);
+      reducedMotion.addEventListener("change", () => { if (reducedMotion.matches && selectedRequest) staticReplay(); });
+      document.addEventListener("visibilitychange", () => { if (document.hidden) pauseReplay(); });
+      new ResizeObserver(layoutRoute).observe(document.querySelector("#route-wrap"));
+      document.querySelector("#theme-toggle").addEventListener("click", event => {
+        const root = document.documentElement; const next = root.dataset.theme === "dark" ? "light" : "dark"; root.dataset.theme = next;
+        event.currentTarget.textContent = next === "dark" ? "Light theme" : "Dark theme";
+        event.currentTarget.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
+      });
+      renderRequests();
+    })();
+  </script>
+</body>
+</html>

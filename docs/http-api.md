@@ -116,6 +116,12 @@ it never reloads the engine, registers a config version, or edits the routing
 overlay. The layout is installation-wide: all browsers read the same file, with
 atomic last-writer-wins saves rather than revision-based concurrency protection. Connections remain constrained to the ordered first-match matrix;
 policy changes still use the routing configuration validation and apply routes.
+The strategy view fills the viewport below the shared dashboard header. Its canvas
+contains the title and warning controls, a floating selection/pan/add-rule toolbar,
+and a bounded bottom drawer for help, node and edge lists, advanced editors and
+review actions. The drawer starts collapsed and scrolls internally when expanded.
+Selected-node details open in a size-capped, scrollable panel beside the node;
+changing tools affects canvas interaction only, not the routing strategy.
 The whiteboard renders question context, the ordered match/unmatched rule chain,
 fallback, labels, and model pools at the saved coordinates. Reconnecting a match
 edge changes its rule or fallback label; reconnecting an unmatched edge moves a

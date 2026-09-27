@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"Spec index and quality checklist for the gateway dashboard boundary."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Check separation of routing policy and canvas layout, keyboard/browser interaction requirements, and authorization."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Project test and quality verification expectations."}
+{"file":".trellis/tasks/09-25-mixboard-strategy-editor/research/mixboard-interactions.md","reason":"Verify that claimed Mixboard behavior comes from official observation and that unverified details are not invented."}

@@ -23,11 +23,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import { api } from "../api";
 import RoutingCanvas from "./RoutingCanvas";
-import { changeLabelMembership } from "./canvas";
+import { canvasAvailableRect, changeLabelMembership, handoffInspectorFocus, inspectorFallbackPosition, inspectorPosition, pageViewport, reconcileRuleSelection, visibleCanvasRect } from "./canvas";
 import type { RuleLayoutMutation } from "./canvas";
 import type { ConfigurationPayload, LabelRow, RoutingOverlayPayload } from "../api";
 import { useTranslation } from "../i18n";
@@ -41,6 +42,7 @@ import type { DraftDiff, ModelDraft, RoutingDraft, WorkflowEdge } from "./draft"
 
 interface EditorProps {
   config: ConfigurationPayload;
+  error?: string | null;
   onReloaded: () => Promise<void>;
   onError: (message: string) => void;
 }
@@ -281,12 +283,66 @@ function DropZone({
   );
 }
 
-export default function RoutingEditor({ config, onReloaded, onError }: EditorProps) {
+export default function RoutingEditor({ config, error, onReloaded, onError }: EditorProps) {
   const [draft, setDraft] = useState<RoutingDraft>(() => draftFromConfiguration(config));
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [serverWarnings, setServerWarnings] = useState<string[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string>("questions");
+  const [selectedNode, setSelectedNode] = useState("");
+  const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [nodeDragging, setNodeDragging] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const [inspectorAt, setInspectorAt] = useState<(NonNullable<ReturnType<typeof inspectorPosition>> & { fallback: boolean }) | null>(null);
+  const [revealNode, setRevealNode] = useState<{ id: string; serial: number } | null>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
+  const inspectorRef = useRef<HTMLElement>(null);
+  const ruleFormRef = useRef<HTMLFieldSetElement>(null);
+  const drawerBodyRef = useRef<HTMLDivElement>(null);
+  const reviewRef = useRef<HTMLDivElement>(null);
+  const drawerToggleRef = useRef<HTMLButtonElement>(null);
+  const openDrawerAt = useCallback((target: "rule" | "review") => {
+    setInfoOpen(true);
+    requestAnimationFrame(() => {
+      const body = drawerBodyRef.current;
+      const item = target === "rule" ? ruleFormRef.current : reviewRef.current;
+      if (body && item) body.scrollTop += item.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      (item?.querySelector<HTMLElement>("select, input, button") ?? item)?.focus({ preventScroll: true });
+    });
+  }, []);
+  const handoffFocus = () => {
+    const workspace = workspaceRef.current;
+    const canvas = workspace?.querySelector<HTMLElement>(".routing-canvas-scroll") ?? null;
+    const node = [...(workspace?.querySelectorAll<HTMLButtonElement>("[data-canvas-node]") ?? [])]
+      .find((item) => item.dataset.canvasNode === selectedNode) ?? null;
+    handoffInspectorFocus(inspectorRef.current, node, canvas, canvas ? canvasAvailableRect(canvas) : null);
+  };
+  const selectEditorNode = (id: string) => {
+    handoffFocus();
+    setAnchor(null);
+    setInfoOpen(false);
+    setSelectedNodes([]); setSelectedNode(id); setInspectorOpen(true);
+    setRevealNode((current) => ({ id, serial: (current?.serial ?? 0) + 1 }));
+  };
+  const selectLayoutNodes = (ids: string[]) => {
+    if (ids.length !== 1 || ids[0] !== selectedNode) handoffFocus();
+    setSelectedNodes(ids);
+    if (ids.length === 1) { setSelectedNode(ids[0]!); setInspectorOpen(true); setInfoOpen(false); }
+    else { setSelectedNode(""); setInspectorOpen(false); }
+  };
+  const selectCanvasNode = (id: string, focusInspector = false) => {
+    if (id !== selectedNode) handoffFocus();
+    setSelectedNodes([]);
+    setSelectedNode(id);
+    setInspectorOpen(true);
+    setInfoOpen(false);
+    if (focusInspector) requestAnimationFrame(() => requestAnimationFrame(() => inspectorRef.current?.querySelector("button")?.focus({ preventScroll: true })));
+  };
+  const closeInspector = () => {
+    handoffFocus();
+    selectLayoutNodes([]);
+  };
   const [review, setReview] = useState<{ payload: RoutingOverlayPayload; warnings: string[]; diff: DraftDiff } | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [resetReview, setResetReview] = useState(false);
@@ -299,6 +355,31 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
   const [questionNames, setQuestionNames] = useState<Record<string, string>>({});
   const [criterionNames, setCriterionNames] = useState<Record<string, string>>({});
   const { t } = useTranslation();
+  const updateInspectorPosition = useCallback(() => {
+    const workspace = workspaceRef.current;
+    const panel = inspectorRef.current;
+    if (!workspace || !panel) return;
+    const bounds = workspace.getBoundingClientRect();
+    const canvas = workspace.querySelector<HTMLElement>(".routing-canvas-scroll");
+    const available = canvas && canvasAvailableRect(canvas);
+    const position = anchor && available ? inspectorPosition(anchor, available, { width: 340, height: 460 }) : null;
+    const fallback = inspectorFallbackPosition(available, visibleCanvasRect(bounds, pageViewport()) ?? bounds);
+    const next = position ?? fallback;
+    setInspectorAt({ ...next, x: next.x - bounds.left, y: next.y - bounds.top, fallback: !position });
+  }, [anchor]);
+  useLayoutEffect(() => {
+    if (!inspectorOpen || nodeDragging) return;
+    updateInspectorPosition();
+    const observer = new ResizeObserver(updateInspectorPosition);
+    if (inspectorRef.current) observer.observe(inspectorRef.current);
+    if (workspaceRef.current) observer.observe(workspaceRef.current);
+    workspaceRef.current?.querySelectorAll("[data-canvas-occlusion]").forEach((element) => observer.observe(element));
+    window.addEventListener("resize", updateInspectorPosition);
+    window.addEventListener("scroll", updateInspectorPosition, true);
+    window.visualViewport?.addEventListener("resize", updateInspectorPosition);
+    window.visualViewport?.addEventListener("scroll", updateInspectorPosition);
+    return () => { observer.disconnect(); window.removeEventListener("resize", updateInspectorPosition); window.removeEventListener("scroll", updateInspectorPosition, true); window.visualViewport?.removeEventListener("resize", updateInspectorPosition); window.visualViewport?.removeEventListener("scroll", updateInspectorPosition); };
+  }, [inspectorOpen, nodeDragging, anchor, updateInspectorPosition]);
   const tr = useCallback((key: Parameters<typeof t>[0], values: Record<string, string> = {}) =>
     Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, value), t(key)), [t]);
 
@@ -324,18 +405,24 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
   const addableLabels = config.labels.filter((label) => label.resolution === "models"
     ? label.models.some((id) => Object.hasOwn(draft.models, id))
     : config.models.some((model) => draft.models[model.id]?.tags.includes(label.tag)));
+  // Future AI proposal composition belongs at this boundary: a proposal must enter
+  // the ordinary draft, validation, review and explicit apply flow. No prompt UI or payload exists here.
   const selectedRuleIndex = selectedNode.startsWith("rule-") ? Number(selectedNode.slice(5)) : -1;
   const selectedRuleExists = Number.isInteger(selectedRuleIndex) && selectedRuleIndex >= 0 && selectedRuleIndex < draft.rules.length;
   const updateRuleDraft = useCallback((next: RoutingDraft, mutation?: RuleLayoutMutation) => {
     if (next === draft) return;
     setDraft(next);
-    if (mutation) setTopology((current) => ({ serial: (current?.serial ?? 0) + 1, mutation }));
+    if (mutation) {
+      setTopology((current) => ({ serial: (current?.serial ?? 0) + 1, mutation }));
+      setSelectedNode((id) => reconcileRuleSelection(id, mutation));
+      setSelectedNodes((ids) => ids.map((id) => reconcileRuleSelection(id, mutation)).filter(Boolean));
+    }
   }, [draft]);
   const applyRuleMove = (from: number, to: number) => updateRuleDraft(moveRule(draft, from, to), { kind: "move", from, to });
   const applyRuleRemoval = (index: number) => {
     const next = removeRule(draft, index);
     updateRuleDraft(next, { kind: "remove", index });
-    setSelectedNode("questions");
+    selectEditorNode("questions");
   };
 
   const updateMembership = (modelId: string, tag: string, member: boolean) => {
@@ -391,13 +478,14 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
         if (!result.valid) throw new Error(t("invalidConfiguration"));
         setReview({ payload, diff: reviewedDiff, warnings: result.warnings.map((warning) => tr("validationWarning", { code: warning.code, message: warning.message })) });
         setAcknowledged(false);
+        openDrawerAt("review");
       } catch (caught) {
         onError(caught instanceof Error ? caught.message : String(caught));
       } finally {
         setBusy(false);
       }
     })();
-  }, [writeDisabled, busy, diff.changed, draft, config, t, tr, onError]);
+  }, [writeDisabled, busy, diff.changed, draft, config, t, tr, onError, openDrawerAt]);
 
   const save = useCallback(() => {
     if (review === null || busy || writeDisabled || (review.warnings.length > 0 && !acknowledged)) return;
@@ -435,17 +523,9 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
     })();
   }, [onError, onReloaded, t, writeDisabled, busy, resetReview]);
 
-  return (
-    <section className="panel" style={{ gridColumn: "1 / -1" }}>
-      <h2>{t("configuration")}</h2>
-      <div className="meta">
-        {t("strategy")} <code>{config.strategy}</code> {t("from")} <code>{config.baseline_source}</code>
-      </div>
-      <div className="meta">
-        {config.overlay.applied
-          ? tr("overlayApplied", { path: config.overlay.path })
-          : t("noOverlay")}
-      </div>
+  const heading = <>
+      <header className="workspace-heading"><div><span className="meta">{t("routingWorkflow")}</span><h2>{t("configuration")}</h2></div><span className="workspace-status">{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span></header>
+      {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {config.overlay.error === null ? null : (
         <div className="notice warn">{tr("overlayUnreadable", { error: config.overlay.error })}</div>
       )}
@@ -467,39 +547,57 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
           ))}
         </div>
       )}
+  </>;
 
+  return (
+    <section className="workflow-workspace" ref={workspaceRef} onKeyDown={(event) => {
+      if (event.key !== "Escape") return;
+      if (inspectorOpen) { event.preventDefault(); event.stopPropagation(); closeInspector(); }
+      else if (infoOpen) { event.preventDefault(); setInfoOpen(false); drawerToggleRef.current?.focus({ preventScroll: true }); }
+    }}>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <div className="workflow-workspace">
-          <div className="workflow-board">
-            <h3>{t("routingWorkflow")}</h3>
-            <RoutingCanvas draft={draft} config={config} disabled={editDisabled} selected={selectedNode}
-              onSelect={setSelectedNode} onDraft={updateRuleDraft} onError={onError} topology={topology} />
-          </div>
-          <aside className="workflow-inspector" aria-label={t("nodeInspector")}>
-            <div className="meta">{t("strategy")} <code>{config.strategy}</code></div>
-        <details className="workflow-advanced">
-          <summary>{t("advancedFallback")}</summary>
-          <p className="meta">{t("firstMatch")}</p>
-        <nav className="workflow-nav" aria-label={t("workflowNodes")}>
-          <button type="button" onClick={() => setSelectedNode("questions")}>{t("questions")}</button>
-          {draft.rules.map((_rule, index) => <button type="button" key={ruleId(index)} onClick={() => setSelectedNode(ruleId(index))}>{t("rule")} {index + 1}</button>)}
-          <button type="button" onClick={() => setSelectedNode("fallback")}>{t("fallback")}</button>
-          {config.labels.map((label) => <button type="button" key={label.tag} onClick={() => setSelectedNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</button>)}
-        </nav>
-        <ol className="workflow-chain" aria-label={t("orderedWorkflow")}>
-          {draft.rules.map((rule, index) => <li key={`workflow-${index}`}><button type="button" onClick={() => setSelectedNode(ruleId(index))}><strong>{t("rule")} {index + 1}</strong><span>{describeRule(rule, t)}</span></button><div className="workflow-edges">{edges.filter((edge) => edge.from === ruleId(index)).map((edge) => <WorkflowConnection key={`${edge.kind}-${edge.to}`} edge={edge} onSelect={setSelectedNode} target={edge.kind === "match" ? config.labels.find((label) => zoneId(label.tag) === edge.to)?.name ?? t("unboundLabel") : edge.to === "fallback" ? t("fallback") : `${t("rule")} ${index + 2}`} />)}</div></li>)}
-          <li><button type="button" onClick={() => setSelectedNode("fallback")}><strong>{t("fallback")}</strong><span>{draft.fallback.label ?? t("unboundLabel")} ({draft.fallback.selection ?? t("defaultSelection")})</span></button><div className="workflow-edges">{edges.filter((edge) => edge.from === "fallback").map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={setSelectedNode} target={draft.fallback.label ?? t("unboundLabel")} />)}</div></li>
-        </ol>
-        <div className="workflow-pools">{config.labels.map((label) => <div key={label.tag}><button type="button" onClick={() => setSelectedNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</button>{edges.filter((edge) => edge.from === zoneId(label.tag)).map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={setSelectedNode} target={edge.to.slice("model::".length)} />)}</div>)}</div>
-        </details>
-        <div className="workflow-edit" aria-live="polite">
+            <RoutingCanvas heading={heading} draft={draft} config={config} disabled={editDisabled} selected={selectedNode} selection={selectedNodes}
+              onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onError={onError} topology={topology}
+              inspectorOpen={inspectorOpen} onAnchor={setAnchor} revealNode={revealNode} onReveal={selectEditorNode}
+              onDraggingChange={setNodeDragging}
+              canAddRule={addableQuestions.length > 0 && addableLabels.length > 0}
+              onAddRule={() => { selectLayoutNodes([]); openDrawerAt("rule"); }}>
+          {(canvasInformation: ReactNode) => <>
+          {inspectorOpen && selectedNodes.length <= 1 && <aside className="workflow-inspector" ref={inspectorRef} data-fallback={inspectorAt?.fallback} style={{ left: inspectorAt?.x, top: inspectorAt?.y, width: inspectorAt?.width, height: inspectorAt?.height, visibility: inspectorAt && !nodeDragging ? "visible" : "hidden" }} aria-label={t("nodeInspector")}>
+            <header className="inspector-heading"><h3>{t("nodeInspector")}</h3><button type="button" title={t("closeInspector")} aria-label={t("closeInspector")} onClick={closeInspector}>×</button></header>
+        <div className="inspector-body">
+        {selectedNodes.length <= 1 && <div className="workflow-edit" aria-live="polite">
           {selectedNode === "questions" ? <fieldset disabled={editDisabled}><legend>{t("questionDefinitions")}</legend>{Object.entries(draft.questions).map(([name, question]) => <div key={name}><label>{t("questionName")}<input value={questionNames[name] ?? name} onChange={(event) => setQuestionNames((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setDraft((current) => renameQuestion(current, name, questionNames[name]!)); setQuestionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(draft.questions).length <= 1 || draft.rules.some((rule) => Object.hasOwn(rule.when, name) && Object.keys(rule.when).length === 1)} onClick={() => setDraft((current) => removeQuestion(current, name))}>{t("remove")}</button><label>{t("instructions")}<textarea value={question.instructions} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, instructions: event.target.value }))} /></label><div>{Object.entries(question.criteria).map(([criterion, description]) => <div key={criterion}><label>{t("criterionKey")}<input value={criterionNames[`${name}::${criterion}`] ?? criterion} onChange={(event) => setCriterionNames((current) => ({ ...current, [`${name}::${criterion}`]: event.target.value }))} /></label><button type="button" disabled={!criterionNames[`${name}::${criterion}`] || (criterionNames[`${name}::${criterion}`] !== criterion && Object.hasOwn(question.criteria, criterionNames[`${name}::${criterion}`] ?? ""))} onClick={() => { setDraft((current) => renameCriterion(current, name, criterion, criterionNames[`${name}::${criterion}`]!)); setCriterionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(question.criteria).length <= 2 || draft.rules.some((rule) => { const value = rule.when[name]; return (Array.isArray(value) ? value.length === 1 && value[0] === criterion : value === criterion) && Object.keys(rule.when).length === 1; })} onClick={() => setDraft((current) => removeCriterion(current, name, criterion))}>{t("remove")}</button><label>{t("criterionDescription")}<input value={description} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, criteria: { ...question.criteria, [criterion]: event.target.value } }))} /></label></div>)}</div><label>{t("newCriterion")}<input value={newCriteria[name] ?? ""} onChange={(event) => setNewCriteria((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" onClick={() => { setDraft((current) => addCriterion(current, name, newCriteria[name] ?? "")); setNewCriteria((current) => ({ ...current, [name]: "" })); }}>{t("add")}</button></div>)}<label>{t("newQuestion")}<input value={newQuestion} onChange={(event) => setNewQuestion(event.target.value)} /></label><button type="button" onClick={() => { setDraft((current) => addQuestion(current, newQuestion)); setNewQuestion(""); }}>{t("add")}</button></fieldset> : null}
           {selectedNode === "fallback" ? <fieldset disabled={editDisabled}><legend>{t("unmatchedFallback")}</legend><label>{t("label")}<select value={draft.fallback.label ?? ""} onChange={(event) => setDraft((current) => setFallback(current, { label: event.target.value }))}>{config.labels.map((label) => <option key={label.name} value={label.name}>{label.name}</option>)}</select></label><label>{t("selection")}<select value={draft.fallback.selection ?? ""} onChange={(event) => setDraft((current) => setFallback(current, { selection: event.target.value || undefined }))}><option value="">{t("defaultSelection")}</option>{selections.map((selection) => <option key={selection} value={selection}>{selection}</option>)}</select></label></fieldset> : null}
           {selectedRuleExists ? (() => { const index = selectedRuleIndex; const rule = draft.rules[index]; return rule ? <fieldset disabled={editDisabled}><legend>{t("rule")} {index + 1}</legend><button type="button" disabled={editDisabled} onClick={() => applyRuleRemoval(index)}>{t("deleteRule")}</button>{Object.entries(draft.questions).map(([question, definition]) => { const selected = rule.when[question]; const values = selected === undefined ? [] : Array.isArray(selected) ? selected : [selected]; return <fieldset key={question}><legend>{question}</legend><label><input type="checkbox" checked={selected !== undefined} disabled={editDisabled || (selected !== undefined && Object.keys(rule.when).length === 1)} onChange={(event) => setDraft((current) => toggleRuleQuestion(current, index, question, event.target.checked))} />{t("includeQuestion")}</label>{Object.keys(definition.criteria).map((criterion) => <label key={criterion}><input type="checkbox" disabled={editDisabled || selected === undefined} checked={values.includes(criterion)} onChange={(event) => setDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} />{criterion}</label>)}</fieldset>; })}<label>{t("label")}<select value={rule.select.label ?? ""} onChange={(event) => setDraft((current) => setRuleChoice(current, index, { label: event.target.value }))}>{config.labels.map((label) => <option key={label.name} value={label.name}>{label.name}</option>)}</select></label><label>{t("selection")}<select value={rule.select.selection ?? ""} onChange={(event) => setDraft((current) => setRuleChoice(current, index, { selection: event.target.value || undefined }))}><option value="">{t("defaultSelection")}</option>{selections.map((selection) => <option key={selection} value={selection}>{selection}</option>)}</select></label><button type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</button><button type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</button></fieldset> : null; })() : null}
           {selectedNode.startsWith("model::") ? (() => { const model = draft.models[selectedNode.slice(7)]; return model ? <fieldset disabled={editDisabled}><legend>{t("model")} {model.id}</legend><label>{t("priority")}<input type="number" value={model.priority} onChange={(event) => { const priority = Number.parseInt(event.target.value, 10); if (Number.isFinite(priority)) setDraft((current) => setPriority(current, model.id, priority)); }} /></label>{config.labels.map((label) => <label key={label.tag}><input type="checkbox" disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(model.id) : model.tags.includes(label.tag)} onChange={(event) => updateMembership(model.id, label.tag, event.target.checked)} />{label.name}{label.resolution === "models" ? ` (${t("explicitModelsReadOnly")})` : ""}</label>)}</fieldset> : null; })() : null}
           {selectedNode.startsWith("zone::") ? (() => { const label = config.labels.find((item) => zoneId(item.tag) === selectedNode); return label ? <fieldset disabled={editDisabled}><legend>{tr("labelPool", { label: label.name })}</legend>{label.resolution === "models" ? <p>{t("explicitModelsReadOnly")}</p> : null}{config.models.map((item) => <label key={item.id}><input type="checkbox" disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(item.id) : draft.models[item.id]?.tags.includes(label.tag) ?? false} onChange={(event) => updateMembership(item.id, label.tag, event.target.checked)} />{item.id}</label>)}</fieldset> : null; })() : null}
+        </div>}</div></aside>}
+      <section className="workflow-drawer" data-canvas-occlusion="bottom" aria-label={t("canvasInformation")}>
+        <div className="workflow-drawer-heading">
+          <button type="button" ref={drawerToggleRef} aria-expanded={infoOpen} aria-controls="routing-information" onClick={() => setInfoOpen(!infoOpen)}>{infoOpen ? "▾" : "▴"} {t("canvasInformation")}</button>
+          <span className="meta" role="status">{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span>
         </div>
-        <fieldset className="rule-add" disabled={editDisabled}>
+      <div id="routing-information" className="workflow-info" ref={drawerBodyRef} hidden={!infoOpen}>
+        {canvasInformation}
+        <div className="meta">{t("strategy")} <code>{config.strategy}</code> {t("from")} <code>{config.baseline_source}</code></div>
+        <div className="meta">{config.overlay.applied ? tr("overlayApplied", { path: config.overlay.path }) : t("noOverlay")}</div>
+        <details className="workflow-advanced">
+          <summary>{t("advancedFallback")}</summary>
+          <p className="meta">{t("firstMatch")}</p>
+        <nav className="workflow-nav" aria-label={t("workflowNodes")}>
+          <button type="button" onClick={() => selectEditorNode("questions")}>{t("questions")}</button>
+          {draft.rules.map((_rule, index) => <button type="button" key={ruleId(index)} onClick={() => selectEditorNode(ruleId(index))}>{t("rule")} {index + 1}</button>)}
+          <button type="button" onClick={() => selectEditorNode("fallback")}>{t("fallback")}</button>
+          {config.labels.map((label) => <button type="button" key={label.tag} onClick={() => selectEditorNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</button>)}
+        </nav>
+        <ol className="workflow-chain" aria-label={t("orderedWorkflow")}>
+          {draft.rules.map((rule, index) => <li key={`workflow-${index}`}><button type="button" onClick={() => selectEditorNode(ruleId(index))}><strong>{t("rule")} {index + 1}</strong><span>{describeRule(rule, t)}</span></button><div className="workflow-edges">{edges.filter((edge) => edge.from === ruleId(index)).map((edge) => <WorkflowConnection key={`${edge.kind}-${edge.to}`} edge={edge} onSelect={selectEditorNode} target={edge.kind === "match" ? config.labels.find((label) => zoneId(label.tag) === edge.to)?.name ?? t("unboundLabel") : edge.to === "fallback" ? t("fallback") : `${t("rule")} ${index + 2}`} />)}</div></li>)}
+          <li><button type="button" onClick={() => selectEditorNode("fallback")}><strong>{t("fallback")}</strong><span>{draft.fallback.label ?? t("unboundLabel")} ({draft.fallback.selection ?? t("defaultSelection")})</span></button><div className="workflow-edges">{edges.filter((edge) => edge.from === "fallback").map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={draft.fallback.label ?? t("unboundLabel")} />)}</div></li>
+        </ol>
+        <div className="workflow-pools">{config.labels.map((label) => <div key={label.tag}><button type="button" onClick={() => selectEditorNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</button>{edges.filter((edge) => edge.from === zoneId(label.tag)).map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={edge.to.slice("model::".length)} />)}</div>)}</div>
+        </details>
+        <fieldset className="rule-add" ref={ruleFormRef} disabled={editDisabled}>
           {addableQuestions.length === 0 || addableLabels.length === 0 ? <p className="meta">{t("noValidRuleOptions")}</p> : null}
           <legend>{t("addRule")}</legend>
           <label>{t("questionName")}<select value={newRuleQuestion} onChange={(event) => { setNewRuleQuestion(event.target.value); setNewRuleCriterion(""); }}>
@@ -516,7 +614,8 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
             const next = addRule(draft, config, newRuleQuestion, newRuleCriterion, newRuleLabel);
             if (next === draft) return;
             updateRuleDraft(next, { kind: "insert", index });
-            setSelectedNode(`rule-${index}`);
+            setInfoOpen(false);
+            selectEditorNode(`rule-${index}`);
           }}>{t("addRule")}</button>
         </fieldset>
         <details className="workflow-advanced">
@@ -603,10 +702,6 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
           ))}
         </div>
         </details>
-          </aside>
-        </div>
-      </DndContext>
-
       <details className="workflow-advanced">
         <summary>{t("advancedPoolOrder")}</summary>
       <h3>{t("savedPoolOrder")}</h3>
@@ -639,21 +734,27 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
       </div>
 
       </details>
+      <details className="workflow-advanced">
+      <summary>{t("pendingChanges")}</summary>
       <h3>{t("pendingChanges")}</h3>
       {diff.changed ? (
         <DiffList diff={diff} t={t} />
       ) : (
         <div className="empty">{t("noPendingChanges")}</div>
       )}
+      </details>
+      <div ref={reviewRef} tabIndex={-1}>
       {review === null ? null : <div className="notice" role="status"><h4>{t("reviewChanges")}</h4><DiffList diff={review.diff} t={t} />{review.warnings.map((warning) => <div className="notice warn" key={warning}>{warning}</div>)}{review.warnings.length > 0 ? <label><input type="checkbox" disabled={writeDisabled || busy} checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t("acknowledgeWarnings")}</label> : null}</div>}
       {resetReview ? <div className="notice warn" role="status">{t("resetReviewPrompt")}</div> : null}
+      </div>
+      </div>
       <div className="workflow-toolbar">
-        <strong>{t("pendingChanges")}: {diff.changed ? t("reviewChanges") : t("noPendingChanges")}</strong>
         {review === null ? <button type="button" onClick={startReview} disabled={writeDisabled || busy || resetReview || !diff.changed}>{t("reviewChanges")}</button> : <><button type="button" onClick={save} disabled={writeDisabled || busy || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</button><button type="button" onClick={() => setReview(null)} disabled={busy}>{t("backToEditing")}</button></>}
         <button
           type="button"
           onClick={() => {
             setDraft(draftFromConfiguration(config));
+            selectLayoutNodes([]);
             setNotice(null);
             setReview(null);
           }}
@@ -661,8 +762,12 @@ export default function RoutingEditor({ config, onReloaded, onError }: EditorPro
         >
           {t("cancel")}
         </button>
-        {resetReview ? <><button type="button" onClick={reset} disabled={writeDisabled || busy}>{t("confirmReset")}</button><button type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</button></> : <button type="button" onClick={() => setResetReview(true)} disabled={writeDisabled || busy || review !== null || !config.overlay.applied}>{t("resetBaseline")}</button>}
+        {resetReview ? <><button type="button" onClick={reset} disabled={writeDisabled || busy}>{t("confirmReset")}</button><button type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</button></> : <button type="button" onClick={() => { setResetReview(true); openDrawerAt("review"); }} disabled={writeDisabled || busy || review !== null || !config.overlay.applied}>{t("resetBaseline")}</button>}
       </div>
+      </section>
+      </>}
+      </RoutingCanvas>
+      </DndContext>
     </section>
   );
 }

@@ -4,15 +4,60 @@ The `jev` command manages the local gateway process, runtime configuration, and 
 
 ## Install and output
 
-On macOS or Linux, install with:
+On macOS or Linux, with Python 3.10+ available as `python3` and `curl`, install with:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TexasOct/jev-gateway/main/scripts/install.sh | sh -s -- --yes
+curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
 ```
 
-The raw `main` bootstrap resolves the latest published stable GitHub Release, downloads `jev_gateway-X.Y.Z-py3-none-any.whl` and its `.sha256` sidecar from that Release, and verifies the checksum before installing. It fails if no stable Release or matching assets exist; it never falls back to Git `main`. Pin or roll back to a published version with `--version X.Y.Z` (optional leading `v`); explicit prereleases such as `--version 0.2.0rc1` are allowed. `--ref REF` remains an explicit Git-source developer option, mutually exclusive with `--version`, and does not verify a release checksum. `--dry-run` makes no network requests or changes and cannot confirm which latest Release or checksum is available. Rerunning the installer preserves runtime configuration and records.
+The URL selects the latest stable Release's `install.sh`. The script embeds its
+release tag and downloads `jev_gateway-X.Y.Z-py3-none-any.whl` plus its `.sha256`
+sidecar from that exact tag's asset URLs. It verifies the wheel before invoking
+`uv tool install`. It does not resolve latest again or query the GitHub API for a
+wheel. Rerunning it preserves runtime configuration and records.
 
-`--yes` allows the bootstrap to install `uv` when it is missing. Review the installer before piping it into a shell, or download it and run `sh install.sh --yes`. If `uv` is already installed, `--yes` is not needed. Windows is not supported by this installer; use the source checkout or Docker instructions in [local installation](local-install.md).
+For a pin or rollback, download the installer from the chosen published tag:
+
+```sh
+curl -fsSL https://github.com/TexasOct/jev-gateway/releases/download/v0.1.0/install.sh | sh -s -- --yes
+```
+
+Alternatively, pass `--version X.Y.Z` (optional leading `v`) to a Release
+installer. Explicit prereleases such as `--version 0.2.0rc1` are allowed. If the
+requested tag differs from the embedded tag, the script downloads the target
+tag's `install.sh` and `install.sh.sha256`, verifies the checksum and exact
+embedded tag, then invokes that installer once with the supported flags
+forwarded. A matching tag installs directly; a delegated script cannot delegate
+again. Missing assets, malformed checksums, or tag/digest mismatches stop before
+child execution or tool installation. There is no fallback to `main`.
+
+The initial `curl | sh` command executes the script without checking its
+checksum. Follow the [pinned download, review, and verification example](local-install.md#verify-installer)
+to check those bytes before execution. A checksum from the same Release detects
+corruption or inconsistent assets; it is not an independent publisher signature.
+
+| Installer option | Behavior |
+| --- | --- |
+| `--yes` | Permit installing `uv` from `astral.sh` when missing. Without it, noninteractive installation requires an existing `uv`. |
+| `--no-uv` | Require an existing `uv`; never bootstrap it. |
+| `--home DIR` | Set the runtime directory for initialization. |
+| `--no-init` | Install the tool without initializing the runtime directory. |
+| `--dry-run` | Print the plan without network requests, child execution, installation, or writes. It does not verify asset availability or checksums. |
+| `--ref REF` | Explicit developer Git install, without Release checksum verification; cannot be combined with `--version`. |
+
+The download in a `curl | sh ... --dry-run` command still uses the network; only
+the installer itself performs no network requests. To preview without any
+download, run a previously downloaded installer with `--dry-run`.
+
+The checkout's `scripts/install.sh` is an unstamped template. It cannot perform
+a Release install, even with `--version`; production installs must use a Release
+asset. Its explicit developer escape is `sh scripts/install.sh --ref REF`.
+For a source install with a dashboard, follow the frontend build and local
+installer instructions in [local installation](local-install.md). Installed
+Release wheels contain the dashboard and need no Node.js.
+
+Windows is not supported by the curl installer; see the source checkout or
+Docker instructions in [local installation](local-install.md).
 
 Commands accept `--json` for one JSON document on stdout. Errors contain `error.code` and `error.message`; exit statuses are 0 success, 1 operation failure, 2 usage/platform failure, 3 invalid configuration, 4 not running, 5 already running, and 6 installation state unavailable. Prompts are disabled in JSON mode, quiet mode, and when stdin is not a terminal.
 

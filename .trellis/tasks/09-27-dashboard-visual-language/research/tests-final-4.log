@@ -1,0 +1,13 @@
+
+> jev-gateway-dashboard@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 /Users/texas/Workspace/jev-llmroute-test/frontend
+
+
+ Test Files  11 passed (11)
+      Tests  120 passed (120)
+   Start at  07:39:18
+   Duration  297ms (transform 72%, import 16%, tests 10%, worker 2%)
+

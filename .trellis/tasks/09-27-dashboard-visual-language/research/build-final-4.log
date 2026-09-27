@@ -1,0 +1,14 @@
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 135 modules transformed.
+rendering chunks...
+computing gzip size...
+../jev_gateway/static/index.html                   0.46 kB │ gzip:   0.28 kB
+../jev_gateway/static/assets/index-BQJeTgaz.css   20.62 kB │ gzip:   4.85 kB
+../jev_gateway/static/assets/index-DzzxX68x.js   430.81 kB │ gzip: 137.56 kB
+
+✓ built in 91ms

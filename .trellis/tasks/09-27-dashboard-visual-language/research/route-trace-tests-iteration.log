@@ -1,0 +1,38 @@
+
+> jev-gateway-dashboard@0.1.0 test
+> vitest run src/monitoring/RouteTrace.test.tsx
+
+
+ RUN  v5.0.1 /Users/texas/Workspace/jev-llmroute-test/frontend
+
+ ❯ src/monitoring/RouteTrace.test.tsx (8 tests | 1 failed) 28ms
+   ❯ monitoring route trace (8)
+     × marks each absent field as disconnected and does not invent an in-progress outcome 4ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  07:34:02
+   Duration  159ms (transform 45%, tests 31%, import 21%, worker 2%)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/monitoring/RouteTrace.test.tsx > monitoring route trace > marks each absent field as disconnected and does not invent an in-progress outcome
+AssertionError: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ src/monitoring/RouteTrace.test.tsx:72:61
+     70|     expect(html).toContain("trace-outcome-unknown");
+     71|     expect((html.match(/trace-stage-missing/g) ?? []).length).toBe(3);
+     72|     expect((html.match(/trace-segment-gap/g) ?? []).length).toBe(2);
+       |                                                             ^
+     73|     expect(html).not.toContain("in progress");
+     74|     expect(html).not.toContain("Pending");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

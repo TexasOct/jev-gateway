@@ -122,6 +122,8 @@ When you touch the license, the build backend, or the build requirement floor,
 prove the metadata rather than trusting the build exit code:
 
 ```bash
+npm --prefix frontend install
+scripts/build-frontend.sh
 uv build
 python3 - <<'PY'
 import glob, zipfile
@@ -150,18 +152,29 @@ Run commands from the repository root.
 
 ```bash
 uv sync --all-groups
+npm --prefix frontend install
+scripts/build-frontend.sh
 uv run pytest -q
 uvx pyright
 uv build
 ```
 
-`uv run pytest -q` and `uv build` are the repository's documented verification
-commands. Pyright is configured by `pyrightconfig.json` for Python 3.10 and
-includes both `jev_gateway` and `tests`. It may be run through `uvx` because it is
-not declared in the development dependency group.
+Full tests and source wheel builds require Node.js with npm in addition to
+Python and uv. The Release workflow uses Node.js 22 and Python 3.11. Tests that
+need the dashboard must request the session-scoped `dashboard_bundle` fixture
+from `tests/conftest.py`; it always runs `npm --prefix frontend run build` once,
+so it requires npm dependencies installed beforehand. Never assume generated
+assets exist in a fresh Git checkout. Installed Release wheels already contain
+the dashboard and need no Node.js.
 
-When the change touches `frontend/`, `jev_gateway/static/`, `pyproject.toml`, or
-the `Dockerfile`, add the frontend gates:
+`uv run pytest -q` and `uv build` are the repository's documented verification
+commands after the frontend setup above. Pyright is configured by
+`pyrightconfig.json` for Python 3.10 and includes both `jev_gateway` and `tests`.
+It may be run through `uvx` because it is not declared in the development
+dependency group.
+
+When the change touches `frontend/`, generated `jev_gateway/static/`,
+`pyproject.toml`, or the `Dockerfile`, add the frontend gates:
 
 ```bash
 npm --prefix frontend run lint
@@ -169,12 +182,28 @@ npm --prefix frontend run test
 scripts/build-frontend.sh --check
 ```
 
-`scripts/build-frontend.sh --check` fails when the committed bundle under
-`jev_gateway/static/` is older than `frontend/src`, which is the guard against
-shipping a stale UI. Run `scripts/build-frontend.sh` (no flag) to rebuild and
-commit the result. See
+`scripts/build-frontend.sh` installs frontend dependencies and creates the
+ignored bundle under `jev_gateway/static/`; release packaging must run it before
+the Python tests and `uv build`. `scripts/build-frontend.sh --check` only detects
+missing or stale output; it does not build. Do not commit generated bundles. See
 [Dashboard and routing configuration](./dashboard-routing-config.md) for the
 serving, CSP, and packaging contracts.
+
+For Release packaging, use Python 3.11+ and validate the built artifacts with
+the tag that exactly matches `pyproject.toml`:
+
+```bash
+uv build
+python3 scripts/validate-release.py v0.1.0 dist
+```
+
+Substitute the intended version and use an output directory with exactly one
+wheel. Validation must confirm wheel metadata, entry points, templates, license,
+dashboard shell and referenced assets, and exact file parity with the built
+source tree. It also stamps the source installer's release-tag placeholder into
+`dist/install.sh`, checks shell syntax, and generates installer and wheel SHA256
+sidecars. The workflow uploads those four explicit paths only, after frontend
+and Python verification passes. Local validation does not publish a Release.
 
 Ruff is not currently configured. You may use `uvx ruff check` as an additional
 local diagnostic, but do not make it a completion requirement or run automatic

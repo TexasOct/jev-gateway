@@ -1,0 +1,174 @@
+[
+  {
+    "case": "initial-static-no-packet",
+    "passed": true
+  },
+  {
+    "case": "pause-label",
+    "passed": true
+  },
+  {
+    "case": "pause-freezes-packet-and-highlights",
+    "passed": true
+  },
+  {
+    "case": "resume-continues-current-replay",
+    "passed": true
+  },
+  {
+    "case": "completed-hides-packet",
+    "passed": true
+  },
+  {
+    "case": "reset-clears-state",
+    "passed": true
+  },
+  {
+    "case": "recorded-failure",
+    "passed": true
+  },
+  {
+    "case": "switch-stops-replay",
+    "passed": true
+  },
+  {
+    "case": "missing-stages-never-highlighted",
+    "passed": true
+  },
+  {
+    "case": "empty-session-no-invented-request",
+    "passed": true
+  },
+  {
+    "case": "live-motion-setting-stops-packet",
+    "passed": true
+  },
+  {
+    "case": "reduced-motion-only-available-stages",
+    "passed": true
+  },
+  {
+    "case": "monitoring-1440-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-1440-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-1440-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-1440-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-1440-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "monitoring-390-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-390-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-390-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-390-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-390-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "monitoring-320-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-320-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-320-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "monitoring-320-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "monitoring-320-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "style-board-1440-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-1440-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-1440-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-1440-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-1440-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "style-board-390-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-390-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-390-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-390-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-390-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "style-board-320-dark-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-320-dark-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-320-light-no-page-overflow",
+    "passed": true
+  },
+  {
+    "case": "style-board-320-light-local-resources-only",
+    "passed": true
+  },
+  {
+    "case": "style-board-320-no-page-errors",
+    "passed": true
+  },
+  {
+    "case": "frontend-hashes-unchanged-this-verification",
+    "passed": true
+  }
+]

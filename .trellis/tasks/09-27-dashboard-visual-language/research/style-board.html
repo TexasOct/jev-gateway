@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JEV Gateway · Style board</title>
+  <link rel="stylesheet" href="./style-board.css">
+</head>
+<body>
+  <div class="prototype-note"><span>Style study</span><span>Synthetic sample data · illustrative controls · no gateway connection</span></div>
+  <header class="app-header">
+    <div class="brand"><div class="brand-mark">J</div><div><strong>JEV gateway</strong><small>Live process state and retained routing evidence</small></div></div>
+    <nav class="view-nav" aria-label="Views"><button>Monitoring</button><button class="selected">Strategy workflow</button><button>Theme</button></nav>
+    <div class="global-tools"><label>Theme <span class="select">System⌄</span></label><label>Language <span class="select">English⌄</span></label><button>Refresh</button></div>
+  </header>
+
+  <main>
+    <section class="section-heading"><div><span class="eyebrow">System / design study</span><h1>Dashboard style proposal</h1><p>Surface and control examples for retained evidence and policy editing.</p></div><div class="theme-switch" aria-label="Preview theme"><button class="active" data-theme-choice="dark" aria-pressed="true">Dark</button><button data-theme-choice="light" aria-pressed="false">Light</button></div></section>
+
+    <section class="token-strip" aria-label="Design tokens">
+      <div class="token-group"><span class="token-label">SURFACES</span><div class="swatches"><i class="swatch bg"></i><i class="swatch surface"></i><i class="swatch alt"></i><i class="swatch border"></i></div></div>
+      <div class="token-group"><span class="token-label">SEMANTIC</span><div class="semantic"><b class="accent-dot"></b><span>Accent</span><b class="good-dot"></b><span>Success</span><b class="warn-dot"></b><span>Warning</span><b class="bad-dot"></b><span>Failure</span></div></div>
+      <div class="token-group type-sample"><span class="token-label">TYPE SCALE</span><div><strong>Operations dashboard</strong><span>Secondary details · labels · timestamps</span></div></div>
+    </section>
+
+    <section class="monitor-layout" aria-label="Monitoring view example">
+      <article class="panel sessions-panel"><div class="panel-heading"><div><h2>Sample sessions</h2><p>Retained metadata · synthetic examples</p></div><span class="count">03 samples</span></div>
+        <div class="session-list">
+          <div class="session selected"><span class="status-line good"></span><div class="session-main"><strong>chat.completions</strong><span>sess_7a21 · 2 minutes ago</span><small>task_aware · craft · openai/gpt-4.1</small></div><span class="result success">Succeeded</span></div>
+          <div class="session"><span class="status-line warn"></span><div class="session-main"><strong>responses</strong><span>sess_5f08 · 8 minutes ago</span><small>quality_first · balanced · anthropic/claude-3-7</small></div><span class="result pending">No outcome</span></div>
+          <div class="session"><span class="status-line bad"></span><div class="session-main"><strong>chat.completions</strong><span>sess_31cd · 14 minutes ago</span><small>task_aware · fallback · sample_upstream_error</small></div><span class="result failed">Failed</span></div>
+        </div>
+        <div class="pagination"><span>Showing 3 sessions</span><button>Load more</button></div>
+      </article>
+      <article class="panel detail-panel"><div class="panel-heading"><div><h2>Request evidence</h2><p>sess_7a21 · retained outcomes</p></div><button class="quiet-button">View session</button></div>
+        <div class="request"><div class="request-top"><div><strong>/v1/chat/completions</strong></div><span class="result success">Succeeded · 1.42 s</span></div><div class="request-meta"><span>Provider <b>openai</b></span><span>Model <b>gpt-4.1</b></span></div><details><summary>Decision and retained evidence <span>+</span></summary><p>Request evidence stays behind disclosure and within the existing detail area.</p></details></div>
+        <div class="request subdued"><div class="request-top"><div><strong>/v1/responses</strong></div><span class="result success">Succeeded · 0.83 s</span></div><div class="request-meta"><span>Provider <b>anthropic</b></span><span>Model <b>claude-3-7</b></span></div></div>
+      </article>
+      <article class="panel outcomes-panel"><div class="panel-heading"><div><h2>Retained outcomes</h2><p>Retained submissions · does not establish provider health</p></div><span class="count">Last 15 minutes</span></div>
+        <div class="table-scroll" tabindex="0" aria-label="Synthetic provider observations"><table><thead><tr><th>Provider</th><th>Attempts</th><th>Completed</th><th>Succeeded</th><th>Failed</th><th>Avg. duration</th><th>Latest result</th></tr></thead><tbody><tr><td><strong>openai</strong></td><td>42</td><td>39</td><td class="good-text">37</td><td class="bad-text">2</td><td>1.18 s</td><td><span class="result success">Succeeded</span></td></tr><tr><td><strong>anthropic</strong></td><td>18</td><td>18</td><td class="good-text">17</td><td class="bad-text">1</td><td>0.94 s</td><td><span class="result success">Succeeded</span></td></tr></tbody></table></div>
+      </article>
+    </section>
+
+    <section class="section-heading strategy-title"><div><span class="eyebrow">STRATEGY / WORKFLOW</span><h2>Policy structure stays in focus.</h2><p>The graph remains spacious enough to scan. Selection and links carry the accent, while category color stays semantic.</p></div><span class="pending-state"><i></i>No pending changes</span></section>
+    <section class="canvas-frame" tabindex="0" aria-label="Static routing canvas illustration, scroll horizontally on narrow screens">
+      <div class="canvas-caption"><span>ROUTING WORKFLOW</span><strong>Configuration</strong><span class="caption-spacer"></span><span>Strategy · task_aware</span><span class="read-only">Illustrative only</span></div>
+      <svg class="connections" viewBox="0 0 1200 430" preserveAspectRatio="none" aria-hidden="true"><path d="M220 143 C290 143, 300 143, 375 143"/><path d="M565 143 C650 143, 650 112, 730 112"/><path d="M565 143 C650 143, 650 282, 730 282"/><path d="M220 300 C285 300, 310 300, 375 300"/><path d="M565 300 C645 300, 660 282, 730 282"/><path class="fallback-edge" d="M220 300 C300 300, 600 354, 730 354"/></svg>
+      <div class="node question-node"><span class="node-type"><i>▧</i>Question group</span><strong>Questions</strong><small>5 definitions</small></div>
+      <div class="node rule-node"><span class="node-type"><i>⌁</i>Rule · 01</span><strong>Rule 1</strong><small>scale = large → craft</small></div>
+      <div class="node rule-node second-rule"><span class="node-type"><i>⌁</i>Rule · 02</span><strong>Rule 2</strong><small>scale = small → ultra</small></div>
+      <div class="node label-node"><span class="node-type"><i>◇</i>Label pool</span><strong>craft</strong><small>4 models</small></div>
+      <div class="node label-node second-label"><span class="node-type"><i>◇</i>Label pool</span><strong>ultra</strong><small>3 models</small></div>
+      <div class="canvas-tools"><button class="tool-active" aria-label="Select tool sample">↖</button><button aria-label="Pan tool sample">✋</button><span></span><button aria-label="Zoom out sample">−</button><output>100%</output><button aria-label="Zoom in sample">+</button><i></i><button>Fit view</button></div>
+      <aside class="inspector"><div class="inspector-head"><strong>Node inspector</strong><button>×</button></div><label>Question name<span class="input-demo">scale</span></label><label>Instructions<span class="input-demo multiline">Classify the scale and complexity of this request.</span></label><label>Criterion key<span class="input-demo">large</span></label></aside>
+      <div class="drawer"><div class="drawer-head"><button>⌃ Canvas information and advanced editors</button><span>No pending changes</span><div><button class="review" disabled>Review changes</button><button disabled>Cancel</button><button disabled>Reset to baseline</button></div></div></div>
+    </section>
+
+    <section class="component-row"><article class="panel"><div class="panel-heading"><div><h2>Controls and state</h2><p>Shared shapes, clear focus, restrained emphasis</p></div></div><div class="control-samples"><button class="primary">Apply changes</button><button>Secondary action</button><button class="ghost">View details</button><button disabled>Disabled</button><label class="demo-input">Question name<span class="input-demo">Enter a name</span></label></div><div class="state-samples"><span class="focus-demo">Keyboard focus</span><span class="result success">Succeeded</span><span class="result failed">Failed</span><span class="result pending">Needs review</span></div></article>
+      <article class="panel palette-panel"><div class="panel-heading"><div><h2>Light and dark</h2><p>Same roles, seed-derived values</p></div></div><div class="mini-themes"><div class="mini-theme light"><span>LIGHT</span><strong>Warm clarity</strong><i></i><i></i><i></i><small>Surface · border · accent</small></div><div class="mini-theme dark"><span>DARK</span><strong>Quiet contrast</strong><i></i><i></i><i></i><small>Surface · border · accent</small></div></div></article></section>
+    <footer><span>JEV gateway · visual language proposal</span><span>No functional behavior represented in this study</span></footer>
+  </main>
+  <script>
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.documentElement.dataset.theme = button.dataset.themeChoice;
+        document.querySelectorAll('[data-theme-choice]').forEach((item) => {
+          item.classList.toggle('active', item === button);
+          item.setAttribute('aria-pressed', String(item === button));
+        });
+      });
+    });
+  </script>
+</body>
+</html>

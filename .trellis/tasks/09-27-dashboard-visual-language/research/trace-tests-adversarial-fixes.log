@@ -1,0 +1,13 @@
+
+> jev-gateway-dashboard@0.1.0 test
+> vitest run src/monitoring/RouteTrace.test.tsx src/monitoring/route-trace.test.ts
+
+
+ RUN  v5.0.1 /Users/texas/Workspace/jev-llmroute-test/frontend
+
+
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Start at  08:11:55
+   Duration  154ms (transform 49%, import 23%, tests 23%, worker 5%)
+

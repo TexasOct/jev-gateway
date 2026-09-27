@@ -1,0 +1,380 @@
+{
+  "session": "node-drag-dff5644a5770",
+  "cases": [
+    {
+      "viewport": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "node": "questions",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 78,
+            "y": 104
+          }
+        }
+      ],
+      "hit": {
+        "actual": "questions",
+        "owner": "questions",
+        "x": 78,
+        "y": 251
+      },
+      "css_delta": {
+        "x": 28,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 28,
+        "y": 24
+      },
+      "saved": {
+        "x": 78,
+        "y": 104
+      },
+      "restored": {
+        "x": 78,
+        "y": 104
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "node": "rule-0",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 428,
+            "y": 104
+          }
+        }
+      ],
+      "hit": {
+        "actual": "rule-0",
+        "owner": "rule-0",
+        "x": 428,
+        "y": 251
+      },
+      "css_delta": {
+        "x": 28,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 28,
+        "y": 24
+      },
+      "saved": {
+        "x": 428,
+        "y": 104
+      },
+      "restored": {
+        "x": 428,
+        "y": 104
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 0,
+        "y": -4
+      },
+      "zoom": 0.75,
+      "node": "questions",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 87,
+            "y": 112
+          }
+        }
+      ],
+      "hit": {
+        "actual": "questions",
+        "owner": "questions",
+        "x": 59,
+        "y": 226
+      },
+      "css_delta": {
+        "x": 27.75,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 37,
+        "y": 32
+      },
+      "saved": {
+        "x": 87,
+        "y": 112
+      },
+      "restored": {
+        "x": 87,
+        "y": 112
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 0,
+        "y": -4
+      },
+      "zoom": 0.75,
+      "node": "rule-0",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 437,
+            "y": 112
+          }
+        }
+      ],
+      "hit": {
+        "actual": "rule-0",
+        "owner": "rule-0",
+        "x": 321,
+        "y": 226
+      },
+      "css_delta": {
+        "x": 27.75,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 37,
+        "y": 32
+      },
+      "saved": {
+        "x": 437,
+        "y": 112
+      },
+      "restored": {
+        "x": 437,
+        "y": 112
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "node": "questions",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 78,
+            "y": 104
+          }
+        }
+      ],
+      "hit": {
+        "actual": "questions",
+        "owner": "questions",
+        "x": 78,
+        "y": 487
+      },
+      "css_delta": {
+        "x": 28,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 28,
+        "y": 24
+      },
+      "saved": {
+        "x": 78,
+        "y": 104
+      },
+      "restored": {
+        "x": 78,
+        "y": 104
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 335,
+        "y": 0
+      },
+      "zoom": 1,
+      "node": "rule-0",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 428,
+            "y": 104
+          }
+        }
+      ],
+      "hit": {
+        "actual": "rule-0",
+        "owner": "rule-0",
+        "x": 93,
+        "y": 487
+      },
+      "css_delta": {
+        "x": 28,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 28,
+        "y": 24
+      },
+      "saved": {
+        "x": 428,
+        "y": 104
+      },
+      "restored": {
+        "x": 428,
+        "y": 104
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 0,
+        "y": -4
+      },
+      "zoom": 0.75,
+      "node": "questions",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 87,
+            "y": 112
+          }
+        }
+      ],
+      "hit": {
+        "actual": "questions",
+        "owner": "questions",
+        "x": 59,
+        "y": 462
+      },
+      "css_delta": {
+        "x": 27.75,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 37,
+        "y": 32
+      },
+      "saved": {
+        "x": 87,
+        "y": 112
+      },
+      "restored": {
+        "x": 87,
+        "y": 112
+      },
+      "result": "pass"
+    },
+    {
+      "viewport": {
+        "x": 281,
+        "y": -4
+      },
+      "zoom": 0.75,
+      "node": "rule-0",
+      "pending_before": "No pending changes.",
+      "writes": [
+        {
+          "method": "PUT",
+          "path": "/v1/dashboard/canvas-layout",
+          "node": {
+            "x": 437,
+            "y": 112
+          }
+        }
+      ],
+      "hit": {
+        "actual": "rule-0",
+        "owner": "rule-0",
+        "x": 110,
+        "y": 462
+      },
+      "css_delta": {
+        "x": 27.75,
+        "y": 24.0
+      },
+      "board_delta": {
+        "x": 37,
+        "y": 32
+      },
+      "saved": {
+        "x": 437,
+        "y": 112
+      },
+      "restored": {
+        "x": 437,
+        "y": 112
+      },
+      "result": "pass"
+    }
+  ],
+  "pointercancel": "unverified: agent-browser mouse exposes no cancel command",
+  "group_drag": "unverified by this focused probe",
+  "viewport_reload": {
+    "before": {
+      "freeTop": 140.328125,
+      "origin": 67.5625,
+      "scroll": {
+        "x": 400,
+        "y": 450
+      },
+      "x": 533.3333333333334,
+      "y": 584,
+      "zoom": 0.75
+    },
+    "after": {
+      "freeTop": 140.328125,
+      "origin": 67.5625,
+      "scroll": {
+        "x": 533,
+        "y": 596
+      },
+      "x": 533,
+      "y": 584,
+      "zoom": 1
+    },
+    "saved": {
+      "x": 533,
+      "y": 596
+    },
+    "result": "pass"
+  },
+  "read_only": {
+    "result": "pass",
+    "node_before": {
+      "x": 50,
+      "y": 80
+    },
+    "requests": 0
+  }
+}

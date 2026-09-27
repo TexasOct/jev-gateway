@@ -2,7 +2,7 @@
 
 ## Boundaries
 
-`scripts/install.sh` remains the public bootstrap entry point and supports macOS and Linux. It resolves the selected GitHub Release, verifies its wheel, and installs the wheel with `uv tool install`. The Python CLI continues to initialize runtime files and record installation provenance. GitHub Actions owns tagged source validation, wheel construction, checksum generation, and Release creation.
+The public curl command downloads the standalone installer asset from the selected GitHub Release, not from raw `main`. The latest URL resolves the latest stable release; a tag-pinned URL selects an exact release. Each release supplies its installer and checksum, versioned wheel and checksum. Installation behavior therefore follows the published tag. GitHub Actions builds frontend assets from tracked frontend source, validates the wheel and installer, then publishes all assets. Generated `jev_gateway/static/` output is not tracked; it is built during release packaging.
 
 The first public Release is not part of this change. The installer and workflow can be tested with mocked GitHub responses and local artifacts before maintainers create a real Release.
 
@@ -10,8 +10,8 @@ The first public Release is not part of this change. The installer and workflow 
 
 - No version argument selects GitHub's latest stable Release. Use the Releases API's `latest` endpoint, which excludes prereleases; treat 404 or an absent matching asset as a clear failure.
 - `--version X.Y.Z` selects an explicitly named Release, including a prerelease. Normalize an optional leading `v` consistently or reject it consistently; document the chosen form during implementation. Fetch the exact tag's Release metadata, not a guessed mutable branch.
-- Use a single predictable artifact name derived from the package name and version, for example `jev_gateway-X.Y.Z-py3-none-any.whl`, and a sidecar SHA256 file with a matching basename. Workflow, installer, tests, and docs must share this convention.
-- Download the wheel and checksum over HTTPS from the same immutable Release. Validate that the asset exists, the checksum has the expected format and filename, and the computed SHA256 matches before invoking `uv tool install` on the local wheel. Any metadata, download, or integrity failure aborts before replacing the installed CLI.
+- Each Release includes `install.sh`, `install.sh.sha256`, `jev_gateway-X.Y.Z-py3-none-any.whl`, and its `.sha256` sidecar. The workflow builds the frontend from source, creates these assets from the tag, and validates the wheel and all checksums before publishing.
+- The public Release asset is the executable installer. It verifies its wheel and checksum from that exact Release, validates filename, checksum syntax and digest, and only then invokes `uv tool install` on the local wheel. Any download or integrity failure aborts before replacing the installed CLI.
 - Keep release resolution and package acquisition in the shell installer. This avoids introducing GitHub network concerns into runtime CLI commands.
 - Preserve `--home`, initialization opt-out, `--dry-run`, `--yes`, and `--no-uv` semantics where applicable. Dry-run must not install or mutate; show the requested release selector and commands, and clearly state that latest resolution and checksum cannot be verified offline unless the user explicitly opts into lookup.
 
@@ -19,26 +19,26 @@ The first public Release is not part of this change. The installer and workflow 
 
 The package version in `pyproject.toml` is the canonical release version. Replace the hard-coded `jev --version` value with package metadata so installed wheel version reporting follows the artifact. Release tags use `v<project-version>` and the workflow verifies that the tag and built wheel metadata agree.
 
-The installer passes explicit provenance to `jev install init`. Extend install state to represent a wheel installation accurately, including selected version and wheel source URL, instead of synthesizing a Git URL from `--ref`. Preserve backward compatibility when reading existing state created by Git installs. Keep current runtime files and records untouched on reinstall.
+The versioned installer passes explicit provenance to `jev install init`. Extend install state to represent a Release wheel installation accurately, including selected tag/version and wheel source URL, rather than synthesizing a Git URL from `--ref`. Preserve backward compatibility when reading existing Git-based state. Keep current runtime files and records untouched on reinstall.
 
-The current `--ref` option is a developer escape hatch in the existing contract. During implementation, define a non-ambiguous compatibility path: retain explicit Git-ref installation only when explicitly requested, while default and `--version` use Releases. Do not permit a supplied version/ref to become an unvalidated URL or shell fragment. Preserve quoting and validate selector characters.
+The public installer asset defaults to latest stable and accepts `--version` for explicit pins; it does not resolve `main`. A separate explicit developer checkout/install path may continue to support `--ref`, but it must not be used by README's public curl command. Never interpolate version/tag/user text into a shell command; validate selectors and use an argument-preserving `exec`/subprocess path.
 
 ## Release workflow
 
-A single GitHub Actions workflow runs on version-tag pushes (`v*`). It checks out that tag, validates the relationship between tag, `pyproject.toml`, and CLI/package metadata, builds from a clean source checkout, inspects wheel contents and metadata, generates the SHA256 file, and creates a published GitHub Release containing both assets. It uses `permissions: contents: write` and the repository's `GITHUB_TOKEN`; no long-lived publishing secret is needed. Repository tag protection is the authorization boundary. The workflow must not depend on a second workflow triggered by its own Release event.
+A single GitHub Actions workflow runs on version-tag pushes (`v*`). It checks out that tag, validates the relationship between tag, `pyproject.toml`, and CLI/package metadata, builds from a clean source checkout, inspects wheel contents and metadata, generates SHA256 sidecars for both the wheel and the standalone versioned installer, and creates a published GitHub Release containing all three assets. It uses `permissions: contents: write` and the repository's `GITHUB_TOKEN`; no long-lived publishing secret is needed. Repository tag protection is the authorization boundary. The workflow must not depend on a second workflow triggered by its own Release event.
 
 A failed validation must not publish a usable Release. Build and validation complete before the publish step. The Release is stable by default; prerelease classification follows the tag/version syntax and must be explicit. The default installer remains stable-only, while explicit selection may resolve prereleases.
 
 ## Compatibility and documentation
 
-Keep macOS/Linux support, uv bootstrap and consent behavior, isolated tool installation, and current initialization flow. Preserve existing runtime configuration and records through reinstall and default uninstall. Update README.md and README.zh-CN.md in matching structure, plus installation/CLI docs, with latest install, `--version`, prerelease selection, SHA256 behavior, missing-release errors, and rollback by installing a previous version.
+Keep macOS/Linux support, uv bootstrap and consent behavior, isolated tool installation, and current initialization flow. README curl fetches the installer from the latest Release asset; version-pinned URLs remain tied to that tag. Preserve existing runtime configuration and records through reinstall and default uninstall. The wheel must include dashboard assets generated by the release build. Update README.md and README.zh-CN.md in matching structure, plus installation/CLI docs, with latest install, `--version`, prerelease selection, SHA256 behavior, missing-release errors, and rollback by installing a previous version.
 
 Keep PyPI, Homebrew, containers, Windows, private-release authentication, and first-release creation outside scope.
 
 ## Failure and rollback
 
-- No latest stable release: print an actionable error and exit nonzero; never fall back to `main`.
-- Explicit version not found, missing asset, checksum missing, malformed checksum, or mismatch: print a specific error and exit nonzero before tool installation.
+- No latest stable release: print an actionable error and exit nonzero; never fall back to raw `main`.
+- Explicit version not found, missing installer/wheel/checksum asset, malformed checksum, or mismatch: print a specific error and exit nonzero before execution of unverified installer or tool installation.
 - Failed build/tag/version/content checks: workflow ends before publication.
 - To roll back an installed client, rerun the installer with `--version` set to a previously published version. Runtime data stays in place.
 

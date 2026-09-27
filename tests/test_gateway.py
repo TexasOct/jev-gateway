@@ -850,7 +850,7 @@ def test_stream_failure_has_safe_logs_and_null_persisted_message(
 
 
 def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
-    monkeypatch,
+    monkeypatch, dashboard_bundle,
 ) -> None:
     install_completion(monkeypatch)
     app = gateway.create_app(make_config(gateway_api_key="client-key"))

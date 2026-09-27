@@ -12,6 +12,7 @@ import type {
 } from "./api";
 import RoutingEditor from "./config/RoutingEditor";
 import { useLocale } from "./i18n";
+import { RouteTrace } from "./monitoring/RouteTrace";
 import { VirtualList } from "./monitoring/VirtualList";
 import { appendUnique } from "./monitoring/pagination";
 import {
@@ -94,29 +95,33 @@ function JsonBlock({ name, value, empty }: { name: string; value: unknown; empty
   );
 }
 
-function RequestCard({ item, t, formatDateTime }: { item: RetainedRequest; t: ReturnType<typeof useLocale>["t"]; formatDateTime: ReturnType<typeof useLocale>["formatDateTime"] }) {
+function RequestCard({ item, t, formatDateTime, selected, onSelect }: { item: RetainedRequest; t: ReturnType<typeof useLocale>["t"]; formatDateTime: ReturnType<typeof useLocale>["formatDateTime"]; selected: boolean; onSelect: () => void }) {
   const request = item.request;
   const requestId = typeof request["request_id"] === "string" ? request["request_id"] : t("unknownRequest");
   const receivedAt = typeof request["received_at"] === "number" ? request["received_at"] : null;
   const outcome = item.outcome;
   const status =
     outcome === null
-      ? t("pendingOrRejected")
+      ? t("traceUnknown")
       : outcome["ok"] === true
         ? t("succeeded")
         : t("failed");
   const statusClass =
     outcome === null ? "meta" : outcome["ok"] === true ? "status-ok" : "status-bad";
   return (
-    <article className="card">
-      <h3>{formatDateTime(receivedAt)}</h3>
-      <div className="meta">
-        {requestId} · <span className={statusClass}>{status}</span>
-      </div>
-      <JsonBlock name={t("inboundRequest")} value={item.request} empty={t("notRecorded")} />
-      <JsonBlock name={t("routingDecision")} value={item.decision} empty={t("notRecorded")} />
-      <JsonBlock name={t("upstreamRequest")} value={item.upstream_request} empty={t("notRecorded")} />
-      <JsonBlock name={t("outcome")} value={item.outcome} empty={t("notRecorded")} />
+    <article className={`card request-card${selected ? " selected" : ""}`}>
+      <button type="button" className="request-select" aria-pressed={selected} onClick={onSelect}>
+        <span>{formatDateTime(receivedAt)}</span>
+        <span className="meta">
+          {requestId} · <span className={statusClass}>{status}</span>
+        </span>
+      </button>
+      {selected ? <RouteTrace item={item} /> : <div className="request-evidence">
+        <JsonBlock name={t("inboundRequest")} value={item.request} empty={t("notRecorded")} />
+        <JsonBlock name={t("routingDecision")} value={item.decision} empty={t("notRecorded")} />
+        <JsonBlock name={t("upstreamRequest")} value={item.upstream_request} empty={t("notRecorded")} />
+        <JsonBlock name={t("outcome")} value={item.outcome} empty={t("notRecorded")} />
+      </div>}
     </article>
   );
 }
@@ -190,6 +195,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionsPayload | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionRequestsPayload | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [sessionPageError, setSessionPageError] = useState(false);
   const [detailPageError, setDetailPageError] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
@@ -337,6 +343,7 @@ export default function App() {
       setDetailPageError(false);
       setDetailListEpoch(generation);
       setDetail(null);
+      setSelectedRequestId(null);
       await loadMonitoring();
       if (selected !== null) {
         const controller = new AbortController();
@@ -364,6 +371,7 @@ export default function App() {
       setDetailLoading(false);
       setSelected(sessionId);
       setDetail(null);
+      setSelectedRequestId(null);
       setDetailPageError(false);
       setDetailListEpoch(generation);
       void run(async () => {
@@ -434,10 +442,11 @@ export default function App() {
   }, [run, t]);
 
   const writeDisabled = configuration !== null && !configuration.write_available;
+  const activeRequestId = selectedRequestId ?? (detail?.requests[0]?.request["request_id"] == null ? null : String(detail.requests[0].request["request_id"]));
 
   return (
-    <>
-      <header>
+    <div className={view === "strategy" ? "app-shell strategy-shell" : "app-shell"}>
+      <header className="app-header">
         <div className="title">
           <h1>JEV gateway</h1>
           <div className="subtitle">{locale === "zh-CN" ? "进程实时状态与保留的路由证据" : "Live process state and retained routing evidence"}</div>
@@ -494,7 +503,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className={view === "monitoring" ? "split" : undefined}>
+      <main className={view === "monitoring" ? "split" : view === "strategy" ? "strategy-main" : undefined}>
         {needsKey ? (
           <section className="panel">
             <h2>{t("connect")}</h2>
@@ -515,7 +524,7 @@ export default function App() {
           </section>
         ) : null}
 
-        {error === null ? null : (
+        {error === null || (view === "strategy" && configuration !== null) ? null : (
           <section className="panel">
             <div className="notice warn">{error}</div>
           </section>
@@ -577,7 +586,16 @@ export default function App() {
                 loading={detailLoading}
                 onMore={() => void loadMoreDetail()}
                 footer={detailPageError ? <button type="button" onClick={() => { setDetailPageError(false); void loadMoreDetail(); }}>{t("retryPage")}</button> : detail === null ? <div className="empty">{t("inspectRequests")}</div> : detail.requests.length === 0 ? <div className="empty">{t("noRetainedRequests")}</div> : null}
-                render={(item) => <RequestCard item={item} t={t} formatDateTime={formatDateTime} />}
+                render={(item) => {
+                  const requestId = String(item.request["request_id"]);
+                  return <RequestCard
+                    item={item}
+                    t={t}
+                    formatDateTime={formatDateTime}
+                    selected={requestId === activeRequestId}
+                    onSelect={() => setSelectedRequestId(requestId)}
+                  />;
+                }}
               />
             </section>
 
@@ -671,11 +689,12 @@ export default function App() {
           <RoutingEditor
             key={configuration.config_hash}
             config={configuration}
+            error={error}
             onReloaded={reloadConfiguration}
             onError={setError}
           />
         )}
       </main>
-    </>
+    </div>
   );
 }

@@ -1,0 +1,22 @@
+{
+  "frontend/src/App.tsx": {
+    "index_sha256": "a8652b1c6852603386644f8ed1a3edb20959cfefb4f3a9a2e456f3bf00827def",
+    "worktree_sha256": "6b21c17ae6ba8bd1363541e42cd7f9c19558e0a4810eb31683aa03b4edf9f4ad"
+  },
+  "frontend/src/styles.css": {
+    "index_sha256": "0bc62dafeaee3f5985cb3af55a47f465a5a522d63e69ca340d1dfe6a7f007d52",
+    "worktree_sha256": "3e9e3133b3b172596610aa21d4069eca74e00472f0eff959e0e02fd941f4e4a0"
+  },
+  "frontend/src/i18n.tsx": {
+    "index_sha256": "67cd5b7dd6674d50725590a70ce8d5dd94f139328a13b2977ace42973cba3e36",
+    "worktree_sha256": "380cd35c907308a073050c0dacd49a8acc27547822857cc67ae73ac641edf96a"
+  },
+  "frontend/src/api.ts": {
+    "index_sha256": "3e3ac5ac21f54a7061fdd98ac8fd12f144df3bff3f7e954d5476d3c7295cde3b",
+    "worktree_sha256": "3e3ac5ac21f54a7061fdd98ac8fd12f144df3bff3f7e954d5476d3c7295cde3b"
+  },
+  "frontend/src/monitoring/VirtualList.tsx": {
+    "index_sha256": "656d8e50bf8bd9c5762bc2b923185b086d2c1701171a50fbdd812a3e53a963aa",
+    "worktree_sha256": "656d8e50bf8bd9c5762bc2b923185b086d2c1701171a50fbdd812a3e53a963aa"
+  }
+}

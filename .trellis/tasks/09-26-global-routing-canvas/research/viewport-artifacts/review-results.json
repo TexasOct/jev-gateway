@@ -1,0 +1,1137 @@
+{
+  "320-initial": {
+    "board": {
+      "bottom": 2775.53125,
+      "clientHeight": 2482,
+      "clientWidth": 3200,
+      "h": 2482.265625,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 293.265625
+    },
+    "content": {
+      "bottom": 2588.21875,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 388.21875
+    },
+    "drawer": {
+      "bottom": 700,
+      "clientHeight": 101,
+      "clientWidth": 320,
+      "h": 102.3125,
+      "scrollHeight": 101,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 597.6875
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 376.21875,
+      "clientHeight": 69,
+      "clientWidth": 294,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 305.265625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 524.21875,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 468.21875
+    },
+    "surface": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    },
+    "toolbar": {
+      "bottom": 585.6875,
+      "clientHeight": 47,
+      "clientWidth": 294,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 536.5
+    },
+    "viewport": [
+      320,
+      700
+    ],
+    "workspace": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 407,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    }
+  },
+  "320-expanded": {
+    "board": {
+      "bottom": 2868.4375,
+      "clientHeight": 2575,
+      "clientWidth": 3200,
+      "h": 2575.171875,
+      "scrollHeight": 2575,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 293.265625
+    },
+    "content": {
+      "bottom": 2588.21875,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 388.21875
+    },
+    "drawer": {
+      "bottom": 700,
+      "clientHeight": 194,
+      "clientWidth": 320,
+      "h": 195.21875,
+      "scrollHeight": 194,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 504.78125
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 376.21875,
+      "clientHeight": 69,
+      "clientWidth": 294,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 305.265625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 524.21875,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 468.21875
+    },
+    "surface": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 2575,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    },
+    "toolbar": {
+      "bottom": 492.78125,
+      "clientHeight": 47,
+      "clientWidth": 294,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 443.59375
+    },
+    "viewport": [
+      320,
+      700
+    ],
+    "workspace": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 407,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    }
+  },
+  "320-question-inspector": {
+    "board": {
+      "bottom": 2775.53125,
+      "clientHeight": 2482,
+      "clientWidth": 3200,
+      "h": 2482.265625,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 293.265625
+    },
+    "content": {
+      "bottom": 2588.21875,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 388.21875
+    },
+    "drawer": {
+      "bottom": 700,
+      "clientHeight": 101,
+      "clientWidth": 320,
+      "h": 102.3125,
+      "scrollHeight": 101,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 597.6875
+    },
+    "focus": "<button type=\"button\" title=\"Close node details\" aria-label=\"Close node details\">×</button>",
+    "heading": {
+      "bottom": 376.21875,
+      "clientHeight": 69,
+      "clientWidth": 294,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 305.265625
+    },
+    "inspector": {
+      "bottom": 456.21875,
+      "clientHeight": 66,
+      "clientWidth": 294,
+      "h": 68,
+      "scrollHeight": 77,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 388.21875
+    },
+    "inspectorBody": {
+      "bottom": 466.21875,
+      "clientHeight": 24,
+      "clientWidth": 294,
+      "h": 24,
+      "scrollHeight": 4183,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 294,
+      "x": 13,
+      "y": 442.21875
+    },
+    "node": {
+      "bottom": 524.21875,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 468.21875
+    },
+    "surface": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    },
+    "toolbar": {
+      "bottom": 585.6875,
+      "clientHeight": 47,
+      "clientWidth": 294,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 536.5
+    },
+    "viewport": [
+      320,
+      700
+    ],
+    "workspace": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 407,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    }
+  },
+  "320-rule6-inspector": {
+    "board": {
+      "bottom": 2775.53125,
+      "clientHeight": 2482,
+      "clientWidth": 3200,
+      "h": 2482.265625,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 293.265625
+    },
+    "content": {
+      "bottom": 2588.21875,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 388.21875
+    },
+    "drawer": {
+      "bottom": 700,
+      "clientHeight": 101,
+      "clientWidth": 320,
+      "h": 102.3125,
+      "scrollHeight": 101,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 597.6875
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 376.21875,
+      "clientHeight": 69,
+      "clientWidth": 294,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 305.265625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 524.21875,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 468.21875
+    },
+    "surface": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    },
+    "toolbar": {
+      "bottom": 585.6875,
+      "clientHeight": 47,
+      "clientWidth": 294,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 536.5
+    },
+    "viewport": [
+      320,
+      700
+    ],
+    "workspace": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 407,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    }
+  },
+  "focus-before-resize": {
+    "board": {
+      "bottom": 2775.53125,
+      "clientHeight": 2482,
+      "clientWidth": 3200,
+      "h": 2482.265625,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 293.265625
+    },
+    "content": {
+      "bottom": 2588.21875,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 388.21875
+    },
+    "drawer": {
+      "bottom": 700,
+      "clientHeight": 101,
+      "clientWidth": 320,
+      "h": 102.3125,
+      "scrollHeight": 101,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 597.6875
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 376.21875,
+      "clientHeight": 69,
+      "clientWidth": 294,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 294,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 305.265625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 524.21875,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 468.21875
+    },
+    "surface": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    },
+    "toolbar": {
+      "bottom": 585.6875,
+      "clientHeight": 47,
+      "clientWidth": 294,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 296,
+      "x": 12,
+      "y": 536.5
+    },
+    "viewport": [
+      320,
+      700
+    ],
+    "workspace": {
+      "bottom": 700,
+      "clientHeight": 407,
+      "clientWidth": 320,
+      "h": 406.734375,
+      "scrollHeight": 407,
+      "scrollWidth": 320,
+      "visibility": "visible",
+      "w": 320,
+      "x": 0,
+      "y": 293.265625
+    }
+  },
+  "focus-after-resize": {
+    "board": {
+      "bottom": 2709.15625,
+      "clientHeight": 2482,
+      "clientWidth": 3200,
+      "h": 2482.265625,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 226.890625
+    },
+    "content": {
+      "bottom": 2521.84375,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 321.84375
+    },
+    "drawer": {
+      "bottom": 844,
+      "clientHeight": 101,
+      "clientWidth": 390,
+      "h": 102.3125,
+      "scrollHeight": 101,
+      "scrollWidth": 390,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 741.6875
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 309.84375,
+      "clientHeight": 69,
+      "clientWidth": 364,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 364,
+      "visibility": "visible",
+      "w": 366,
+      "x": 12,
+      "y": 238.890625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 457.84375,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 401.84375
+    },
+    "surface": {
+      "bottom": 844,
+      "clientHeight": 617,
+      "clientWidth": 390,
+      "h": 617.109375,
+      "scrollHeight": 2482,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 226.890625
+    },
+    "toolbar": {
+      "bottom": 729.6875,
+      "clientHeight": 47,
+      "clientWidth": 364,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 366,
+      "x": 12,
+      "y": 680.5
+    },
+    "viewport": [
+      390,
+      844
+    ],
+    "workspace": {
+      "bottom": 844,
+      "clientHeight": 617,
+      "clientWidth": 390,
+      "h": 617.109375,
+      "scrollHeight": 617,
+      "scrollWidth": 390,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 226.890625
+    }
+  },
+  "focus-after-drawer": {
+    "board": {
+      "bottom": 2903.046875,
+      "clientHeight": 2676,
+      "clientWidth": 3200,
+      "h": 2676.15625,
+      "scrollHeight": 2676,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 226.890625
+    },
+    "content": {
+      "bottom": 2521.84375,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 321.84375
+    },
+    "drawer": {
+      "bottom": 844,
+      "clientHeight": 295,
+      "clientWidth": 390,
+      "h": 296.203125,
+      "scrollHeight": 295,
+      "scrollWidth": 390,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 547.796875
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 309.84375,
+      "clientHeight": 69,
+      "clientWidth": 364,
+      "h": 70.953125,
+      "scrollHeight": 69,
+      "scrollWidth": 364,
+      "visibility": "visible",
+      "w": 366,
+      "x": 12,
+      "y": 238.890625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 457.84375,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 50,
+      "y": 401.84375
+    },
+    "surface": {
+      "bottom": 844,
+      "clientHeight": 617,
+      "clientWidth": 390,
+      "h": 617.109375,
+      "scrollHeight": 2676,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 226.890625
+    },
+    "toolbar": {
+      "bottom": 535.796875,
+      "clientHeight": 47,
+      "clientWidth": 364,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 537,
+      "visibility": "visible",
+      "w": 366,
+      "x": 12,
+      "y": 486.609375
+    },
+    "viewport": [
+      390,
+      844
+    ],
+    "workspace": {
+      "bottom": 844,
+      "clientHeight": 617,
+      "clientWidth": 390,
+      "h": 617.109375,
+      "scrollHeight": 617,
+      "scrollWidth": 390,
+      "visibility": "visible",
+      "w": 390,
+      "x": 0,
+      "y": 226.890625
+    }
+  },
+  "zoom-half": {
+    "board": {
+      "bottom": 1938.484375,
+      "clientHeight": 1854,
+      "clientWidth": 2400,
+      "h": 1853.71875,
+      "scrollHeight": 1854,
+      "scrollWidth": 2400,
+      "visibility": "visible",
+      "w": 2400,
+      "x": 0,
+      "y": 84.765625
+    },
+    "content": {
+      "bottom": 1802.328125,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 1650,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 2400,
+      "x": 0,
+      "y": 152.328125
+    },
+    "drawer": {
+      "bottom": 800,
+      "clientHeight": 50,
+      "clientWidth": 1280,
+      "h": 51.15625,
+      "scrollHeight": 50,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 748.84375
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 140.328125,
+      "clientHeight": 42,
+      "clientWidth": 1254,
+      "h": 43.5625,
+      "scrollHeight": 42,
+      "scrollWidth": 1254,
+      "visibility": "visible",
+      "w": 1256,
+      "x": 12,
+      "y": 96.765625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 254.328125,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 42,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 142.5,
+      "x": 37.5,
+      "y": 212.328125
+    },
+    "surface": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 1854,
+      "scrollWidth": 2400,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    },
+    "toolbar": {
+      "bottom": 736.84375,
+      "clientHeight": 47,
+      "clientWidth": 718,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 718,
+      "visibility": "visible",
+      "w": 720,
+      "x": 280,
+      "y": 687.65625
+    },
+    "viewport": [
+      1280,
+      800
+    ],
+    "workspace": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 715,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    }
+  },
+  "drag-hit": {
+    "before": {
+      "x": 37.5,
+      "y": 212.328125
+    },
+    "id": "questions",
+    "x": 68,
+    "y": 237
+  },
+  "zoom-drag-layout": {
+    "version": 1,
+    "nodes": {
+      "questions": {
+        "x": 157,
+        "y": 120
+      }
+    },
+    "viewport": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "zoom-drag-after": {
+    "board": {
+      "bottom": 1938.484375,
+      "clientHeight": 1854,
+      "clientWidth": 2400,
+      "h": 1853.71875,
+      "scrollHeight": 1854,
+      "scrollWidth": 2400,
+      "visibility": "visible",
+      "w": 2400,
+      "x": 0,
+      "y": 84.765625
+    },
+    "content": {
+      "bottom": 1802.328125,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 1650,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 2400,
+      "x": 0,
+      "y": 152.328125
+    },
+    "drawer": {
+      "bottom": 800,
+      "clientHeight": 50,
+      "clientWidth": 1280,
+      "h": 51.15625,
+      "scrollHeight": 50,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 748.84375
+    },
+    "focus": "<button type=\"button\" data-canvas-node=\"questions\" class=\"routing-canvas-node selected\" style=\"left: 157px; top: 120px;\">Questions</button>",
+    "heading": {
+      "bottom": 140.328125,
+      "clientHeight": 42,
+      "clientWidth": 1254,
+      "h": 43.5625,
+      "scrollHeight": 42,
+      "scrollWidth": 1254,
+      "visibility": "visible",
+      "w": 1256,
+      "x": 12,
+      "y": 96.765625
+    },
+    "inspector": {
+      "bottom": 675.65625,
+      "clientHeight": 458,
+      "clientWidth": 338,
+      "h": 460,
+      "scrollHeight": 458,
+      "scrollWidth": 338,
+      "visibility": "visible",
+      "w": 340,
+      "x": 272.25,
+      "y": 215.65625
+    },
+    "inspectorBody": {
+      "bottom": 674.65625,
+      "clientHeight": 405,
+      "clientWidth": 338,
+      "h": 405,
+      "scrollHeight": 4183,
+      "scrollWidth": 338,
+      "visibility": "visible",
+      "w": 338,
+      "x": 273.25,
+      "y": 269.65625
+    },
+    "node": {
+      "bottom": 284.328125,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 42,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 142.5,
+      "x": 117.75,
+      "y": 242.328125
+    },
+    "surface": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 1854,
+      "scrollWidth": 2400,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    },
+    "toolbar": {
+      "bottom": 736.84375,
+      "clientHeight": 47,
+      "clientWidth": 718,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 718,
+      "visibility": "visible",
+      "w": 720,
+      "x": 280,
+      "y": 687.65625
+    },
+    "viewport": [
+      1280,
+      800
+    ],
+    "workspace": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 715,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    }
+  },
+  "zoom-drag-reload": {
+    "board": {
+      "bottom": 2488.484375,
+      "clientHeight": 2404,
+      "clientWidth": 3200,
+      "h": 2403.71875,
+      "scrollHeight": 2404,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 84.765625
+    },
+    "content": {
+      "bottom": 2352.328125,
+      "clientHeight": 2200,
+      "clientWidth": 3200,
+      "h": 2200,
+      "scrollHeight": 2200,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 3200,
+      "x": 0,
+      "y": 152.328125
+    },
+    "drawer": {
+      "bottom": 800,
+      "clientHeight": 50,
+      "clientWidth": 1280,
+      "h": 51.15625,
+      "scrollHeight": 50,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 748.84375
+    },
+    "focus": "<body>\n    <div id=\"root\"><div class=\"app-shell strategy-shell\"><header class=\"app-header\"><div class=\"title\"><h1>JEV gateway</h1><div class=\"subtitle\">Live pro",
+    "heading": {
+      "bottom": 140.328125,
+      "clientHeight": 42,
+      "clientWidth": 1254,
+      "h": 43.5625,
+      "scrollHeight": 42,
+      "scrollWidth": 1254,
+      "visibility": "visible",
+      "w": 1256,
+      "x": 12,
+      "y": 96.765625
+    },
+    "inspector": null,
+    "inspectorBody": null,
+    "node": {
+      "bottom": 328.328125,
+      "clientHeight": 54,
+      "clientWidth": 188,
+      "h": 56,
+      "scrollHeight": 54,
+      "scrollWidth": 188,
+      "visibility": "visible",
+      "w": 190,
+      "x": 157,
+      "y": 272.328125
+    },
+    "surface": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 2404,
+      "scrollWidth": 3200,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    },
+    "toolbar": {
+      "bottom": 736.84375,
+      "clientHeight": 47,
+      "clientWidth": 718,
+      "h": 49.1875,
+      "scrollHeight": 47,
+      "scrollWidth": 718,
+      "visibility": "visible",
+      "w": 720,
+      "x": 280,
+      "y": 687.65625
+    },
+    "viewport": [
+      1280,
+      800
+    ],
+    "workspace": {
+      "bottom": 800,
+      "clientHeight": 715,
+      "clientWidth": 1280,
+      "h": 715.234375,
+      "scrollHeight": 715,
+      "scrollWidth": 1280,
+      "visibility": "visible",
+      "w": 1280,
+      "x": 0,
+      "y": 84.765625
+    }
+  },
+  "zoom-drag-requests": [
+    {
+      "method": "PUT",
+      "path": "/v1/dashboard/canvas-layout",
+      "body": {
+        "version": 1,
+        "nodes": {
+          "questions": {
+            "x": 157,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  ]
+}

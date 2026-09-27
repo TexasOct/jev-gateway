@@ -1,0 +1,448 @@
+{
+  "session": "layout-race-54649df8a144",
+  "scenarios": {
+    "delayed_failure": {
+      "base": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": false,
+            "dragging": false,
+            "x": 110,
+            "y": 120
+          },
+          "rule-0": {
+            "captured": false,
+            "dragging": false,
+            "x": 440,
+            "y": 110
+          }
+        },
+        "pointerId": null,
+        "scroll": {
+          "x": 0,
+          "y": 0
+        },
+        "status": "No pending changes."
+      },
+      "held": {
+        "dom": {
+          "error": null,
+          "nodes": {
+            "questions": {
+              "captured": false,
+              "dragging": false,
+              "x": 140,
+              "y": 140
+            },
+            "rule-0": {
+              "captured": false,
+              "dragging": false,
+              "x": 440,
+              "y": 110
+            }
+          },
+          "pointerId": 1,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "status": "No pending changes."
+        },
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 140,
+                  "y": 140
+                },
+                "rule-0": {
+                  "x": 440,
+                  "y": 110
+                }
+              },
+              "viewport": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        ]
+      },
+      "second_active": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": false,
+            "dragging": false,
+            "x": 140,
+            "y": 140
+          },
+          "rule-0": {
+            "captured": true,
+            "dragging": true,
+            "x": 460,
+            "y": 130
+          }
+        },
+        "pointerId": 1,
+        "scroll": {
+          "x": 0,
+          "y": 0
+        },
+        "status": "No pending changes."
+      },
+      "after_failure": {
+        "dom": {
+          "error": "Fixture delayed layout failureRetry saving layoutDiscard local layout changes",
+          "nodes": {
+            "questions": {
+              "captured": false,
+              "dragging": false,
+              "x": 110,
+              "y": 120
+            },
+            "rule-0": {
+              "captured": false,
+              "dragging": false,
+              "x": 440,
+              "y": 110
+            }
+          },
+          "pointerId": 1,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "status": "No pending changes."
+        },
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 140,
+                  "y": 140
+                },
+                "rule-0": {
+                  "x": 440,
+                  "y": 110
+                }
+              },
+              "viewport": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        ]
+      },
+      "late_input": {
+        "dom": {
+          "error": "Fixture delayed layout failureRetry saving layoutDiscard local layout changes",
+          "nodes": {
+            "questions": {
+              "captured": false,
+              "dragging": false,
+              "x": 110,
+              "y": 120
+            },
+            "rule-0": {
+              "captured": false,
+              "dragging": false,
+              "x": 440,
+              "y": 110
+            }
+          },
+          "pointerId": 1,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "status": "No pending changes."
+        },
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 140,
+                  "y": 140
+                },
+                "rule-0": {
+                  "x": 440,
+                  "y": 110
+                }
+              },
+              "viewport": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        ]
+      },
+      "retry": {
+        "dom": {
+          "error": null,
+          "nodes": {
+            "questions": {
+              "captured": false,
+              "dragging": false,
+              "x": 110,
+              "y": 120
+            },
+            "rule-0": {
+              "captured": false,
+              "dragging": false,
+              "x": 464,
+              "y": 130
+            }
+          },
+          "pointerId": 1,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "status": "No pending changes."
+        },
+        "layout": {
+          "version": 1,
+          "nodes": {
+            "questions": {
+              "x": 110,
+              "y": 120
+            },
+            "rule-0": {
+              "x": 464,
+              "y": 130
+            }
+          },
+          "viewport": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 140,
+                  "y": 140
+                },
+                "rule-0": {
+                  "x": 440,
+                  "y": 110
+                }
+              },
+              "viewport": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 110,
+                  "y": 120
+                },
+                "rule-0": {
+                  "x": 464,
+                  "y": 130
+                }
+              },
+              "viewport": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        ]
+      },
+      "result": "pass"
+    },
+    "wheel_capture": {
+      "before_wheel": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": true,
+            "dragging": true,
+            "x": 134,
+            "y": 135
+          },
+          "rule-0": {
+            "captured": false,
+            "dragging": false,
+            "x": 440,
+            "y": 110
+          }
+        },
+        "pointerId": 1,
+        "scroll": {
+          "x": 60,
+          "y": 55
+        },
+        "status": "No pending changes."
+      },
+      "after_wheel": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": true,
+            "dragging": true,
+            "x": 134,
+            "y": 135
+          },
+          "rule-0": {
+            "captured": false,
+            "dragging": false,
+            "x": 440,
+            "y": 110
+          }
+        },
+        "pointerId": 1,
+        "scroll": {
+          "x": 60,
+          "y": 55
+        },
+        "status": "No pending changes."
+      },
+      "after_move": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": true,
+            "dragging": true,
+            "x": 140,
+            "y": 138
+          },
+          "rule-0": {
+            "captured": false,
+            "dragging": false,
+            "x": 440,
+            "y": 110
+          }
+        },
+        "pointerId": 1,
+        "scroll": {
+          "x": 60,
+          "y": 55
+        },
+        "status": "No pending changes."
+      },
+      "after_up": {
+        "dom": {
+          "error": null,
+          "nodes": {
+            "questions": {
+              "captured": false,
+              "dragging": false,
+              "x": 140,
+              "y": 138
+            },
+            "rule-0": {
+              "captured": false,
+              "dragging": false,
+              "x": 440,
+              "y": 110
+            }
+          },
+          "pointerId": 1,
+          "scroll": {
+            "x": 60,
+            "y": 55
+          },
+          "status": "No pending changes."
+        },
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/v1/dashboard/canvas-layout",
+            "body": {
+              "version": 1,
+              "nodes": {
+                "questions": {
+                  "x": 140,
+                  "y": 138
+                },
+                "rule-0": {
+                  "x": 440,
+                  "y": 110
+                }
+              },
+              "viewport": {
+                "x": 60,
+                "y": 55
+              }
+            }
+          }
+        ],
+        "layout": {
+          "version": 1,
+          "nodes": {
+            "questions": {
+              "x": 140,
+              "y": 138
+            },
+            "rule-0": {
+              "x": 440,
+              "y": 110
+            }
+          },
+          "viewport": {
+            "x": 60,
+            "y": 55
+          }
+        }
+      },
+      "post_release_scroll": {
+        "error": null,
+        "nodes": {
+          "questions": {
+            "captured": false,
+            "dragging": false,
+            "x": 140,
+            "y": 138
+          },
+          "rule-0": {
+            "captured": false,
+            "dragging": false,
+            "x": 440,
+            "y": 110
+          }
+        },
+        "pointerId": 1,
+        "scroll": {
+          "x": 160,
+          "y": 155
+        },
+        "status": "No pending changes."
+      },
+      "initial_scroll": {
+        "x": 60,
+        "y": 55
+      },
+      "result": "pass"
+    }
+  }
+}

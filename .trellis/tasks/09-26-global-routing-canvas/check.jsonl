@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Verify layout persistence remains separate from policy configuration."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify required frontend and backend quality checks."}

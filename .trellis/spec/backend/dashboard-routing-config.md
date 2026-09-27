@@ -5,9 +5,12 @@
 
 ## Overview
 
-The dashboard is a Vite + React + TypeScript app in `frontend/`. Its build output
-is committed at `jev_gateway/static/` and served by the gateway process, so there
-is no second server to start and `pip install` needs no Node.
+The dashboard is a Vite + React + TypeScript app in `frontend/`. Generated output
+lives at `jev_gateway/static/` during local/release builds and is served by the
+gateway process, so there is no second server to start. The generated bundle is
+not committed; release packaging builds it from `frontend/` before creating the
+wheel. A built wheel includes its dashboard assets, so installed users do not
+need Node.
 
 Three files next to the active `models.json` hold runtime edits:
 
@@ -194,8 +197,14 @@ the bundle. `npm --prefix frontend run lint|test|build` are the frontend gates.
   the selected dashboard locale under a dedicated fixed key; the credential
   remains module-memory-only.
 - `pyproject.toml` declares `[tool.setuptools.package-data]` for
-  `jev_gateway/static/**`; the `Dockerfile` rebuilds the bundle in a Node stage
-  before `uv build`.
+  `jev_gateway/static/**`; the `Dockerfile` and release workflow build the bundle
+  from `frontend/` before `uv build`. The repository does not track generated
+  `jev_gateway/static/` output.
+- A fresh source checkout needs `npm --prefix frontend install` and a frontend
+  build before local installation or packaging. `scripts/build-frontend.sh`
+  installs dependencies and builds; `--check` only checks for missing or stale
+  output. The release workflow uses Node.js 22 and builds before Python tests
+  and wheel packaging. Installed wheels need no Node.js.
 - Startup announces the address through the `dashboard_url` logging field. It must
   be emitted from the app lifespan: a log call before `uvicorn.run` happens
   before Uvicorn applies the configured formatters and is dropped by the default
@@ -207,21 +216,32 @@ the bundle. `npm --prefix frontend run lint|test|build` are the frontend gates.
 | --- | --- |
 | Assets present | Shell `200`, assets `200` with immutable caching |
 | Assets absent | Shell `404 dashboard_not_built`; startup logs a warning; `/v1` routes unaffected |
-| Committed bundle older than `frontend/src` | `scripts/build-frontend.sh --check` exits `1` |
+| Existing generated bundle older than `frontend/src` | `scripts/build-frontend.sh --check` exits `1` |
+| Generated bundle absent | Build it with `scripts/build-frontend.sh` before packaging; dashboard remains unavailable in an unbuilt source checkout |
 | Wildcard bind host | `dashboard_url` displays the loopback address |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: the wheel carries `static/index.html` and its hashed assets, and the
   service serving `/dashboard` needs nothing else.
-- Base: a checkout without Node still runs `uv build` and the test suite, because
-  the bundle is committed.
+- Base: a release build runs the frontend build before `uv build`; the resulting
+  wheel includes dashboard assets. A source checkout without Node can run backend
+  tests that do not require the generated bundle, but must build it before making
+  an installable wheel.
 - Bad: serving the shell through `StaticFiles(html=True)` alone. The bare mount
   path answers `307` to `/dashboard/`, which silently changes the status of an
   existing endpoint. Keep the explicit shell route.
 
 ### 6. Tests Required
 
+- `tests/conftest.py` owns the session-scoped `dashboard_bundle` fixture. Tests
+  that inspect or package the dashboard must request it; it runs
+  `npm --prefix frontend run build` once per session and requires dependencies
+  installed with `npm --prefix frontend install`. It must not reuse a bundle
+  merely because it exists locally or assume generated assets are Git-tracked.
+- `tests/test_release_validation.py`: build the bundle before copying the
+  package into a temporary release source, then check shell references and
+  exact wheel/source asset parity.
 - `tests/test_gateway.py`: shell `200` with `no-store`, `nosniff`,
   `referrer-policy`, and a CSP whose `script-src` is exactly `'self'`; the shell
   carries no session data and only `/dashboard/assets/` references; assets are
@@ -296,7 +316,14 @@ The layout is shared by browsers connected to the same installation. The API cur
 - `tests/test_canvas_layout.py`: strict shape, Unicode IDs, limits, corrupt-file fallback, and read-after-write at the byte limit.
 - `tests/test_gateway.py`: configured-key guard, Bearer checks, file failure, unchanged policy hash/version count and unchanged baseline/overlay bytes.
 - `frontend/src/config/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
-- Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works.
+- Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works. For zoomed/scrolled canvases, `elementFromPoint(clientX, clientY)` must identify the intended `data-canvas-node`; verify with real browser mouse input because synthetic `PointerEvent` dispatch does not exercise browser pointer capture faithfully.
+- Browser checks for responsive canvas fitting should scroll the canvas into the visible page before measuring node bounds. Assert that the selected node's bounding box is inside the visible canvas after Fit, at a usable CSS size, rather than relying on absence of page-level horizontal overflow. When the whole board cannot fit at minimum readable zoom, focus a selected node or compact group and provide explicit pan controls; viewport changes remain layout-only and must not submit policy changes.
+- `RoutingEditor` selection is the source passed into canvas fitting and the inspector. Canvas node selection callbacks must update the parent `selectedNode`; otherwise Fit may focus a stale default node even when the user selected another module. Verify selection synchronization in browser tests after switching from an advanced panel.
+- The strategy-only shell is a `100dvh` grid with `auto minmax(0, 1fr)` rows. The shared header owns the auto row; the actual canvas fills the remaining row. Do not restore a fixed board height or make monitoring/appearance use this shell.
+- Workspace overlays are unscaled and declare measured `[data-canvas-occlusion="top"|"bottom"]` bounds. `canvasAvailableRect()` and `unoccludedCanvasRect()` provide the common free area for Fit, reveal, toolbar and inspector placement. Account for content origin offsets in inverse pointer mapping while preserving unscaled stored node coordinates.
+- The bottom drawer owns help, node/edge lists, advanced editors, source/pool metadata and review controls. Its body scrolls internally at a bounded height; all sortable rules and model drop zones remain descendants of `DndContext`. Structure tests must verify this boundary when controls move between containers.
+- An anchored inspector must leave the selected node exposed, especially when it stacks above or below the node on narrow screens. Before native drag verification, `elementFromPoint` at the intended start point must reach that node rather than a panel field. A failed drag on an occluded point is not evidence of a pointer-capture or browser-tool failure.
+- Browser checks include tall viewports (1430×2511), ordinary desktop and 390px/320px widths in both locales. Measure the canvas's top and bottom against the shared header and viewport, including expanded drawers and wrapped headers. No second page of editor controls should be created by drawer expansion.
 
 ### 7. Wrong vs Correct
 
@@ -435,8 +462,9 @@ Wrong: `session_request_evidence(id)[:limit]` loads every retained payload. Corr
   fails on a different OS/libc. Use `npm install`.
 - Do not log startup announcements before Uvicorn applies `log_config`. Emit them
   from the lifespan handler, or the operator never sees them.
-- Do not commit a changed `frontend/src` without rebuilding and committing
-  `jev_gateway/static/`; `--check` is what catches it.
+- Do not track generated `jev_gateway/static/` files. Build them from
+  `frontend/src` before packaging, then run `--check` to detect stale local
+  output.
 - Do not let `frontend/node_modules` reach the Docker build context. `COPY
   frontend/ ./` would replace the container's musl native bindings with the
   host's and break the image build, so `.dockerignore` excludes it.

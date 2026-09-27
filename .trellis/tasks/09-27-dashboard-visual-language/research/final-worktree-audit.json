@@ -1,0 +1,22 @@
+{
+  "frontend/src/App.tsx": {
+    "index_unchanged": true,
+    "worktree_hash": "58f60d26794663afda35136261a7f0a0f9304de73c325584c5ad2b53b240a16c"
+  },
+  "frontend/src/styles.css": {
+    "index_unchanged": true,
+    "worktree_hash": "3736c52d62d9a145eb5da09707faa6997bcf0b0cf8b3e5c6d6734c8584f30213"
+  },
+  "frontend/src/i18n.tsx": {
+    "index_unchanged": true,
+    "worktree_hash": "380cd35c907308a073050c0dacd49a8acc27547822857cc67ae73ac641edf96a"
+  },
+  "frontend/src/api.ts": {
+    "index_unchanged": true,
+    "worktree_hash": "3e3ac5ac21f54a7061fdd98ac8fd12f144df3bff3f7e954d5476d3c7295cde3b"
+  },
+  "frontend/src/monitoring/VirtualList.tsx": {
+    "index_unchanged": true,
+    "worktree_hash": "656d8e50bf8bd9c5762bc2b923185b086d2c1701171a50fbdd812a3e53a963aa"
+  }
+}
