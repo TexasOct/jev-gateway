@@ -22,15 +22,11 @@ jev_gateway/
 ├── catalog.py               # Catalog types and models.json parsing/validation
 ├── config.py                # Shared scalar and URL coercion helpers
 ├── decision.py              # Session-aware routing orchestration
-├── decision_provider/       # Decision protocol adapters and failover facade
-│   ├── __init__.py          # DecisionClient and protocol registry
-│   ├── base.py              # DecisionAdapter and normalized DecisionResult
-│   └── system_one.py        # System One wire adapter
 ├── gateway.py               # FastAPI schemas, routes, auth, streaming, reload
 ├── reasoning.py             # reasoning_effort derivation and clamping
 ├── records.py               # SQLite evidence store and writer queue
 ├── sessions.py              # Session identity and in-memory TTL state
-├── signals.py               # Request signal extraction and local scoring
+├── request_facts.py         # Neutral prompt and structural request facts
 ├── logging/
 │   ├── __init__.py          # Logging facade
 │   ├── catalog.py           # Logging settings parsed from gateway config
@@ -45,7 +41,11 @@ jev_gateway/
     ├── registry.py          # Strategy kinds and concrete client construction
     ├── policy.py            # Built-in policy strategy
     ├── classifier.py        # DecisionClassifier and DecisionStrategy
-    └── matrix.py            # DecisionMatrixStrategy and local rules
+    ├── matrix.py            # DecisionMatrixStrategy and local rules
+    └── decision_provider/   # Decision protocols and failover facade
+        ├── __init__.py      # DecisionClient and protocol registry
+        ├── base.py          # DecisionAdapter and normalized DecisionResult
+        └── system_one.py    # System One wire adapter
 
 tests/
 ├── conftest.py              # Shared pytest fixtures
@@ -65,9 +65,9 @@ docs/
 | --- | --- | --- |
 | `catalog.py` | Immutable catalog-domain objects and strict configuration parsing | `Catalog`, `RoutingPolicy`, `StrategyDefinition`, `catalog_from_document()`, `load_catalog()` |
 | `decision.py` | Turn-level routing, session interaction, strategy invocation, and best-effort evidence submission | `Decision`, `RoutingEngine` |
-| `decision_provider/` | Decision-protocol transport, normalized answers, and ordered failover | `DecisionClient`, `DecisionAdapter`, `DecisionResult`, `registered_protocols()` |
+| `strategy/decision_provider/` | Decision-protocol transport, normalized answers, and ordered failover | `DecisionClient`, `DecisionAdapter`, `DecisionResult`, `registered_protocols()` |
 | `gateway.py` | HTTP boundary, request models, route handlers, authentication, LiteLLM transport, streaming, and reload | `ChatCompletionRequest`, `GatewayConfig`, `create_app()`, `run_gateway()` |
-| `signals.py` | Convert chat messages and request features into `RequestSignals` | `ScoringPolicy`, `RequestSignals`, `extract_signals()` |
+| `request_facts.py` | Extract raw prompt text and structural facts for provider questions, hard model constraints, session identity, and request records | `RequestFacts`, `extract_request_facts()` |
 | `reasoning.py` | Choose and clamp a legal reasoning effort after a model is selected | `derive_effort()`, `effort_for()`, `clamp_effort()` |
 | `sessions.py` | Derive session IDs and hold bounded in-memory session state | `SessionState`, `MemorySessionStore`, `derive_session_id()` |
 | `records.py` | Store requests, decisions, outcomes, configuration snapshots, and provider continuation state | `RecordStore`, `SqliteRecordStore`, `record_store_from_settings()` |
@@ -94,8 +94,8 @@ engine.
 
 ### Add a decision protocol adapter
 
-1. Implement `DecisionAdapter` in `jev_gateway/decision_provider/`.
-2. Register its protocol in `_ADAPTERS` in `decision_provider/__init__.py`.
+1. Implement `DecisionAdapter` in `jev_gateway/strategy/decision_provider/`.
+2. Register its protocol in `_ADAPTERS` in `strategy/decision_provider/__init__.py`.
 3. Keep `registered_protocols()` aligned with that registry so catalog parsing
    rejects unsupported protocols before startup or reload swaps live state.
 4. Add transport, malformed-response, and failover tests in
@@ -129,8 +129,10 @@ record store.
 
 - Strategies may depend on catalog models and policy settings. Decision-backed
   strategies use `DecisionMaker` from `strategy/contracts.py`; only
-  `strategy/registry.py` constructs `DecisionClient`. No strategy imports
-  individual protocol adapters.
+  `strategy/registry.py` constructs `DecisionClient`. Provider adapters live in
+  `strategy/decision_provider/`; catalog protocol lookup stays lazy to avoid
+  package initialization cycles. Strategy implementations do not import concrete
+  adapters.
 - `decision.py` consumes the public `strategy` facade.
 - `gateway.py` consumes `RoutingEngine` and the public `provider` facade. It does
   not select concrete strategy or provider implementations directly.

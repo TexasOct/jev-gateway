@@ -1,6 +1,6 @@
 """Session-aware routing decisions.
 
-`RoutingEngine` owns the request lifecycle: it extracts signals, asks the
+`RoutingEngine` owns the request lifecycle: it extracts structural request facts, asks the
 selected strategy which catalog model serves the turn, and turns that answer
 into a :class:`Decision`. It does not contain routing rules of its own; the
 algorithm lives in `jev_gateway.strategy`. Storage of the inbound request, the
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from jev_gateway.catalog import Catalog, ModelProfile
-from jev_gateway.config import coerce_float, coerce_int
+from jev_gateway.config import coerce_int
 from jev_gateway.reasoning import effort_for
 from jev_gateway.records import (
     DecisionRecord,
@@ -32,7 +32,7 @@ from jev_gateway.records import (
     build_config_hash,
 )
 from jev_gateway.sessions import MemorySessionStore, SessionState
-from jev_gateway.signals import RequestSignals, extract_signals
+from jev_gateway.request_facts import RequestFacts, extract_request_facts
 from jev_gateway.strategy import (
     RoutingRequest,
     StrategyContractError,
@@ -49,7 +49,6 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-RECENT_SCORE_LIMIT = 10
 DECISION_LOG_SIZE = 500
 
 
@@ -78,7 +77,6 @@ class Decision:
     reasoning_effort: str | None
     reasoning_effort_source: str
     candidates: tuple[str, ...]
-    signals: dict[str, Any]
     created_at: float
 
     @property
@@ -105,7 +103,6 @@ class Decision:
             "reasoning_effort": self.reasoning_effort,
             "reasoning_effort_source": self.reasoning_effort_source,
             "candidates": list(self.candidates),
-            "signals": dict(self.signals),
             "created_at": self.created_at,
         }
 
@@ -154,14 +151,13 @@ class RoutingEngine:
         max_tokens: int | None = None,
         tools: list[Any] | None = None,
         response_format: dict[str, Any] | None = None,
-    ) -> RequestSignals:
+    ) -> RequestFacts:
         """Persist the inbound request before routing validates anything."""
-        signals = extract_signals(
+        facts = extract_request_facts(
             messages,
             max_tokens=max_tokens,
             tools=tools,
             response_format=response_format,
-            scoring=self.catalog.policy.scoring,
         )
         record = RequestRecord(
             request_id=request_id,
@@ -177,17 +173,17 @@ class RoutingEngine:
             tools=tools,
             response_format=response_format,
             messages=messages,
-            prompt=signals.prompt,
-            prompt_chars=signals.prompt_chars,
-            prompt_tokens=signals.prompt_tokens,
-            conversation_tokens=signals.conversation_tokens,
-            turn_index=signals.turn_index,
-            has_tools=signals.needs_tools,
-            has_vision=signals.needs_vision,
-            wants_json=signals.needs_json,
+            prompt=facts.prompt,
+            prompt_chars=facts.prompt_chars,
+            prompt_tokens=facts.prompt_tokens,
+            conversation_tokens=facts.conversation_tokens,
+            turn_index=facts.turn_index,
+            has_tools=facts.needs_tools,
+            has_vision=facts.needs_vision,
+            wants_json=facts.needs_json,
         )
         self._store(lambda: self.record_store.record_request(record), "request")
-        return signals
+        return facts
 
     def record_invalid_request(self, record: RequestRecord) -> None:
         """Queue an invalid request record without affecting the HTTP response."""
@@ -210,12 +206,11 @@ class RoutingEngine:
     ) -> Decision:
         """Route one request, using the stored session when one exists."""
         strategy_impl = self.strategies.resolve(strategy)
-        signals = extract_signals(
+        facts = extract_request_facts(
             messages,
             max_tokens=max_tokens,
             tools=tools,
             response_format=response_format,
-            scoring=strategy_impl.scoring,
         )
         manual: ModelProfile | None = None
         if requested_model is not None:
@@ -228,10 +223,10 @@ class RoutingEngine:
         # canonical session shared with concurrent requests.
         outcome = strategy_impl.decide(
             RoutingRequest(
-                signals=signals,
+                facts=facts,
                 session=session,
                 manual=manual,
-                turn_index=signals.turn_index,
+                turn_index=facts.turn_index,
                 now=self._clock(),
             ),
             self.catalog,
@@ -243,7 +238,7 @@ class RoutingEngine:
                 f"{outcome.model!r}."
             )
         effort, effort_source = self._reasoning_choice(
-            strategy_impl, signals, profile, reasoning_effort, outcome.tier
+            strategy_impl, facts, profile, reasoning_effort, outcome.tier
         )
         decision = self._build(
             request_id=request_id,
@@ -253,12 +248,12 @@ class RoutingEngine:
             outcome_tier=outcome.tier,
             reason=outcome.reason,
             mode=outcome.mode,
-            turn_index=signals.turn_index,
+            turn_index=facts.turn_index,
             switched_from=outcome.switched_from,
             blocked_by=outcome.blocked_by,
             reasoning_effort=effort,
             reasoning_effort_source=effort_source,
-            signals=signals,
+            facts=facts,
         )
         self._record_decision(decision)
         self._log.append(decision)
@@ -279,12 +274,11 @@ class RoutingEngine:
     ) -> dict[str, Any]:
         """Return the routing answer for a request without mutating any state."""
         strategy_impl = self.strategies.resolve(strategy)
-        signals = extract_signals(
+        facts = extract_request_facts(
             messages,
             max_tokens=max_tokens,
             tools=tools,
             response_format=response_format,
-            scoring=strategy_impl.scoring,
         )
         manual: ModelProfile | None = None
         if requested_model is not None:
@@ -296,10 +290,10 @@ class RoutingEngine:
         # Preview receives a detached snapshot and cannot touch live state.
         outcome = strategy_impl.decide(
             RoutingRequest(
-                signals=signals,
+                facts=facts,
                 session=session,
                 manual=manual,
-                turn_index=signals.turn_index,
+                turn_index=facts.turn_index,
                 now=self._clock(),
             ),
             self.catalog,
@@ -311,7 +305,7 @@ class RoutingEngine:
                 f"{outcome.model!r}."
             )
         effort, effort_source = self._reasoning_choice(
-            strategy_impl, signals, profile, reasoning_effort, outcome.tier
+            strategy_impl, facts, profile, reasoning_effort, outcome.tier
         )
         return {
             "strategy": strategy_impl.name,
@@ -327,9 +321,8 @@ class RoutingEngine:
             "blocked_by": outcome.blocked_by,
             "reasoning_effort": effort,
             "reasoning_effort_source": effort_source,
-            "turn_index": signals.turn_index,
+            "turn_index": facts.turn_index,
             "candidates": [profile.name for profile in self.catalog.profiles],
-            "signals": signals.as_dict(),
         }
 
     # Outcomes
@@ -418,10 +411,6 @@ class RoutingEngine:
                     prompt_tokens or 0, completion_tokens or 0
                 )
 
-            score = decision.signals.get("score")
-            if isinstance(score, (int, float)) and not isinstance(score, bool):
-                state.recent_scores.append(coerce_float(score))
-                del state.recent_scores[:-RECENT_SCORE_LIMIT]
             state.updated_at = self._clock()
 
         self.store.mutate(decision.session_id, update)
@@ -523,7 +512,7 @@ class RoutingEngine:
             reasoning_effort=decision.reasoning_effort,
             reasoning_effort_source=decision.reasoning_effort_source,
             candidates=decision.candidates,
-            signals=decision.signals,
+            signals={},
             created_at=decision.created_at,
         )
         self._store(lambda: self.record_store.record_decision(record), "decision")
@@ -531,7 +520,7 @@ class RoutingEngine:
     def _reasoning_choice(
         self,
         strategy_impl: Any,
-        signals: RequestSignals,
+        facts: RequestFacts,
         profile: ModelProfile,
         requested: str | None,
         tier: str,
@@ -543,7 +532,7 @@ class RoutingEngine:
         candidates. The policy comes from the strategy so `economy` and `quality`
         can differ; a custom strategy that exposes no policy inherits the catalog's.
 
-        The tier is the one the strategy committed to, not the locally scored one.
+        The tier is the one the strategy committed to.
         It carries a classifier's verdict where one is configured, and it is the
         value reported as `X-JEV-Task-Type`, so the level can never contradict the
         tier the client is told about.
@@ -558,7 +547,7 @@ class RoutingEngine:
                 **reasoning.effort_by_label, tier: configured.reasoning_effort
             })
         return effort_for(
-            signals,
+            facts,
             reasoning,
             profile.capabilities.reasoning_effort,
             requested=requested,
@@ -582,7 +571,7 @@ class RoutingEngine:
         blocked_by: str | None,
         reasoning_effort: str | None,
         reasoning_effort_source: str,
-        signals: RequestSignals,
+        facts: RequestFacts,
     ) -> Decision:
         return Decision(
             decision_id=f"dec-{uuid.uuid4().hex[:16]}",
@@ -602,7 +591,6 @@ class RoutingEngine:
             reasoning_effort=reasoning_effort,
             reasoning_effort_source=reasoning_effort_source,
             candidates=tuple(item.name for item in self.catalog.profiles),
-            signals=signals.as_dict(),
             created_at=self._clock(),
         )
 
@@ -651,7 +639,6 @@ class RoutingEngine:
                     "reason": decision.reason,
                     "mode": decision.mode,
                     "turn": decision.turn_index,
-                    "score": decision.signals.get("score"),
                     "decision_id": decision.decision_id,
                 }
             )

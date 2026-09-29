@@ -390,7 +390,7 @@ def test_preview_routes_without_mutating_state(monkeypatch) -> None:
     assert chosen["strategy"] == "always-strong"
     assert chosen["route"] == LARGE_ID
     assert chosen["mode"] == "auto"
-    assert chosen["signals"]["tier"] == "simple"
+    assert "signals" not in chosen
     # Preview reads the session store but must not create or advance one.
     assert len(engine.store) == 0
 
@@ -483,7 +483,7 @@ def test_enabled_storage_records_request_decision_and_outcome(
     assert request_row[1] is None
     assert request_row[2] == COMPLEX_PROMPT
     assert decision_row[0] == "task_aware"
-    assert decision_row[1] == LARGE_ID
+    assert decision_row[1] == SMALL_ID
     assert decision_row[2] == response.headers["x-jev-request-id"]
     assert decision_row[3]
     store.close()

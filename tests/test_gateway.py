@@ -230,8 +230,8 @@ def test_temperature_is_dropped_for_models_that_reject_it(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert response.headers["x-jev-route"] == LARGE_ID
-    assert "temperature" not in calls[0]
+    assert response.headers["x-jev-route"] == SMALL_ID
+    assert calls[0]["temperature"] == 0
 
 
 def test_deepseek_uses_native_litellm_provider(monkeypatch) -> None:
@@ -577,7 +577,7 @@ def test_session_stays_on_its_model_across_turns(monkeypatch) -> None:
     assert "x-jev-switch" not in second.headers
 
 
-def test_session_switches_models_when_the_work_gets_harder(monkeypatch) -> None:
+def test_session_does_not_switch_for_prompt_complexity(monkeypatch) -> None:
     calls = install_completion(monkeypatch)
     app = gateway.create_app(make_config())
 
@@ -601,10 +601,10 @@ def test_session_switches_models_when_the_work_gets_harder(monkeypatch) -> None:
         },
     )
 
-    assert escalated.headers["x-jev-route"] == LARGE_ID
-    assert escalated.headers["x-jev-reason"] == "complexity_spike"
-    assert escalated.headers["x-jev-switch"] == f"{SMALL_ID}->{LARGE_ID}"
-    assert calls[-1]["model"] == "openai/vendor/large-model"
+    assert escalated.headers["x-jev-route"] == SMALL_ID
+    assert escalated.headers["x-jev-reason"] == "session_sticky"
+    assert "x-jev-switch" not in escalated.headers
+    assert calls[-1]["model"] == "openai/vendor/small-model"
 
 
 def test_default_pin_holds_the_first_turn_model(monkeypatch) -> None:
@@ -1844,7 +1844,7 @@ def test_routing_endpoints_expose_policy_decisions_and_sessions(monkeypatch) -> 
     decision = request(app, "GET", f"/v1/routing/decisions/{decision_id}")
     assert decision.status_code == 200
     assert decision.json()["reason"] == "first_turn_simple"
-    assert decision.json()["signals"]["tier"] == "simple"
+    assert "signals" not in decision.json()
 
     session = request(app, "GET", f"/v1/routing/sessions/{session_id}")
     assert session.status_code == 200
@@ -2456,15 +2456,12 @@ def test_each_model_uses_its_own_base_and_key(monkeypatch) -> None:
     )
 
     assert simple.headers["x-jev-route"] == SMALL_ID
-    assert complex_request.headers["x-jev-route"] == LARGE_ID
+    assert complex_request.headers["x-jev-route"] == SMALL_ID
     small_call = next(
         call for call in calls if call["api_base"] == "https://small.example/v1"
     )
-    large_call = next(
-        call for call in calls if call["api_base"] == "https://large.example/v1"
-    )
     assert small_call["api_key"] == "test-key-small"
-    assert large_call["api_key"] == "test-key-large"
+    assert not any(call["api_base"] == "https://large.example/v1" for call in calls)
 
 
 def test_same_provider_models_share_connection_and_keep_their_upstream_model(

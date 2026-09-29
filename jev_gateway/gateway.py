@@ -72,7 +72,7 @@ from jev_gateway.sessions import (
     SessionState,
     derive_session_id,
 )
-from jev_gateway.signals import content_text, estimate_tokens, latest_user_text
+from jev_gateway.request_facts import content_text, estimate_tokens, latest_user_text
 
 logger = logging.getLogger(__name__)
 UPSTREAM_FAILURE_MESSAGE = "Upstream provider request failed."
@@ -816,7 +816,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     )
                 labels.append({
                     "name": name,
-                    "score": route.score,
                     "reasoning_effort": route.reasoning_effort,
                     "description": route.description,
                     "tag": tag,

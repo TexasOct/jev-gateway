@@ -14,7 +14,7 @@ keep a session on one route or reconsider it each turn.
 
 - Serves `POST /v1/chat/completions` for clients configured with the gateway URL and a catalog model or strategy name.
 - Can classify work by task type, scale, and rigor, then select from configured model pools.
-- Optionally asks configured decision providers typed choice questions, with local scoring or a configured fallback when unavailable.
+- Optionally asks configured decision providers typed choice questions; when no answer is available, routing uses the configured deterministic fallback.
 - Supports session pinning and per-turn selection; the shipped `task_aware` strategy uses `fresh` mode.
 - Derives a `reasoning_effort` level per route and clamps it to the levels that route accepts.
 - Records requests, decisions, outcomes, and provider continuation state in SQLite; recording failures do not fail chat requests.

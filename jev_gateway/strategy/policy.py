@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from jev_gateway.catalog import Catalog, ModelProfile, RoutingMode, RoutingPolicy
+from jev_gateway.request_facts import RequestFacts
 from jev_gateway.sessions import SessionState
-from jev_gateway.signals import RequestSignals, ScoringPolicy
 
 from .contracts import RoutingRequest, StrategyOutcome
 
@@ -43,7 +43,6 @@ class _Escalation:
     tier: str
     reason: str
     exclude_current: bool = False
-    require_reasoning: bool = False
 
 
 class PolicyStrategy:
@@ -58,11 +57,6 @@ class PolicyStrategy:
         self.name = name
         self.policy = policy
         self.description = description
-
-    @property
-    def scoring(self) -> ScoringPolicy:
-        """Return the complexity scoring rules this strategy applies."""
-        return self.policy.scoring
 
     def describe(self) -> dict[str, Any]:
         """Serialize the strategy and the policy that drives it."""
@@ -82,7 +76,7 @@ class PolicyStrategy:
 
     def _initial(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         manual = request.manual
-        label = self._signal_label(request.signals)
+        label = self._request_label(request.facts)
         if manual is not None:
             return self._outcome(
                 manual,
@@ -90,7 +84,7 @@ class PolicyStrategy:
                 "manual_override",
                 "manual",
             )
-        selection = self._select(label, request.signals, catalog)
+        selection = self._select(label, request.facts, catalog)
         effective_tier = self._effective_tier(selection)
         reason = (
             f"first_turn_{effective_tier}"
@@ -110,7 +104,7 @@ class PolicyStrategy:
         if manual is not None and manual.name != current.name:
             return self._outcome(
                 manual,
-                self._tier_for_profile(manual, self._signal_label(request.signals)),
+                self._tier_for_profile(manual, self._request_label(request.facts)),
                 "manual_override",
                 "manual",
                 switched_from=current.name,
@@ -142,19 +136,19 @@ class PolicyStrategy:
         catalog: Catalog,
     ) -> tuple[Selection, str, str | None]:
         """Choose the model for a later turn, or keep the session's model."""
-        signals = request.signals
+        facts = request.facts
 
         if self.policy.mode is RoutingMode.FRESH:
-            return self._select(self._signal_label(signals), signals, catalog), "per_turn_policy", None
+            return self._select(self._request_label(facts), facts, catalog), "per_turn_policy", None
 
         if self.policy.mode in {RoutingMode.STICKY, RoutingMode.CACHED}:
             return self._pinned_selection(current, session, request, catalog)
 
-        hard = self._hard_requirement(current, session, signals)
+        hard = self._hard_requirement(current, session, facts)
         if hard is not None:
             candidate = self._select(
                 hard.tier,
-                signals,
+                facts,
                 catalog,
                 exclude=current.name if hard.exclude_current else None,
                 min_context=hard.min_context,
@@ -164,11 +158,11 @@ class PolicyStrategy:
             ):
                 return candidate, hard.reason, None
 
-        escalation = self._escalation(session, current, signals)
+        escalation = self._escalation(session, current, facts)
         if escalation is not None:
             if self._hysteresis_allows(session, request.turn_index, request.now):
                 candidate = self._escalation_candidate(
-                    current, escalation, signals, catalog
+                    current, escalation, facts, catalog
                 )
                 if candidate is not None:
                     return candidate, escalation.reason, None
@@ -193,14 +187,14 @@ class PolicyStrategy:
         the pin when their reason is listed in `policy.pin.break_on`; every other
         condition leaves the conversation where it is and reports `session_pinned`.
         """
-        signals = request.signals
+        facts = request.facts
         break_on = self.policy.pin.break_on
 
-        hard = self._hard_requirement(current, session, signals)
+        hard = self._hard_requirement(current, session, facts)
         if hard is not None and hard.reason in break_on:
             candidate = self._select(
                 hard.tier,
-                signals,
+                facts,
                 catalog,
                 exclude=current.name if hard.exclude_current else None,
                 min_context=hard.min_context,
@@ -210,14 +204,14 @@ class PolicyStrategy:
             ):
                 return candidate, hard.reason, None
 
-        escalation = self._escalation(session, current, signals)
+        escalation = self._escalation(session, current, facts)
         if (
             escalation is not None
             and escalation.reason in break_on
             and self._hysteresis_allows(session, request.turn_index, request.now)
         ):
             candidate = self._escalation_candidate(
-                current, escalation, signals, catalog
+                current, escalation, facts, catalog
             )
             if candidate is not None:
                 return candidate, escalation.reason, None
@@ -229,7 +223,7 @@ class PolicyStrategy:
         self,
         current: ModelProfile,
         escalation: _Escalation,
-        signals: RequestSignals,
+        facts: RequestFacts,
         catalog: Catalog,
     ) -> Selection | None:
         """Pick a model that differs from the current one, raising the tier if needed."""
@@ -238,10 +232,9 @@ class PolicyStrategy:
         while True:
             candidate = self._select(
                 tier,
-                signals,
+                facts,
                 catalog,
                 exclude=current.name if escalation.exclude_current else None,
-                require_reasoning=escalation.require_reasoning,
             )
             if candidate.profile.name != current.name:
                 return Selection(
@@ -261,14 +254,14 @@ class PolicyStrategy:
         self,
         current: ModelProfile,
         session: SessionState,
-        signals: RequestSignals,
+        facts: RequestFacts,
     ) -> _HardRequirement | None:
         """Return a constraint the current model cannot satisfy."""
-        if not self._capable(current, signals):
+        if not self._capable(current, facts):
             return _HardRequirement(
                 tier=session.tier, reason="capability_gap", exclude_current=True
             )
-        required = self._required_context(signals)
+        required = self._required_context(facts)
         if not current.fits_context(required) or self._over_pressure(current, required):
             return _HardRequirement(
                 tier=session.tier,
@@ -276,7 +269,7 @@ class PolicyStrategy:
                 exclude_current=True,
                 min_context=required,
             )
-        if not current.fits_output(self._output_requirement(signals)):
+        if not current.fits_output(self._output_requirement(facts)):
             return _HardRequirement(
                 tier=session.tier, reason="output_limit", exclude_current=True
             )
@@ -286,12 +279,11 @@ class PolicyStrategy:
         self,
         session: SessionState,
         current: ModelProfile,
-        signals: RequestSignals,
+        facts: RequestFacts,
     ) -> _Escalation | None:
         """Return the highest-priority quality reason to change models."""
         escalation = self.policy.escalation
         rank = self._rank(session.tier)
-        signal_label = self._signal_label(signals)
 
         if session.consecutive_failures >= escalation.max_consecutive_failures:
             return _Escalation(
@@ -301,55 +293,15 @@ class PolicyStrategy:
             return _Escalation(
                 tier=self._raise_tier(session.tier), reason="output_truncated"
             )
-        if escalation.escalate_on_user_correction and signals.user_correction:
-            return _Escalation(
-                tier=self._raise_tier(session.tier), reason="user_correction"
-            )
-        if (
-            escalation.escalate_on_reasoning_request
-            and signals.reasoning_requested
-            and not current.capabilities.reasoning
-        ):
-            return _Escalation(
-                tier=self._raise_tier(session.tier),
-                reason="reasoning_required",
-                require_reasoning=True,
-            )
-        if (
-            escalation.escalate_on_complexity_spike
-            and self._rank(signal_label) > rank
-            and signals.turn_index >= escalation.min_turns_before_escalation
-        ):
-            return _Escalation(tier=signal_label, reason="complexity_spike")
         if self._over_budget(session) and rank > 0:
             return _Escalation(
                 tier=self._lower_tier(session.tier), reason="budget_pressure"
             )
-        if (
-            self.policy.mode is RoutingMode.ADAPTIVE
-            and escalation.deescalate_when_settled
-            and self._rank(signal_label) < rank
-            and self._settled(session)
-        ):
-            return _Escalation(tier=signal_label, reason="complexity_settled")
         return None
 
     def _over_budget(self, session: SessionState) -> bool:
         limit = self.policy.budget.max_cost_per_session_usd
         return limit is not None and session.cost_usd >= limit
-
-    def _settled(self, session: SessionState) -> bool:
-        """Report whether recent turns were all below the standard threshold."""
-        window = self.policy.escalation.settle_window
-        if window <= 0:
-            return False
-        recent = session.recent_scores[-window:]
-        if len(recent) < window:
-            return False
-        if session.consecutive_failures or session.consecutive_truncations:
-            return False
-        boundary = self.policy.labels[session.tier].score
-        return all(score < boundary for score in recent)
 
     def _hysteresis_allows(
         self, session: SessionState, turn_index: int, now: float
@@ -382,54 +334,41 @@ class PolicyStrategy:
     def _select(
         self,
         tier: str,
-        signals: RequestSignals,
+        facts: RequestFacts,
         catalog: Catalog,
         *,
         exclude: str | None = None,
-        require_reasoning: bool = False,
         min_context: int | None = None,
     ) -> Selection:
         """Pick a model, relaxing constraints in a fixed order until one fits."""
-        required_context = max(self._required_context(signals), min_context or 0)
-        required_output = self._output_requirement(signals)
+        required_context = max(self._required_context(facts), min_context or 0)
+        required_output = self._output_requirement(facts)
         tier_pool = self._tier_pool(tier, catalog)
         pools: list[tuple[list[ModelProfile], bool]] = []
         if tier_pool:
             pools.append((tier_pool, False))
         pools.append((list(catalog.profiles), True))
 
-        steps: list[tuple[bool, bool, int, int | None]] = []
-        if require_reasoning:
-            steps.extend(
-                (
-                    (True, True, required_context, required_output),
-                    (True, True, required_context, None),
-                    (True, True, 0, None),
-                )
-            )
-        steps.extend(
-            (
-                (False, True, required_context, required_output),
-                (False, True, required_context, None),
-                (False, True, 0, None),
-                (False, False, 0, None),
-            )
-        )
+        steps: list[tuple[bool, int, int | None]] = [
+            (True, required_context, required_output),
+            (True, required_context, None),
+            (True, 0, None),
+            (False, 0, None),
+        ]
 
-        for reasoning, capability_strict, context, output in steps:
+        for capability_strict, context, output in steps:
             for pool, widened in pools:
                 candidates = [
                     profile
                     for profile in pool
                     if (exclude is None or profile.name != exclude)
-                    and (not reasoning or profile.capabilities.reasoning)
-                    and (not capability_strict or self._capable(profile, signals))
+                    and (not capability_strict or self._capable(profile, facts))
                     and profile.fits_context(context)
                     and (output is None or profile.fits_output(output))
                 ]
                 if candidates:
                     return Selection(
-                        profile=self._order(candidates, signals)[0],
+                        profile=self._order(candidates, facts)[0],
                         tier=tier,
                         relaxed=widened,
                     )
@@ -440,20 +379,20 @@ class PolicyStrategy:
             if exclude is None or profile.name != exclude
         ]
         return Selection(
-            profile=self._order(fallback or list(catalog.profiles), signals)[0],
+            profile=self._order(fallback or list(catalog.profiles), facts)[0],
             tier=tier,
             relaxed=True,
         )
 
     def _order(
-        self, candidates: list[ModelProfile], signals: RequestSignals
+        self, candidates: list[ModelProfile], facts: RequestFacts
     ) -> list[ModelProfile]:
         """Rank the candidate models with this strategy's selection rule."""
         selection = self.policy.selection
-        output_tokens = self._output_requirement(signals)
+        output_tokens = self._output_requirement(facts)
         costs = {
             profile.name: profile.estimated_cost(
-                signals.conversation_tokens, output_tokens
+                facts.conversation_tokens, output_tokens
             )
             for profile in candidates
         }
@@ -499,11 +438,11 @@ class PolicyStrategy:
             return math.inf
         return profile.max_output_tokens
 
-    def _capable(self, profile: ModelProfile, signals: RequestSignals) -> bool:
+    def _capable(self, profile: ModelProfile, facts: RequestFacts) -> bool:
         return profile.supports(
-            tools=signals.needs_tools,
-            vision=signals.needs_vision,
-            json_mode=signals.needs_json,
+            tools=facts.needs_tools,
+            vision=facts.needs_vision,
+            json_mode=facts.needs_json,
         )
 
     def _over_pressure(self, profile: ModelProfile, required_tokens: int) -> bool:
@@ -512,13 +451,13 @@ class PolicyStrategy:
         ratio = self.policy.budget.context_pressure_ratio
         return required_tokens > profile.context_window * ratio
 
-    def _output_requirement(self, signals: RequestSignals) -> int:
-        if signals.requested_max_tokens is not None:
-            return max(signals.requested_max_tokens, 1)
+    def _output_requirement(self, facts: RequestFacts) -> int:
+        if facts.requested_max_tokens is not None:
+            return max(facts.requested_max_tokens, 1)
         return DEFAULT_OUTPUT_TOKENS
 
-    def _required_context(self, signals: RequestSignals) -> int:
-        return signals.conversation_tokens + self._output_requirement(signals)
+    def _required_context(self, facts: RequestFacts) -> int:
+        return facts.conversation_tokens + self._output_requirement(facts)
 
     # Tier labels
 
@@ -535,20 +474,11 @@ class PolicyStrategy:
                 return tier
         return fallback
 
-    def _signal_label(self, signals: RequestSignals) -> str:
-        """Map local score to this strategy's labels, with marker promotion."""
-        override = signals.route_label
-        if override in self.policy.labels:
-            return override
-        if self.policy.tier_models and signals.tier in self.policy.labels:
-            return signals.tier
-        if signals.markers:
-            return next(reversed(self.policy.labels))
-        chosen = next(iter(self.policy.labels))
-        for name, route in self.policy.labels.items():
-            if signals.score >= route.score:
-                chosen = name
-        return chosen
+    def _request_label(self, facts: RequestFacts) -> str:
+        """Use a decision-provider label or the first configured label."""
+        if facts.route_label in self.policy.labels:
+            return facts.route_label
+        return next(iter(self.policy.labels))
 
     def _rank(self, tier: str) -> int:
         return list(self.policy.labels).index(tier)

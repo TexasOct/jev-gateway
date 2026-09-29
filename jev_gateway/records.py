@@ -267,7 +267,7 @@ class RequestMeta:
 
 @dataclass(frozen=True)
 class RequestRecord:
-    """One inbound request, with the signals the router extracted from it."""
+    """One inbound request, with its structural request facts."""
 
     request_id: str
     received_at: float
@@ -313,6 +313,7 @@ class DecisionRecord:
     reasoning_effort: str | None
     reasoning_effort_source: str
     candidates: tuple[str, ...]
+    # Retained to satisfy the legacy required SQLite column; new decisions write {}.
     signals: dict[str, Any]
     created_at: float
 
@@ -850,7 +851,6 @@ def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
             "reasoning_effort": row["reasoning_effort"],
             "reasoning_effort_source": row["reasoning_effort_source"],
             "candidates": _decoded_json(row["candidates_json"], []),
-            "signals": _decoded_json(row["signals_json"], {}),
             "created_at": row["decision_created_at"],
         }
     upstream = None

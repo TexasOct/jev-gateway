@@ -16,10 +16,10 @@ from jev_gateway.catalog import (
     catalog_from_document,
 )
 from jev_gateway.sessions import SessionState
-from jev_gateway.signals import extract_signals
+from jev_gateway.request_facts import extract_request_facts as extract_facts
 from jev_gateway.strategy import RoutingRequest
-from jev_gateway.decision_provider import DecisionClient
-from jev_gateway.decision_provider.base import DecisionResult
+from jev_gateway.strategy.decision_provider import DecisionClient
+from jev_gateway.strategy.decision_provider.base import DecisionResult
 from jev_gateway.strategy.classifier import DecisionClassifier, DecisionStrategy
 from tests.helpers import CATALOG_DOCUMENT, LARGE_MODEL_ID, SMALL_MODEL_ID
 
@@ -80,11 +80,10 @@ class FakeDecisionMaker:
 def test_classifier_accepts_settings_free_decision_maker() -> None:
     maker = FakeDecisionMaker()
     classifier = DecisionClassifier(maker)
-    signals = extract_signals([{"role": "user", "content": "hello"}])
-    refined = classifier.refine(signals)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    refined = classifier.refine(facts)
     assert maker.calls == 1
     assert refined.route_label == "complex"
-    assert refined.reasons[-1] == "decision:fake:complex"
     assert classifier.client.describe() == {"enabled": True, "providers": []}
 
 
@@ -99,14 +98,11 @@ def test_classifier_refines_the_tier(monkeypatch) -> None:
 
     monkeypatch.setattr(httpx, "post", post)
     classifier = DecisionClassifier(DecisionClient(settings(source())))
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
 
-    refined = classifier.refine(signals)
+    refined = classifier.refine(facts)
 
-    assert refined.tier == "complex"
-    assert refined.base_tier == "complex"
-    assert refined.score_tier == "complex"
-    assert refined.reasons[-1] == "decision:primary:complex"
+    assert refined.route_label == "complex"
     assert seen["url"] == "https://primary.example/systemone"
     assert seen["headers"] == {"Authorization": "Bearer key"}
     assert seen["timeout"] == 1.0
@@ -126,18 +122,18 @@ def test_classifier_falls_back_to_the_next_source(monkeypatch) -> None:
 
     monkeypatch.setattr(httpx, "post", post)
     classifier = DecisionClassifier(DecisionClient(settings(source(), source("secondary"))))
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
 
-    refined = classifier.refine(signals)
+    refined = classifier.refine(facts)
 
-    assert refined.tier == "standard"
+    assert refined.route_label == "standard"
     assert calls == [
         "https://primary.example/systemone",
         "https://secondary.example/systemone",
     ]
 
 
-def test_classifier_keeps_signals_when_every_source_fails(monkeypatch) -> None:
+def test_classifier_keeps_request_facts_when_every_provider_fails(monkeypatch) -> None:
     monkeypatch.setenv("TEST_PRIMARY_KEY", "key")
 
     def post(url: str, **kwargs: Any) -> httpx.Response:
@@ -146,9 +142,9 @@ def test_classifier_keeps_signals_when_every_source_fails(monkeypatch) -> None:
 
     monkeypatch.setattr(httpx, "post", post)
     classifier = DecisionClassifier(DecisionClient(settings(source())))
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
 
-    assert classifier.refine(signals) is signals
+    assert classifier.refine(facts) is facts
 
 
 def test_cached_decision_strategy_classifies_only_the_first_turn() -> None:
@@ -157,9 +153,9 @@ def test_cached_decision_strategy_classifies_only_the_first_turn() -> None:
             super().__init__(FakeDecisionMaker())
             self.calls = 0
 
-        def refine(self, signals):
+        def refine(self, facts):
             self.calls += 1
-            return replace(signals, tier="complex", base_tier="complex")
+            return replace(facts, route_label="complex")
 
     catalog = catalog_from_document(CATALOG_DOCUMENT, "test catalog")
     classifier = CountingClassifier()
@@ -175,11 +171,11 @@ def test_cached_decision_strategy_classifies_only_the_first_turn() -> None:
         ),
         classifier,
     )
-    first_signals = extract_signals([{"role": "user", "content": "hello"}])
+    first_facts = extract_facts([{"role": "user", "content": "hello"}])
 
     first = strategy.decide(
         RoutingRequest(
-            signals=first_signals,
+            facts=first_facts,
             session=None,
             manual=None,
             turn_index=1,
@@ -198,7 +194,7 @@ def test_cached_decision_strategy_classifies_only_the_first_turn() -> None:
     )
     second = strategy.decide(
         RoutingRequest(
-            signals=extract_signals([{"role": "user", "content": "next"}]),
+            facts=extract_facts([{"role": "user", "content": "next"}]),
             session=session,
             manual=None,
             turn_index=2,
@@ -222,6 +218,6 @@ def test_classifier_rejects_a_non_object_response(monkeypatch) -> None:
 
     monkeypatch.setattr(httpx, "post", post)
     classifier = DecisionClassifier(DecisionClient(settings(source())))
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
 
-    assert classifier.refine(signals) is signals
+    assert classifier.refine(facts) is facts

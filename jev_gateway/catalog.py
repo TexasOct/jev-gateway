@@ -28,7 +28,6 @@ from jev_gateway.reasoning import (
     policy_effort,
 )
 from jev_gateway.records import StorageSettings
-from jev_gateway.signals import ScoringPolicy
 
 __all__ = [
     "GATEWAY_SESSION_STRATEGIES",
@@ -50,8 +49,6 @@ __all__ = [
     "RouteLabel",
     "RoutingMode",
     "RoutingPolicy",
-    "ScoringPolicy",
-    "SignalsSettings",
     "StrategyDefinition",
     "catalog_from_document",
     "decision_from_dict",
@@ -59,8 +56,6 @@ __all__ = [
     "policy_from_dict",
     "profile_from_dict",
     "provider_from_dict",
-    "scoring_from_dict",
-    "signals_from_dict",
     "storage_from_dict",
 ]
 
@@ -215,16 +210,10 @@ class ModelProfile:
 
 @dataclass(frozen=True)
 class EscalationPolicy:
-    """Thresholds that turn a conversation signal into a tier change."""
+    """Thresholds for changing routes after upstream outcomes."""
 
     max_consecutive_failures: int = 2
     max_consecutive_truncations: int = 2
-    min_turns_before_escalation: int = 1
-    escalate_on_user_correction: bool = True
-    escalate_on_reasoning_request: bool = True
-    escalate_on_complexity_spike: bool = True
-    deescalate_when_settled: bool = True
-    settle_window: int = 3
 
 
 @dataclass(frozen=True)
@@ -261,26 +250,6 @@ class BudgetPolicy:
 
     max_cost_per_session_usd: float | None = None
     context_pressure_ratio: float = 0.75
-
-
-@dataclass(frozen=True)
-class SignalsSettings:
-    """Document-level defaults for the request signal extractor.
-
-    These values seed every strategy in the document. A strategy that declares the
-    same key inside its own ``policy.scoring`` keeps its own value, so this block
-    supplies the default and the strategy keeps the final say.
-    """
-
-    patterns_enabled: bool | None = None
-    intent_patterns_enabled: bool | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        """Serialize the signal defaults for the policy endpoint."""
-        return {
-            "patterns_enabled": self.patterns_enabled,
-            "intent_patterns_enabled": self.intent_patterns_enabled,
-        }
 
 
 @dataclass(frozen=True)
@@ -355,9 +324,8 @@ class DecisionSettings:
 
 @dataclass(frozen=True)
 class RouteLabel:
-    """One ordered score boundary and its model selector."""
+    """One ordered routing label and its model selector."""
 
-    score: float
     models: tuple[str, ...] = ()
     tag: str | None = None
     description: str = ""
@@ -365,7 +333,6 @@ class RouteLabel:
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "score": self.score,
             "description": self.description,
         }
         if self.models:
@@ -397,8 +364,6 @@ class ReasoningPolicy:
         default_factory=lambda: {"simple": "low", "standard": "medium", "complex": "high"}
     )
     effort_by_label: Mapping[str, str] = field(default_factory=dict)
-    on_reasoning_request: str | None = "high"
-    on_user_correction: str | None = "high"
     fallback: str = "medium"
 
     def as_dict(self) -> dict[str, Any]:
@@ -407,8 +372,6 @@ class ReasoningPolicy:
             "mode": self.mode,
             "effort_by_label": dict(self.effort_by_label),
             "effort_by_tier": dict(self.effort_by_tier),
-            "on_reasoning_request": self.on_reasoning_request,
-            "on_user_correction": self.on_user_correction,
             "fallback": self.fallback,
         }
 
@@ -423,7 +386,6 @@ class RoutingPolicy:
         default_factory=lambda: dict(DEFAULT_TIER_ROUTES)
     )
     labels: dict[str, RouteLabel] = field(default_factory=dict)
-    scoring: ScoringPolicy = field(default_factory=ScoringPolicy)
     escalation: EscalationPolicy = field(default_factory=EscalationPolicy)
     hysteresis: HysteresisPolicy = field(default_factory=HysteresisPolicy)
     pin: PinPolicy = field(default_factory=PinPolicy)
@@ -440,26 +402,11 @@ class RoutingPolicy:
             "mode": self.mode.value,
             "selection": self.selection,
             "labels": {name: label.as_dict() for name, label in self.labels.items()},
-            "scoring": self.scoring.as_dict(),
             "escalation": {
                 "max_consecutive_failures": self.escalation.max_consecutive_failures,
                 "max_consecutive_truncations": (
                     self.escalation.max_consecutive_truncations
                 ),
-                "min_turns_before_escalation": (
-                    self.escalation.min_turns_before_escalation
-                ),
-                "escalate_on_user_correction": (
-                    self.escalation.escalate_on_user_correction
-                ),
-                "escalate_on_reasoning_request": (
-                    self.escalation.escalate_on_reasoning_request
-                ),
-                "escalate_on_complexity_spike": (
-                    self.escalation.escalate_on_complexity_spike
-                ),
-                "deescalate_when_settled": self.escalation.deescalate_when_settled,
-                "settle_window": self.escalation.settle_window,
             },
             "hysteresis": {
                 "min_turns_between_switches": (
@@ -560,7 +507,6 @@ class Catalog:
     default_strategy: str = "task_aware"
     storage: StorageSettings = field(default_factory=StorageSettings)
     decision: DecisionSettings = field(default_factory=DecisionSettings)
-    signals: SignalsSettings = field(default_factory=SignalsSettings)
 
     def by_name(self, name: str | None) -> ModelProfile | None:
         """Look up a model by its provider-qualified catalog id."""
@@ -655,7 +601,6 @@ class Catalog:
             "policy": self.policy.as_dict(),
             "default_strategy": self.default_strategy,
             "strategies": [definition.as_dict() for definition in self.strategies],
-            "signals": self.signals.as_dict(),
             "storage": self.storage.as_dict(),
             "decision": self.decision.as_dict(),
             "providers": [provider.as_dict() for provider in self.providers],
@@ -677,15 +622,9 @@ def _validate_policy(
     if not policy.labels:
         raise ValueError(f"{label} labels must be a non-empty object.")
     model_names = {profile.name for profile in profiles}
-    previous = -1.0
     for name, route in policy.labels.items():
         if not isinstance(name, str) or not name.strip():
             raise ValueError(f"{label} labels must have non-empty names.")
-        if not 0 <= route.score <= 1 or route.score <= previous:
-            raise ValueError(
-                f"{label} labels[{name!r}].score must increase within [0, 1]."
-            )
-        previous = route.score
         unknown_models = [model for model in route.models if model not in model_names]
         if unknown_models:
             raise ValueError(
@@ -703,8 +642,6 @@ def _validate_policy(
                 f"{label} labels[{name!r}] resolves tag {tag!r}, but no model "
                 "declares that tag."
             )
-    if next(iter(policy.labels.values())).score != 0:
-        raise ValueError(f"{label} first label score must be 0.")
     if not isinstance(policy.mode, RoutingMode):
         raise TypeError(
             f"{label} mode {policy.mode!r} is unknown. "
@@ -971,111 +908,6 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
     )
 
 
-SCORING_FLOAT_FIELDS = (
-    "marker_weight",
-    "additional_marker_weight",
-    "max_additional_marker_weight",
-    "reasoning_weight",
-    "multi_step_weight",
-    "long_output_weight",
-    "tools_weight",
-    "vision_weight",
-    "code_weight",
-    "long_prompt_weight",
-    "very_long_prompt_weight",
-    "turn_depth_weight",
-    "max_turn_depth_weight",
-    "correction_weight",
-)
-SCORING_INT_FIELDS = ("long_prompt_chars", "very_long_prompt_chars")
-SCORING_THRESHOLD_FIELDS = ("standard_threshold", "complex_threshold")
-
-
-def scoring_from_dict(
-    value: Any, source: str, *, base: ScoringPolicy | None = None
-) -> ScoringPolicy:
-    """Build scoring rules, inheriting unspecified values from ``base``."""
-    if value is None:
-        return base or ScoringPolicy()
-    if not isinstance(value, dict):
-        raise TypeError(f"{source} policy scoring must be an object.")
-
-    known = {
-        "markers",
-        "patterns_enabled",
-        "intent_patterns_enabled",
-        *SCORING_FLOAT_FIELDS,
-        *SCORING_INT_FIELDS,
-        *SCORING_THRESHOLD_FIELDS,
-    }
-    unknown = set(value) - known
-    if unknown:
-        raise ValueError(
-            f"{source} policy scoring has unknown keys: {', '.join(sorted(unknown))}."
-        )
-
-    overrides: dict[str, Any] = {}
-    for name in (*SCORING_FLOAT_FIELDS, *SCORING_THRESHOLD_FIELDS):
-        if name in value:
-            overrides[name] = _document_float(value[name], f"{source} scoring.{name}")
-    for name in SCORING_INT_FIELDS:
-        if name in value:
-            overrides[name] = _document_int(value[name], f"{source} scoring.{name}")
-    if "markers" in value:
-        markers_value = value["markers"]
-        if not isinstance(markers_value, list):
-            raise TypeError(f"{source} scoring.markers must be a list.")
-        overrides["markers"] = tuple(str(marker) for marker in markers_value)
-    if "patterns_enabled" in value:
-        overrides["patterns_enabled"] = _document_bool(
-            value["patterns_enabled"], f"{source} scoring.patterns_enabled"
-        )
-    if "intent_patterns_enabled" in value:
-        # Tri-state, unlike the flags around it: `null` means "follow
-        # patterns_enabled", which is what keeps an unset catalog unchanged.
-        intent_value = value["intent_patterns_enabled"]
-        overrides["intent_patterns_enabled"] = (
-            None
-            if intent_value is None
-            else _document_bool(
-                intent_value, f"{source} scoring.intent_patterns_enabled"
-            )
-        )
-
-    scoring = replace(base or ScoringPolicy(), **overrides)
-    if scoring.complex_threshold < scoring.standard_threshold:
-        raise ValueError(
-            f"{source} scoring.complex_threshold must not be below "
-            "scoring.standard_threshold."
-        )
-    return scoring
-
-
-def _scoring_with_document_default(
-    value: Any,
-    source: str,
-    patterns_default: bool | None,
-    intent_default: bool | None = None,
-    *,
-    base: ScoringPolicy | None = None,
-) -> ScoringPolicy:
-    """Apply the document-level signal defaults to one policy's scoring rules.
-
-    A strategy that declares the key itself keeps its own value, so the document
-    block only supplies the default.
-    """
-    scoring = scoring_from_dict(value, source, base=base)
-    declared = value if isinstance(value, dict) else {}
-    if "patterns_enabled" not in declared and patterns_default is not None:
-        scoring = replace(scoring, patterns_enabled=patterns_default)
-    # An explicit null counts as "no opinion" rather than as an override, so a
-    # strategy that writes null inherits the document default like any other
-    # strategy instead of silently resetting to `follow patterns_enabled`.
-    if declared.get("intent_patterns_enabled") is None and intent_default is not None:
-        scoring = replace(scoring, intent_patterns_enabled=intent_default)
-    return scoring
-
-
 def reasoning_from_dict(
     value: Any,
     source: str,
@@ -1092,8 +924,6 @@ def reasoning_from_dict(
         "mode",
         "effort_by_tier",
         "effort_by_label",
-        "on_reasoning_request",
-        "on_user_correction",
         "fallback",
     }
     unknown = set(value) - known
@@ -1129,23 +959,9 @@ def reasoning_from_dict(
             f"{', '.join(sorted(unknown_tiers))}. Expected some of: "
             f"{', '.join(TIER_ORDER)}."
         )
-    return ReasoningPolicy(
-        mode=mode,
-        effort_by_tier=by_tier,
-        effort_by_label=by_label,
-        on_reasoning_request=optional_policy_effort(
-            value.get("on_reasoning_request", default_policy.on_reasoning_request),
-            f"{source} policy reasoning.on_reasoning_request",
-        ),
-        on_user_correction=optional_policy_effort(
-            value.get("on_user_correction", default_policy.on_user_correction),
-            f"{source} policy reasoning.on_user_correction",
-        ),
-        fallback=policy_effort(
-            value.get("fallback", default_policy.fallback),
-            f"{source} policy reasoning.fallback",
-        ),
-    )
+    return ReasoningPolicy(mode=mode, effort_by_tier=by_tier, effort_by_label=by_label,
+                           fallback=policy_effort(value.get("fallback", default_policy.fallback),
+                                                  f"{source} policy reasoning.fallback"))
 
 
 def _legacy_labels(routes: dict[str, tuple[str, ...]], source: str) -> dict[str, RouteLabel]:
@@ -1154,34 +970,24 @@ def _legacy_labels(routes: dict[str, tuple[str, ...]], source: str) -> dict[str,
         extra = set(routes) - set(TIER_ORDER)
         raise ValueError(f"{source} tier_models has missing tiers or unknown tiers: "
                          f"{', '.join(sorted(missing | extra))}.")
-    return {
-        name: RouteLabel(
-            score=score,
-            models=routes[name],
-            description=description,
-        )
-        for name, score, description in zip(
-            TIER_ORDER, (0.0, 0.35, 0.65),
-            ("Direct bounded work", "Multi-step work", "Deep analysis or architecture"),
-            strict=True,
-        )
-    }
+    descriptions = ("Direct bounded work", "Multi-step work", "Deep analysis or architecture")
+    return {name: RouteLabel(models=routes[name], description=description)
+            for name, description in zip(TIER_ORDER, descriptions, strict=True)}
 
 
 def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
     if not isinstance(value, dict) or not value:
         raise ValueError(f"{source} policy labels must be a non-empty object.")
     labels: dict[str, RouteLabel] = {}
-    previous = -1.0
     for name, raw in value.items():
         subject = f"{source} policy labels[{name!r}]"
         if not isinstance(name, str) or not name.strip():
             raise ValueError(f"{source} policy label names must be non-empty strings.")
         if not isinstance(raw, dict) or set(raw) - {
-            "models", "tag", "score", "description", "reasoning_effort"
+            "models", "tag", "description", "reasoning_effort"
         }:
             raise ValueError(
-                f"{subject} must contain only models, tag, score, description, "
+                f"{subject} must contain only models, tag, description, "
                 "reasoning_effort."
             )
         if "models" in raw and "tag" in raw:
@@ -1203,23 +1009,16 @@ def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
             or "//" in clean_tag
         ):
             raise ValueError(f"{subject}.tag must use non-empty '/' segments.")
-        score = raw.get("score")
-        if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1 or score <= previous:
-            raise ValueError(f"{subject}.score must increase within [0, 1].")
-        previous = score
         description = raw.get("description", "")
         if not isinstance(description, str):
             raise TypeError(f"{subject}.description must be text.")
         effort = optional_policy_effort(raw.get("reasoning_effort"), f"{subject}.reasoning_effort")
         labels[name] = RouteLabel(
-            score=score,
             models=tuple(models),
             tag=clean_tag,
             description=description,
             reasoning_effort=effort,
         )
-    if next(iter(labels.values())).score != 0:
-        raise ValueError(f"{source} policy first label score must be 0.")
     return labels
 
 
@@ -1227,8 +1026,6 @@ def policy_from_dict(
     data: dict[str, Any],
     source: str,
     *,
-    patterns_default: bool | None = None,
-    intent_default: bool | None = None,
     base: RoutingPolicy | None = None,
     inherited_strategy: str = "task_aware",
 ) -> RoutingPolicy:
@@ -1240,7 +1037,6 @@ def policy_from_dict(
         "selection",
         "tier_models",
         "labels",
-        "scoring",
         "escalation",
         "hysteresis",
         "pin",
@@ -1270,12 +1066,6 @@ def policy_from_dict(
         "escalation": {
             "max_consecutive_failures",
             "max_consecutive_truncations",
-            "min_turns_before_escalation",
-            "escalate_on_user_correction",
-            "escalate_on_reasoning_request",
-            "escalate_on_complexity_spike",
-            "deescalate_when_settled",
-            "settle_window",
         },
         "hysteresis": {
             "min_turns_between_switches",
@@ -1288,8 +1078,6 @@ def policy_from_dict(
             "mode",
             "effort_by_tier",
             "effort_by_label",
-            "on_reasoning_request",
-            "on_user_correction",
             "fallback",
         },
     }
@@ -1366,13 +1154,6 @@ def policy_from_dict(
         selection=str(data.get("selection", default_policy.selection)),
         tier_models=tier_models,
         labels=labels,
-        scoring=_scoring_with_document_default(
-            data.get("scoring"),
-            source,
-            patterns_default,
-            intent_default,
-            base=default_policy.scoring,
-        ),
         escalation=replace(
             default_policy.escalation,
             **{
@@ -1489,7 +1270,7 @@ def decision_from_dict(value: Any, source: str) -> DecisionSettings:
         raise TypeError(f"{source} {label} {provider_key} must be a list.")
     providers: list[DecisionProvider] = []
     names: set[str] = set()
-    from jev_gateway.decision_provider import registered_protocols
+    from jev_gateway.strategy.decision_provider import registered_protocols
 
     for index, item in enumerate(raw_providers):
         subject = f"{source} {label} {provider_key}[{index}]"
@@ -1531,37 +1312,6 @@ def decision_from_dict(value: Any, source: str) -> DecisionSettings:
     if enabled and not providers:
         raise ValueError(f"{source} {label} enabled requires at least one provider.")
     return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers))
-
-
-def signals_from_dict(value: Any, source: str) -> SignalsSettings:
-    """Build the document-level request signal defaults."""
-    if value is None:
-        return SignalsSettings()
-    if not isinstance(value, dict):
-        raise TypeError(f"{source} signals must be an object.")
-    unknown = set(value) - {"patterns_enabled", "intent_patterns_enabled"}
-    if unknown:
-        raise ValueError(
-            f"{source} signals has unknown keys: {', '.join(sorted(unknown))}."
-        )
-    defaults = SignalsSettings(
-        patterns_enabled=(
-            _document_bool(
-                value["patterns_enabled"], f"{source} signals.patterns_enabled"
-            )
-            if "patterns_enabled" in value
-            else None
-        ),
-        intent_patterns_enabled=(
-            None
-            if value.get("intent_patterns_enabled") is None
-            else _document_bool(
-                value["intent_patterns_enabled"],
-                f"{source} signals.intent_patterns_enabled",
-            )
-        ),
-    )
-    return defaults
 
 
 def storage_from_dict(value: Any, source: str) -> StorageSettings:
@@ -1648,8 +1398,6 @@ def strategies_from_document(
     document: dict[str, Any],
     source: str,
     *,
-    patterns_default: bool | None = None,
-    intent_default: bool | None = None,
     base_policy: RoutingPolicy | None = None,
 ) -> tuple[tuple[StrategyDefinition, ...], str]:
     """Parse named model-routing strategies.
@@ -1733,8 +1481,6 @@ def strategies_from_document(
                 policy=policy_from_dict(
                     policy_value,
                     f"{source} {label}[{clean_name!r}]",
-                    patterns_default=patterns_default,
-                    intent_default=intent_default,
                     base=base_policy,
                     inherited_strategy=default_strategy,
                 ),
@@ -1761,7 +1507,6 @@ def _build_catalog(
     default_strategy: str,
     storage: StorageSettings,
     decision: DecisionSettings,
-    signals: SignalsSettings,
 ) -> Catalog:
     """Attach reusable provider connections to each concrete model."""
     provider_by_name = {provider.name: provider for provider in providers}
@@ -1789,7 +1534,6 @@ def _build_catalog(
         default_strategy=default_strategy,
         storage=storage,
         decision=decision,
-        signals=signals,
     )
     catalog.validate()
     return catalog
@@ -1799,8 +1543,10 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
     """Build a catalog from a parsed models.json document."""
     if not isinstance(document, dict):
         raise TypeError(f"{source} must contain a JSON object.")
-    if "jev" in document:
-        raise ValueError(f"{source} has unknown keys: jev.")
+    allowed = {"providers", "models", "policy", "strategies", "default_strategy", "gateway", "storage", "decision"}
+    unknown = set(document) - allowed
+    if unknown:
+        raise ValueError(f"{source} has unknown keys: {', '.join(sorted(unknown))}.")
     raw_providers = document.get("providers")
     if not isinstance(raw_providers, list):
         raise TypeError(f"{source} providers must be a list.")
@@ -1838,9 +1584,6 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         seen_names.add(profile.name)
         profiles.append(profile)
 
-    signals = signals_from_dict(document.get("signals"), source)
-    patterns_default = signals.patterns_enabled
-    intent_default = signals.intent_patterns_enabled
     strategies_value = document.get("strategies")
     policy_value = document.get("policy")
     if strategies_value is None:
@@ -1850,8 +1593,6 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
             policy_from_dict(
                 policy_value,
                 source,
-                patterns_default=patterns_default,
-                intent_default=intent_default,
             )
             if policy_value is not None
             else None
@@ -1859,8 +1600,6 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         definitions, default_strategy = strategies_from_document(
             document,
             source,
-            patterns_default=patterns_default,
-            intent_default=intent_default,
             base_policy=base_policy,
         )
         strategies = definitions
@@ -1884,7 +1623,6 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         default_strategy,
         storage_from_dict(document.get("storage"), source),
         decision_from_dict(document.get("decision"), source),
-        signals,
     )
 
 

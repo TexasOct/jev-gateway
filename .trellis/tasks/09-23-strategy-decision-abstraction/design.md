@@ -6,7 +6,7 @@
 `Protocol` for decision-backed strategies. Its `evaluate(state, questions,
 *, valid=None)` operation returns `DecisionResult | None`, where
 `DecisionResult` is the existing normalized, provider-neutral result type in
-`decision_provider/base.py`. It also exposes `enabled: bool` and
+`strategy/decision_provider/base.py`. It also exposes `enabled: bool` and
 `describe() -> dict[str, Any]`. Strategy implementations use only this contract,
 not `DecisionClient`, `DecisionSettings`, adapters, protocol names, credentials,
 or wire responses.
@@ -14,7 +14,10 @@ or wire responses.
 `DecisionClient` gains `enabled` and `describe()` by delegating to its settings.
 `describe()` returns the existing redacted `settings.as_dict()` shape. Failover,
 credential lookup, timeout, and per-provider answer validation stay inside
-`decision_provider/`, unchanged.
+`strategy/decision_provider/`, unchanged. The old
+`jev_gateway.decision_provider` path is removed without a compatibility shim.
+`catalog.py` must keep protocol registration lazy, and registry imports must not
+cause `strategy/__init__.py` to cycle back through catalog construction.
 
 `strategy/registry.py` is the sole strategy composition point. Its factories
 create `DecisionClient(catalog.decision)` and pass it to `DecisionClassifier` /
@@ -57,6 +60,32 @@ supply its own safe description. Question schema and answer checks stay owned
 by the classifier and the matrix strategy, and the `valid` callback still drives
 provider failover.
 
+## Signal removal
+
+Delete `jev_gateway/signals.py` and remove its local prompt-pattern detectors,
+scoring model, signal object, and exported configuration throughout the catalog
+parser, model definitions, API, docs, and tests. No scorer or intent-detector
+replacement is part of this task. Keep only request facts needed for decision
+provider prompts, capability/context/output constraints, session identity, and
+request recording. Do not expose a `signals` object in decision or preview
+responses. Keep the required SQLite `signals_json` column without a schema
+migration and persist `{}` for new decisions.
+
+Remove `policy.scoring`, top-level `signals`, label `score`, and escalation and
+reasoning switches that depend only on local prompt classifiers. Retain session,
+budget, upstream-outcome, capability, context, output, label, and decision-matrix
+configuration where it still has defined behavior. Delete reason paths that
+cannot fire after the local detectors are gone. Existing serialized historical
+evidence is not rewritten.
+
+## Provider package move
+
+Move `jev_gateway/decision_provider/` to
+`jev_gateway/strategy/decision_provider/` with no old-path shim. Avoid import
+cycles: keep the catalog's protocol-registry lookup lazy; import concrete client
+construction lazily at the registry composition seam; avoid runtime contract
+imports that initialize the strategy facade while catalog parsing is active.
+
 ## Catalog migration
 
 `catalog.py` accepts only the canonical top-level `decision` key. Remove the
@@ -74,13 +103,14 @@ translation.
 
 This is a breaking change for catalogs and Python callers that use the old
 names. The shipped catalog is updated in the same change, so the repository's
-own deployment is unaffected. Third-party catalogs declaring `kind: "jev"` or
-`kind: "jev_matrix"` must be updated; they now fail fast at startup with the
-unknown-kind error rather than routing differently. Catalogs with the legacy
-top-level `jev` key must replace it with `decision` (using `providers`,
-`default_provider`, and explicit `protocol`), or parsing fails as an unknown
-key. `JevSettings`, `JevSource`, `jev_from_dict`, `Catalog.jev`, and
-`DecisionSettings`' legacy accessors are gone.
+own deployment is unaffected. Third-party catalogs declaring kind `jev` or
+`jev_matrix` must be updated; they now fail at startup with the unknown-kind
+error. Catalogs with the legacy top-level `jev` key must replace it with
+`decision` using `providers`, `default_provider`, and explicit `protocol`, or
+parsing fails as an unknown key. Old signals/scoring keys fail strict catalog
+validation. Python imports under `jev_gateway.decision_provider` and
+`jev_gateway.signals` are removed. Existing historical decision records remain
+unchanged; new records keep `signals_json` empty.
 
 Rollback is a revert of the rename, the factory mapping, the shipped kind, and
 the docs. No persistent-data migration is involved, so a rollback needs no

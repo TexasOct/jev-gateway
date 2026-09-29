@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from jev_gateway.catalog import Catalog, StrategyDefinition
-from jev_gateway.decision_provider import DecisionClient
 
-from .contracts import RoutingStrategy, UnknownStrategyError
 from .classifier import DecisionClassifier, DecisionStrategy
+from .contracts import RoutingStrategy, UnknownStrategyError
+from .decision_provider import DecisionClient
 from .matrix import DecisionMatrixStrategy
 from .policy import PolicyStrategy
 

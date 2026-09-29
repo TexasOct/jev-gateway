@@ -73,31 +73,29 @@ class DecisionMatrixStrategy(PolicyStrategy):
                     reason = f"rule_{index + 1}"
                     break
 
-        tier = choice.get("label", self._signal_label(request.signals))
+        tier = choice.get("label", next(iter(self.policy.labels)))
         selection = choice.get("selection", self.policy.selection)
-        signals = request.signals
-        if tier != self._signal_label(signals):
-            signals = replace(signals, route_label=tier)
+        facts = request.facts
+        if tier != next(iter(self.policy.labels)):
+            facts = replace(facts, route_label=tier)
         policy = replace(self.policy, selection=selection)
         outcome = PolicyStrategy(self.name, policy, self.description).decide(
-            replace(request, signals=signals), catalog
+            replace(request, facts=facts), catalog
         )
         evidence = f"decision_matrix:{source or 'local'}:{reason}"
         return replace(outcome, reason=f"{evidence}:{outcome.reason}")
 
     @staticmethod
     def _state(request: RoutingRequest) -> dict[str, Any]:
-        signals = request.signals
+        facts = request.facts
         session = request.session
         return {
-            "prompt": signals.prompt,
-            "local_score": signals.score,
-            "local_tier": signals.tier,
-            "conversation_tokens": signals.conversation_tokens,
-            "requested_max_tokens": signals.requested_max_tokens,
-            "needs_tools": signals.needs_tools,
-            "needs_vision": signals.needs_vision,
-            "needs_json": signals.needs_json,
+            "prompt": facts.prompt,
+            "conversation_tokens": facts.conversation_tokens,
+            "requested_max_tokens": facts.requested_max_tokens,
+            "needs_tools": facts.needs_tools,
+            "needs_vision": facts.needs_vision,
+            "needs_json": facts.needs_json,
             "turn_index": request.turn_index,
             "session": None
             if session is None

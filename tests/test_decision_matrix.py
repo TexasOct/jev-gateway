@@ -10,9 +10,9 @@ import httpx
 import pytest
 
 from jev_gateway.catalog import catalog_from_document
-from jev_gateway.decision_provider.base import DecisionResult
+from jev_gateway.strategy.decision_provider.base import DecisionResult
 from jev_gateway.sessions import SessionState
-from jev_gateway.signals import extract_signals
+from jev_gateway.request_facts import extract_request_facts as extract_facts
 from jev_gateway.strategy import (
     DecisionMaker,
     DecisionMatrixStrategy,
@@ -82,8 +82,8 @@ def document() -> dict[str, Any]:
 def decide(config: dict[str, Any]):
     catalog = catalog_from_document(config, "test matrix")
     strategy = StrategyRegistry.from_catalog(catalog).resolve("matrix")
-    signals = extract_signals([{"role": "user", "content": "hello"}])
-    outcome = strategy.decide(RoutingRequest(signals, None, None, 1, 0.0), catalog)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    outcome = strategy.decide(RoutingRequest(facts, None, None, 1, 0.0), catalog)
     return outcome, strategy
 
 
@@ -112,8 +112,8 @@ def test_matrix_accepts_a_settings_free_decision_maker() -> None:
     strategy = DecisionMatrixStrategy(
         definition.name, definition.policy, maker, definition.options
     )
-    signals = extract_signals([{"role": "user", "content": "hello"}])
-    outcome = strategy.decide(RoutingRequest(signals, None, None, 1, 0.0), catalog)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    outcome = strategy.decide(RoutingRequest(facts, None, None, 1, 0.0), catalog)
 
     assert outcome.model == LARGE_MODEL_ID
     assert outcome.reason.startswith("decision_matrix:fake:rule_1:")
@@ -191,9 +191,9 @@ def test_matrix_respects_manual_model_without_calling_decision_provider(monkeypa
     monkeypatch.setattr(httpx, "post", post)
     catalog = catalog_from_document(document(), "manual matrix")
     strategy = StrategyRegistry.from_catalog(catalog).resolve("matrix")
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
     outcome = strategy.decide(
-        RoutingRequest(signals, None, catalog.by_name(LARGE_MODEL_ID), 1, 0.0), catalog
+        RoutingRequest(facts, None, catalog.by_name(LARGE_MODEL_ID), 1, 0.0), catalog
     )
     assert outcome.model == LARGE_MODEL_ID
     assert outcome.mode == "manual"
@@ -222,8 +222,8 @@ def test_matrix_cached_session_queries_once_and_honors_pin(monkeypatch) -> None:
     config["strategies"]["definitions"]["matrix"]["policy"]["mode"] = "cached"
     catalog = catalog_from_document(config, "cached matrix")
     strategy = StrategyRegistry.from_catalog(catalog).resolve("matrix")
-    signals = extract_signals([{"role": "user", "content": "hello"}])
-    first = strategy.decide(RoutingRequest(signals, None, None, 1, 0.0), catalog)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    first = strategy.decide(RoutingRequest(facts, None, None, 1, 0.0), catalog)
     session = SessionState(
         session_id="s",
         route=first.model,
@@ -233,7 +233,7 @@ def test_matrix_cached_session_queries_once_and_honors_pin(monkeypatch) -> None:
         updated_at=0.0,
         switched_at=0.0,
     )
-    second = strategy.decide(RoutingRequest(signals, session, None, 2, 1.0), catalog)
+    second = strategy.decide(RoutingRequest(facts, session, None, 2, 1.0), catalog)
     assert calls == 1
     assert first.model == second.model == LARGE_MODEL_ID
     assert second.reason == "session_pinned"
