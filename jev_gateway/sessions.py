@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from jev_gateway.signals import content_text
+from jev_gateway.request_facts import content_text
 
 __all__ = [
     "EVENT_LIMIT",
@@ -44,7 +44,6 @@ class SessionState:
     consecutive_failures: int = 0
     consecutive_truncations: int = 0
     cost_usd: float = 0.0
-    recent_scores: list[float] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     # Provider adapters may retain bounded, opaque continuation metadata for the
     # life of this session. It is deliberately excluded from inspection output.
@@ -70,7 +69,6 @@ class SessionState:
             "consecutive_failures": self.consecutive_failures,
             "consecutive_truncations": self.consecutive_truncations,
             "cost_usd": round(self.cost_usd, 6),
-            "recent_scores": [round(score, 4) for score in self.recent_scores],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "first_request_at": self.first_request_at,
@@ -150,7 +148,6 @@ class MemorySessionStore:
             if session is None:
                 return None
             snapshot = copy.copy(session)
-            snapshot.recent_scores = list(session.recent_scores)
             snapshot.events = [dict(event) for event in session.events]
             snapshot.adapter_state = {}
             return snapshot

@@ -69,7 +69,7 @@ def _decision(request_id: str, config_hash: str) -> DecisionRecord:
         reasoning_effort="low",
         reasoning_effort_source="derived",
         candidates=("provider/model",),
-        signals={"score": 0.1, "reasons": ["marker:test"]},
+        signals={},
         created_at=1001.0,
     )
 
@@ -112,11 +112,11 @@ def test_store_joins_request_decision_outcome_and_config(tmp_path: Path) -> None
         "assistant_continuations": 0,
     }
     with sqlite3.connect(path) as db:
-        route, strategy, ok, signals = db.execute(
+        route, strategy, ok, stored_signals = db.execute(
             "SELECT route, strategy, ok, signals_json FROM decision_evidence"
         ).fetchone()
         assert (route, strategy, ok) == ("provider/model", "quality", 1)
-        assert json.loads(signals)["reasons"] == ["marker:test"]
+        assert json.loads(stored_signals) == {}
         assert db.execute("SELECT prompt FROM requests").fetchone()[0] == "secret prompt"
         assert db.execute("SELECT catalog_json FROM config_versions").fetchone()[0]
     store.close()
@@ -398,7 +398,7 @@ def test_session_evidence_replaces_invalid_stored_json_with_safe_values(
 
     assert rows[0]["request"]["messages"] is None
     assert rows[0]["decision"]["candidates"] == []
-    assert rows[0]["decision"]["signals"] == {}
+    assert "signals" not in rows[0]["decision"]
     assert rows[0]["upstream_request"]["payload"] == {}
     store.close()
 

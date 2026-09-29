@@ -8,7 +8,7 @@ JEV separates provider transport from concrete model metadata.
 | --- | --- | --- |
 | Provider | `provider.id` | LiteLLM `type` and its transport parameters |
 | Model | `provider/upstream_model` | Capabilities, context and output limits, quality, priority, cost, and scoped tags |
-| Label | `policy.labels[label]` | Score boundary, decision description, and the tag that selects eligible models |
+| Label | `policy.labels[label]` | Decision description and the tag that selects eligible models |
 
 `provider/upstream_model` is the canonical model ID. JEV rejects a bare
 upstream model name for manual selection because multiple providers may expose
@@ -47,8 +47,8 @@ the same model label.
   ],
   "policy": {
     "labels": {
-      "quick": {"score": 0, "description": "Bounded work"},
-      "deep": {"score": 0.65, "description": "Deep analysis"}
+      "quick": {"description": "Bounded work"},
+      "deep": {"description": "Deep analysis"}
     }
   }
 }
@@ -70,7 +70,7 @@ matches no model, malformed tags, and literal `api_key` fields.
 
 ## Selection
 
-The strategy maps the local score to its ordered `labels` (markers select the last label). It starts with models carrying that label's scoped tag. It filters
+The decision provider may select a configured label. Without a provider result, the first configured label is the stable fallback. It starts with models carrying that label's scoped tag. It filters
 models by required tools, vision, JSON mode, reasoning, context capacity, and
 output capacity. The remaining models are ranked by `policy.selection`:
 
@@ -104,22 +104,7 @@ while it is still comparing candidates. The strategy contract therefore does not
 change: `StrategyOutcome` still returns a model, and a custom strategy gets a
 sensible level for whichever model it picked without doing anything.
 
-The order is `on_user_correction`, `on_reasoning_request`, `labels.*.reasoning_effort` or `effort_by_label[label]`,
-then `fallback`, clamped into the ladder by walking up first and then down. The
-label is the one the router committed to, not the locally scored one: the two
-differ whenever a classifier refines the label inside a strategy or a pinned
-session keeps an earlier one. Using the committed label keeps the level from
-contradicting the `X-JEV-Route-Label` (`X-JEV-Task-Type` remains an alias) the client is told. A model that declares no
-ladder is left alone entirely: no field is sent and nothing is overridden, which
-keeps a catalog that has not opted in byte-identical to one without this feature.
-
-The two text triggers, `on_reasoning_request` and `on_user_correction`, read the
-request-intent detectors. `signals.intent_patterns_enabled` controls those
-separately from the scoring patterns and defaults to following
-`patterns_enabled`, so keeping scoring patterns off while leaving intent
-detection on is a supported combination: the detectors feed both the escalation
-and the effort triggers without moving the tier, because their score weights stay
-behind `patterns_enabled`.
+The engine derives effort from the committed routing label using the configured label mapping or fallback, then clamps it into the selected model's ladder. The committed label is also what the client sees in `X-JEV-Route-Label` (`X-JEV-Task-Type` remains an alias). A model with no declared ladder is left alone.
 
 `policy.reasoning.mode` decides what happens to a level the client sent itself.
 `override` replaces it, `cap` lowers but never raises it, `fill` speaks only when
@@ -136,8 +121,8 @@ has a model:
 | --- | --- |
 | `sticky` (default) | Hold the first turn's model until a reason listed in `policy.pin.break_on` releases it |
 | `cached` | As `sticky`, but a decision-backed strategy classifies only the first turn of a live session and reuses its stored tier and model afterward |
-| `escalate` | Follow hard requirements and escalation signals, and never lower the tier on complexity alone |
-| `adaptive` | As `escalate`, and return to a lower tier once `escalation.settle_window` turns score below `scoring.standard_threshold` |
+| `escalate` | Follow hard requirements and upstream outcome escalation; prompt wording does not change the label |
+| `adaptive` | As `escalate`, with supported budget-based adjustment |
 | `fresh` | Re-run selection every turn, ignoring the session's model |
 
 The default pin keeps a conversation on one model, so it does not lose the
@@ -162,17 +147,12 @@ in `pin.break_on` release the pin:
 | `output_limit` | The requested output exceeds the pinned model's output cap |
 | `upstream_failures` | `escalation.max_consecutive_failures` upstream errors accumulated |
 | `output_truncated` | `escalation.max_consecutive_truncations` responses stopped at the output cap |
-| `user_correction` | The user corrected the previous answer |
-| `reasoning_required` | The prompt asks for step-by-step reasoning the pinned model cannot do |
-| `complexity_spike` | The inferred tier rose above the session's tier |
 | `budget_pressure` | `budget.max_cost_per_session_usd` was reached |
-| `complexity_settled` | `adaptive` only: recent scores fell below the standard threshold |
 
 The default lists the first three because holding them back would send a request
-the pinned model cannot serve. The rest are escalation signals, so listing one
-lets a quality or cost change end the pin as well. An unlisted reason leaves the
+the pinned model cannot serve. Other retained outcome or budget reasons may be listed to end the pin. An unlisted reason leaves the
 session on its model, the decision reports `session_pinned`, and the pin stays.
-`mode: "escalate"` restores switch-on-signal behavior for a strategy that should
+`mode: "escalate"` enables outcome-based switching for a strategy that should
 not pin.
 
 ## Strategies
@@ -193,16 +173,16 @@ object may define any number of sibling model-routing strategies:
       "mode": "cached",
       "selection": "quality_first",
       "labels": {
-        "routine": {"score": 0, "description": "Routine answers"},
-        "critical": {"score": 0.65, "description": "Critical work"}
+        "routine": {"description": "Routine answers"},
+        "critical": {"description": "Critical work"}
       }
     },
     "economy": {
       "mode": "cached",
       "selection": "cheapest_adequate",
       "labels": {
-        "budget": {"score": 0, "description": "Bounded work"},
-        "extended": {"score": 0.35, "description": "Extended work"}
+        "budget": {"description": "Bounded work"},
+        "extended": {"description": "Extended work"}
       }
     }
   }
@@ -273,7 +253,7 @@ The strategy implementations depend only on the `DecisionMaker` protocol:
 `evaluate(state, questions, valid=...)`, `enabled`, and `describe()`. Only
 `strategy/registry.py` constructs a concrete `DecisionClient`; its typed answers
 are normalized before either strategy reads them. `DecisionClassifier` records
-`decision:<provider>:<label>` in signal reasons, and `DecisionMatrixStrategy`
+`decision:<provider>:<label>` as classifier evidence, and `DecisionMatrixStrategy`
 records `decision_matrix:<provider|local>:<rule_N|default|fallback>` in routing
 reasons. These replace the former `jev:` and `jev_matrix:` prefixes, including
 in stored evidence and `X-JEV-Reason` values. The header name does not change.
@@ -390,7 +370,7 @@ The optional top-level `storage` object configures a SQLite store:
 ```
 
 When enabled, the gateway queues an inbound request, a decision with its
-signals and candidate evidence, a sanitized copy of the final LiteLLM request,
+request facts and candidate evidence, a sanitized copy of the final LiteLLM request,
 and the upstream outcome. The LiteLLM record is created after provider message
 preparation and reasoning-effort selection, immediately before the upstream
 call, so failed calls retain the submitted request evidence. Resolved API keys,
@@ -436,7 +416,7 @@ error messages from earlier gateway versions; no migration scrubs those rows.
 
 `queue_size` defaults to 4096. `max_requests: null` keeps every request; set a
 number only if you explicitly want to prune old evidence. `capture_content:
-false` keeps the prompt digest, character counts, extracted signals, models,
+false` keeps the prompt digest, character counts, structural request facts, models,
 timing, and safe structural metadata. It drops inbound prompt and message
 content and replaces content-bearing LiteLLM fields with omission descriptors.
 SQLite initialization runs in the writer thread at startup; the process waits
@@ -494,3 +474,7 @@ All `storage` fields require a restart, including retention, capture, and queue
 settings; reload rejects changes with `400 restart_required`. Gateway host, port,
 and logging settings also require a restart. See the [HTTP API reference](http-api.md)
 for reload responses and failure codes.
+
+## Breaking changes: local prompt classification removed
+
+The local prompt detectors and scoring system are removed, with no replacement scorer. Catalogs must remove top-level `signals`, `policy.scoring`, label `score`, and the prompt-intent escalation and reasoning fields; the strict parser rejects them. Prompt text remains available to decision providers, while tool, vision, JSON, context, output, session, and inbound-recording facts remain structural inputs. Decision and preview responses no longer include `signals`. The required SQLite `signals_json` column remains unchanged and stores `{}` for new decisions.

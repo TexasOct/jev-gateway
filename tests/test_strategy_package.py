@@ -7,7 +7,7 @@ import copy
 import pytest
 
 from jev_gateway.catalog import Catalog, StrategyDefinition, catalog_from_document
-from jev_gateway.signals import ScoringPolicy, extract_signals
+from jev_gateway.request_facts import extract_request_facts
 from jev_gateway.strategy import (
     DecisionClassifier,
     DecisionMaker,
@@ -98,10 +98,6 @@ class FirstModelStrategy:
         self.description = definition.description
         self._policy = definition.policy
 
-    @property
-    def scoring(self) -> ScoringPolicy:
-        return self._policy.scoring
-
     def describe(self) -> dict[str, object]:
         return {
             "name": self.name,
@@ -129,10 +125,7 @@ def test_registry_accepts_an_independent_strategy_factory() -> None:
     strategy = registry.resolve("custom")
     outcome = strategy.decide(
         RoutingRequest(
-            signals=extract_signals(
-                [{"role": "user", "content": "hello"}],
-                scoring=strategy.scoring,
-            ),
+            facts=extract_request_facts([{"role": "user", "content": "hello"}]),
             session=None,
             manual=None,
             turn_index=1,

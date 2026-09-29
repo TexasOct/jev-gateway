@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from jev_gateway.catalog import Catalog, ModelProfile
-from jev_gateway.decision_provider.base import DecisionResult
+from jev_gateway.request_facts import RequestFacts
 from jev_gateway.sessions import SessionState
-from jev_gateway.signals import RequestSignals, ScoringPolicy
+from jev_gateway.strategy.decision_provider.base import DecisionResult
 
 __all__ = [
     "DecisionMaker",
@@ -58,7 +58,7 @@ class StrategyContractError(RuntimeError):
 class RoutingRequest:
     """Every input a strategy may read. Nothing else is passed to it."""
 
-    signals: RequestSignals
+    facts: RequestFacts
     session: SessionState | None
     manual: ModelProfile | None
     turn_index: int
@@ -96,11 +96,6 @@ class RoutingStrategy(Protocol):
 
     name: str
     description: str | None
-
-    @property
-    def scoring(self) -> ScoringPolicy:
-        """Return the complexity scoring rules this strategy applies."""
-        raise AssertionError("RoutingStrategy is a protocol, not an implementation.")
 
     def describe(self) -> dict[str, Any]:
         """Return this strategy's configuration for inspection endpoints."""

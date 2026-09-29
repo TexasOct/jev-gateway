@@ -20,10 +20,6 @@
       }
     ]
   },
-  "signals": {
-    "patterns_enabled": false,
-    "intent_patterns_enabled": true
-  },
   "strategies": {
     "task_aware": {
       "kind": "decision_matrix",
@@ -158,27 +154,22 @@
       },
       "labels": {
         "draft": {
-          "score": 0,
           "description": "Research, documentation, bounded edits, and quick coding passes",
           "reasoning_effort": "low"
         },
         "review": {
-          "score": 0.25,
           "description": "Exacting research, documentation, and bounded edits",
           "reasoning_effort": "medium"
         },
         "craft": {
-          "score": 0.45,
           "description": "Shippable small and mid-sized coding",
           "reasoning_effort": "medium"
         },
         "engineering": {
-          "score": 0.65,
           "description": "Large coding and reverse engineering",
           "reasoning_effort": "high"
         },
         "ultra": {
-          "score": 0.85,
           "description": "Cross-domain ultra-complex work reserved for the top tier",
           "reasoning_effort": "xhigh"
         }
@@ -189,17 +180,14 @@
       "selection": "quality_first",
       "labels": {
         "routine": {
-          "score": 0,
           "description": "Routine answers",
           "reasoning_effort": "low"
         },
         "analysis": {
-          "score": 0.35,
           "description": "Multi-step analysis",
           "reasoning_effort": "medium"
         },
         "critical": {
-          "score": 0.65,
           "description": "Critical architecture and audits",
           "reasoning_effort": "high"
         }
@@ -210,17 +198,14 @@
       "selection": "cheapest_adequate",
       "labels": {
         "budget": {
-          "score": 0,
           "description": "Low-cost short requests",
           "reasoning_effort": "low"
         },
         "extended": {
-          "score": 0.35,
           "description": "Low-cost multi-step requests",
           "reasoning_effort": "medium"
         },
         "exception": {
-          "score": 0.65,
           "description": "Complex work with a cost-aware pool",
           "reasoning_effort": "high"
         }
@@ -253,8 +238,6 @@
     },
     "reasoning": {
       "mode": "override",
-      "on_reasoning_request": "high",
-      "on_user_correction": "high",
       "fallback": "medium",
       "effort_by_label": {
         "quick": "low",
@@ -264,17 +247,14 @@
     },
     "labels": {
       "quick": {
-        "score": 0,
         "description": "Short bounded tasks",
         "reasoning_effort": "low"
       },
       "working": {
-        "score": 0.35,
         "description": "Multi-step tasks",
         "reasoning_effort": "medium"
       },
       "deep": {
-        "score": 0.65,
         "description": "Architecture and deep reasoning",
         "reasoning_effort": "high"
       }

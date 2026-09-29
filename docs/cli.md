@@ -85,7 +85,7 @@ jev config validate
 jev config reload
 ```
 
-The CLI can write provider and model entries. Policy, strategies, gateway, storage, decision, and signals are read-only. Secret variables are displayed by name and presence only.
+The CLI can write provider and model entries. Policy, strategies, gateway, storage, and decision are read-only. Secret variables are displayed by name and presence only.
 
 ## Providers and credentials
 

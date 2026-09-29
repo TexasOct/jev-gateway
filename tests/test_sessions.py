@@ -162,7 +162,6 @@ def test_snapshot_reports_counters_and_events() -> None:
     state = make_state("s1", clock())
     state.consecutive_failures = 1
     state.cost_usd = 0.125
-    state.recent_scores = [0.5]
     state.record_event({"type": "switch"})
     store.put(state)
 
@@ -172,7 +171,6 @@ def test_snapshot_reports_counters_and_events() -> None:
     assert snapshot["route"] == "small"
     assert snapshot["consecutive_failures"] == 1
     assert snapshot["cost_usd"] == 0.125
-    assert snapshot["recent_scores"] == [0.5]
     assert snapshot["events"] == [{"type": "switch"}]
     assert store.snapshot("missing") is None
 

@@ -6,12 +6,9 @@ from typing import Any
 
 import httpx
 
-from jev_gateway.catalog import (
-    DecisionProvider,
-    DecisionSettings,
-)
-from jev_gateway.decision_provider import DecisionClient
+from jev_gateway.catalog import DecisionProvider, DecisionSettings
 from jev_gateway.strategy import DecisionMaker
+from jev_gateway.strategy.decision_provider import DecisionClient
 
 QUESTIONS = {"risk": {"type": "choice", "instructions": "Choose.", "criteria": {"low": "Low", "high": "High"}}}
 

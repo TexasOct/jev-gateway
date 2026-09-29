@@ -92,28 +92,19 @@ def clamp_effort(ladder: tuple[str, ...], wanted: str | None) -> str | None:
 
 
 def derive_effort(
-    signals: Any,
+    facts: Any,
     policy: Any,
     tier: str | None = None,
 ) -> str:
     """The level the request asks for, before any route clamp.
 
-    `tier` defaults to the locally scored one, but callers pass the tier the router
-    actually committed to. Those differ, and the routed one is the better input:
-    it already carries a classifier's verdict and any session pin, and it is the
-    value the client sees in `X-JEV-Task-Type`, so the reported tier and the
-    thinking level cannot contradict each other.
+    Callers pass the tier the router actually committed to. It carries the
+    classifier's verdict and any session pin, and is the value the client sees
+    in `X-JEV-Task-Type`.
 
-    Ordered by how specific the reason is. A user correction outranks the word
-    "reasonable" in the prompt, and both outrank the inferred tier, because a
-    correction is evidence about the answer we already gave while the tier is a
-    guess about the answer we are about to give.
+    Derive effort from the committed routing label, then use the configured fallback.
     """
-    if policy.on_user_correction and signals.user_correction:
-        return policy.on_user_correction
-    if policy.on_reasoning_request and signals.reasoning_requested:
-        return policy.on_reasoning_request
-    label = signals.tier if tier is None else tier
+    label = tier if tier is not None else "simple"
     by_label = getattr(policy, "effort_by_label", {}).get(label)
     if by_label:
         return by_label
@@ -124,7 +115,7 @@ def derive_effort(
 
 
 def effort_for(
-    signals: Any,
+    facts: Any,
     policy: Any,
     ladder: tuple[str, ...],
     requested: str | None = None,
@@ -132,8 +123,7 @@ def effort_for(
 ) -> tuple[str | None, str]:
     """Return ``(level, source)`` for one request on one already-selected model.
 
-    `tier` is the tier the router committed to, which need not be the locally
-    scored one. See :func:`derive_effort`.
+    `tier` is the tier the router committed to. See :func:`derive_effort`.
 
     The source is what makes the choice auditable: it separates a level the client
     asked for, a level the gateway derived, a level that had to be clamped into the
@@ -147,7 +137,7 @@ def effort_for(
     if not ladder:
         return None, "undeclared"
 
-    derived = clamp_effort(ladder, derive_effort(signals, policy, tier))
+    derived = clamp_effort(ladder, derive_effort(facts, policy, tier))
 
     if requested is not None:
         if not is_effort(requested):

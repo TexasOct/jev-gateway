@@ -16,7 +16,7 @@ import pytest
 
 from jev_gateway.catalog import catalog_from_document
 from jev_gateway.reasoning import effort_for
-from jev_gateway.signals import extract_signals
+from jev_gateway.request_facts import extract_request_facts as extract_facts
 from jev_gateway.strategy import RoutingRequest, StrategyRegistry
 from jev_gateway.strategy.policy import PolicyStrategy
 
@@ -148,8 +148,8 @@ def route(
         PolicyStrategy,
         StrategyRegistry.from_catalog(catalog).resolve("task_aware"),
     )
-    signals = extract_signals([{"role": "user", "content": "hello"}])
-    outcome = strategy.decide(RoutingRequest(signals, None, None, 1, 0.0), catalog)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    outcome = strategy.decide(RoutingRequest(facts, None, None, 1, 0.0), catalog)
     return outcome, strategy, catalog
 
 
@@ -256,10 +256,6 @@ def test_labels_are_ordered_and_carry_a_thinking_level(monkeypatch) -> None:
         "engineering",
         "ultra",
     ]
-    scores = [label.score for label in policy.labels.values()]
-    assert scores == sorted(scores)
-    assert scores[0] == 0
-
     expected = {
         "quick": "minimal",
         "draft": "low",
@@ -318,26 +314,26 @@ def test_everyday_pools_think_at_the_required_level(
     assert outcome.tier == label
     assert f":{rule}:" in outcome.reason
     assert effort_for(
-        extract_signals([{"role": "user", "content": "hello"}]),
+        extract_facts([{"role": "user", "content": "hello"}]),
         strategy.policy.reasoning,
         profile.capabilities.reasoning_effort,
         tier=label,
     ) == (effort, "derived")
 
 
-def test_quality_strategy_reaches_openai_tiers_at_revised_scores(monkeypatch) -> None:
+def test_quality_strategy_labels_remain_ordered_without_score_thresholds(monkeypatch) -> None:
     _, _, catalog = route(
         monkeypatch, {"workload": "coding", "scale": "large", "rigor": "exacting"}
     )
     quality = next(strategy for strategy in catalog.strategies if strategy.name == "quality")
 
     assert [
-        (label, definition.score, definition.reasoning_effort)
+        (label, definition.reasoning_effort)
         for label, definition in quality.policy.labels.items()
     ] == [
-        ("routine", 0.0, "low"),
-        ("analysis", 0.25, "medium"),
-        ("critical", 0.55, "high"),
+        ("routine", "low"),
+        ("analysis", "medium"),
+        ("critical", "high"),
     ]
 
 
@@ -346,12 +342,12 @@ def test_the_reserved_tier_thinks_at_the_deepest_configured_level(monkeypatch) -
         monkeypatch,
         {"workload": "coding", "scale": "cross_domain", "rigor": "exacting"},
     )
-    signals = extract_signals([{"role": "user", "content": "hello"}])
+    facts = extract_facts([{"role": "user", "content": "hello"}])
     astra = catalog.by_name(ASTRA)
     assert astra is not None
 
     effort, source = effort_for(
-        signals,
+        facts,
         strategy.policy.reasoning,
         astra.capabilities.reasoning_effort,
         tier="ultra",

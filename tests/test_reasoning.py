@@ -16,7 +16,7 @@ from jev_gateway.reasoning import (
     ladder_from_list,
 )
 from jev_gateway.sessions import MemorySessionStore
-from jev_gateway.signals import extract_signals
+from jev_gateway.request_facts import extract_request_facts as extract_facts
 from tests.helpers import (
     COMPLEX_PROMPT,
     SIMPLE_PROMPT,
@@ -40,16 +40,14 @@ class _Policy:
             "effort_by_tier",
             {"simple": "low", "standard": "medium", "complex": "high"},
         )
-        self.on_reasoning_request = overrides.get("on_reasoning_request", "high")
-        self.on_user_correction = overrides.get("on_user_correction", "high")
         self.fallback = overrides.get("fallback", "medium")
 
 
-def _signals(prompt: str, **overrides: Any) -> Any:
-    signals = extract_signals([{"role": "user", "content": prompt}])
+def _facts(prompt: str, **overrides: Any) -> Any:
+    facts = extract_facts([{"role": "user", "content": prompt}])
     for key, value in overrides.items():
-        object.__setattr__(signals, key, value)
-    return signals
+        object.__setattr__(facts, key, value)
+    return facts
 
 
 # The ladder
@@ -131,61 +129,38 @@ def test_effort_for_respects_the_mode_and_the_route_ladder(
     expected: str | None,
     source: str,
 ) -> None:
-    simple = _signals(SIMPLE_PROMPT)
+    simple = _facts(SIMPLE_PROMPT)
     applied, origin = effort_for(
-        simple, _Policy(mode=mode), ladder, requested=requested
+        simple, _Policy(mode=mode), ladder, requested=requested, tier="simple"
     )
     assert (applied, origin) == (expected, source)
 
 
 def test_cap_only_ever_lowers() -> None:
     """A client that asked for less than we derived keeps its own budget."""
-    complex_signals = _signals(COMPLEX_PROMPT)
+    complex_facts = _facts(COMPLEX_PROMPT)
     # The derived level for a complex prompt is `high`; a cap must not raise the
     # client's `low` up to it.
     assert effort_for(
-        complex_signals, _Policy(mode="cap"), FULL_LADDER, requested="low"
+        complex_facts, _Policy(mode="cap"), FULL_LADDER, requested="low", tier="complex"
     ) == ("low", "client")
     assert effort_for(
-        complex_signals, _Policy(mode="cap"), FULL_LADDER, requested="xhigh"
+        complex_facts, _Policy(mode="cap"), FULL_LADDER, requested="xhigh", tier="complex"
     ) == ("high", "capped")
 
 
 def test_fill_ignores_the_request_when_the_route_declares_no_ladder() -> None:
     applied, source = effort_for(
-        _signals(SIMPLE_PROMPT), _Policy(mode="fill"), (), requested=None
+        _facts(SIMPLE_PROMPT), _Policy(mode="fill"), (), requested=None
     )
     assert (applied, source) == (None, "undeclared")
 
 
-@pytest.mark.parametrize(
-    ("prompt", "expected"),
-    (
-        (SIMPLE_PROMPT, "low"),
-        (COMPLEX_PROMPT, "high"),
-        # A reasoning request outranks the tier: this prompt scores as simple, so
-        # only the trigger can be what raises it to `high`.
-        ("think it through", "high"),
-        ("请一步步来", "high"),
-    ),
-)
-def test_derived_level_follows_the_tier_and_the_prompt(prompt: str, expected: str) -> None:
-    applied, source = effort_for(_signals(prompt), _Policy(), FULL_LADDER)
-    assert (applied, source) == (expected, "derived")
-
-
-def test_a_user_correction_outranks_the_prompt_markers() -> None:
-    signals = _signals("不对，你上面写错了")
-    applied, _ = effort_for(signals, _Policy(on_user_correction="xhigh"), FULL_LADDER)
-    assert applied == "xhigh"
-    # Turning the trigger off leaves the tier rule in charge.
-    applied, _ = effort_for(
-        signals, _Policy(on_user_correction=None), FULL_LADDER
-    )
-    assert applied == "low"
-
-
-# Catalog parsing
+def test_derived_level_uses_only_the_committed_label() -> None:
+    applied, source = effort_for(_facts(COMPLEX_PROMPT), _Policy(), FULL_LADDER, tier="simple")
+    assert (applied, source) == ("low", "derived")
+    applied, source = effort_for(_facts(SIMPLE_PROMPT), _Policy(), FULL_LADDER, tier="complex")
+    assert (applied, source) == ("high", "derived")
 
 
 def test_catalog_reads_the_declared_ladder_off_the_model() -> None:
@@ -288,11 +263,10 @@ def test_engine_drops_a_level_the_route_cannot_name(clock: FakeClock) -> None:
     assert decision.reasoning_effort_source == "clamped_client"
 
 
-def test_an_explicit_tier_overrides_the_locally_scored_one() -> None:
+def test_an_explicit_tier_overrides_the_request_default() -> None:
     """The routed tier is the input, because a classifier may have set it."""
-    signals = _signals(SIMPLE_PROMPT)
-    assert signals.tier == "simple"
-    applied, source = effort_for(signals, _Policy(), FULL_LADDER, tier="complex")
+    facts = _facts(SIMPLE_PROMPT)
+    applied, source = effort_for(facts, _Policy(), FULL_LADDER, tier="complex")
     assert (applied, source) == ("high", "derived")
 
 
@@ -310,16 +284,14 @@ def test_the_level_follows_the_routed_tier_across_a_pinned_session(
     first = engine.decide(
         messages=[{"role": "user", "content": COMPLEX_PROMPT}], session_id="session-1"
     )
-    assert (first.tier, first.reasoning_effort) == ("complex", "high")
+    assert (first.tier, first.reasoning_effort) == ("simple", "low")
 
-    # A cheap follow-up scores as `simple` on its own, but the session is pinned to
-    # the complex tier, and that is the tier the client is told about.
+    # Prompt text does not reclassify a pinned session.
     second = engine.decide(
         messages=[{"role": "user", "content": SIMPLE_PROMPT}], session_id="session-1"
     )
-    assert second.signals["tier"] == "simple"
-    assert second.tier == "complex"
-    assert second.reasoning_effort == "high"
+    assert second.tier == "simple"
+    assert second.reasoning_effort == "low"
 
 
 def test_preview_reports_the_same_level_it_would_send(clock: FakeClock) -> None:

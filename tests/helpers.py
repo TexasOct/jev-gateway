@@ -37,7 +37,6 @@ CATALOG_DOCUMENT: dict[str, Any] = {
         "escalation": {
             "max_consecutive_failures": 2,
             "max_consecutive_truncations": 2,
-            "settle_window": 3,
         },
         "hysteresis": {
             "min_turns_between_switches": 2,
