@@ -1,0 +1,20 @@
+{
+  "command": [
+    "npm",
+    "--prefix",
+    "frontend",
+    "run",
+    "test:browser"
+  ],
+  "cwd": "/Users/texas/Workspace/jev-llmroute-test",
+  "exit": 1,
+  "seconds": 36.694,
+  "counts": {
+    "passed": 65,
+    "failed": 3,
+    "skipped": 0,
+    "flaky": 0,
+    "did not run": 0
+  },
+  "log": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/full-browser-gate.log"
+}

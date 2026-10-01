@@ -1,0 +1,179 @@
+
+> jev-gateway-dashboard@0.1.0 test:browser
+> npm run build && tsc -p tests/tsconfig.json && playwright test -c playwright.config.ts
+
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 2044 modules transformed.
+rendering chunks...
+computing gzip size...
+../jev_gateway/static/index.html                      0.46 kB │ gzip:   0.28 kB
+../jev_gateway/static/assets/deepseek-Bl9-59Mi.svg   10.65 kB │ gzip:   4.27 kB
+../jev_gateway/static/assets/index-JM0ENv98.css      48.46 kB │ gzip:   9.71 kB
+../jev_gateway/static/assets/index-5zay16AD.js      584.86 kB │ gzip: 182.45 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 145ms
+
+Running 68 tests using 7 workers
+
+  ✓   3 tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event (507ms)
+  ✓   6 tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once (563ms)
+  ✓   4 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese (725ms)
+  ✓   1 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese (718ms)
+  ✓   2 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese (813ms)
+  ✓   7 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese (824ms)
+  ✓   5 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with system font (2.2s)
+  ✓   8 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 1280px with system font (1.9s)
+  ✓   9 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 390px with system font (1.9s)
+  ✓  14 tests/browser/monitoring.spec.ts:8:1 › restores the first cursor page when a later page fails, then loads the next page on retry (359ms)
+  ✓  10 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 390px with system font (1.8s)
+  ✓  11 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 320px with system font (1.9s)
+  ✓  15 tests/browser/monitoring.spec.ts:26:1 › supports keyboard session selection and selected detail (287ms)
+  ✓  13 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 320px with system font (1.9s)
+  ✓  12 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with serif font (1.9s)
+  ✓  19 tests/browser/monitoring.spec.ts:157:1 › keeps request-detail loading copy visible while its synthetic response is delayed (256ms)
+  ✓  16 tests/browser/monitoring.spec.ts:39:1 › request-detail list loads a cursor page on scroll and retains its focused row (388ms)
+  ✓  20 tests/browser/monitoring.spec.ts:170:1 › keeps mobile provider cells' data-label records readable (252ms)
+  ✓  23 tests/browser/monitoring.spec.ts:217:1 › keeps the latest-session preview unselected until an operator chooses a session (178ms)
+  ✓  18 tests/browser/monitoring.spec.ts:137:1 › keeps request-detail loading, failure, unavailable evidence, and empty states distinct (503ms)
+  ✓  24 tests/browser/provider-management.spec.ts:12:1 › provider editing preserves ID, clears secrets, and sends the shared contract (338ms)
+  ✓  25 tests/browser/provider-management.spec.ts:34:1 › supplier aliases, custom entry, icon picker and System One are usable (518ms)
+  ✓  27 tests/browser/provider-management.spec.ts:88:1 › unknown metadata blocks import and failed operations remain retryable (486ms)
+  ✓  26 tests/browser/provider-management.spec.ts:59:1 › selection scope, metadata edits and explicit import refresh the catalog (563ms)
+  ✓  28 tests/browser/provider-management.spec.ts:106:1 › revision conflicts preserve the draft, clear the secret and use the refreshed revision (475ms)
+  ✓  30 tests/browser/provider-management.spec.ts:148:1 › read-only and unauthorized configuration reads expose the appropriate recovery (279ms)
+  ✓  29 tests/browser/provider-management.spec.ts:127:1 › candidate private-network discovery is explicit and canceled results stay out of other tabs (408ms)
+  ✓  31 tests/browser/provider-management.spec.ts:160:1 › verified DeepSeek artwork loads locally, preserves proportions and retains attribution (343ms)
+  ✓  17 tests/browser/monitoring.spec.ts:58:1 › utility geometry keeps virtual windows, recorded trace and mobile table readable (1.7s)
+  ✓  33 tests/browser/provider-management.spec.ts:205:1 › native endpoint presets preserve null and fill their declared credential reference (346ms)
+  ✓  35 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 320px en light (412ms)
+  ✓  32 tests/browser/provider-management.spec.ts:174:1 › metadata retry remains a metadata operation and batch values need an explicit null decision (752ms)
+  ✓  34 tests/browser/provider-management.spec.ts:220:1 › saving a previewed provider keeps model selection and reviewed metadata for explicit import (617ms)
+  ✓  37 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 320px en dark (391ms)
+  ✓  36 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 320px zh-CN light (450ms)
+  ✓  38 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 320px zh-CN dark (425ms)
+  ✓  39 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 390px en light (399ms)
+  ✓  40 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 390px en dark (402ms)
+  ✓  41 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 390px zh-CN light (432ms)
+  ✓  43 tests/browser/provider-management.spec.ts:266:3 › provider form fits 320px en light (245ms)
+  ✓  42 tests/browser/provider-management.spec.ts:245:3 › model confirmation fits 390px zh-CN dark (428ms)
+  ✓  44 tests/browser/provider-management.spec.ts:266:3 › provider form fits 320px en dark (311ms)
+  ✓  45 tests/browser/provider-management.spec.ts:266:3 › provider form fits 320px zh-CN light (340ms)
+  ✓  47 tests/browser/provider-management.spec.ts:266:3 › provider form fits 390px en light (290ms)
+  ✓  46 tests/browser/provider-management.spec.ts:266:3 › provider form fits 320px zh-CN dark (310ms)
+  ✓  48 tests/browser/provider-management.spec.ts:266:3 › provider form fits 390px en dark (277ms)
+  ✓  49 tests/browser/provider-management.spec.ts:266:3 › provider form fits 390px zh-CN light (309ms)
+  ✓  50 tests/browser/provider-management.spec.ts:266:3 › provider form fits 390px zh-CN dark (313ms)
+  ✓  52 tests/browser/provider-management.spec.ts:266:3 › provider form fits 1280px en dark (269ms)
+  ✓  51 tests/browser/provider-management.spec.ts:266:3 › provider form fits 1280px en light (290ms)
+  ✓  53 tests/browser/provider-management.spec.ts:266:3 › provider form fits 1280px zh-CN light (362ms)
+  ✓  54 tests/browser/provider-management.spec.ts:266:3 › provider form fits 1280px zh-CN dark (318ms)
+  ✓  56 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 1280x900 in English and Chinese (711ms)
+  ✓  57 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 1430x2511 in English and Chinese (747ms)
+  ✓  58 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 390x820 in English and Chinese (752ms)
+  ✓  59 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 320x820 in English and Chinese (768ms)
+  ✓  60 tests/browser/routing-editor.spec.ts:8:1 › shows configured route explanation with and without reduced motion (416ms)
+  ✓  62 tests/browser/routing-editor.spec.ts:96:1 › canvas supports keyboard node focus and real pointer drag without policy writes (410ms)
+  ✓  64 tests/browser/settings.spec.ts:4:1 › settings keeps theme writes disabled when configuration writes are unavailable (315ms)
+  ✓  61 tests/browser/routing-editor.spec.ts:51:1 › routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset (708ms)
+  ✓  65 tests/browser/settings.spec.ts:19:1 › a late settings read cannot overwrite a newer theme read (236ms)
+  ✓  63 tests/browser/routing-editor.spec.ts:121:1 › canvas utilities preserve measured geometry, toolbar controls and real hit targets at supported widths (802ms)
+  ✓  67 tests/browser/settings.spec.ts:68:1 › a failed settings theme read is visible and can be retried (278ms)
+  ✓  66 tests/browser/settings.spec.ts:41:1 › settings re-entry during a theme write keeps the write pending and skips reads (301ms)
+  ✓  68 tests/browser/settings.spec.ts:78:1 › a settings write rejected with 401 requires reconnection without persisting credentials (316ms)
+  ✘  55 tests/browser/responsive.spec.ts:8:1 › top-level view buttons stay compact on desktop and usable on mobile (1.9s)
+  ✘  21 tests/browser/monitoring.spec.ts:189:1 › activity settings expose refresh and animation controls outside the route map (5.2s)
+  ✘  22 tests/browser/monitoring.spec.ts:206:1 › activity sample failure is shown as unavailable and can be retried without policy writes (30.0s)
+
+
+  1) tests/browser/monitoring.spec.ts:189:1 › activity settings expose refresh and animation controls outside the route map 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('details[data-dashboard-settings]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('details[data-dashboard-settings]') with timeout 5000ms
+      - waiting for locator('details[data-dashboard-settings]')
+
+
+      192 |     await openDashboard(page);
+      193 |     const settings = page.locator("details[data-dashboard-settings]");
+    > 194 |     await expect(settings).toBeVisible();
+          |                            ^
+      195 |     await settings.locator("summary").click();
+      196 |     await expect(settings.getByRole("button", { name: "Refresh activity" })).toBeVisible();
+      197 |     const toggle = settings.getByRole("button", { name: "Pause animation" });
+        at /Users/texas/Workspace/jev-llmroute-test/frontend/tests/browser/monitoring.spec.ts:194:28
+
+    Error Context: node_modules/.cache/playwright-results/monitoring-activity-settin-2963c-trols-outside-the-route-map/error-context.md
+
+  2) tests/browser/monitoring.spec.ts:206:1 › activity sample failure is shown as unavailable and can be retried without policy writes 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Refresh activity' })
+
+
+      209 |   await expect(page.getByRole("status").filter({ hasText: "Activity unavailable" })).toBeVisible();
+      210 |   const activityCallsBeforeRetry = mockApi.requests.filter(({ path }) => path === "/v1/routing/activity").length;
+    > 211 |   await page.getByRole("button", { name: "Refresh activity" }).click();
+          |                                                                ^
+      212 |   await expect(page.getByRole("status").filter({ hasText: "In flight" })).toBeVisible();
+      213 |   expect(mockApi.requests.filter(({ path }) => path === "/v1/routing/activity").length).toBeGreaterThan(activityCallsBeforeRetry);
+      214 |   expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path.includes("configuration"))).toEqual([]);
+        at /Users/texas/Workspace/jev-llmroute-test/frontend/tests/browser/monitoring.spec.ts:211:64
+
+    Error Context: node_modules/.cache/playwright-results/monitoring-activity-sample-8e8a0-tried-without-policy-writes/error-context.md
+
+  3) tests/browser/responsive.spec.ts:8:1 › top-level view buttons stay compact on desktop and usable on mobile 
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 8
+
+    - Array []
+    + Array [
+    +   "GET /v1/provider-configuration",
+    +   "GET /v1/provider-configuration",
+    +   "GET /v1/provider-configuration",
+    +   "GET /v1/provider-configuration",
+    +   "GET /v1/provider-configuration",
+    +   "GET /v1/provider-configuration",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-llmroute-test/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: node_modules/.cache/playwright-results/responsive-top-level-view--a7214-esktop-and-usable-on-mobile/error-context.md
+
+  3 failed
+    tests/browser/monitoring.spec.ts:189:1 › activity settings expose refresh and animation controls outside the route map 
+    tests/browser/monitoring.spec.ts:206:1 › activity sample failure is shown as unavailable and can be retried without policy writes 
+    tests/browser/responsive.spec.ts:8:1 › top-level view buttons stay compact on desktop and usable on mobile 
+  65 passed (33.9s)

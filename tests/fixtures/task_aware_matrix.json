@@ -1,0 +1,411 @@
+{
+  "decision": {
+    "enabled": true,
+    "timeout_seconds": 5,
+    "providers": [
+      {
+        "id": "decision-example",
+        "protocol": "system_one",
+        "api_base": "https://decision.example/v1/evaluate",
+        "api_key_env": "JEV_OPENROUTER_API_KEY"
+      }
+    ]
+  },
+  "strategies": {
+    "task_aware": {
+      "kind": "decision_matrix",
+      "mode": "fresh",
+      "reasoning": {
+        "mode": "override",
+        "effort_by_label": {
+          "quick": "minimal",
+          "draft": "low",
+          "review": "medium",
+          "investigate": "high",
+          "craft": "medium",
+          "engineering": "high",
+          "ultra": "xhigh"
+        }
+      },
+      "options": {
+        "questions": {
+          "workload": {
+            "type": "choice",
+            "instructions": "What is the main kind of work this request asks for?",
+            "criteria": {
+              "research": "Investigate, search, read, or summarise existing material: looking things up, reading code or documents, comparing options, or gathering evidence. It produces understanding, not a behaviour change.",
+              "docs": "Write or edit documentation, comments, prose, translations, or release notes.",
+              "small_change": "A narrow, bounded change: a rename, dependency bump, formatting pass, config tweak, or single-file edit.",
+              "coding": "Implement, fix, or refactor behaviour in code; the change has to work.",
+              "reverse": "Understand, audit, or reverse-engineer existing code or systems: architecture, protocol or binary analysis, security review, or hard debugging."
+            }
+          },
+          "scale": {
+            "type": "choice",
+            "instructions": "How large and self-contained is the work?",
+            "criteria": {
+              "bounded": "One file or one spot with clear edges; it can be finished in a single short pass.",
+              "moderate": "Several files or steps, but the path is clear: small to mid-sized work.",
+              "large": "Cross-module or long-horizon work that needs architecture judgement, sustained autonomous execution, or repeated experimentation.",
+              "cross_domain": "The request needs several independent high-difficulty professional domains at once, such as 3D modelling together with circuit design, or coupled mechanical, electromagnetic, and thermal engineering. A single hard domain is not this."
+            }
+          },
+          "rigor": {
+            "type": "choice",
+            "instructions": "How exact does the output need to be?",
+            "criteria": {
+              "draft": "A first pass is fine; it will be reviewed or reworked.",
+              "exacting": "It ships or gates other work: an interface, migration, security boundary, or release."
+            }
+          }
+        },
+        "rules": [
+          {
+            "when": {
+              "scale": "cross_domain",
+              "workload": [
+                "coding",
+                "reverse"
+              ]
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "ultra"
+            }
+          },
+          {
+            "when": {
+              "workload": "reverse"
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "engineering"
+            }
+          },
+          {
+            "when": {
+              "workload": "coding",
+              "scale": "large"
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "engineering"
+            }
+          },
+          {
+            "when": {
+              "workload": "coding",
+              "scale": "moderate",
+              "rigor": "exacting"
+            },
+            "select": {
+              "selection": "quality_first",
+              "label": "engineering"
+            }
+          },
+          {
+            "when": {
+              "workload": "coding"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "craft"
+            }
+          },
+          {
+            "when": {
+              "workload": "research",
+              "rigor": "exacting"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "investigate"
+            }
+          },
+          {
+            "when": {
+              "workload": [
+                "docs",
+                "small_change"
+              ],
+              "rigor": "exacting"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "review"
+            }
+          },
+          {
+            "when": {
+              "workload": "small_change",
+              "scale": "bounded",
+              "rigor": "draft"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "quick"
+            }
+          },
+          {
+            "when": {
+              "workload": [
+                "research",
+                "docs",
+                "small_change"
+              ],
+              "rigor": "draft"
+            },
+            "select": {
+              "selection": "cheapest_adequate",
+              "label": "draft"
+            }
+          }
+        ],
+        "fallback": {
+          "selection": "cheapest_adequate",
+          "label": "review"
+        }
+      },
+      "labels": {
+        "quick": {
+          "description": "Bounded draft-level edits",
+          "reasoning_effort": "minimal"
+        },
+        "draft": {
+          "description": "Draft research, documentation, and edits",
+          "reasoning_effort": "low"
+        },
+        "review": {
+          "description": "Exacting documentation and edits",
+          "reasoning_effort": "medium"
+        },
+        "investigate": {
+          "description": "Exacting research",
+          "reasoning_effort": "high"
+        },
+        "craft": {
+          "description": "Small and mid-sized coding",
+          "reasoning_effort": "medium"
+        },
+        "engineering": {
+          "description": "Large coding and reverse engineering",
+          "reasoning_effort": "high"
+        },
+        "ultra": {
+          "description": "Cross-domain coding and reverse engineering",
+          "reasoning_effort": "xhigh"
+        }
+      }
+    },
+    "quality": {
+      "mode": "cached",
+      "selection": "quality_first",
+      "labels": {
+        "routine": {
+          "description": "Routine answers",
+          "reasoning_effort": "low"
+        },
+        "analysis": {
+          "description": "Multi-step analysis",
+          "reasoning_effort": "medium"
+        },
+        "critical": {
+          "description": "Critical architecture and audits",
+          "reasoning_effort": "high"
+        }
+      }
+    }
+  },
+  "providers": [
+    {
+      "id": "deepseek",
+      "type": "deepseek",
+      "api_base": "https://deepseek.example/v1",
+      "api_key_env": "JEV_OPENROUTER_API_KEY"
+    },
+    {
+      "id": "openai",
+      "type": "openai",
+      "api_base": "https://openai.example/v1",
+      "api_key_env": "JEV_OPENROUTER_API_KEY"
+    }
+  ],
+  "policy": {
+    "mode": "sticky",
+    "selection": "balanced",
+    "pin": {
+      "break_on": [
+        "capability_gap",
+        "context_pressure",
+        "output_limit"
+      ]
+    },
+    "reasoning": {
+      "mode": "override",
+      "fallback": "medium",
+      "effort_by_label": {
+        "quick": "low",
+        "working": "medium",
+        "deep": "high"
+      }
+    },
+    "labels": {
+      "quick": {
+        "description": "Short bounded tasks",
+        "reasoning_effort": "low"
+      },
+      "working": {
+        "description": "Multi-step tasks",
+        "reasoning_effort": "medium"
+      },
+      "deep": {
+        "description": "Architecture and deep reasoning",
+        "reasoning_effort": "high"
+      }
+    }
+  },
+  "models": [
+    {
+      "provider": "deepseek",
+      "upstream_model": "deepseek-flash",
+      "priority": 10,
+      "quality": 0.6,
+      "context_window": 1000000,
+      "max_output_tokens": 384000,
+      "capabilities": {
+        "reasoning": true,
+        "reasoning_effort": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 0.29643682931167364,
+        "output_per_million": 1.1857473172466946
+      },
+      "tags": [
+        "task_aware/quick",
+        "task_aware/draft",
+        "task_aware/review",
+        "task_aware/investigate"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-5.6-terra",
+      "priority": 20,
+      "quality": 0.75,
+      "context_window": 1000000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 0.75,
+        "output_per_million": 7.5
+      },
+      "tags": [
+        "quality/analysis"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-astra",
+      "priority": 5,
+      "quality": 1.0,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 10.0,
+        "output_per_million": 50.0
+      },
+      "tags": [
+        "task_aware/ultra"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-sol",
+      "priority": 20,
+      "quality": 0.95,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 2.0,
+        "output_per_million": 10.0
+      },
+      "tags": [
+        "quality/critical",
+        "task_aware/engineering"
+      ]
+    },
+    {
+      "provider": "openai",
+      "upstream_model": "gpt-6-luna",
+      "priority": 10,
+      "quality": 0.7,
+      "context_window": 1050000,
+      "max_output_tokens": 128000,
+      "capabilities": {
+        "reasoning": true,
+        "temperature": false,
+        "reasoning_effort": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      "cost": {
+        "input_per_million": 0.1,
+        "output_per_million": 0.5
+      },
+      "tags": [
+        "quality/routine",
+        "task_aware/craft",
+        "task_aware/draft",
+        "task_aware/engineering",
+        "task_aware/review"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "command": "npm run test",
+  "cwd": "frontend",
+  "exit": 0,
+  "seconds": 0.994
+}

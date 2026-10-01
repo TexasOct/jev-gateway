@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Verify dashboard changes preserve API, auth, pagination, and canvas contracts"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/design-language.md", "reason": "Review implementation consistency with the approved shared visual language"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/interaction-analysis.md", "reason": "Check approved interaction scope against the read-only UX analysis and deferred decisions"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-routing-analysis.md", "reason": "Verify route visualization does not invent traffic or alter routing policy semantics"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/tailwind-migration.md", "reason": "Review Tailwind migration for reset, palette, canvas, and packaging regressions"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/overhaul-architecture.md", "reason": "Check policy/layout separation and new toolchain migration boundaries"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-reference-capture.md", "reason": "Verify route visual borrows only supported composition/motion rather than demo metrics"}

@@ -1,0 +1,484 @@
+/* Paint-only editor chrome. Keep the node box, measured overlays, port hit areas,
+   scroll surface and viewport geometry in styles.css and canvas.ts unchanged. */
+.workflow-workspace .workspace-chrome,
+.workflow-workspace .workflow-inspector {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.workflow-workspace .workflow-drawer {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 -3px 12px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.workflow-workspace .inspector-heading,
+.workflow-workspace .workflow-drawer-heading {
+  background: var(--surface-alt);
+}
+
+.workflow-workspace .workflow-state-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.workflow-workspace .workflow-state-pair > span {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+}
+
+.workflow-workspace .workflow-state-pair [data-policy-draft="pending"] {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.workflow-workspace .workflow-state-pair [data-policy-draft="unchanged"] {
+  color: var(--text-muted);
+}
+
+.workflow-workspace .inspector-policy-note {
+  margin: 0 0 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-inline-start: 2px solid var(--accent);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.workflow-workspace .workflow-edit-map {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.workflow-workspace .workflow-edit-map h3 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.workflow-workspace .workflow-edit-map p {
+  margin: 0.25rem 0;
+}
+
+.workflow-workspace .workflow-nav button {
+  border-color: var(--border);
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+.workflow-workspace .canvas-connection-choice {
+  margin: 0.45rem 0;
+  padding: 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.workflow-workspace .canvas-connection-choice p {
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.workflow-workspace .canvas-connection-reasons {
+  max-height: 9rem;
+  margin: 0.4rem 0 0;
+  padding-left: 1.15rem;
+  overflow-y: auto;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.workflow-workspace .canvas-layout-state {
+  color: var(--text-muted);
+}
+
+.workflow-workspace .workflow-info > .rule-add {
+  margin-block: 0.65rem;
+  padding: 0.65rem;
+}
+
+.workflow-workspace .workflow-info > .rule-add > p {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.workflow-workspace .workspace-heading h2,
+.workflow-workspace .inspector-heading h3,
+.workflow-workspace .workflow-info h3,
+.workflow-workspace .workflow-info h4,
+.workflow-workspace .workflow-edit legend,
+.workflow-workspace .rule-add legend {
+  color: var(--text);
+}
+
+.workflow-workspace .workflow-advanced > summary {
+  color: var(--text);
+}
+
+.workflow-workspace .workflow-advanced > summary:hover {
+  color: var(--accent);
+}
+
+.workflow-workspace .workflow-info code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.workflow-workspace .rule-row,
+.workflow-workspace .chip,
+.workflow-workspace .workflow-edit fieldset,
+.workflow-workspace .rule-add {
+  border-color: var(--border);
+  border-radius: 6px;
+}
+
+.workflow-workspace .zone {
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.workflow-workspace .zone.over {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-alt));
+}
+
+.workflow-workspace .chip.dragging {
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.workflow-workspace :is(.workspace-chrome, .workflow-inspector, .workflow-drawer) :is(button, input, select, textarea) {
+  border-radius: 6px;
+}
+
+.workflow-workspace :is(.workflow-inspector, .workflow-drawer) :is(input, select, textarea) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.workflow-workspace :is(.workspace-chrome, .workflow-inspector, .workflow-drawer) button:hover:not(:disabled):not([aria-pressed="true"]) {
+  background: var(--surface-alt);
+  border-color: var(--accent);
+}
+
+.workflow-workspace :is(.workspace-chrome, .workflow-inspector, .workflow-drawer) :is(button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.workflow-workspace .workflow-toolbar > button:first-child:not(:disabled) {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.workflow-workspace .workflow-toolbar > button:first-child:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.workflow-workspace .workflow-toolbar > button:first-child:active:not(:disabled) {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
+}
+
+/* A quiet, neutral map makes branch order and selected policy edits legible in
+   both schemes. Every path still comes from workflowEdges(draft, config). */
+.workflow-workspace .routing-canvas-board {
+  background-color: var(--bg);
+  background-image: radial-gradient(color-mix(in srgb, var(--text-muted) 22%, transparent) 0.9px, transparent 0.9px);
+}
+
+.workflow-workspace .routing-canvas-lines {
+  color: color-mix(in srgb, var(--text-muted) 70%, var(--border));
+}
+
+.workflow-workspace .canvas-edge-handle {
+  fill: var(--surface);
+  stroke: var(--accent);
+}
+
+.workflow-workspace .canvas-add-handle {
+  fill: var(--accent);
+  stroke: var(--surface);
+}
+
+.workflow-workspace .canvas-tools {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.workflow-workspace .canvas-tools button[aria-pressed="true"] {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.workflow-workspace .canvas-zoom output {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.workflow-workspace .routing-canvas-node {
+  --canvas-node-accent: var(--text-muted);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--canvas-node-accent);
+  border-radius: 8px;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.workflow-workspace .routing-canvas-node[data-node-kind="questions"] {
+  --canvas-node-accent: var(--accent);
+  border-radius: 8px;
+}
+
+.workflow-workspace .routing-canvas-node[data-node-kind="rule"] {
+  --canvas-node-accent: var(--text);
+  border-radius: 8px;
+}
+
+.workflow-workspace .routing-canvas-node[data-node-kind="fallback"] {
+  --canvas-node-accent: var(--text-muted);
+  border-style: solid;
+}
+
+.workflow-workspace .routing-canvas-node[data-node-kind="label"] {
+  --canvas-node-accent: var(--accent);
+  border-inline-start-style: solid;
+  border-radius: 8px;
+}
+
+.workflow-workspace .routing-canvas-node[data-node-kind="model"] {
+  --canvas-node-accent: var(--text-muted);
+  border-inline-start-width: 1px;
+  border-inline-end: 3px solid var(--canvas-node-accent);
+  border-radius: 8px;
+}
+
+.workflow-workspace .routing-canvas-node:hover:not(:disabled) {
+  background: var(--surface-alt);
+  border-color: var(--text-muted);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.workflow-workspace .routing-canvas-node.selected {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+}
+
+.workflow-workspace .routing-canvas-node.compatible {
+  outline-color: var(--accent);
+}
+
+.workflow-workspace .routing-canvas-node:focus-visible {
+  outline-color: var(--accent);
+}
+
+.workflow-workspace .routing-canvas-node.dragging {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text) 17%, transparent);
+  animation: none;
+}
+
+.workflow-workspace .canvas-node-type {
+  color: var(--canvas-node-accent);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.workflow-workspace .canvas-node-title {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.workflow-workspace .canvas-node-summary {
+  color: var(--text-muted);
+}
+
+.workflow-workspace .canvas-context-actions {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.workflow-workspace .workflow-inspector {
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--text) 16%, transparent);
+}
+
+.workflow-workspace .inspector-heading,
+.workflow-workspace .workflow-drawer-heading {
+  background: var(--surface);
+}
+
+.workflow-workspace .inspector-heading h3,
+.workflow-workspace .workflow-drawer-heading .meta {
+  letter-spacing: 0.01em;
+}
+
+.workflow-workspace .workflow-info :is(.canvas-help, .canvas-lists details, .workflow-advanced) {
+  border-color: var(--border);
+}
+
+.workflow-workspace .workflow-info :is(.canvas-help, .canvas-lists details) > summary,
+.workflow-workspace .workflow-advanced > summary {
+  color: var(--text);
+}
+
+.workflow-workspace .workflow-info :is(.canvas-help, .canvas-lists details) > summary:hover,
+.workflow-workspace .workflow-advanced > summary:hover {
+  color: var(--accent);
+}
+
+.workflow-workspace .rule-row,
+.workflow-workspace .chip,
+.workflow-workspace .workflow-edit fieldset,
+.workflow-workspace .rule-add {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.workflow-workspace .rule-row:hover,
+.workflow-workspace .chip:hover {
+  border-color: var(--text-muted);
+}
+
+.workflow-workspace .zone {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+.workflow-workspace .zone.over {
+  border-color: var(--accent);
+}
+
+.workflow-workspace :is(.workflow-inspector, .workflow-drawer) :is(input, select, textarea):focus-visible {
+  border-color: var(--accent);
+}
+
+.workflow-workspace .workflow-toolbar {
+  background: var(--surface);
+}
+
+.workflow-workspace .workflow-connection.unmatched {
+  border-style: dashed;
+}
+
+.workflow-workspace .workflow-state-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workflow-workspace .workflow-state-pair > span {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.workflow-workspace .workflow-state-pair [data-policy-draft="pending"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.workflow-workspace .workflow-edit-map {
+  margin-block: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.workflow-workspace .workflow-edit-map h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workflow-workspace .workflow-edit-map > .meta {
+  margin-block: 4px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workflow-workspace .workflow-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workflow-workspace .workflow-nav button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.workflow-workspace .workflow-nav button:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.workflow-workspace .canvas-connection-choice {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-block: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.workflow-workspace .canvas-connection-choice > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workflow-workspace .canvas-connection-choice > label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workflow-workspace .canvas-connection-reasons {
+  margin: 0;
+  padding-inline-start: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-workspace .routing-canvas-node,
+  .workflow-workspace .canvas-tools button {
+    transition: none;
+  }
+}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Frontend and repository verification commands"}
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Accessibility, geometry, bundling and responsive browser contracts"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-add-project-icons/research/icon-inventory.md", "reason": "Audit migrated action controls and unchanged graphics"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-add-project-icons/research/icon-library-decision.md", "reason": "Confirm static imports and the resolved semantic-node scope"}

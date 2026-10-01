@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Project spec ownership and documentation conventions"}
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Dashboard UI, accessibility, bundling and browser verification contracts"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-add-project-icons/research/icon-inventory.md", "reason": "Existing glyphs and control behavior to preserve"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-add-project-icons/research/icon-library-decision.md", "reason": "Selected package, peer compatibility and resolved semantic-node scope"}

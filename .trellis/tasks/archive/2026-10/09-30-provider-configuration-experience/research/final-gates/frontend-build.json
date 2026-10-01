@@ -1,0 +1,6 @@
+{
+  "command": "npm run build",
+  "cwd": "frontend",
+  "exit": 0,
+  "seconds": 2.193
+}

@@ -1,0 +1,10 @@
+{
+  "unchanged_test_functions": 10,
+  "unchanged_case_arrays": [
+    "CASES",
+    "RESERVED_CASES"
+  ],
+  "assertions_before": 29,
+  "assertions_after": 29,
+  "no_assertions_or_cases_weakened": true
+}

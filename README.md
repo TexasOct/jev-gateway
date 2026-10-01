@@ -103,6 +103,13 @@ The template disables external decisions, so `task_aware` uses its configured fa
 `GET /healthz` confirms the process is up. For persistent, container, and wheel installs, see
 [`docs/local-install.md`](docs/local-install.md).
 
+Once the gateway has a valid catalog, open `/dashboard` and use Provider to browse
+supplier presets or configure a custom LLM or decision provider. Configure
+`gateway.api_key_env` to enable management commands. Model discovery produces a
+searchable candidate list; review price and capability metadata, then explicitly
+import the selected models. Provider setup and private-network opt-in are covered
+in [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入).
+
 ## Model identity
 
 A catalog model is indexed by its provider-qualified ID, `<provider>/<upstream_model>`. The
@@ -148,7 +155,7 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness and configuration snapshot. |
-| `GET` | `/dashboard` | Bundled operator UI for monitoring and routing configuration. |
+| `GET` | `/dashboard` | Bundled operator UI for monitoring, providers, and routing configuration. |
 | `GET` | `/v1/models` | Strategy names and catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and policies. |
@@ -159,6 +166,11 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | `GET` | `/v1/routing/sessions/{session_id}` | One live session. |
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | Retained requests for a session. |
 | `GET` | `/v1/routing/providers/summary` | Retained provider activity. |
+| `GET` | `/v1/provider-configuration` | Safe provider configuration, presets, and revision. |
+| `POST` | `/v1/provider-configuration/validate` | Validate provider changes or confirmed model imports. |
+| `PUT` | `/v1/provider-configuration` | Apply provider changes or confirmed model imports. |
+| `POST` | `/v1/provider-discovery` | Fetch candidate upstream models without importing. |
+| `POST` | `/v1/provider-metadata` | Query metadata suggestions and their sources. |
 | `GET` | `/v1/routing/configuration` | Editable routing surface. |
 | `POST` | `/v1/routing/configuration/validate` | Validate an overlay without applying it. |
 | `PUT` | `/v1/routing/configuration` | Apply an overlay beside `models.json`. |

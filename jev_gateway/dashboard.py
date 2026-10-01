@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import ipaddress
 import base64
 import binascii
-import hashlib
+import ipaddress
 import hmac
 import json
 import math
@@ -32,6 +31,7 @@ class DashboardState(Protocol):
     gateway_api_key: str | None
     models_file: Path
     engine: Any
+    routing_activity: Any
 
 
 Authorize = Callable[[str | None, str | None], None]
@@ -296,6 +296,24 @@ def create_dashboard_router(
             index, headers={**_SECURITY_HEADERS, "Cache-Control": _NO_STORE}
         )
 
+    @router.get("/v1/routing/activity", response_model=None)
+    def routing_activity(
+        authorization: str | None = Header(default=None),
+    ) -> Response:
+        authorize(state.gateway_api_key, authorization)
+        activity = state.routing_activity
+        if activity is None:
+            return Response(
+                content=json.dumps({"object": "routing.activity", "scope": "process", "instance_id": "unavailable", "complete": False, "paths": []}),
+                media_type="application/json",
+                headers={"Cache-Control": _NO_STORE},
+            )
+        return Response(
+            content=json.dumps(activity.snapshot(), separators=(",", ":")),
+            media_type="application/json",
+            headers={"Cache-Control": _NO_STORE},
+        )
+
     @router.get("/v1/routing/providers/summary", response_model=None)
     def routing_provider_summary(
         authorization: str | None = Header(default=None),
@@ -499,7 +517,7 @@ def create_dashboard_router(
         body: dict[str, Any],
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        require_write(authorization)
+        authorize(state.gateway_api_key, authorization)
         try:
             document = validate_theme_shape(body)
             write_theme(state.models_file, document["seed"])
@@ -530,7 +548,7 @@ def create_dashboard_router(
     def reset_dashboard_theme(
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        require_write(authorization)
+        authorize(state.gateway_api_key, authorization)
         removed = remove_theme(state.models_file)
         return {"version": 1, "seed": DEFAULT_THEME_SEED, "removed": removed}
 

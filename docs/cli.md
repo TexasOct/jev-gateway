@@ -14,7 +14,14 @@ The URL selects the latest stable Release's `install.sh`. The script embeds its
 release tag and downloads `jev_gateway-X.Y.Z-py3-none-any.whl` plus its `.sha256`
 sidecar from that exact tag's asset URLs. It verifies the wheel before invoking
 `uv tool install`. It does not resolve latest again or query the GitHub API for a
-wheel. Rerunning it preserves runtime configuration and records.
+wheel. Rerunning it preserves runtime configuration and records. After a successful
+Release wheel install, it restarts a gateway already running under CLI management
+for the selected `--home`, waiting up to 10 seconds for health. If no managed
+gateway was running, it leaves the service stopped. An unverified live PID is not
+signalled. A failed restart returns a nonzero installer status after the wheel has
+been installed; check `jev --home DIR status`, the PID file and logs before using
+`jev --home DIR start`. This does not manage foreground or externally supervised
+processes.
 
 For a pin or rollback, download the installer from the chosen published tag:
 
@@ -41,7 +48,7 @@ corruption or inconsistent assets; it is not an independent publisher signature.
 | `--yes` | Permit installing `uv` from `astral.sh` when missing. Without it, noninteractive installation requires an existing `uv`. |
 | `--no-uv` | Require an existing `uv`; never bootstrap it. |
 | `--home DIR` | Set the runtime directory for initialization. |
-| `--no-init` | Install the tool without initializing the runtime directory. |
+| `--no-init` | Skip runtime initialization; still restart an already running CLI-managed gateway after a Release wheel install. |
 | `--dry-run` | Print the plan without network requests, child execution, installation, or writes. It does not verify asset availability or checksums. |
 | `--ref REF` | Explicit developer Git install, without Release checksum verification; cannot be combined with `--version`. |
 

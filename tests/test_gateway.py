@@ -829,13 +829,15 @@ def test_stream_failure_has_safe_logs_and_null_persisted_message(
     config = make_stored_config(tmp_path)
     app = gateway.create_app(config)
     caplog.set_level(logging.DEBUG, logger="jev_gateway.gateway")
-    with pytest.raises(RuntimeError, match="Upstream provider request failed"):
-        request(
-            app, "POST", "/v1/chat/completions",
-            headers={"X-JEV-Session-Id": "stream-error"},
-            json={"model": "task_aware", "stream": True,
-                  "messages": [{"role": "user", "content": "Hi"}]},
-        )
+    response = request(
+        app, "POST", "/v1/chat/completions",
+        headers={"X-JEV-Session-Id": "stream-error"},
+        json={"model": "task_aware", "stream": True,
+              "messages": [{"role": "user", "content": "Hi"}]},
+    )
+    assert response.status_code == 200
+    assert '"content": "ok"' in response.text
+    assert "[DONE]" not in response.text
 
     path = Path(config.engine.record_store.settings.path)
     config.engine.record_store.flush()
@@ -1041,40 +1043,66 @@ def test_dashboard_theme_reports_unreadable_file(tmp_path: Path, monkeypatch) ->
     config.engine.close()
 
 
-def test_dashboard_theme_writes_need_a_configured_gateway_key(
+def test_dashboard_theme_writes_without_key_leave_routing_unchanged(
     tmp_path: Path, monkeypatch,
 ) -> None:
     install_completion(monkeypatch)
-    open_config = make_config(models_file=tmp_path / "models.json")
+    open_config = make_stored_config(tmp_path)
+    open_config.models_file = tmp_path / "models.json"
     app = gateway.create_app(open_config)
 
-    # Reads keep today's behavior; mutations refuse to inherit it.
+    baseline = tmp_path / "models.json"
+    overlay = tmp_path / "routing-overrides.json"
+    baseline_bytes = json.dumps(catalog_document()).encode()
+    overlay_bytes = b'{"version": 1, "strategy": "task_aware", "rules": []}'
+    baseline.write_bytes(baseline_bytes)
+    overlay.write_bytes(overlay_bytes)
+    before = open_config.engine.policy_snapshot()
+    before_hash = open_config.engine.config_hash
+    before_versions = open_config.engine.record_store.counts()["config_versions"]
+    assert before_versions > 0
     assert request(app, "GET", "/v1/dashboard/theme").status_code == 200
-    for method in ("PUT", "DELETE"):
-        blocked = request(
-            app, method, "/v1/dashboard/theme", json={"version": 1, "seed": "#3b66d9"}
-        )
-        assert blocked.status_code == 403
-        assert blocked.json()["error"]["code"] == "config_writes_disabled"
+    body = {"version": 1, "seed": "#234567"}
+    assert request(app, "PUT", "/v1/dashboard/theme", json=body).json() == body
+    assert json.loads((tmp_path / "dashboard-theme.json").read_text()) == body
+    assert request(app, "GET", "/v1/dashboard/theme").json()["seed"] == body["seed"]
+    assert request(app, "DELETE", "/v1/dashboard/theme").json() == {
+        "version": 1, "seed": "#3b66d9", "removed": True,
+    }
+    assert request(app, "GET", "/v1/dashboard/theme").json()["seed"] == "#3b66d9"
     assert not (tmp_path / "dashboard-theme.json").exists()
+    assert baseline.read_bytes() == baseline_bytes
+    assert overlay.read_bytes() == overlay_bytes
+    assert open_config.engine.policy_snapshot() == before
+    assert open_config.engine.config_hash == before_hash
+    assert open_config.engine.record_store.counts()["config_versions"] == before_versions
     open_config.engine.close()
 
+
+def test_dashboard_theme_configured_key_denies_missing_and_wrong_bearer(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    install_completion(monkeypatch)
     secured = make_config(
         gateway_api_key="client-key", models_file=tmp_path / "models.json"
     )
     secured_app = gateway.create_app(secured)
     body = {"version": 1, "seed": "#3b66d9"}
     assert request(secured_app, "GET", "/v1/dashboard/theme").status_code == 401
-    assert request(secured_app, "PUT", "/v1/dashboard/theme", json=body).status_code == 401
-    assert request(
-        secured_app, "PUT", "/v1/dashboard/theme",
-        headers={"Authorization": "Bearer wrong"}, json=body,
-    ).status_code == 401
     ok = request(
         secured_app, "PUT", "/v1/dashboard/theme",
         headers={"Authorization": "Bearer client-key"}, json=body,
     )
     assert ok.status_code == 200
+    theme_file = tmp_path / "dashboard-theme.json"
+    before = theme_file.read_bytes()
+    for method in ("PUT", "DELETE"):
+        for headers in ({}, {"Authorization": "Bearer wrong"}):
+            denied = request(secured_app, method, "/v1/dashboard/theme", headers=headers,
+                             json={"version": 1, "seed": "#234567"})
+            assert denied.status_code == 401
+            assert denied.json()["error"]["code"] == "invalid_api_key"
+            assert theme_file.read_bytes() == before
     secured.engine.close()
 
 

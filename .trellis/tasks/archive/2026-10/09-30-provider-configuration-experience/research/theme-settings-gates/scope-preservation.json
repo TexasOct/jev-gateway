@@ -1,0 +1,16 @@
+{
+  "dashboard_changes_exactly_two_theme_auth_call_sites": true,
+  "unchanged_files": {
+    "frontend/src/styles/canvas-geometry.css": true,
+    "frontend/src/styles/monitoring.css": true,
+    "frontend/src/styles/virtual-list.css": true,
+    "frontend/src/styles/tokens.css": true,
+    "frontend/src/styles/index.css": true,
+    "frontend/src/styles/shell.css": true,
+    "frontend/src/styles/appearance.css": true,
+    "frontend/src/styles/routing.css": true,
+    "frontend/src/styles/base.css": true,
+    "frontend/src/shared/theme/palette.ts": true,
+    "frontend/src/app/hooks/useDashboardTheme.ts": true
+  }
+}

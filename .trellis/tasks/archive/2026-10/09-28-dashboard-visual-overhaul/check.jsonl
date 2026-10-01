@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Frontend and API quality and privacy contracts"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Tests and quality gate guidance"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/routing-result-availability.md", "reason": "Validate attribution and live-only counts in monitoring"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/legacy-task-consolidation.md", "reason": "用户批准合并的旧画布/UI 验收映射；保留未验证项及责任分工"}

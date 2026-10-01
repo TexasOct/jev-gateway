@@ -1,0 +1,87 @@
+{
+  "screenshot": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/05-metadata-conflict-1280-en-light.png",
+  "geometry": {
+    "viewport": 1280,
+    "document": 1280,
+    "body": 1280,
+    "scheme": "light",
+    "pageHeight": 1800
+  },
+  "writes": 0,
+  "validations": 0,
+  "discoveryCalls": 1,
+  "metadataCalls": 1,
+  "requests": [
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-5zay16AD.js"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-JM0ENv98.css"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/providers/summary"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/strategies"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/policy"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/dashboard/theme"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/activity"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/provider-configuration"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/provider-discovery"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/provider-metadata"
+    }
+  ],
+  "conflictCues": 3,
+  "toolsValue": "",
+  "inputPrice": "",
+  "outputPrice": "3",
+  "importDisabled": true,
+  "fixtureOverride": "Existing fixture mock body adds a second applicable source with contradictory tools and input price; no fetch."
+}

@@ -1,0 +1,38 @@
+{
+  "id": "dashboard-visual-overhaul",
+  "name": "dashboard-visual-overhaul",
+  "title": "Rebuild dashboard visual design",
+  "description": "Redesign the JEV dashboard from scratch in a Magpie and shadcn/ui visual style while preserving the strategy canvas editing interactions.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-28",
+  "completedAt": "2026-10-01",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-28-strategy-monitoring-home",
+    "09-28-strategy-canvas-visual-redesign",
+    "09-28-dashboard-appearance-redesign",
+    "09-28-dashboard-shell-visual-system"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "user_archived",
+      "acceptance_complete": false,
+      "user_approved": true,
+      "note": "archive-note.md"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "active_task": {
+    "path": ".trellis/tasks/09-30-provider-configuration-experience",
+    "verified_via": "native bash; sandbox subprocess lacks session task context"
+  },
+  "task_validation_exit": 0,
+  "whitespace_exit": 0,
+  "design_yaml_unchanged": true,
+  "pytest": {
+    "command": "PYTHON_DOTENV_DISABLED=1 LITELLM_LOCAL_MODEL_COST_MAP=true uv run pytest -q",
+    "exit": 0,
+    "seconds": 36.584
+  },
+  "pyright": {
+    "command": "uvx pyright",
+    "cwd": "/Users/texas/Workspace/jev-llmroute-test",
+    "exit": 0,
+    "seconds": 4.825
+  },
+  "frontend-lint": {
+    "command": "npm run lint",
+    "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+    "exit": 0,
+    "seconds": 3.954
+  },
+  "frontend-unit": {
+    "command": "npm run test",
+    "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+    "exit": 0,
+    "seconds": 1.147
+  },
+  "browser": {
+    "command": "npm --prefix frontend run test:browser",
+    "exit": 0,
+    "seconds": 15.961
+  },
+  "bundle-check": {
+    "command": "bash scripts/build-frontend.sh --check",
+    "exit": 0,
+    "seconds": 0.032
+  },
+  "package-build": {
+    "command": "uv build",
+    "exit": 0,
+    "seconds": 1.615
+  },
+  "package-assets": {
+    "command": "python3 .trellis/tasks/09-30-provider-configuration-experience/research/verify-package-assets.py dist/jev_gateway-0.1.0-py3-none-any.whl dist/jev_gateway-0.1.0.tar.gz",
+    "exit": 0,
+    "seconds": 0.047
+  },
+  "counts": {
+    "backend": 720,
+    "frontend_units": 210,
+    "browser": 81
+  }
+}

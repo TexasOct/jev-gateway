@@ -1,4 +1,0 @@
-{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Dashboard API 与前端安全约束"}
-{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "SQLite evidence查询和留存边界"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端测试和类型检查门槛"}
-{"file": ".trellis/tasks/09-23-gateway-session-dashboard/design.md", "reason": "session API 和时间字段的集成设计"}

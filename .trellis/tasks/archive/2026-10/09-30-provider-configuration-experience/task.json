@@ -1,0 +1,31 @@
+{
+  "id": "provider-configuration-experience",
+  "name": "provider-configuration-experience",
+  "title": "Provider 配置体验与模型发现适配",
+  "description": "统一 provider 配置底座，规划供应商浏览搜索、官方标识、自定义 decision/LLM provider、上游模型发现与 DESIGN.md 提炼",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-30",
+  "completedAt": "2026-10-01",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-30-provider-profile-config",
+    "09-30-provider-model-discovery",
+    "09-30-provider-library-onboarding",
+    "09-30-dashboard-design-baseline"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

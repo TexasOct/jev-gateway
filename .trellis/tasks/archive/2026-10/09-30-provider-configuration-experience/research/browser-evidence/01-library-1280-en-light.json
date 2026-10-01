@@ -1,0 +1,91 @@
+{
+  "screenshot": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/01-library-1280-en-light.png",
+  "geometry": {
+    "viewport": 1280,
+    "document": 1280,
+    "body": 1280,
+    "scheme": "light",
+    "pageHeight": 900
+  },
+  "writes": 0,
+  "validations": 0,
+  "discoveryCalls": 0,
+  "metadataCalls": 0,
+  "requests": [
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-5zay16AD.js"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-JM0ENv98.css"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/providers/summary"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/strategies"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/policy"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/dashboard/theme"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/activity"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/provider-configuration"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/deepseek-Bl9-59Mi.svg"
+    }
+  ],
+  "artwork": {
+    "src": "http://127.0.0.1:4182/dashboard/assets/deepseek-Bl9-59Mi.svg",
+    "naturalWidth": 195,
+    "naturalHeight": 41,
+    "width": 88,
+    "height": 18.65625
+  },
+  "libraryFocus": {
+    "tag": "BUTTON",
+    "name": null,
+    "text": "OPOpenAIopenai",
+    "outlineStyle": "solid",
+    "outlineWidth": "2px"
+  },
+  "enterOpenedLibrary": true
+}

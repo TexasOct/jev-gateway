@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "跨层字段、元数据确认、取消/重试、双语窄屏与秘密清除验收"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "HTTP、frontend types、确认和持久化 envelope 的一致性验收"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/cc-switch-and-upstream-references.md", "reason": "CC Switch 参考与上游列表协议证据"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/dashboard-provider-design-baseline.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/related-task-boundaries.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/planning-options.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/model-metadata-sources.md", "reason": "元数据确认页的未知/冲突/过期状态和确认前禁写验收"}

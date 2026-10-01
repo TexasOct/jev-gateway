@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import os
-import shutil
-import stat
 import sys
-import tempfile
-from contextlib import suppress
+import re
 from pathlib import Path
 
 from jev_gateway.cli.output import CliError, ExitCode
 from jev_gateway.cli.paths import prompt_value
+from jev_gateway.config_transaction import configuration_lock, optional_bytes, replace_configuration
+from jev_gateway.provider_config import env_update
 
 
 def obtain_secret(*, env_name: str | None, stdin_secret: bool, json_mode: bool, quiet: bool) -> str:
@@ -42,10 +41,12 @@ def upsert_env(path: Path, name: str, value: str) -> None:
     if not value or any(character in value for character in "\r\n\x00"):
         raise CliError("invalid_secret", "Credential must be nonempty and fit on one line.", ExitCode.USAGE)
     replacement = f"{name}={value}"
+    if any(c in value for c in " \t#$\\'\""):
+        replacement = env_update(b"", name, value).decode().rstrip("\n")
     found = False
     output: list[str] = []
     for line in lines:
-        if line.startswith(f"{name}="):
+        if re.match(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=", line):
             if not found:
                 output.append(replacement)
                 found = True
@@ -58,7 +59,7 @@ def upsert_env(path: Path, name: str, value: str) -> None:
 
 def remove_env(path: Path, name: str) -> bool:
     lines = _read_lines(path)
-    output = [line for line in lines if not line.startswith(f"{name}=")]
+    output = [line for line in lines if not re.match(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=", line)]
     if len(output) == len(lines):
         return False
     _write_env(path, output)
@@ -66,21 +67,9 @@ def remove_env(path: Path, name: str) -> bool:
 
 
 def _write_env(path: Path, lines: list[str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        backup = path.with_name(".env.backup")
-        shutil.copy2(path, backup)
-        os.chmod(backup, stat.S_IRUSR | stat.S_IWUSR)
-    fd, temporary = tempfile.mkstemp(prefix=".env.", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines) + ("\n" if lines else ""))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temporary, stat.S_IRUSR | stat.S_IWUSR)
-        os.replace(temporary, path)
-        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
-    except OSError:
-        with suppress(OSError):
-            os.unlink(temporary)
-        raise
+    models_file = path.parent / "models.json"
+    with configuration_lock(models_file):
+        replace_configuration(models_file, {
+            path: ("\n".join(lines) + ("\n" if lines else "")).encode(),
+            path.with_name(".env.backup"): optional_bytes(path),
+        })

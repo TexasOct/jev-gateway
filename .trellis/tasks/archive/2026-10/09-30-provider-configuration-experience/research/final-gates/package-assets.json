@@ -1,0 +1,5 @@
+{
+  "command": "python3 .trellis/tasks/09-30-provider-configuration-experience/research/verify-package-assets.py dist/jev_gateway-0.1.0-py3-none-any.whl dist/jev_gateway-0.1.0.tar.gz",
+  "exit": 0,
+  "seconds": 0.049
+}

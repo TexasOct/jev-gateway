@@ -1,0 +1,20 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "-c",
+    "/tmp/jev-provider-browser-evidence/capture.config.ts",
+    "--grep",
+    "unknown metadata remains blocked"
+  ],
+  "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+  "exit": 0,
+  "seconds": 1.521,
+  "counts": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "reason": "Temporary screenshot helper matched both hidden batch Tools and model Tools. Scope corrected to selected model only; tracked test sources unchanged."
+}

@@ -1,0 +1,5 @@
+{
+  "command": "npx --yes @google/design.md@0.4.0 lint --format json DESIGN.md",
+  "exit": 0,
+  "seconds": 2.121
+}

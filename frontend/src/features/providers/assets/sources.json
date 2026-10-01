@@ -1,0 +1,23 @@
+{
+  "deepseek": {
+    "file": "deepseek.svg",
+    "source": "https://raw.githubusercontent.com/deepseek-ai/DeepSeek-V2/ec98ee3cbffc32104cd55dba8af884b3d772602a/figures/logo.svg",
+    "official_reference": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README.md",
+    "license_source": "https://github.com/deepseek-ai/DeepSeek-V2/blob/ec98ee3cbffc32104cd55dba8af884b3d772602a/LICENSE-CODE",
+    "license": "MIT; Copyright (c) 2023 DeepSeek",
+    "attribution": "LICENSE-deepseek.txt",
+    "sha256": "ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b",
+    "usage": "Unmodified official repository artwork identifies the supplier. No endorsement is implied. Preserve proportions and color; use a white backing in either scheme.",
+    "verified_at": "2026-09-30"
+  },
+  "openai": {
+    "packaged": false,
+    "source": "https://openai.com/brand/",
+    "reason": "Prior source research recorded HTTP 403; no asset and usage terms verified for local packaging. Neutral initials fallback."
+  },
+  "anthropic": {
+    "packaged": false,
+    "source": "https://brandfolder.com/anthropic",
+    "reason": "Official brandfolder identified in prior research; no downloadable asset and usage terms verified for local packaging. Neutral initials fallback."
+  }
+}

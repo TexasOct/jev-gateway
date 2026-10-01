@@ -1,0 +1,21 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "-c",
+    "playwright.config.ts",
+    "tests/browser/monitoring.spec.ts:189",
+    "tests/browser/monitoring.spec.ts:206",
+    "tests/browser/responsive.spec.ts:8",
+    "--workers=1"
+  ],
+  "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+  "exit": 1,
+  "seconds": 38.623,
+  "counts": {
+    "passed": 0,
+    "failed": 3,
+    "skipped": 0
+  }
+}

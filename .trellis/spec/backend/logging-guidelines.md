@@ -72,7 +72,9 @@ The current allowlist is:
 decision_id, request_id, session_id, strategy, requested_model,
 route, provider, model, label, tier, mode, reason,
 reasoning_effort, reasoning_effort_source, switched_from,
-capability_gap, ok, latency_ms, error_type, record_kind
+capability_gap, ok, latency_ms, error_type, record_kind, dashboard_url,
+stream_stage, retry_attempted, retry_exhausted, original_exception_type,
+status_code, is_pre_first_chunk
 ```
 
 Fields outside this list are dropped. `tests/test_logging_config.py` verifies

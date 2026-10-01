@@ -1,0 +1,7 @@
+{
+  "command": "lsof -nP -iTCP:4178 -iTCP:4182 -sTCP:LISTEN",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "",
+  "noListeners": true
+}

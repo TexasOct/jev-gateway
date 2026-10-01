@@ -1,0 +1,47 @@
+[
+  {
+    "path": "frontend/src/tailwind.css",
+    "bytes": 2552,
+    "sha256": "85aac57c6f8b403104b012d2db21e928ae3a9df4d4a343802df7852f91bb386e"
+  },
+  {
+    "path": "frontend/src/styles.css",
+    "bytes": 22873,
+    "sha256": "35d7c48d6daaf1c875fd4548e08ea64c12ab0ddea825e7c01ae308585eb6488a"
+  },
+  {
+    "path": "frontend/src/monitoring/monitoring.css",
+    "bytes": 5610,
+    "sha256": "739f7adec1a6aaa720cb14393cf68596b9974805af25175c06504923064d4c07"
+  },
+  {
+    "path": "frontend/src/appearance/appearance.css",
+    "bytes": 2166,
+    "sha256": "f651e62388e620ea68d6c336ba88fe249cdf907582f8685a44c506b3c1a7ba42"
+  },
+  {
+    "path": "frontend/src/config/configured-route-flow.css",
+    "bytes": 687,
+    "sha256": "120b78c439c5bf8fdc88a007d712cfaaab33bc3f04998478bfc0f9406171c758"
+  },
+  {
+    "path": "frontend/src/config/routing-editor-presentation.css",
+    "bytes": 12241,
+    "sha256": "6c20ff355fe1aa6d504d47a1f5aea2d550f4fe6a1bc1368b5c6666b41f00deaa"
+  },
+  {
+    "path": "frontend/src/main.tsx",
+    "bytes": 458,
+    "sha256": "3d60adbc7b38c3aed6ba7f1e74e1a0671a9334ea3044ba2418294221a159e4a2"
+  },
+  {
+    "path": "frontend/src/ui/theme-contract.test.js",
+    "bytes": 1288,
+    "sha256": "66ab8c9b295a09deb22c903110332cde1717bec247a8480a0b514298d264e93c"
+  },
+  {
+    "path": "jev_gateway/static/assets/index-DnfXJdJH.css",
+    "bytes": 54842,
+    "sha256": "57f8149751c75adbe71a1b93cea3a407095c07fb295827e9a00dd6f758f60060"
+  }
+]

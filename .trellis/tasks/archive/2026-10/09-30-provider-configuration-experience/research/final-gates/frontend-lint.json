@@ -1,0 +1,6 @@
+{
+  "command": "npm run lint",
+  "cwd": "frontend",
+  "exit": 0,
+  "seconds": 3.694
+}

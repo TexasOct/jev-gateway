@@ -1,0 +1,352 @@
+Building source distribution...
+running egg_info
+writing jev_gateway.egg-info/PKG-INFO
+writing dependency_links to jev_gateway.egg-info/dependency_links.txt
+writing entry points to jev_gateway.egg-info/entry_points.txt
+writing requirements to jev_gateway.egg-info/requires.txt
+writing top-level names to jev_gateway.egg-info/top_level.txt
+reading manifest file 'jev_gateway.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'jev_gateway.egg-info/SOURCES.txt'
+running sdist
+running egg_info
+writing jev_gateway.egg-info/PKG-INFO
+writing dependency_links to jev_gateway.egg-info/dependency_links.txt
+writing entry points to jev_gateway.egg-info/entry_points.txt
+writing requirements to jev_gateway.egg-info/requires.txt
+writing top-level names to jev_gateway.egg-info/top_level.txt
+reading manifest file 'jev_gateway.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'jev_gateway.egg-info/SOURCES.txt'
+running check
+creating jev_gateway-0.1.0
+creating jev_gateway-0.1.0/jev_gateway
+creating jev_gateway-0.1.0/jev_gateway.egg-info
+creating jev_gateway-0.1.0/jev_gateway/cli
+creating jev_gateway-0.1.0/jev_gateway/logging
+creating jev_gateway-0.1.0/jev_gateway/provider
+creating jev_gateway-0.1.0/jev_gateway/static
+creating jev_gateway-0.1.0/jev_gateway/static/assets
+creating jev_gateway-0.1.0/jev_gateway/strategy
+creating jev_gateway-0.1.0/jev_gateway/strategy/decision_provider
+creating jev_gateway-0.1.0/jev_gateway/templates
+creating jev_gateway-0.1.0/tests
+copying files to jev_gateway-0.1.0...
+copying LICENSE -> jev_gateway-0.1.0
+copying README.md -> jev_gateway-0.1.0
+copying pyproject.toml -> jev_gateway-0.1.0
+copying jev_gateway/__init__.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/activity.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/canvas_layout.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/catalog.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/config.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/config_transaction.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/dashboard.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/decision.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/discovery_network.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/gateway.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/model_discovery.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/model_metadata.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/provider_config.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/provider_presets.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/reasoning.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/records.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/request_facts.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/routing_overlay.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway/sessions.py -> jev_gateway-0.1.0/jev_gateway
+copying jev_gateway.egg-info/PKG-INFO -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway.egg-info/SOURCES.txt -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway.egg-info/dependency_links.txt -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway.egg-info/entry_points.txt -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway.egg-info/requires.txt -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway.egg-info/top_level.txt -> jev_gateway-0.1.0/jev_gateway.egg-info
+copying jev_gateway/cli/__init__.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/config_ops.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/health.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/install_state.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/main.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/output.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/paths.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/process.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/providers.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/secrets.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/server.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/cli/uninstall.py -> jev_gateway-0.1.0/jev_gateway/cli
+copying jev_gateway/logging/__init__.py -> jev_gateway-0.1.0/jev_gateway/logging
+copying jev_gateway/logging/catalog.py -> jev_gateway-0.1.0/jev_gateway/logging
+copying jev_gateway/logging/config.py -> jev_gateway-0.1.0/jev_gateway/logging
+copying jev_gateway/provider/__init__.py -> jev_gateway-0.1.0/jev_gateway/provider
+copying jev_gateway/provider/base.py -> jev_gateway-0.1.0/jev_gateway/provider
+copying jev_gateway/provider/deepseek.py -> jev_gateway-0.1.0/jev_gateway/provider
+copying jev_gateway/static/index.html -> jev_gateway-0.1.0/jev_gateway/static
+copying jev_gateway/static/assets/deepseek-Bl9-59Mi.svg -> jev_gateway-0.1.0/jev_gateway/static/assets
+copying jev_gateway/static/assets/index-BIAwD2ys.js -> jev_gateway-0.1.0/jev_gateway/static/assets
+copying jev_gateway/static/assets/index-Bghjijcp.css -> jev_gateway-0.1.0/jev_gateway/static/assets
+copying jev_gateway/strategy/__init__.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/classifier.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/contracts.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/matrix.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/policy.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/registry.py -> jev_gateway-0.1.0/jev_gateway/strategy
+copying jev_gateway/strategy/decision_provider/__init__.py -> jev_gateway-0.1.0/jev_gateway/strategy/decision_provider
+copying jev_gateway/strategy/decision_provider/base.py -> jev_gateway-0.1.0/jev_gateway/strategy/decision_provider
+copying jev_gateway/strategy/decision_provider/system_one.py -> jev_gateway-0.1.0/jev_gateway/strategy/decision_provider
+copying jev_gateway/templates/env.example -> jev_gateway-0.1.0/jev_gateway/templates
+copying jev_gateway/templates/models.example.json -> jev_gateway-0.1.0/jev_gateway/templates
+copying tests/test_activity.py -> jev_gateway-0.1.0/tests
+copying tests/test_canvas_layout.py -> jev_gateway-0.1.0/tests
+copying tests/test_catalog.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_config_ops.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_home.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_install_state.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_main.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_managed_credentials.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_process.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_providers.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_review_regressions.py -> jev_gateway-0.1.0/tests
+copying tests/test_cli_templates.py -> jev_gateway-0.1.0/tests
+copying tests/test_custom_labels.py -> jev_gateway-0.1.0/tests
+copying tests/test_decision.py -> jev_gateway-0.1.0/tests
+copying tests/test_decision_matrix.py -> jev_gateway-0.1.0/tests
+copying tests/test_decision_provider.py -> jev_gateway-0.1.0/tests
+copying tests/test_decision_strategy.py -> jev_gateway-0.1.0/tests
+copying tests/test_discovery_network.py -> jev_gateway-0.1.0/tests
+copying tests/test_gateway.py -> jev_gateway-0.1.0/tests
+copying tests/test_install_script.py -> jev_gateway-0.1.0/tests
+copying tests/test_logging_config.py -> jev_gateway-0.1.0/tests
+copying tests/test_model_discovery.py -> jev_gateway-0.1.0/tests
+copying tests/test_model_metadata.py -> jev_gateway-0.1.0/tests
+copying tests/test_provider_adapters.py -> jev_gateway-0.1.0/tests
+copying tests/test_provider_config.py -> jev_gateway-0.1.0/tests
+copying tests/test_provider_config_regressions.py -> jev_gateway-0.1.0/tests
+copying tests/test_provider_management_api.py -> jev_gateway-0.1.0/tests
+copying tests/test_provider_onboarding_integration.py -> jev_gateway-0.1.0/tests
+copying tests/test_reasoning.py -> jev_gateway-0.1.0/tests
+copying tests/test_records.py -> jev_gateway-0.1.0/tests
+copying tests/test_release_validation.py -> jev_gateway-0.1.0/tests
+copying tests/test_routing_overlay.py -> jev_gateway-0.1.0/tests
+copying tests/test_routing_strategies.py -> jev_gateway-0.1.0/tests
+copying tests/test_sessions.py -> jev_gateway-0.1.0/tests
+copying tests/test_strategy_package.py -> jev_gateway-0.1.0/tests
+copying tests/test_task_aware_matrix.py -> jev_gateway-0.1.0/tests
+Writing jev_gateway-0.1.0/setup.cfg
+Creating tar archive
+removing 'jev_gateway-0.1.0' (and everything under it)
+Building wheel from source distribution...
+running egg_info
+writing jev_gateway.egg-info/PKG-INFO
+writing dependency_links to jev_gateway.egg-info/dependency_links.txt
+writing entry points to jev_gateway.egg-info/entry_points.txt
+writing requirements to jev_gateway.egg-info/requires.txt
+writing top-level names to jev_gateway.egg-info/top_level.txt
+reading manifest file 'jev_gateway.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'jev_gateway.egg-info/SOURCES.txt'
+running bdist_wheel
+running build
+running build_py
+creating build/lib/jev_gateway
+copying jev_gateway/catalog.py -> build/lib/jev_gateway
+copying jev_gateway/routing_overlay.py -> build/lib/jev_gateway
+copying jev_gateway/sessions.py -> build/lib/jev_gateway
+copying jev_gateway/gateway.py -> build/lib/jev_gateway
+copying jev_gateway/config.py -> build/lib/jev_gateway
+copying jev_gateway/records.py -> build/lib/jev_gateway
+copying jev_gateway/activity.py -> build/lib/jev_gateway
+copying jev_gateway/__init__.py -> build/lib/jev_gateway
+copying jev_gateway/discovery_network.py -> build/lib/jev_gateway
+copying jev_gateway/decision.py -> build/lib/jev_gateway
+copying jev_gateway/provider_config.py -> build/lib/jev_gateway
+copying jev_gateway/dashboard.py -> build/lib/jev_gateway
+copying jev_gateway/model_metadata.py -> build/lib/jev_gateway
+copying jev_gateway/config_transaction.py -> build/lib/jev_gateway
+copying jev_gateway/model_discovery.py -> build/lib/jev_gateway
+copying jev_gateway/canvas_layout.py -> build/lib/jev_gateway
+copying jev_gateway/provider_presets.py -> build/lib/jev_gateway
+copying jev_gateway/request_facts.py -> build/lib/jev_gateway
+copying jev_gateway/reasoning.py -> build/lib/jev_gateway
+creating build/lib/jev_gateway/provider
+copying jev_gateway/provider/__init__.py -> build/lib/jev_gateway/provider
+copying jev_gateway/provider/deepseek.py -> build/lib/jev_gateway/provider
+copying jev_gateway/provider/base.py -> build/lib/jev_gateway/provider
+creating build/lib/jev_gateway/cli
+copying jev_gateway/cli/server.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/paths.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/health.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/__init__.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/config_ops.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/providers.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/secrets.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/uninstall.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/process.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/install_state.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/main.py -> build/lib/jev_gateway/cli
+copying jev_gateway/cli/output.py -> build/lib/jev_gateway/cli
+creating build/lib/jev_gateway/logging
+copying jev_gateway/logging/catalog.py -> build/lib/jev_gateway/logging
+copying jev_gateway/logging/config.py -> build/lib/jev_gateway/logging
+copying jev_gateway/logging/__init__.py -> build/lib/jev_gateway/logging
+creating build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/matrix.py -> build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/classifier.py -> build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/registry.py -> build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/policy.py -> build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/__init__.py -> build/lib/jev_gateway/strategy
+copying jev_gateway/strategy/contracts.py -> build/lib/jev_gateway/strategy
+creating build/lib/jev_gateway/strategy/decision_provider
+copying jev_gateway/strategy/decision_provider/__init__.py -> build/lib/jev_gateway/strategy/decision_provider
+copying jev_gateway/strategy/decision_provider/system_one.py -> build/lib/jev_gateway/strategy/decision_provider
+copying jev_gateway/strategy/decision_provider/base.py -> build/lib/jev_gateway/strategy/decision_provider
+running egg_info
+writing jev_gateway.egg-info/PKG-INFO
+writing dependency_links to jev_gateway.egg-info/dependency_links.txt
+writing entry points to jev_gateway.egg-info/entry_points.txt
+writing requirements to jev_gateway.egg-info/requires.txt
+writing top-level names to jev_gateway.egg-info/top_level.txt
+reading manifest file 'jev_gateway.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'jev_gateway.egg-info/SOURCES.txt'
+creating build/lib/jev_gateway/static
+copying jev_gateway/static/index.html -> build/lib/jev_gateway/static
+creating build/lib/jev_gateway/static/assets
+copying jev_gateway/static/assets/index-BIAwD2ys.js -> build/lib/jev_gateway/static/assets
+copying jev_gateway/static/assets/index-Bghjijcp.css -> build/lib/jev_gateway/static/assets
+copying jev_gateway/static/assets/deepseek-Bl9-59Mi.svg -> build/lib/jev_gateway/static/assets
+creating build/lib/jev_gateway/templates
+copying jev_gateway/templates/models.example.json -> build/lib/jev_gateway/templates
+copying jev_gateway/templates/env.example -> build/lib/jev_gateway/templates
+warning: build_py: byte-compiling is disabled, skipping.
+
+installing to build/bdist.macosx-26.0-arm64/wheel
+running install
+running install_lib
+creating build/bdist.macosx-26.0-arm64/wheel
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway
+copying build/lib/jev_gateway/catalog.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/routing_overlay.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/sessions.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/gateway.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/config.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/records.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/provider
+copying build/lib/jev_gateway/provider/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/provider
+copying build/lib/jev_gateway/provider/deepseek.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/provider
+copying build/lib/jev_gateway/provider/base.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/provider
+copying build/lib/jev_gateway/activity.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/discovery_network.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/cli
+copying build/lib/jev_gateway/cli/server.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/paths.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/health.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/config_ops.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/providers.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/secrets.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/uninstall.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/process.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/install_state.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/main.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/cli/output.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/cli
+copying build/lib/jev_gateway/decision.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/provider_config.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/dashboard.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/model_metadata.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/config_transaction.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/static
+copying build/lib/jev_gateway/static/index.html -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/static
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/static/assets
+copying build/lib/jev_gateway/static/assets/index-BIAwD2ys.js -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/static/assets
+copying build/lib/jev_gateway/static/assets/index-Bghjijcp.css -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/static/assets
+copying build/lib/jev_gateway/static/assets/deepseek-Bl9-59Mi.svg -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/static/assets
+copying build/lib/jev_gateway/model_discovery.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/canvas_layout.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/provider_presets.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+copying build/lib/jev_gateway/request_facts.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/templates
+copying build/lib/jev_gateway/templates/models.example.json -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/templates
+copying build/lib/jev_gateway/templates/env.example -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/templates
+copying build/lib/jev_gateway/reasoning.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/logging
+copying build/lib/jev_gateway/logging/catalog.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/logging
+copying build/lib/jev_gateway/logging/config.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/logging
+copying build/lib/jev_gateway/logging/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/logging
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/matrix.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/classifier.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/registry.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/policy.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+copying build/lib/jev_gateway/strategy/contracts.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway/strategy/decision_provider
+copying build/lib/jev_gateway/strategy/decision_provider/__init__.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy/decision_provider
+copying build/lib/jev_gateway/strategy/decision_provider/system_one.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy/decision_provider
+copying build/lib/jev_gateway/strategy/decision_provider/base.py -> build/bdist.macosx-26.0-arm64/wheel/./jev_gateway/strategy/decision_provider
+warning: install_lib: byte-compiling is disabled, skipping.
+
+running install_egg_info
+Copying jev_gateway.egg-info to build/bdist.macosx-26.0-arm64/wheel/./jev_gateway-0.1.0-py3.14.egg-info
+running install_scripts
+creating build/bdist.macosx-26.0-arm64/wheel/jev_gateway-0.1.0.dist-info/WHEEL
+creating '/Users/texas/Workspace/jev-llmroute-test/dist/.tmp-_pv8crfo/jev_gateway-0.1.0-py3-none-any.whl' and adding 'build/bdist.macosx-26.0-arm64/wheel' to it
+adding 'jev_gateway/__init__.py'
+adding 'jev_gateway/activity.py'
+adding 'jev_gateway/canvas_layout.py'
+adding 'jev_gateway/catalog.py'
+adding 'jev_gateway/config.py'
+adding 'jev_gateway/config_transaction.py'
+adding 'jev_gateway/dashboard.py'
+adding 'jev_gateway/decision.py'
+adding 'jev_gateway/discovery_network.py'
+adding 'jev_gateway/gateway.py'
+adding 'jev_gateway/model_discovery.py'
+adding 'jev_gateway/model_metadata.py'
+adding 'jev_gateway/provider_config.py'
+adding 'jev_gateway/provider_presets.py'
+adding 'jev_gateway/reasoning.py'
+adding 'jev_gateway/records.py'
+adding 'jev_gateway/request_facts.py'
+adding 'jev_gateway/routing_overlay.py'
+adding 'jev_gateway/sessions.py'
+adding 'jev_gateway/cli/__init__.py'
+adding 'jev_gateway/cli/config_ops.py'
+adding 'jev_gateway/cli/health.py'
+adding 'jev_gateway/cli/install_state.py'
+adding 'jev_gateway/cli/main.py'
+adding 'jev_gateway/cli/output.py'
+adding 'jev_gateway/cli/paths.py'
+adding 'jev_gateway/cli/process.py'
+adding 'jev_gateway/cli/providers.py'
+adding 'jev_gateway/cli/secrets.py'
+adding 'jev_gateway/cli/server.py'
+adding 'jev_gateway/cli/uninstall.py'
+adding 'jev_gateway/logging/__init__.py'
+adding 'jev_gateway/logging/catalog.py'
+adding 'jev_gateway/logging/config.py'
+adding 'jev_gateway/provider/__init__.py'
+adding 'jev_gateway/provider/base.py'
+adding 'jev_gateway/provider/deepseek.py'
+adding 'jev_gateway/static/index.html'
+adding 'jev_gateway/static/assets/deepseek-Bl9-59Mi.svg'
+adding 'jev_gateway/static/assets/index-BIAwD2ys.js'
+adding 'jev_gateway/static/assets/index-Bghjijcp.css'
+adding 'jev_gateway/strategy/__init__.py'
+adding 'jev_gateway/strategy/classifier.py'
+adding 'jev_gateway/strategy/contracts.py'
+adding 'jev_gateway/strategy/matrix.py'
+adding 'jev_gateway/strategy/policy.py'
+adding 'jev_gateway/strategy/registry.py'
+adding 'jev_gateway/strategy/decision_provider/__init__.py'
+adding 'jev_gateway/strategy/decision_provider/base.py'
+adding 'jev_gateway/strategy/decision_provider/system_one.py'
+adding 'jev_gateway/templates/env.example'
+adding 'jev_gateway/templates/models.example.json'
+adding 'jev_gateway-0.1.0.dist-info/licenses/LICENSE'
+adding 'jev_gateway-0.1.0.dist-info/METADATA'
+adding 'jev_gateway-0.1.0.dist-info/WHEEL'
+adding 'jev_gateway-0.1.0.dist-info/entry_points.txt'
+adding 'jev_gateway-0.1.0.dist-info/top_level.txt'
+adding 'jev_gateway-0.1.0.dist-info/RECORD'
+removing build/bdist.macosx-26.0-arm64/wheel
+Successfully built dist/jev_gateway-0.1.0.tar.gz
+Successfully built dist/jev_gateway-0.1.0-py3-none-any.whl

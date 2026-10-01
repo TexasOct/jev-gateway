@@ -1,0 +1,12 @@
+[
+  {
+    "archive": "jev_gateway-0.1.0-py3-none-any.whl",
+    "forbidden_local_config_files": [],
+    "missing_provider_modules": []
+  },
+  {
+    "archive": "jev_gateway-0.1.0.tar.gz",
+    "forbidden_local_config_files": [],
+    "missing_provider_modules": []
+  }
+]

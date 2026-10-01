@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Frontend dashboard contracts, packaging, responsive list behavior, and canvas constraints"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/design-language.md", "reason": "Canonical shared visual tokens, composition, responsive rules, and exclusions"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/interaction-analysis.md", "reason": "Approved follow-up fixes the top two evidence/preview clarity findings only"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-routing-analysis.md", "reason": "Reference evidence, existing policy graph semantics, motion safety and data-scope decision"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/tailwind-migration.md", "reason": "Official Vite and Preflight migration approach and protected dynamic theme/geometry boundaries"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/overhaul-architecture.md", "reason": "Current graph/draft/layout boundaries and Tailwind/shadcn integration risks"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-reference-capture.md", "reason": "Verified routing demo geometry and animation behavior, with illustrative-data exclusions"}

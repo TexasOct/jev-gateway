@@ -1,0 +1,35 @@
+
+Running 5 tests using 1 worker
+
+  ✓  1 ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:44:5 › 1280 English light: local DeepSeek library and custom form keyboard behavior (488ms)
+  ✓  2 ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:83:5 › 320 Chinese dark: custom provider complete form (356ms)
+  ✘  3 ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:97:5 › 390 English dark: unknown metadata remains blocked (344ms)
+  ✓  4 ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:114:5 › 1280 English light: conflicting metadata exposes source review (504ms)
+  ✓  5 ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:158:5 › 390 English dark: first entry stays read only before and after load (202ms)
+
+
+  1) ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:97:5 › 390 English dark: unknown metadata remains blocked 
+
+    Error: locator.focus: Error: strict mode violation: getByLabel('Tools', { exact: true }) resolved to 2 elements:
+        1) <select id="batch-tools" class="min-h-11 w-full min-w-0 max-w-full rounded-md border border-outline bg-panel px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">…</select> aka locator('#batch-tools')
+        2) <select id="model-0-tools" class="min-h-11 w-full min-w-0 max-w-full rounded-md border border-outline bg-panel px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">…</select> aka getByRole('region', { name: 'fixture/manual-unknown' }).getByLabel('Tools')
+
+    Call log:
+      - waiting for getByLabel('Tools', { exact: true })
+
+
+      34 | }
+      35 | async function tabFocus(page: Page, label: string) {
+    > 36 |   await page.getByLabel(label, { exact: true }).focus();
+         |                                                 ^
+      37 |   await page.keyboard.press("Tab");
+      38 |   const focused = await page.evaluate(() => { const element = document.activeElement as HTMLElement; return { tag: element.tagName, name: element.getAttribute("name"), text: element.textContent, outlineStyle: getComputedStyle(element).outlineStyle, outlineWidth: getComputedStyle(element).outlineWidth }; });
+      39 |   expect(focused.outlineStyle).not.toBe("none");
+        at tabFocus (/private/tmp/jev-provider-browser-evidence/capture.spec.ts:36:49)
+        at /private/tmp/jev-provider-browser-evidence/capture.spec.ts:110:23
+
+    Error Context: ../../../../../tmp/jev-provider-browser-evidence/results/capture-390-English-dark-unknown-metadata-remains-blocked/error-context.md
+
+  1 failed
+    ../../../../../private/tmp/jev-provider-browser-evidence/capture.spec.ts:97:5 › 390 English dark: unknown metadata remains blocked 
+  4 passed (3.0s)

@@ -1,0 +1,92 @@
+[
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/01-library-1280-en-light.png",
+    "dimensions": [
+      1280,
+      900
+    ],
+    "bytes": 102357,
+    "geometry": {
+      "viewport": 1280,
+      "document": 1280,
+      "body": 1280,
+      "scheme": "light",
+      "pageHeight": 900
+    }
+  },
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/02-custom-1280-en-light.png",
+    "dimensions": [
+      1280,
+      900
+    ],
+    "bytes": 95819,
+    "geometry": {
+      "viewport": 1280,
+      "document": 1280,
+      "body": 1280,
+      "scheme": "light",
+      "pageHeight": 900
+    }
+  },
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/03-custom-320-zh-dark.png",
+    "dimensions": [
+      320,
+      1407
+    ],
+    "bytes": 89594,
+    "geometry": {
+      "viewport": 320,
+      "document": 320,
+      "body": 320,
+      "scheme": "dark",
+      "pageHeight": 1407
+    }
+  },
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/04-metadata-unknown-390-en-dark.png",
+    "dimensions": [
+      390,
+      2597
+    ],
+    "bytes": 178682,
+    "geometry": {
+      "viewport": 390,
+      "document": 390,
+      "body": 390,
+      "scheme": "dark",
+      "pageHeight": 2597
+    }
+  },
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/05-metadata-conflict-1280-en-light.png",
+    "dimensions": [
+      1280,
+      1800
+    ],
+    "bytes": 176038,
+    "geometry": {
+      "viewport": 1280,
+      "document": 1280,
+      "body": 1280,
+      "scheme": "light",
+      "pageHeight": 1800
+    }
+  },
+  {
+    "path": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/06-readonly-first-entry-390-en-dark.png",
+    "dimensions": [
+      390,
+      900
+    ],
+    "bytes": 38412,
+    "geometry": {
+      "viewport": 390,
+      "document": 390,
+      "body": 390,
+      "scheme": "dark",
+      "pageHeight": 900
+    }
+  }
+]

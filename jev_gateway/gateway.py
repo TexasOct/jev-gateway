@@ -10,14 +10,13 @@ import re
 import threading
 import time
 import warnings
-from collections.abc import AsyncIterator, Iterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Generator, Iterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, replace
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, cast
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -25,6 +24,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from jev_gateway.activity import ActivityPath, ActivityRegistry
 from jev_gateway.catalog import (
     Catalog,
     GatewaySettings,
@@ -46,6 +46,9 @@ from jev_gateway.decision import (
 )
 from jev_gateway.logging.config import safe_traceback
 from jev_gateway.provider import adapter_for
+from jev_gateway.provider_config import ProviderConfiguration, RevisionConflict, credential_snapshot, metadata_envelope
+from jev_gateway.config_transaction import configuration_lock, configuration_read_lock, require_readable_configuration
+from jev_gateway import model_discovery, model_metadata
 from jev_gateway.reasoning import leaves_payload_alone
 from jev_gateway.records import (
     RecordStore,
@@ -139,6 +142,8 @@ class GatewayConfig:
     session_strategy: str
     echo_requested_model: bool = True
     models_file: Path = Path("models.json")
+    routing_activity: ActivityRegistry | None = None
+    credential_environment: dict[str, str] | None = None
 
     def apply_settings(self, settings: GatewaySettings) -> None:
         """Apply reloadable catalog settings without changing the bound socket."""
@@ -175,8 +180,16 @@ def load_gateway_config(models_file: Path | None = None) -> GatewayConfig:
     """Build the gateway configuration from the selected catalog file."""
     path = models_file or runtime_directory() / "models.json"
     path = path.expanduser().resolve()
-    load_dotenv(path.parent / ".env", override=True)
-    catalog = _resolve_storage_path(load_catalog_with_overlay(path), path)
+    external = dict(os.environ)
+    with configuration_read_lock(path):
+        env = credential_snapshot(path, external=external)
+        document = read_models_document(path)
+        overlay, _error = read_overlay(path)
+        try:
+            catalog = catalog_from_document(merge_overlay(document, overlay), str(path), env)
+        except (ValueError, TypeError):
+            catalog = catalog_from_document(document, str(path), env)
+    catalog = _resolve_storage_path(catalog, path)
     settings: GatewaySettings = catalog.gateway
     return GatewayConfig(
         engine=RoutingEngine(
@@ -193,6 +206,7 @@ def load_gateway_config(models_file: Path | None = None) -> GatewayConfig:
         session_strategy=settings.session_strategy,
         echo_requested_model=settings.echo_requested_model,
         models_file=path,
+        credential_environment=external,
     )
 
 
@@ -420,6 +434,7 @@ def error_body(
 def create_app(config: GatewayConfig | None = None) -> FastAPI:
     """Create the gateway app. Supplying a config makes the app easy to test."""
     active = config or load_gateway_config()
+    activity = active.routing_activity or ActivityRegistry()
     reload_lock = threading.Lock()
 
     @asynccontextmanager
@@ -433,10 +448,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 "dashboard available",
                 extra={"dashboard_url": dashboard_url(settings.host, settings.port)},
             )
-        yield
+        try:
+            yield
+        finally:
+            activity.clear()
 
     app = FastAPI(title="JEV LiteLLM gateway", version="0.2.0", lifespan=lifespan)
     app.state.jev_config = active
+    active.routing_activity = activity
+    app.state.routing_activity = activity
 
     @app.exception_handler(StarletteHTTPException)
     async def openai_error_response(
@@ -711,6 +731,95 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 ),
             )
 
+    provider_service = ProviderConfiguration(active.models_file, external=active.credential_environment)
+
+    def provider_error(error: Exception) -> HTTPException:
+        if isinstance(error, RevisionConflict):
+            return HTTPException(409, detail=error_body("Configuration changed. Refresh before applying.", code="revision_conflict"))
+        if isinstance(error, (ValueError, TypeError)):
+            return HTTPException(400, detail=error_body("Provider configuration is invalid. Check fields, credentials, and references.", code="invalid_configuration"))
+        return HTTPException(500, detail=error_body("Could not apply provider configuration.", code="provider_configuration_failed"))
+
+    @app.get("/v1/provider-configuration")
+    def provider_configuration(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_gateway_key(active.gateway_api_key, authorization)
+        try:
+            with reload_lock:
+                return provider_service.read(write_available=bool(active.gateway_api_key))
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
+            raise provider_error(error) from None
+
+    def provider_command(body: dict[str, Any], *, apply: bool) -> dict[str, Any]:
+        with reload_lock:
+            previous_catalog = active.engine.catalog
+            previous_registry = active.engine.strategies
+            previous_source = active.engine.config_source
+
+            def prepare(catalog: Catalog) -> Any:
+                resolved = _resolve_storage_path(catalog, active.models_file)
+                if resolved.storage != previous_catalog.storage:
+                    raise ValueError("Storage settings require a restart.")
+                return active.engine.prepare_catalog_reload(resolved)
+
+            def activate(catalog: Catalog, registry: Any) -> None:
+                resolved = _resolve_storage_path(catalog, active.models_file)
+                active.engine.reload_catalog(resolved, source=str(active.models_file), registry=registry)
+                active.apply_settings(resolved.gateway)
+
+            def restore() -> None:
+                active.engine.reload_catalog(previous_catalog, source=previous_source, registry=previous_registry)
+                active.apply_settings(previous_catalog.gateway)
+
+            try:
+                return provider_service.command(body, apply=apply, prepare=prepare, activate=activate, restore_runtime=restore)
+            except Exception as error:
+                # Transaction recovery and all public errors deliberately exclude exception text.
+                raise provider_error(error) from None
+
+    @app.post("/v1/provider-configuration/validate")
+    def validate_provider_configuration(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        return provider_command(body, apply=False)
+
+    @app.put("/v1/provider-configuration")
+    def apply_provider_configuration(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        return provider_command(body, apply=True)
+
+    @app.post("/v1/provider-discovery")
+    def provider_discovery(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        try:
+            if set(body) - {"provider_id", "provider", "credential"}:
+                raise ValueError("Unknown discovery fields.")
+            provider, key, imported = provider_service.discovery_provider(body)
+            result = model_discovery.discover_models(provider, key, imported_ids=imported)
+            for item in result.get("items", []):
+                item["metadata_envelope"] = metadata_envelope(item["metadata"])
+            return result
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
+            raise provider_error(error) from None
+
+    @app.post("/v1/provider-metadata")
+    def provider_metadata(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        try:
+            if set(body) - {"provider_id", "provider", "credential", "upstream_models", "refresh"}:
+                raise ValueError("Unknown metadata fields.")
+            models = body.get("upstream_models")
+            if not isinstance(models, list) or not models or len(models) > 1000 or any(not isinstance(item, str) or not item.strip() or len(item) > 512 for item in models):
+                raise ValueError("upstream_models must be a bounded nonempty string list.")
+            refresh = body.get("refresh", False)
+            if type(refresh) is not bool:
+                raise ValueError("refresh must be a boolean.")
+            provider, _key, _imported = provider_service.discovery_provider(body)
+            result = model_metadata.lookup_model_metadata(provider, models, refresh=refresh)
+            for item in result.get("items", []):
+                item["metadata"] = metadata_envelope(item)
+            return result
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
+            raise provider_error(error) from None
+
     # Registered here, after the write guard exists, so the dashboard router can
     # share it. Mounting is additive: it never shadows a /v1 route.
     app.include_router(
@@ -730,13 +839,14 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
 
     def prepare_overlay(payload: Any) -> tuple[Catalog, Any, list[dict[str, str]]]:
         """Validate the complete candidate without changing active routing."""
+        require_readable_configuration(active.models_file)
         baseline = read_models_document(active.models_file)
         overlay = validate_overlay_shape(payload)
         if not overlay:
             raise ValueError("Overlay requires version, strategy, and rules or models.")
         merged = merge_overlay(baseline, overlay)
         catalog = _resolve_storage_path(
-            catalog_from_document(merged, str(active.models_file)), active.models_file
+            catalog_from_document(merged, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment)), active.models_file
         )
         registry = active.engine.prepare_catalog_reload(catalog)
         if catalog.storage != active.engine.catalog.storage:
@@ -755,7 +865,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         require_gateway_key(active.gateway_api_key, authorization)
-        with reload_lock:
+        with reload_lock, configuration_lock(active.models_file):
             catalog = active.engine.catalog
             definition = next(
                 (item for item in catalog.strategies if item.name == "task_aware"), None
@@ -767,9 +877,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 )
             options = definition.as_dict()["options"]
             try:
+                require_readable_configuration(active.models_file)
                 baseline = read_models_document(active.models_file)
                 overlay, overlay_error = read_overlay(active.models_file)
-            except (TypeError, ValueError) as error:
+            except (TypeError, ValueError, RuntimeError) as error:
                 raise invalid_configuration(error) from error
             baseline_models = {
                 f"{item['provider']}/{item['upstream_model']}": item
@@ -850,7 +961,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         require_config_write(authorization)
         try:
-            _catalog, _registry, warnings = prepare_overlay(body)
+            with reload_lock, configuration_lock(active.models_file):
+                _catalog, _registry, warnings = prepare_overlay(body)
             return {
                 "valid": True, "warnings": warnings,
                 "diff": {
@@ -868,7 +980,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         body: dict[str, Any], authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         require_config_write(authorization)
-        with reload_lock:
+        with reload_lock, configuration_lock(active.models_file):
             try:
                 catalog, registry, warnings = prepare_overlay(body)
             except (ValueError, TypeError, RuntimeError) as error:
@@ -916,11 +1028,12 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         require_config_write(authorization)
-        with reload_lock:
+        with reload_lock, configuration_lock(active.models_file):
             try:
+                require_readable_configuration(active.models_file)
                 baseline = read_models_document(active.models_file)
                 catalog = _resolve_storage_path(
-                    catalog_from_document(baseline, str(active.models_file)), active.models_file
+                    catalog_from_document(baseline, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment)), active.models_file
                 )
                 registry = active.engine.prepare_catalog_reload(catalog)
                 if catalog.storage != active.engine.catalog.storage:
@@ -968,10 +1081,24 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         """Re-read the routing configuration without restarting the process."""
         require_gateway_key(active.gateway_api_key, authorization)
+        with reload_lock, configuration_lock(active.models_file):
+            try:
+                require_readable_configuration(active.models_file)
+            except RuntimeError as error:
+                raise invalid_configuration(error) from None
+            return reload_locked()
+
+    def reload_locked() -> dict[str, Any]:
         try:
-            load_dotenv(active.models_file.parent / ".env", override=True)
+            env = credential_snapshot(active.models_file, external=active.credential_environment)
+            document = read_models_document(active.models_file)
+            overlay, _overlay_error = read_overlay(active.models_file)
+            try:
+                parsed = catalog_from_document(merge_overlay(document, overlay), str(active.models_file), env)
+            except (ValueError, TypeError):
+                parsed = catalog_from_document(document, str(active.models_file), env)
             catalog = _resolve_storage_path(
-                load_catalog_with_overlay(active.models_file), active.models_file
+                parsed, active.models_file
             )
         except (TypeError, ValueError, RuntimeError) as error:
             raise HTTPException(
@@ -1025,27 +1152,26 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     }
                 },
             ) from error
-        with reload_lock:
-            try:
-                active.engine.record_store.reconfigure(catalog.storage)
-            except StorageUnavailableError as error:
-                raise HTTPException(
-                    status_code=503,
-                    detail={
-                        "error": {
-                            "message": f"Reload rejected: {error}",
-                            "type": "server_error",
-                            "param": "storage",
-                            "code": "storage_unavailable",
-                        }
-                    },
-                ) from error
-            active.engine.reload_catalog(
-                catalog,
-                source=str(active.models_file),
-                registry=registry,
-            )
-            active.apply_settings(catalog.gateway)
+        try:
+            active.engine.record_store.reconfigure(catalog.storage)
+        except StorageUnavailableError as error:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": {
+                        "message": f"Reload rejected: {error}",
+                        "type": "server_error",
+                        "param": "storage",
+                        "code": "storage_unavailable",
+                    }
+                },
+            ) from error
+        active.engine.reload_catalog(
+            catalog,
+            source=str(active.models_file),
+            registry=registry,
+        )
+        active.apply_settings(catalog.gateway)
         return {
             "reloaded": True,
             "models_file": str(active.models_file),
@@ -1218,6 +1344,14 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             },
         )
 
+        activity_path = ActivityPath(
+            strategy=decision.strategy,
+            route=decision.route_name,
+            provider=decision.provider,
+            upstream_model=decision.model,
+        )
+        activity_token = decision.request_id or request_id
+        activity_tracked = activity.begin_request(activity_token, activity_path)
         started = time.perf_counter()
         try:
             from litellm import completion
@@ -1253,10 +1387,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                             "error_type": _safe_error_type(error),
                         },
                     )
+            if body.stream:
+                activity.mark_stream(activity_token)
             response = completion(**payload)
         except HTTPException:
+            if activity_tracked:
+                activity.finish_request(activity_token)
             raise
         except Exception as error:
+            if activity_tracked:
+                activity.finish_request(activity_token)
             latency_ms = (time.perf_counter() - started) * 1000
             error_type = _safe_error_type(error)
             active.engine.record_outcome(
@@ -1295,12 +1435,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     }
                 },
             ) from None
+        except BaseException:
+            if activity_tracked:
+                activity.finish_request(activity_token)
+            raise
 
         headers = decision_headers(decision)
         echoed_model = body.model if active.echo_requested_model else None
-        response_capture = adapter_for(profile.provider_type).capture_response(
-            session, active.engine.record_store
-        )
+        response_adapter = adapter_for(profile.provider_type)
+        try:
+            response_capture = response_adapter.capture_response(
+                session, active.engine.record_store
+            )
+        except BaseException:
+            if activity_tracked:
+                activity.finish_request(activity_token)
+            raise
         if body.stream:
             logger.debug(
                 "routing stream started",
@@ -1311,15 +1461,18 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 },
             )
 
-            def recorded_stream() -> Iterator[str]:
+            def recorded_stream() -> Generator[str, None, None]:
                 ok = True
                 error_type: str | None = None
+                completed = False
+
                 try:
                     yield from sse_chunks(
                         cast(Iterator[Any], response),
                         echoed_model,
                         response_capture.observe,
                     )
+                    completed = True
                 except Exception as error:
                     ok = False
                     error_type = _safe_error_type(error)
@@ -1341,9 +1494,13 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     error.__traceback__ = None
                     error.__cause__ = None
                     error.__context__ = None
-                    raise RuntimeError(UPSTREAM_FAILURE_MESSAGE) from None
+                    return
                 finally:
-                    response_capture.finish()
+                    if not completed:
+                        ok = False
+                        error_type = error_type or "StreamInterrupted"
+                    if activity_tracked:
+                        activity.finish_request(activity_token)
                     active.engine.record_outcome(
                         decision,
                         ok=ok,
@@ -1364,12 +1521,35 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                             },
                         )
 
-            return StreamingResponse(
-                recorded_stream(),
-                media_type="text/event-stream",
-                headers={**headers, "Cache-Control": "no-cache"},
-            )
+            stream_body = recorded_stream()
 
+            class ActivityStreamingResponse(StreamingResponse):
+                async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+                    try:
+                        await super().__call__(scope, receive, send)
+                    finally:
+                        if activity_tracked:
+                            activity.finish_request(activity_token)
+                        # AnyIO may still be exiting a worker-thread next() on cancellation.
+                        # Closing an executing generator raises ValueError; its token is
+                        # already finished, so this must not mask disconnect/cancellation.
+                        with suppress(ValueError):
+                            stream_body.close()
+
+            try:
+                return ActivityStreamingResponse(
+                    stream_body,
+                    media_type="text/event-stream",
+                    headers={**headers, "Cache-Control": "no-cache"},
+                )
+            except BaseException:
+                if activity_tracked:
+                    activity.finish_request(activity_token)
+                stream_body.close()
+                raise
+
+        if activity_tracked:
+            activity.finish_request(activity_token)
         result_body = response_data(response)
         response_capture.observe(result_body)
         response_capture.finish()

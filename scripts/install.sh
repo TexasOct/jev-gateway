@@ -202,4 +202,9 @@ if [ "$no_init" -eq 0 ]; then
     "$bin_dir/jev" --home "$home" install init --ref "$ref" --method isolated
   fi
 fi
+if [ "$init_args" = wheel ]; then
+  if ! "$bin_dir/jev" --home "$home" restart-if-running; then
+    fail "wheel installed, but automatic gateway restart failed. Inspect the PID file and logs; run jev --home '$home' status, then jev --home '$home' start once safe."
+  fi
+fi
 case ":$PATH:" in *":$bin_dir:"*) ;; *) echo "Add $bin_dir to PATH to run jev and jev-gateway." ;; esac

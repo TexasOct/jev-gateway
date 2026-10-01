@@ -1,0 +1,9 @@
+# Structural contract follow-up
+
+The current frontend tree had three location mismatches with the requested target. This pass moved dashboard API response/write interfaces into `frontend/src/shared/api/types.ts`, retaining `ApiError`, the module-memory credential, request handling and endpoint calls in `client.ts`. Runtime imports continue to use `client.ts`; type-only consumers, including browser fixtures and `client.test.ts`, use `types.ts`.
+
+`RoutingCanvas.tsx`, `ConfiguredRouteFlow.tsx` and the latter's colocated test now sit directly under `frontend/src/features/routing/`. Their model, shared, node-card and editor imports were adjusted for the new locations. No route projection, canvas gesture, persistence or API behavior was edited. Current-path references in `frontend/src/shared/ui/README.md` and `.trellis/spec/backend/dashboard-routing-config.md` were updated.
+
+Verification on the relocated tree: frontend ESLint exited successfully with four existing React Refresh warnings in `shared/i18n/index.tsx`; Vitest passed 25 files and 186 tests; TypeScript/Vite build passed with the existing >500 kB chunk warning; eight isolated synthetic Playwright browser tests passed, including native pointer drag without policy writes; `scripts/build-frontend.sh --check` reported a current bundle. A focused source/docs path scan found none of the superseded references in the maintained spec or shared UI README. `git diff --check` over the entire staged worktree still reports unrelated pre-existing whitespace in monitoring, button variants, browser specs and a Python test. This pass corrected the trailing blank line in the newly separated `types.ts`.
+
+This is a structural checkpoint, not completion of R6. Tailwind presentation migration and the full visual acceptance matrix remain for a separate owner. Historic research files retain their original at-the-time paths as evidence.

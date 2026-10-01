@@ -1,0 +1,52 @@
+[
+  {
+    "task": "09-30-provider-configuration-experience",
+    "exit": 0,
+    "tail": [
+      "  \u001b[1;33mcheck.jsonl:6: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it\u001b[0m",
+      "  \u001b[0;32mcheck.jsonl: \u2713 (18 entries)\u001b[0m",
+      "",
+      "\u001b[0;32m\u2713 All validations passed\u001b[0m"
+    ]
+  },
+  {
+    "task": "09-30-provider-profile-config",
+    "exit": 0,
+    "tail": [
+      "  \u001b[1;33mcheck.jsonl:4: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it\u001b[0m",
+      "  \u001b[0;32mcheck.jsonl: \u2713 (13 entries)\u001b[0m",
+      "",
+      "\u001b[0;32m\u2713 All validations passed\u001b[0m"
+    ]
+  },
+  {
+    "task": "09-30-provider-model-discovery",
+    "exit": 0,
+    "tail": [
+      "  \u001b[1;33mcheck.jsonl:12: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it\u001b[0m",
+      "  \u001b[0;32mcheck.jsonl: \u2713 (13 entries)\u001b[0m",
+      "",
+      "\u001b[0;32m\u2713 All validations passed\u001b[0m"
+    ]
+  },
+  {
+    "task": "09-30-provider-library-onboarding",
+    "exit": 0,
+    "tail": [
+      "  \u001b[1;33mcheck.jsonl:1: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it\u001b[0m",
+      "  \u001b[0;32mcheck.jsonl: \u2713 (10 entries)\u001b[0m",
+      "",
+      "\u001b[0;32m\u2713 All validations passed\u001b[0m"
+    ]
+  },
+  {
+    "task": "09-30-dashboard-design-baseline",
+    "exit": 0,
+    "tail": [
+      "  \u001b[1;33mcheck.jsonl:1: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it\u001b[0m",
+      "  \u001b[0;32mcheck.jsonl: \u2713 (7 entries)\u001b[0m",
+      "",
+      "\u001b[0;32m\u2713 All validations passed\u001b[0m"
+    ]
+  }
+]

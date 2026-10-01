@@ -1,0 +1,40 @@
+{
+  "id": "dashboard-ui-layout-redesign",
+  "name": "dashboard-ui-layout-redesign",
+  "title": "Redesign dashboard UI and layout",
+  "description": "Redesign the gateway dashboard across independently verifiable surfaces while preserving operational behavior.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-27",
+  "completedAt": "2026-09-30",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "merged",
+      "merged_into": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul",
+      "acceptance_owners": [
+        ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul",
+        ".trellis/tasks/archive/2026-10/09-28-strategy-canvas-visual-redesign",
+        ".trellis/tasks/archive/2026-10/09-28-dashboard-shell-visual-system",
+        ".trellis/tasks/archive/2026-10/09-28-dashboard-appearance-redesign"
+      ],
+      "acceptance_map": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/legacy-task-consolidation.md",
+      "acceptance_complete": false,
+      "user_approved": true
+    }
+  }
+}

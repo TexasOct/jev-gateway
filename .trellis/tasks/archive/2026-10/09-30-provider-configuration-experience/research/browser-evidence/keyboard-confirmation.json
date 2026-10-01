@@ -1,0 +1,34 @@
+{
+  "libraryFocus": {
+    "tag": "BUTTON",
+    "name": null,
+    "text": "OPOpenAIopenai",
+    "outlineStyle": "solid",
+    "outlineWidth": "2px"
+  },
+  "formFocus": {
+    "tag": "SELECT",
+    "name": null,
+    "text": "Unknown: choose or enter a valueopenaianthropicdeepseek",
+    "outlineStyle": "solid",
+    "outlineWidth": "2px"
+  },
+  "enterOpenedLibrary": true,
+  "enterOpenedCustom": true,
+  "enterSelectedCloud": true,
+  "escapeDismissPreservesDraft": true,
+  "escapeAcceptRestoresAddFocus": true,
+  "nativeConfirmDecisionsThroughPlaywright": [
+    {
+      "type": "confirm",
+      "message": "Discard these unsaved changes?",
+      "decision": "dismiss"
+    },
+    {
+      "type": "confirm",
+      "message": "Discard these unsaved changes?",
+      "decision": "accept"
+    }
+  ],
+  "writes": 0
+}

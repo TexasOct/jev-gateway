@@ -1,0 +1,18 @@
+{
+  "scoped_git_diff_check_exit": 0,
+  "output": "",
+  "final_document_links": "all exist",
+  "gate_exits": {
+    "pytest": 0,
+    "pyright": 0,
+    "frontend-lint": 0,
+    "frontend-unit": 0,
+    "frontend-build": 0,
+    "browser-typescript": 0,
+    "browser": 0,
+    "bundle-check": 0,
+    "package-build": 0,
+    "package-assets": 0,
+    "design-lint": 0
+  }
+}

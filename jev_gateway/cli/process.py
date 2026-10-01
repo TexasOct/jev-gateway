@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import shlex
 import signal
 import subprocess
 import sys
 import time
-from contextlib import suppress
 from collections.abc import Callable
+from contextlib import suppress
 from typing import Any
 
 from jev_gateway.cli.output import CliError, ExitCode
@@ -29,9 +30,23 @@ def _owned(pid: int, token: str, home: str) -> bool:
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return False
-    # Token is a non-credential nonce, not a secret. Match shell-separated
-    # arguments, never a substring of an unrelated process command.
-    return state[:1] not in {"Z", "X"} and "-m jev_gateway.cli.server " in command and f"--home {home} --token {token}" in command
+    if state[:1] in {"Z", "X"}:
+        return False
+    try:
+        arguments = shlex.split(command)
+    except ValueError:
+        return False
+    try:
+        module_index = arguments.index("-m")
+        home_index = arguments.index("--home", module_index + 2)
+        token_index = arguments.index("--token", home_index + 2)
+    except ValueError:
+        return False
+    return (
+        arguments[module_index + 1:module_index + 2] == ["jev_gateway.cli.server"]
+        and arguments[home_index + 1:home_index + 2] == [home]
+        and arguments[token_index + 1:token_index + 2] == [token]
+    )
 
 
 def _read_pid(paths: RuntimePaths) -> tuple[int, str]:
@@ -43,6 +58,56 @@ def _read_pid(paths: RuntimePaths) -> tuple[int, str]:
     except (OSError, ValueError, TypeError, KeyError):
         pass
     raise CliError("not_running", "No gateway process owned by this runtime is running.", ExitCode.NOT_RUNNING)
+
+
+def running_for_update(paths: RuntimePaths) -> bool:
+    """Check whether a live PID record belongs to this runtime."""
+    try:
+        data = json.loads(paths.pid.read_text(encoding="utf-8"))
+        pid, token = data["pid"], data["token"]
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE) from exc
+    if type(pid) is not int or pid <= 0 or not isinstance(token, str) or not token:
+        raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
+    if _owned(pid, token, str(paths.home)):
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    raise CliError("ownership_unverified", "The gateway PID is alive but ownership cannot be verified; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
+
+
+def stop_if_owned(paths: RuntimePaths, timeout: float = 10) -> dict[str, Any]:
+    """Stop the recorded process only while its PID and token still match."""
+    if sys.platform == "win32":
+        raise CliError("unsupported_platform", "Windows process management is not supported.", ExitCode.USAGE)
+    try:
+        data = json.loads(paths.pid.read_text(encoding="utf-8"))
+        pid, token = data["pid"], data["token"]
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE) from exc
+    if type(pid) is not int or not isinstance(token, str) or not token:
+        raise CliError("ownership_unverified", "Gateway ownership changed before stop; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
+    # Check the PID and token again immediately before signaling. This narrows
+    # the PID-reuse window and ensures a changed process is never signaled.
+    if not _owned(pid, token, str(paths.home)):
+        raise CliError("ownership_unverified", "Gateway ownership changed before stop; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        raise CliError("ownership_unverified", "Gateway exited before it could be stopped; inspect jev status before restarting manually.", ExitCode.FAILURE) from None
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _owned(pid, token, str(paths.home)):
+            paths.pid.unlink(missing_ok=True)
+            return {"status": "stopped", "pid": pid}
+        time.sleep(0.1)
+    raise CliError("stop_timeout", "Gateway did not stop before the timeout.", ExitCode.FAILURE)
 
 
 def start(paths: RuntimePaths, host: str, port: int, *, popen: Callable[..., Any] = subprocess.Popen) -> dict[str, Any]:

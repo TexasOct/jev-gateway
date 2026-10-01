@@ -1,0 +1,19 @@
+{
+  "command": [
+    "npx",
+    "tsc",
+    "-p",
+    "tests/tsconfig.json"
+  ],
+  "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+  "exit": 0,
+  "seconds": 0.86,
+  "counts": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "did not run": 0
+  },
+  "log": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/browser-typescript.log"
+}

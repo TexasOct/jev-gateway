@@ -1,0 +1,5 @@
+/* Configured paths are styled on their SVG elements; motion remains finite. */
+@keyframes configured-route-trace {
+  from { stroke-dasharray: 0 80; }
+  to { stroke-dasharray: 80 0; }
+}

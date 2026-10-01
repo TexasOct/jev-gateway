@@ -1,0 +1,30 @@
+[
+  {
+    "archive": "jev_gateway-0.1.0-py3-none-any.whl",
+    "current_source_matches": {
+      "jev_gateway/dashboard.py": true,
+      "jev_gateway/provider_config.py": true,
+      "jev_gateway/provider_presets.py": true,
+      "jev_gateway/config_transaction.py": true,
+      "jev_gateway/model_discovery.py": true,
+      "jev_gateway/model_metadata.py": true,
+      "jev_gateway/discovery_network.py": true
+    },
+    "local_configuration_entries": [],
+    "static_asset_count": 4
+  },
+  {
+    "archive": "jev_gateway-0.1.0.tar.gz",
+    "current_source_matches": {
+      "jev_gateway/dashboard.py": true,
+      "jev_gateway/provider_config.py": true,
+      "jev_gateway/provider_presets.py": true,
+      "jev_gateway/config_transaction.py": true,
+      "jev_gateway/model_discovery.py": true,
+      "jev_gateway/model_metadata.py": true,
+      "jev_gateway/discovery_network.py": true
+    },
+    "local_configuration_entries": [],
+    "static_asset_count": 4
+  }
+]

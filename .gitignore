@@ -30,3 +30,4 @@ logs/
 
 # Local routing evidence database
 jev-records.sqlite3*
+.provider-configuration.lock

@@ -1,0 +1,41 @@
+{
+  "documents": [
+    {
+      "file": "README.md",
+      "headings": 9,
+      "fenced_blocks": 12,
+      "missing_local_links": []
+    },
+    {
+      "file": "README.zh-CN.md",
+      "headings": 9,
+      "fenced_blocks": 12,
+      "missing_local_links": []
+    },
+    {
+      "file": "docs/models-config.md",
+      "headings": 18,
+      "fenced_blocks": 7,
+      "missing_local_links": []
+    },
+    {
+      "file": "docs/http-api.md",
+      "headings": 10,
+      "fenced_blocks": 5,
+      "missing_local_links": []
+    },
+    {
+      "file": ".trellis/spec/backend/provider-configuration.md",
+      "headings": 8,
+      "fenced_blocks": 1,
+      "missing_local_links": []
+    },
+    {
+      "file": "DESIGN.md",
+      "headings": 19,
+      "fenced_blocks": 1,
+      "missing_local_links": []
+    }
+  ],
+  "normative_yaml_unchanged": true
+}

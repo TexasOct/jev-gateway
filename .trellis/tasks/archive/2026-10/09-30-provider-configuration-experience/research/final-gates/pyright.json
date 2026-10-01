@@ -1,0 +1,5 @@
+{
+  "command": "PYTHON_DOTENV_DISABLED=1 LITELLM_LOCAL_MODEL_COST_MAP=true uvx pyright",
+  "exit": 0,
+  "seconds": 4.308
+}

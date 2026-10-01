@@ -60,7 +60,7 @@ def _run_release(
     args: list[str] | None = None, missing: str = "", bad_hash: str = "",
     checksum: str | None = None, child: str | None = None,
     include_uv: bool = True, consent: bool = True, delegated: str = "",
-    wheel_bytes: bytes | None = None,
+    wheel_bytes: bytes | None = None, jev_exit: int = 0, uv_exit: int = 0,
 ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
     """Run full release installers with a hermetic PATH and exact asset URLs."""
     bin_dir = tmp_path / "bin"
@@ -78,7 +78,9 @@ with Path(os.environ["STUB_EVENTS"]).open("a") as stream:
 '''
     for name in ("jev", "record-child", *( ["uv"] if include_uv else [])):
         executable = bin_dir / name
-        executable.write_text(f"#!{sys.executable}\n" + log)
+        exit_code = uv_exit if name == "uv" else 0
+        extra = f"\nif sys.argv[-1:] == ['restart-if-running']:\n    sys.exit({jev_exit})\n" if name == "jev" else f"\nsys.exit({exit_code})\n"
+        executable.write_text(f"#!{sys.executable}\n" + log + extra)
         executable.chmod(0o755)
     wheel = f"jev_gateway-{target[1:]}-py3-none-any.whl"
     if wheel_bytes is None:
@@ -144,10 +146,11 @@ def test_embedded_release_installs_directly_without_api_or_self_delegation(tmp_p
     assert result.returncode == 0, result.stderr
     wheel_url = f"{RELEASES}/v0.1.0/jev_gateway-0.1.0-py3-none-any.whl"
     assert _downloads(events) == [wheel_url, wheel_url + ".sha256"]
-    assert [event[0] for event in events] == ["curl", "curl", "uv", "jev"]
+    assert [event[0] for event in events] == ["curl", "curl", "uv", "jev", "jev"]
     assert events[2][1:4] == ["tool", "install", "--force"]
     assert events[2][4].endswith("/jev_gateway-0.1.0-py3-none-any.whl")
     assert events[3][1:] == ["--home", str(tmp_path / "runtime"), "install", "init", "--version", "0.1.0", "--source", wheel_url, "--method", "isolated"]
+    assert events[4][1:] == ["--home", str(tmp_path / "runtime"), "restart-if-running"]
 
 
 @pytest.mark.parametrize("version", ["0.2.0", "v0.2.0rc1", "0.2.0a1", "0.2.0b2", "0.0.9"])
@@ -158,9 +161,10 @@ def test_different_version_delegates_once_and_installs_only_target_wheel(tmp_pat
     base = f"{RELEASES}/{tag}"
     wheel_url = f"{base}/jev_gateway-{tag[1:]}-py3-none-any.whl"
     assert _downloads(events) == [f"{base}/install.sh", f"{base}/install.sh.sha256", wheel_url, wheel_url + ".sha256"]
-    assert [event[0] for event in events] == ["curl", "curl", "record-child", "curl", "curl", "uv", "jev"]
+    assert [event[0] for event in events] == ["curl", "curl", "record-child", "curl", "curl", "uv", "jev", "jev"]
     assert events[2][1:] == ["--version", tag[1:], "--home", str(tmp_path / "runtime"), "--yes", "--no-uv"]
-    assert events[-1][1:] == ["--home", str(tmp_path / "runtime"), "install", "init", "--version", tag[1:], "--source", wheel_url, "--method", "isolated"]
+    assert events[-2][1:] == ["--home", str(tmp_path / "runtime"), "install", "init", "--version", tag[1:], "--source", wheel_url, "--method", "isolated"]
+    assert events[-1][1:] == ["--home", str(tmp_path / "runtime"), "restart-if-running"]
 
 
 def test_delegation_forwards_no_init_and_home_as_one_argument(tmp_path: Path) -> None:
@@ -169,7 +173,7 @@ def test_delegation_forwards_no_init_and_home_as_one_argument(tmp_path: Path) ->
     assert result.returncode == 0, result.stderr
     child = next(event for event in events if event[0] == "record-child")
     assert child[1:] == ["--version", "0.2.0", "--home", home, "--no-init"]
-    assert not any(event[0] == "jev" for event in events)
+    assert [event[1:] for event in events if event[0] == "jev"] == [["--home", home, "restart-if-running"]]
 
 
 @pytest.mark.parametrize("asset", ["install.sh", "install.sh.sha256"])
@@ -374,6 +378,22 @@ def test_unstamped_template_rejects_release_dry_run_but_allows_git_preview(tmp_p
     else:
         assert result.returncode != 0
         assert "no valid embedded release identity" in result.stderr
+
+
+@pytest.mark.parametrize("args", [[], ["--no-init"]])
+def test_restart_failure_reports_installed_wheel_and_exits_nonzero(tmp_path: Path, args: list[str]) -> None:
+    result, events = _run_release(tmp_path, args=args, jev_exit=1)
+    assert result.returncode != 0
+    assert "wheel installed, but automatic gateway restart failed" in result.stderr
+    assert "jev --home" in result.stderr
+    assert events[-1][1:] == ["--home", str(tmp_path / "runtime"), "restart-if-running"]
+    assert [event[0] for event in events].count("jev") == (1 if "--no-init" in args else 2)
+
+
+def test_failed_wheel_install_never_restarts(tmp_path: Path) -> None:
+    result, events = _run_release(tmp_path, uv_exit=1)
+    assert result.returncode != 0
+    assert not any(event[0] == "jev" for event in events)
 
 
 def test_explicit_git_ref_remains_separate(tmp_path: Path) -> None:

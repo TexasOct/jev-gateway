@@ -1,0 +1,125 @@
+
+> jev-gateway-dashboard@0.1.0 test:browser
+> npm run build && tsc -p tests/tsconfig.json && playwright test -c playwright.config.ts
+
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 2044 modules transformed.
+rendering chunks...
+computing gzip size...
+../jev_gateway/static/index.html                      0.46 kB │ gzip:   0.28 kB
+../jev_gateway/static/assets/deepseek-Bl9-59Mi.svg   10.65 kB │ gzip:   4.27 kB
+../jev_gateway/static/assets/index-Bc7FLlj4.css      48.48 kB │ gzip:   9.71 kB
+../jev_gateway/static/assets/index-B906Maan.js      587.63 kB │ gzip: 183.21 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 148ms
+[WebServer] (node:11188) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 80 tests using 7 workers
+
+(node:11994) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12001) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11996) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11998) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11993) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11997) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11995) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event (363ms)
+  ✓   3 tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once (443ms)
+  ✓   7 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese (599ms)
+  ✓   6 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese (639ms)
+  ✓   1 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese (699ms)
+  ✓   2 tests/browser/appearance.spec.ts:35:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese (710ms)
+  ✓   4 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with system font (2.1s)
+  ✓   8 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 1280px with system font (2.0s)
+  ✓   9 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 390px with system font (2.0s)
+  ✓  14 tests/browser/monitoring.spec.ts:8:1 › restores the first cursor page when a later page fails, then loads the next page on retry (400ms)
+  ✓  12 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 320px with system font (1.9s)
+  ✓  13 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with serif font (1.9s)
+  ✓  10 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 390px with system font (2.0s)
+  ✓  15 tests/browser/monitoring.spec.ts:26:1 › supports keyboard session selection and selected detail (277ms)
+  ✓  11 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 320px with system font (2.0s)
+  ✓  16 tests/browser/monitoring.spec.ts:39:1 › request-detail list loads a cursor page on scroll and retains its focused row (394ms)
+  ✓  19 tests/browser/monitoring.spec.ts:157:1 › keeps request-detail loading copy visible while its synthetic response is delayed (292ms)
+  ✓  20 tests/browser/monitoring.spec.ts:170:1 › keeps mobile provider cells' data-label records readable (305ms)
+  ✓  22 tests/browser/monitoring.spec.ts:223:1 › activity sample failure is shown as unavailable and can be retried without policy writes (277ms)
+  ✓  23 tests/browser/monitoring.spec.ts:234:1 › keeps the latest-session preview unselected until an operator chooses a session (220ms)
+  ✓  18 tests/browser/monitoring.spec.ts:137:1 › keeps request-detail loading, failure, unavailable evidence, and empty states distinct (541ms)
+  ✓  21 tests/browser/monitoring.spec.ts:189:1 › activity honors reduced motion and keeps refresh outside the route map (820ms)
+  ✓  24 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after endpoint changes (751ms)
+  ✓  27 tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for lookup to discovery, unknowns and manual overrides (670ms)
+  ✓  26 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after credential revision changes (776ms)
+  ✓  25 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after transport changes (791ms)
+  ✓  28 tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for discovery to lookup, unknowns and manual overrides (626ms)
+  ✓  30 tests/browser/provider-management.spec.ts:124:3 › candidate credential action edits respect rejected and accepted discard (417ms)
+  ✓  29 tests/browser/provider-management.spec.ts:104:1 › null beside known evidence prefills, reference-only stays unknown and real conflicts block import (587ms)
+  ✓  32 tests/browser/provider-management.spec.ts:152:1 › credential clear sends a value-free local clear and reports inherited effective presence (363ms)
+  ✓  31 tests/browser/provider-management.spec.ts:124:3 › candidate credential password edits respect rejected and accepted discard (476ms)
+  ✓  34 tests/browser/provider-management.spec.ts:167:3 › save remains applied after catalog GET failure and read retry never duplicates PUT (439ms)
+  ✓  35 tests/browser/provider-management.spec.ts:204:1 › broken local supplier image uses the neutral fallback without changing identity geometry (279ms)
+  ✓  17 tests/browser/monitoring.spec.ts:58:1 › utility geometry keeps virtual windows, recorded trace and mobile table readable (1.9s)
+  ✓  33 tests/browser/provider-management.spec.ts:167:3 › import remains applied after catalog GET failure and read retry never duplicates PUT (745ms)
+  ✓  37 tests/browser/provider-management.spec.ts:213:1 › provider editing preserves ID, clears secrets, and sends the shared contract (449ms)
+  ✓  36 tests/browser/provider-management.spec.ts:235:1 › supplier aliases, custom entry, icon picker and System One are usable (619ms)
+  ✓  39 tests/browser/provider-management.spec.ts:289:1 › unknown metadata blocks import and failed operations remain retryable (545ms)
+  ✓  38 tests/browser/provider-management.spec.ts:260:1 › selection scope, metadata edits and explicit import refresh the catalog (612ms)
+  ✓  42 tests/browser/provider-management.spec.ts:349:1 › read-only and unauthorized configuration reads expose the appropriate recovery (333ms)
+  ✓  41 tests/browser/provider-management.spec.ts:328:1 › candidate private-network discovery is explicit and canceled results stay out of other tabs (456ms)
+  ✓  43 tests/browser/provider-management.spec.ts:361:1 › verified DeepSeek artwork loads locally, preserves proportions and retains attribution (357ms)
+  ✓  40 tests/browser/provider-management.spec.ts:307:1 › revision conflicts preserve the draft, clear the secret and use the refreshed revision (567ms)
+  ✓  45 tests/browser/provider-management.spec.ts:406:1 › native endpoint presets preserve null and fill their declared credential reference (429ms)
+  ✓  47 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en light (469ms)
+  ✓  49 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN light (404ms)
+  ✓  48 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en dark (464ms)
+  ✓  46 tests/browser/provider-management.spec.ts:421:1 › saving a previewed provider keeps model selection and reviewed metadata for explicit import (634ms)
+  ✓  50 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN dark (493ms)
+  ✓  44 tests/browser/provider-management.spec.ts:375:1 › metadata retry remains a metadata operation and batch values need an explicit null decision (766ms)
+  ✓  51 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en light (419ms)
+  ✓  52 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en dark (390ms)
+  ✓  55 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en light (302ms)
+  ✓  53 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN light (441ms)
+  ✓  56 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en dark (353ms)
+  ✓  57 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN light (326ms)
+  ✓  54 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN dark (474ms)
+  ✓  58 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN dark (343ms)
+  ✓  59 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en light (317ms)
+  ✓  61 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN light (311ms)
+  ✓  60 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en dark (349ms)
+  ✓  62 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN dark (367ms)
+  ✓  64 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en dark (369ms)
+  ✓  63 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en light (407ms)
+  ✓  65 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN light (358ms)
+  ✓  66 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN dark (371ms)
+  ✓  72 tests/browser/routing-editor.spec.ts:8:1 › shows configured route explanation with and without reduced motion (458ms)
+  ✓  68 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 1280x900 in English and Chinese (890ms)
+  ✓  70 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 390x820 in English and Chinese (890ms)
+  ✓  69 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 1430x2511 in English and Chinese (904ms)
+  ✓  73 tests/browser/routing-editor.spec.ts:51:1 › routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset (708ms)
+  ✓  71 tests/browser/responsive.spec.ts:41:3 › has no document-level horizontal overflow at 320x820 in English and Chinese (891ms)
+  ✓  74 tests/browser/routing-editor.spec.ts:96:1 › canvas supports keyboard node focus and real pointer drag without policy writes (512ms)
+  ✓  77 tests/browser/settings.spec.ts:19:1 › a late settings read cannot overwrite a newer theme read (344ms)
+  ✓  76 tests/browser/settings.spec.ts:41:1 › settings re-entry during a theme write keeps the write pending and skips reads (378ms)
+  ✓  78 tests/browser/settings.spec.ts:4:1 › settings keeps theme writes disabled when configuration writes are unavailable (381ms)
+  ✓  79 tests/browser/settings.spec.ts:68:1 › a failed settings theme read is visible and can be retried (386ms)
+  ✓  80 tests/browser/settings.spec.ts:78:1 › a settings write rejected with 401 requires reconnection without persisting credentials (369ms)
+  ✓  75 tests/browser/routing-editor.spec.ts:121:1 › canvas utilities preserve measured geometry, toolbar controls and real hit targets at supported widths (965ms)
+  ✓  67 tests/browser/responsive.spec.ts:8:1 › top-level view buttons stay compact on desktop and usable on mobile (2.3s)
+
+  80 passed (9.5s)

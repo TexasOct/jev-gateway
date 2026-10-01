@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -118,6 +119,10 @@ class ProviderProfile:
     params: Mapping[str, Any] = field(default_factory=dict, repr=False)
     param_env: Mapping[str, str] = field(default_factory=dict)
     resolved_params: Mapping[str, Any] = field(default_factory=dict, repr=False)
+    display_name: str | None = None
+    brand_id: str | None = None
+    icon_id: str | None = None
+    allow_private_network: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize provider configuration without its resolved secret."""
@@ -127,6 +132,10 @@ class ProviderProfile:
             "api_base": self.api_base,
             "api_key_env": self.api_key_env,
             "has_api_key": bool(self.api_key),
+            "display_name": self.display_name or self.name,
+            "brand_id": self.brand_id,
+            "icon_id": self.icon_id,
+            "allow_private_network": self.allow_private_network,
             "params": dict.fromkeys(self.params, "[configured]"),
             "param_env": dict(self.param_env),
         }
@@ -150,6 +159,7 @@ class ModelProfile:
     max_output_tokens: int | None = None
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
     cost: ModelCost = field(default_factory=ModelCost)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def supports(self, *, tools: bool, vision: bool, json_mode: bool) -> bool:
         """Check the capability gates for one request."""
@@ -205,6 +215,7 @@ class ModelProfile:
                 "input_per_million": self.cost.input_per_million,
                 "output_per_million": self.cost.output_per_million,
             },
+            **({"metadata": _json_value_as_dict(self.metadata)} if self.metadata else {}),
         }
 
 
@@ -292,6 +303,9 @@ class DecisionProvider:
     api_key_env: str
     model: str | None = None
     protocol: str = "system_one"
+    display_name: str | None = None
+    brand_id: str | None = None
+    icon_id: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -301,6 +315,9 @@ class DecisionProvider:
             "api_key_env": self.api_key_env,
             "has_api_key": bool(os.getenv(self.api_key_env)),
             "model": self.model,
+            "display_name": self.display_name or self.name,
+            "brand_id": self.brand_id,
+            "icon_id": self.icon_id,
         }
 
 
@@ -312,13 +329,17 @@ class DecisionSettings:
     default_provider: str | None = None
     timeout_seconds: float = 1.5
     providers: tuple[DecisionProvider, ...] = ()
+    credentials: Mapping[str, str] | None = field(default=None, repr=False, compare=False)
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
             "default_provider": self.default_provider,
             "timeout_seconds": self.timeout_seconds,
-            "providers": [provider.as_dict() for provider in self.providers],
+            "providers": [
+                {**provider.as_dict(), **({"has_api_key": bool(self.credentials.get(provider.api_key_env))} if self.credentials is not None else {})}
+                for provider in self.providers
+            ],
         }
 
 
@@ -702,9 +723,171 @@ def _required_text(value: Any, field_name: str) -> str:
     return text
 
 
-def _resolve_api_key(api_key_env: str, subject: str) -> str:
+def display_fields(item: dict[str, Any]) -> dict[str, str | None]:
+    """Validate optional display identity independently of transport identity."""
+    result: dict[str, str | None] = {}
+    for key in ("display_name", "brand_id", "icon_id"):
+        value = item.get(key)
+        if value is not None and (
+            not isinstance(value, str) or not value.strip() or len(value) > 160
+            or any(ord(char) < 32 for char in value)
+        ):
+            raise ValueError("Provider display fields must be bounded nonempty strings.")
+        result[key] = value
+    return result
+
+
+_METADATA_FIELDS = {"tools", "vision", "json_mode", "reasoning", "temperature", "reasoning_effort", "context_window", "max_output_tokens", "input_per_million", "output_per_million"}
+_PRICE_FIELDS = {"input", "output", "reasoning", "cache_read", "cache_write", "input_audio", "output_audio", "prompt", "completion", "input_cache_read", "input_cache_write", "web_search", "request", "image", "internal_reasoning"}
+_PRICE_FIELD_PATTERN = re.compile(r"(?:(?:input|output)_cost_per_token(?:_(?:above_\d+k_tokens|batches|cache_hit|flex|priority))*|cache_(?:creation|read)_input_(?:audio_)?token_cost(?:_(?:above_\d+k_tokens|above_\d+hr|flex|priority))*|citation_cost_per_token)")
+
+
+def _metadata_number(value: Any) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
+
+
+def _metadata_pricing(value: Any, *, depth: int = 0) -> None:
+    """Validate projected price conditions, never arbitrary upstream objects."""
+    if not isinstance(value, dict) or len(value) > 256 or depth > 2:
+        raise ValueError("Invalid model metadata pricing.")
+    for key, item in value.items():
+        if not isinstance(key, str) or len(key) > 160:
+            raise ValueError("Invalid model metadata pricing field.")
+        if key in _PRICE_FIELDS or _PRICE_FIELD_PATTERN.fullmatch(key):
+            if not isinstance(item, dict) or set(item) != {"value", "unit"} or item["unit"] not in {"USD/M tokens", "USD/source unit"} or (item["value"] is not None and not _metadata_number(item["value"])):
+                raise ValueError("Invalid model metadata price declaration.")
+        elif key in {"tiers", "overrides"}:
+            if depth != 0 or not isinstance(item, list) or len(item) > 32:
+                raise ValueError("Invalid model metadata pricing tiers.")
+            for condition in item:
+                _metadata_pricing(condition, depth=depth + 1)
+        elif key == "context_over_200k":
+            if depth != 0:
+                raise ValueError("Invalid model metadata legacy price tier.")
+            _metadata_pricing(item, depth=depth + 1)
+        elif key == "condition":
+            if depth == 0 or not isinstance(item, dict) or set(item) != {"type", "size"} or item["type"] != "context" or not _metadata_number(item["size"]) or type(item["size"]) is not int:
+                raise ValueError("Invalid model metadata context condition.")
+        elif key in {"min_prompt_tokens", "utc_start", "utc_end", "context", "context_length"}:
+            if depth == 0 or not _metadata_number(item) or (key in {"min_prompt_tokens", "utc_start", "utc_end"} and type(item) is not int):
+                raise ValueError("Invalid model metadata numeric condition.")
+        elif key == "utc_days":
+            if depth == 0 or not isinstance(item, list) or len(item) > 7 or any(day not in {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"} for day in item):
+                raise ValueError("Invalid model metadata weekday condition.")
+        elif key == "condition_fields":
+            if depth == 0 or not isinstance(item, list) or len(item) > 5 or any(name not in {"context", "context_length", "time", "start_time", "end_time"} for name in item):
+                raise ValueError("Invalid model metadata condition fields.")
+        elif key in {"time", "start_time", "end_time"}:
+            if depth == 0 or not isinstance(item, str) or not re.fullmatch(r"[0-9T:Z+./\- ]{1,64}", item):
+                raise ValueError("Invalid model metadata time condition.")
+        elif key in {"unrecognized_conditions", "threshold_unverified"}:
+            if depth == 0 or type(item) is not bool:
+                raise ValueError("Invalid model metadata pricing marker.")
+        else:
+            raise ValueError("Unknown model metadata pricing field.")
+
+
+def _metadata_source_fields(value: Any) -> None:
+    if not isinstance(value, dict) or set(value) - (_METADATA_FIELDS | {"max_input_tokens", "structured_output"}):
+        raise ValueError("Invalid model metadata source fields.")
+    for name, evidence in value.items():
+        if not isinstance(evidence, dict) or set(evidence) - {"value", "source_field", "unit", "source_unit"} or "value" not in evidence or "source_field" not in evidence:
+            raise ValueError("Invalid model metadata source evidence.")
+        for key, text in evidence.items():
+            if key != "value" and (not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 for c in text)):
+                raise ValueError("Invalid model metadata source evidence text.")
+        raw = evidence["value"]
+        if raw is None:
+            continue
+        if name in {"tools", "vision", "json_mode", "reasoning", "temperature", "structured_output"}:
+            if type(raw) is not bool:
+                raise ValueError("Invalid model metadata source capability.")
+        elif name == "reasoning_effort":
+            if not isinstance(raw, list) or len(raw) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 for c in v)) for v in raw):
+                raise ValueError("Invalid model metadata source effort.")
+        elif not _metadata_number(raw) or (name in {"context_window", "max_output_tokens", "max_input_tokens"} and type(raw) is not int):
+            raise ValueError("Invalid model metadata source number.")
+
+
+def model_metadata(value: Any) -> dict[str, Any]:
+    """Accept bounded provenance records without arbitrary upstream payloads."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or set(value) - {"version", "sources", "fields", "confirmation"}:
+        raise ValueError("Model metadata has invalid fields.")
+    if type(value.get("version")) is not int or value["version"] != 1:
+        raise ValueError("Model metadata version must be 1.")
+    if len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode()) > 262144:
+        raise ValueError("Model metadata exceeds 256 KiB.")
+    sources = value.get("sources", [])
+    if not isinstance(sources, list) or len(sources) > 32:
+        raise ValueError("Model metadata sources must be a bounded list.")
+    source_keys = {"id", "source", "url", "fetched_at", "source_updated_at", "provider_id", "model_id", "unit", "field_path", "source_unit", "applicable", "fields", "schema_revision", "canonical_model_id", "source_reasoning_effort", "pricing"}
+    source_ids: set[str] = set()
+    for source in sources:
+        if not isinstance(source, dict) or set(source) - source_keys or not isinstance(source.get("id"), str) or not source["id"] or source["id"] in source_ids:
+            raise ValueError("Invalid model metadata source.")
+        source_ids.add(source["id"])
+        if any(not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 for c in text) for key, text in source.items() if key not in {"applicable", "fields", "pricing", "source_reasoning_effort"}):
+            raise ValueError("Invalid model metadata source text.")
+        if "applicable" in source and type(source["applicable"]) is not bool:
+            raise ValueError("Invalid model metadata source applicability.")
+        if "fields" in source:
+            _metadata_source_fields(source["fields"])
+        if "pricing" in source:
+            _metadata_pricing(source["pricing"])
+        if "source_reasoning_effort" in source:
+            efforts = source["source_reasoning_effort"]
+            if not isinstance(efforts, list) or len(efforts) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 for c in v)) for v in efforts):
+                raise ValueError("Invalid model metadata original effort evidence.")
+        if "url" in source:
+            from urllib.parse import urlsplit
+            url = urlsplit(source["url"])
+            if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment:
+                raise ValueError("Model metadata source URL must be public HTTPS without credentials.")
+    fields = value.get("fields", {})
+    allowed_fields = _METADATA_FIELDS
+    if not isinstance(fields, dict) or set(fields) - allowed_fields:
+        raise ValueError("Invalid model metadata field names.")
+    for name, evidence in fields.items():
+        if not isinstance(evidence, dict) or set(evidence) - {"status", "value", "source_ids", "confirmed_at", "method"}:
+            raise ValueError("Invalid model metadata evidence.")
+        if evidence.get("status") not in {"known", "unknown", "conflict", "confirmed"}:
+            raise ValueError("Invalid model metadata evidence status.")
+        ids = evidence.get("source_ids", [])
+        if not isinstance(ids, list) or len(ids) > 32 or any(not isinstance(x, str) or x not in source_ids for x in ids):
+            raise ValueError("Invalid model metadata evidence source references.")
+        for key in ("confirmed_at", "method"):
+            if key in evidence and (not isinstance(evidence[key], str) or len(evidence[key]) > 160):
+                raise ValueError("Invalid model metadata confirmation text.")
+        if "value" in evidence and evidence["value"] is not None:
+            raw = evidence["value"]
+            if name in {"tools", "vision", "json_mode", "reasoning", "temperature"}:
+                _document_bool(raw, "metadata capability")
+            elif name == "reasoning_effort":
+                if not isinstance(raw, list):
+                    raise ValueError("Metadata reasoning effort must be a list.")
+                ladder_from_list(raw, "metadata reasoning effort")
+            elif name in {"context_window", "max_output_tokens"}:
+                if type(raw) is not int or raw <= 0:
+                    raise ValueError("Metadata limits must be positive integers.")
+            elif not _metadata_number(raw):
+                raise ValueError("Metadata prices must be finite nonnegative numbers.")
+    confirmation = value.get("confirmation", {})
+    if not isinstance(confirmation, dict) or set(confirmation) - {"confirmed_at", "method"} or any(not isinstance(x, str) or len(x) > 160 for x in confirmation.values()):
+        raise ValueError("Invalid model metadata confirmation.")
+    import copy
+    return copy.deepcopy(value)
+
+
+def _resolve_api_key(api_key_env: str, subject: str, credentials: Mapping[str, str] | None = None) -> str:
     """Resolve only the environment variable explicitly named in the catalog."""
-    value = os.getenv(api_key_env)
+    value = os.getenv(api_key_env) if credentials is None else credentials.get(api_key_env)
     if not value or not value.strip():
         raise ValueError(
             f"{subject} declares api_key_env {api_key_env!r}, but that variable is not set."
@@ -712,7 +895,7 @@ def _resolve_api_key(api_key_env: str, subject: str) -> str:
     return value.strip()
 
 
-def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
+def provider_from_dict(item: dict[str, Any], index: int, credentials: Mapping[str, str] | None = None) -> ProviderProfile:
     """Resolve a LiteLLM provider type and its configured completion arguments."""
     name = _required_text(item.get("id"), f"Provider entry {index} id")
     if "api_key" in item:
@@ -720,7 +903,8 @@ def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
             f"Provider {name!r} may not declare api_key. Use api_key_env instead."
         )
     known_fields = {
-        "id", "type", "api_base", "api_key_env", "params", "param_env"
+        "id", "type", "api_base", "api_key_env", "params", "param_env",
+        "display_name", "brand_id", "icon_id", "allow_private_network"
     }
     unknown_fields = set(item) - known_fields
     if unknown_fields:
@@ -765,7 +949,7 @@ def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
     for key, value in raw_param_env.items():
         param_env[key] = _required_text(value, f"Provider {name!r} param_env.{key}")
         resolved_params[key] = _resolve_api_key(
-            param_env[key], f"Provider {name!r} param_env.{key}"
+            param_env[key], f"Provider {name!r} param_env.{key}", credentials
         )
 
     api_base_value = item.get("api_base")
@@ -780,7 +964,7 @@ def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
     )
     if api_key_env and "api_key" in raw_param_env:
         raise ValueError(f"Provider {name!r} cannot declare api_key twice.")
-    api_key = _resolve_api_key(api_key_env, f"Provider {name!r}") if api_key_env else None
+    api_key = _resolve_api_key(api_key_env, f"Provider {name!r}", credentials) if api_key_env else None
     if provider_type == "openai" and (not api_base or not api_key):
         raise ValueError(
             f"Provider {name!r} type 'openai' requires api_base and api_key_env."
@@ -794,6 +978,8 @@ def provider_from_dict(item: dict[str, Any], index: int) -> ProviderProfile:
         params=MappingProxyType(params),
         param_env=MappingProxyType(param_env),
         resolved_params=MappingProxyType(resolved_params),
+        **display_fields(item),
+        allow_private_network=_document_bool(item.get("allow_private_network", False), "allow_private_network"),
     )
 
 
@@ -850,6 +1036,7 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
         "max_output_tokens",
         "capabilities",
         "cost",
+        "metadata",
     }
     unknown_fields = set(item) - known_fields
     if unknown_fields:
@@ -877,6 +1064,7 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
         provider=provider,
         model=model,
         tags=tuple(tags),
+        metadata=_freeze_json_value(model_metadata(item.get("metadata"))),
         priority=_document_int(
             item.get("priority", index * 10), f"Model {name!r} priority"
         ),
@@ -1183,7 +1371,7 @@ def policy_from_dict(
     )
 
 
-def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
+def gateway_from_dict(value: Any, source: str, credentials: Mapping[str, str] | None = None) -> GatewaySettings:
     """Build gateway process settings from the catalog document."""
     if value is None:
         return GatewaySettings()
@@ -1248,12 +1436,12 @@ def gateway_from_dict(value: Any, source: str) -> GatewaySettings:
     if clean_key_env:
         settings = replace(
             settings,
-            api_key=_resolve_api_key(clean_key_env, f"{source} gateway"),
+            api_key=_resolve_api_key(clean_key_env, f"{source} gateway", credentials),
         )
     return settings
 
 
-def decision_from_dict(value: Any, source: str) -> DecisionSettings:
+def decision_from_dict(value: Any, source: str, credentials: Mapping[str, str] | None = None) -> DecisionSettings:
     """Validate canonical decision-provider settings."""
     label = "decision"
     if value is None:
@@ -1276,7 +1464,7 @@ def decision_from_dict(value: Any, source: str) -> DecisionSettings:
         subject = f"{source} {label} {provider_key}[{index}]"
         if not isinstance(item, dict):
             raise TypeError(f"{subject} must be an object.")
-        allowed = {"id", "protocol", "api_base", "api_key_env", "model"}
+        allowed = {"id", "protocol", "api_base", "api_key_env", "model", "display_name", "brand_id", "icon_id"}
         unknown = set(item) - allowed
         if unknown:
             raise ValueError(f"{subject} has unknown keys: {', '.join(sorted(unknown))}.")
@@ -1295,6 +1483,7 @@ def decision_from_dict(value: Any, source: str) -> DecisionSettings:
             api_base=_required_text(item.get("api_base"), f"{subject} api_base"),
             api_key_env=_required_text(item.get("api_key_env"), f"{subject} api_key_env"),
             model=model,
+            **display_fields(item),
         ))
     default_value = value.get(default_key)
     default_provider = (
@@ -1311,7 +1500,7 @@ def decision_from_dict(value: Any, source: str) -> DecisionSettings:
         raise ValueError(f"{source} {label} timeout_seconds must be positive and finite.")
     if enabled and not providers:
         raise ValueError(f"{source} {label} enabled requires at least one provider.")
-    return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers))
+    return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers), MappingProxyType(dict(credentials)) if credentials is not None else None)
 
 
 def storage_from_dict(value: Any, source: str) -> StorageSettings:
@@ -1539,7 +1728,7 @@ def _build_catalog(
     return catalog
 
 
-def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
+def catalog_from_document(document: dict[str, Any], source: str, credentials: Mapping[str, str] | None = None) -> Catalog:
     """Build a catalog from a parsed models.json document."""
     if not isinstance(document, dict):
         raise TypeError(f"{source} must contain a JSON object.")
@@ -1557,7 +1746,7 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
     for index, item in enumerate(raw_providers):
         if not isinstance(item, dict):
             raise TypeError(f"{source} providers[{index}] must be an object.")
-        provider = provider_from_dict(item, index)
+        provider = provider_from_dict(item, index, credentials)
         if provider.name in provider_names:
             raise ValueError(
                 f"{source} configures provider {provider.name!r} more than once."
@@ -1618,11 +1807,11 @@ def catalog_from_document(document: dict[str, Any], source: str) -> Catalog:
         providers,
         profiles,
         policy,
-        gateway_from_dict(document.get("gateway"), source),
+        gateway_from_dict(document.get("gateway"), source, credentials),
         strategies,
         default_strategy,
         storage_from_dict(document.get("storage"), source),
-        decision_from_dict(document.get("decision"), source),
+        decision_from_dict(document.get("decision"), source, credentials),
     )
 
 

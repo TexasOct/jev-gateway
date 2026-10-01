@@ -1,0 +1,18 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "-c",
+    "/tmp/jev-provider-browser-evidence/capture.config.ts"
+  ],
+  "cwd": "/Users/texas/Workspace/jev-llmroute-test/frontend",
+  "exit": 1,
+  "seconds": 3.408,
+  "counts": {
+    "passed": 4,
+    "failed": 1,
+    "skipped": 0
+  },
+  "temporary_spec": "/tmp/jev-provider-browser-evidence/capture.spec.ts"
+}

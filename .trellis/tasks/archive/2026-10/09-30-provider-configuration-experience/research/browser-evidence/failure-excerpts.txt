@@ -1,0 +1,28 @@
+Full browser gate: exit 1; Running 68 tests using 7 workers; 3 failed, 65 passed (33.9s).
+Single reproduction: exit 1; Running 3 tests using 1 worker; 3 failed.
+
+monitoring.spec.ts:189, failing assertion at :194
+Error: expect(locator).toBeVisible() failed
+Locator: locator('details[data-dashboard-settings]')
+Expected: visible
+Timeout: 5000ms
+Error: element(s) not found
+
+monitoring.spec.ts:206, failing action at :211
+Test timeout of 30000ms exceeded.
+Error: locator.click: Test timeout of 30000ms exceeded.
+Call log: waiting for getByRole('button', { name: 'Refresh activity' })
+
+responsive.spec.ts:8, fixture teardown at fixtures.ts:14
+Error: browser suite must remain isolated from unmocked APIs and origins
+expect(received).toEqual(expected)
+Expected: []
+Received: [
+  "GET /v1/provider-configuration",
+  "GET /v1/provider-configuration",
+  "GET /v1/provider-configuration",
+  "GET /v1/provider-configuration",
+  "GET /v1/provider-configuration",
+  "GET /v1/provider-configuration"
+]
+The shared mock aborts these requests; no live gateway request was made.

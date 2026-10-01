@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "浏览器凭证安全及 dashboard 构建约束"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "前端与后端验证门槛"}
+{"file": ".trellis/tasks/archive/2026-09/09-23-gateway-session-dashboard/prd.md", "reason": "父任务的 dashboard 范围与集成验收"}

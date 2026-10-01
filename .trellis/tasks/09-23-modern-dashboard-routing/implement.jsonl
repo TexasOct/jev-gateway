@@ -1,9 +1,0 @@
-{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development checklist and quality gate."}
-{"file":".trellis/spec/backend/directory-structure.md","reason":"Module ownership, FastAPI composition root, router integration, and extension boundaries for the new overlay module and static mount."}
-{"file":".trellis/spec/backend/error-handling.md","reason":"OpenAI error envelope, authentication boundary, and the new write-guard rejection shape."}
-{"file":".trellis/spec/backend/database-guidelines.md","reason":"config_versions auditing and the rule that storage settings stay restart-only."}
-{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Structured logging allowlist and sensitive-data restrictions for the new mutation routes."}
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Typing, testing, verification commands, and forbidden patterns."}
-{"file":".trellis/tasks/09-23-modern-dashboard-routing/research/verified-constraints.md","reason":"Verified anchors for the overlay merge surface, routing semantics, reload path, runtime paths, packaging, authentication defaults, and toolchain versions."}
-{"file":".trellis/tasks/09-23-modern-dashboard-routing/design.md","reason":"Approved boundaries, overlay schema, apply sequence, and packaging strategy."}
-{"file":".trellis/tasks/09-23-gateway-session-dashboard/research/current-data-surfaces.md","reason":"Existing live-session, evidence, identity, and authentication constraints that the new frontend must keep satisfying."}

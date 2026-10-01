@@ -1,0 +1,9 @@
+[0;34m=== Validating Context Files ===[0m
+Target dir: /Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-library-onboarding
+
+  [1;33mimplement.jsonl:1: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it[0m
+  [0;32mimplement.jsonl: ✓ (10 entries)[0m
+  [1;33mcheck.jsonl:1: Warning: .trellis/spec/backend/dashboard-routing-config.md is 35338 bytes, exceeds context_injection.max_file_bytes (32768); injection will truncate it[0m
+  [0;32mcheck.jsonl: ✓ (10 entries)[0m
+
+[0;32m✓ All validations passed[0m

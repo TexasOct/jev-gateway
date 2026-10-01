@@ -1,0 +1,33 @@
+{
+  "id": "handle-agent-stream-missing-finish-reason",
+  "name": "handle-agent-stream-missing-finish-reason",
+  "title": "处理 agent 侧流结束缺少 finish_reason",
+  "description": "Investigate and improve gateway behavior for agent-side streaming responses that terminate without finish_reason, causing repeated Stream ended without finish_reason errors and retry exhaustion.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-30",
+  "completedAt": "2026-10-01",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "user_archived",
+      "acceptance_complete": false,
+      "user_approved": true,
+      "note": "archive-note.md"
+    }
+  }
+}

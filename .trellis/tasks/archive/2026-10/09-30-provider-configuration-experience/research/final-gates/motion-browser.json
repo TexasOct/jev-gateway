@@ -1,0 +1,6 @@
+{
+  "command": "npx playwright test -c playwright.config.ts tests/browser/monitoring.spec.ts:189 --workers=1",
+  "cwd": "frontend",
+  "exit": 0,
+  "seconds": 1.927
+}

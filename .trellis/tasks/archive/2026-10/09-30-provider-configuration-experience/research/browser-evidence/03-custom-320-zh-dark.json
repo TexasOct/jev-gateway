@@ -1,0 +1,78 @@
+{
+  "screenshot": "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/09-30-provider-configuration-experience/research/browser-evidence/03-custom-320-zh-dark.png",
+  "geometry": {
+    "viewport": 320,
+    "document": 320,
+    "body": 320,
+    "scheme": "dark",
+    "pageHeight": 1407
+  },
+  "writes": 0,
+  "validations": 0,
+  "discoveryCalls": 0,
+  "metadataCalls": 0,
+  "requests": [
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-5zay16AD.js"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/dashboard/assets/index-JM0ENv98.css"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/providers/summary"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/strategies"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/policy"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/sessions"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/dashboard/theme"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/routing/activity"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:4182",
+      "path": "/v1/provider-configuration"
+    }
+  ],
+  "focus": {
+    "tag": "SELECT",
+    "name": null,
+    "text": "未知：请选择或输入值openaianthropicdeepseek",
+    "outlineStyle": "solid",
+    "outlineWidth": "2px"
+  }
+}

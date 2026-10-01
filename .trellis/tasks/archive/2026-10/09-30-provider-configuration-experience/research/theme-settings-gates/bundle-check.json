@@ -1,0 +1,5 @@
+{
+  "command": "bash scripts/build-frontend.sh --check",
+  "exit": 0,
+  "seconds": 0.032
+}

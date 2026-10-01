@@ -8,6 +8,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from jev_gateway.cli.health import probe
 from jev_gateway.cli.output import CliError, ExitCode, emit
 from jev_gateway.cli.paths import RuntimePaths, runtime_paths
 from jev_gateway.cli.secrets import obtain_secret
+from jev_gateway.config_transaction import ConfigurationRecoveryRequired
 from jev_gateway.dashboard import browsable_host
 
 
@@ -44,6 +46,7 @@ def _parser() -> argparse.ArgumentParser:
     stop.add_argument("--timeout", type=float, default=10)
     stop.add_argument("--force", action="store_true")
     sub.add_parser("restart")
+    sub.add_parser("restart-if-running", help=argparse.SUPPRESS)
     logs = sub.add_parser("logs")
     logs.add_argument("-n", type=int, default=50)
     logs.add_argument("--follow", action="store_true")
@@ -97,16 +100,41 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _catalog_options(paths: RuntimePaths) -> tuple[dict[str, Any], str, int]:
-    config_ops.load_catalog_env(paths.models)
-    document = config_ops.read_document(paths.models)
+def _catalog_options(paths: RuntimePaths) -> tuple[dict[str, Any], Mapping[str, str], str, int]:
+    document, credentials = config_ops.read_snapshot(paths.models)
+    host, port = _gateway_address(document)
+    return document, credentials, host, port
+
+
+def _gateway_address(document: dict[str, Any]) -> tuple[str, int]:
     gateway = document.get("gateway", {})
     host = gateway.get("host", "127.0.0.1") if isinstance(gateway, dict) else "127.0.0.1"
     port = gateway.get("port", 8000) if isinstance(gateway, dict) else 8000
     try:
-        return document, str(host), int(port)
+        return str(host), int(port)
     except (TypeError, ValueError) as exc:
         raise CliError("invalid_configuration", "Gateway port must be an integer.", ExitCode.INVALID_CONFIG) from exc
+
+
+def _start_and_wait(paths: RuntimePaths, document: dict[str, Any], credentials: Mapping[str, str], host: str, port: int, wait: float) -> dict[str, Any]:
+    result = process.start(paths, host, port)
+    deadline = time.monotonic() + max(wait, 0)
+    while time.monotonic() < deadline:
+        try:
+            current = process.status(paths)
+        except CliError as exc:
+            if exc.code == "not_running":
+                raise CliError("start_failed", "Gateway exited before becoming healthy.", ExitCode.FAILURE) from exc
+            raise
+        gateway = document.get("gateway", {})
+        key_name = gateway.get("api_key_env") if isinstance(gateway, dict) else None
+        health = probe(host, port, timeout=min(1.0, max(deadline - time.monotonic(), 0.001)), api_key=credentials.get(key_name, "") if isinstance(key_name, str) else "")
+        if health.get("reachable") and current.get("pid") == result.get("pid"):
+            return {**result, "status": "running", "health": health}
+        time.sleep(min(0.1, max(deadline - time.monotonic(), 0)))
+    if wait > 0:
+        raise CliError("start_timeout", "Gateway did not become healthy before the wait timeout.", ExitCode.FAILURE)
+    return result
 
 
 def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
@@ -115,27 +143,25 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
         data: dict[str, Any] = {"install_state": install_state.read_state() or {"status": "unmanaged"}, "runtime_dir": str(paths.home), "models_exists": paths.models.exists(), "env_exists": paths.env.exists(), "credentials": []}
         if paths.models.exists():
             try:
-                config_ops.load_catalog_env(paths.models)
-                document = config_ops.read_document(paths.models)
-                config_ops.load_catalog_env(paths.models)
-                config_ops.validate_document(document, str(paths.models))
+                document, credentials = config_ops.read_snapshot(paths.models)
+                config_ops.validate_document(document, str(paths.models), credentials)
                 data["catalog"] = "valid"
-                data["credentials"] = [{"name": item.get("api_key_env"), "key_present": bool(os.getenv(item.get("api_key_env", "")))} for item in document.get("providers", []) if isinstance(item, dict) and isinstance(item.get("api_key_env"), str)]
-            except (ValueError, TypeError) as exc:
-                data["catalog"] = {"valid": False, "message": str(exc)}
+                data["credentials"] = [{"name": item.get("api_key_env"), "key_present": bool(credentials.get(item.get("api_key_env", "")))} for item in document.get("providers", []) if isinstance(item, dict) and isinstance(item.get("api_key_env"), str)]
+            except (ValueError, TypeError):
+                data["catalog"] = {"valid": False, "message": "Invalid gateway configuration."}
         return data, 0
     if group == "status":
         result = process.status(paths)
-        document, host, port = _catalog_options(paths)
+        document, credentials, host, port = _catalog_options(paths)
         gateway = document.get("gateway", {})
         key_name = gateway.get("api_key_env") if isinstance(gateway, dict) else None
-        health = probe(host, port, api_key_env=key_name if isinstance(key_name, str) else None)
+        health = probe(host, port, api_key=credentials.get(key_name, "") if isinstance(key_name, str) else "")
         result.update({"host": host, "port": port, "health": health})
         if not health.get("reachable"):
             raise CliError("running_unreachable", "Gateway process is alive but health endpoint is unreachable.", ExitCode.FAILURE)
         return result, 0
     if group == "start":
-        _, host, port = _catalog_options(paths)
+        document, credentials, host, port = _catalog_options(paths)
         if args.foreground:
             import subprocess
             command = [sys.executable, "-c", "from jev_gateway.gateway import run_gateway; run_gateway()"]
@@ -143,35 +169,25 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
             if completed.returncode:
                 raise CliError("start_failed", "Gateway exited without starting.", ExitCode.FAILURE)
             return {"status": "stopped"}, 0
-        result = process.start(paths, host, port)
-        deadline = time.monotonic() + max(args.wait, 0)
-        while time.monotonic() < deadline:
-            try:
-                process.status(paths)
-            except CliError as exc:
-                if exc.code == "not_running":
-                    raise CliError("start_failed", "Gateway exited before becoming healthy.", ExitCode.FAILURE) from exc
-                raise
-            gateway = config_ops.read_document(paths.models).get("gateway", {})
-            key_name = gateway.get("api_key_env") if isinstance(gateway, dict) else None
-            health = probe(host, port, api_key_env=key_name if isinstance(key_name, str) else None)
-            if health.get("reachable"):
-                return {**result, "status": "running", "health": health}, 0
-            time.sleep(0.1)
-        if args.wait > 0:
-            raise CliError("start_timeout", "Gateway did not become healthy before the wait timeout.", ExitCode.FAILURE)
-        return result, 0
+        return _start_and_wait(paths, document, credentials, host, port, args.wait), 0
     if group == "stop":
         if args.timeout < 0:
             raise CliError("invalid_timeout", "--timeout must be nonnegative.", ExitCode.USAGE)
         return process.stop(paths, args.timeout, args.force), 0
+    if group == "restart-if-running":
+        if not process.running_for_update(paths):
+            return {"status": "not_running", "restarted": False}, 0
+        # Validate the new installation before stopping the known-good process.
+        document, credentials, host, port = _catalog_options(paths)
+        process.stop_if_owned(paths)
+        return {**_start_and_wait(paths, document, credentials, host, port, 10), "restarted": True}, 0
     if group == "restart":
         try:
             process.stop(paths)
         except CliError as exc:
             if exc.code != "not_running":
                 raise
-        _, host, port = _catalog_options(paths)
+        _, _, host, port = _catalog_options(paths)
         return process.start(paths, host, port), 0
     if group == "logs":
         if args.n < 0:
@@ -186,24 +202,23 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
     if group == "config":
         if action == "path":
             return {"home": str(paths.home), "models": str(paths.models), "env": str(paths.env), "records": str(paths.records), "pid": str(paths.pid), "log": str(paths.log)}, 0
-        config_ops.load_catalog_env(paths.models)
-        document = config_ops.read_document(paths.models)
+        document, credentials = config_ops.read_snapshot(paths.models)
         if action == "show":
             writes = {"providers": "writable", "models": "writable", **{key: "read_only" for key in document if key not in {"providers", "models"}}}
-            return {"sections": {key: {"write_access": writes[key], "value": config_ops.redact_document({key: value})[key]} for key, value in document.items()}}, 0
+            return {"sections": {key: {"write_access": writes[key], "value": config_ops.redact_document({key: value}, credentials)[key]} for key, value in document.items()}}, 0
         if action == "validate":
             try:
-                config_ops.validate_document(document, str(paths.models))
+                config_ops.validate_document(document, str(paths.models), credentials)
             except (ValueError, TypeError) as exc:
-                raise CliError("invalid_configuration", str(exc), ExitCode.INVALID_CONFIG) from exc
+                raise CliError("invalid_configuration", "Invalid gateway configuration.", ExitCode.INVALID_CONFIG) from exc
             return {"valid": True, "path": str(paths.models)}, 0
         if action == "reload":
-            _, host, port = _catalog_options(paths)
+            host, port = _gateway_address(document)
             gateway = document.get("gateway", {})
             key_name = gateway.get("api_key_env") if isinstance(gateway, dict) else None
             headers = {}
-            if isinstance(key_name, str) and os.getenv(key_name):
-                headers["Authorization"] = f"Bearer {os.environ[key_name]}"
+            if isinstance(key_name, str) and credentials.get(key_name):
+                headers["Authorization"] = f"Bearer {credentials[key_name]}"
             url = f"http://{browsable_host(host)}:{port}/v1/routing/reload"
             request = urllib.request.Request(url, method="POST", headers=headers)
             try:
@@ -284,6 +299,10 @@ def main(argv: list[str] | None = None) -> int:
     except CliError as exc:
         emit(command, error=exc, json_mode=args.json_mode, quiet=args.quiet)
         return int(exc.exit_code)
+    except ConfigurationRecoveryRequired:
+        mapped = CliError("configuration_recovery_required", "An unresolved configuration recovery file exists.", ExitCode.INVALID_CONFIG)
+        emit(command, error=mapped, json_mode=args.json_mode, quiet=args.quiet)
+        return int(mapped.exit_code)
     except (OSError, ValueError, TypeError) as exc:
         mapped = CliError("invalid_configuration" if isinstance(exc, (ValueError, TypeError)) else "operation_failed", str(exc), ExitCode.INVALID_CONFIG if isinstance(exc, (ValueError, TypeError)) else ExitCode.FAILURE)
         emit(command, error=mapped, json_mode=args.json_mode, quiet=args.quiet)

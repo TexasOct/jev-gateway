@@ -1,0 +1,5 @@
+{
+  "command": "npm --prefix frontend run test:browser",
+  "exit": 0,
+  "seconds": 15.961
+}

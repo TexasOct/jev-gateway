@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Verify dashboard write authorization, credential secrecy, provider UI ownership and existing configuration boundaries against the current contract."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "Compare the merged management flows with the implemented provider configuration, validation, discovery, credential and model-import API contract."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/acceptance.md", "reason": "Use the completed parent evidence to distinguish supported management flows from unverified items in this source plan."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/related-task-boundaries.md", "reason": "Preserve page ownership and integration boundaries with Settings, shell and related provider work."}
+{"file": ".trellis/tasks/09-30-unified-settings-provider-config/research/provider-management-merge.md", "reason": "Authoritative per-requirement acceptance map and unresolved capability list for this merged task."}
