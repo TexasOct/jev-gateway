@@ -11,6 +11,6 @@
 - [x] Replace the backed-up v0.1.0 Release and tag using the user-authorized replacement; check the complete publication workflow.
 - [x] Download the new public assets; check exact asset set, hashes, metadata, tag identity, and latest stable selection.
 - [x] Run fresh isolated installation and default-path installation acceptance from the republished installer.
-- [ ] Persist the final report, audit every PRD requirement, update the relevant spec, and complete task bookkeeping.
+- [x] Persist the final report, audit every PRD requirement, update the relevant spec, and complete task bookkeeping.
 
 Private original artifacts and operational logs live under `/tmp/jev-v010-macos-acceptance`. Do not commit environment files, runtime databases, or raw logs. Roll back only files changed by this task and retain the original release backup until the replacement is verified.
