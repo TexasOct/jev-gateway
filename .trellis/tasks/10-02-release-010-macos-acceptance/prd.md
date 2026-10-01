@@ -19,9 +19,9 @@
 - [x] Focused regression tests and the full Python tests, Pyright, frontend lint/tests/build freshness, shell syntax, and release validator pass for the final source.
 - [x] Installed commands resolve to the intended uv tool environment and report v0.1.0 with Python >=3.12.
 - [x] The production-path file operations pass and all dedicated probe files are removed; existing user configuration and credentials are preserved.
-- [ ] Both isolated and default-path installed services pass lifecycle, health, and dashboard checks. Repeat installation preserves configuration and handles a running service correctly; uninstall preserves runtime files.
-- [ ] Remote v0.1.0 points to the repaired commit, its publication workflow succeeds, and the stable latest Release contains exactly the four intended assets with valid checksums.
-- [ ] A fresh installation from the republished public URL passes the acceptance checks, and a sanitized acceptance report is persisted.
+- [x] Both isolated and default-path installed services pass lifecycle, health, and dashboard checks. Repeat installation preserves configuration and handles a running service correctly; uninstall preserves runtime files.
+- [x] Remote v0.1.0 points to the repaired commit, its publication workflow succeeds, and the stable latest Release contains exactly the four intended assets with valid checksums.
+- [x] A fresh installation from the republished public URL passes the acceptance checks, and a sanitized acceptance report is persisted.
 
 ## Confirmed context
 

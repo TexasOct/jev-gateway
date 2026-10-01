@@ -15,7 +15,7 @@
   "branch": "fix/v0.1.0-macos-release",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "33ae6ce272b65ac274838f92db318566967c1d32",
   "pr_url": null,
   "subtasks": [],
   "children": [],
