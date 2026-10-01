@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Dashboard and security contract"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Project verification rules"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/activity-lifecycle.md", "reason": "Validate cleanup semantics, process-local scope and privacy"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/monitoring-refresh-and-geometry.md", "reason": "Validate refresh isolation, cursor behavior and responsive route geometry"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/routing-result-availability.md", "reason": "Live-only aggregation correctness"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/activity-lifecycle-edge-cases.md", "reason": "Adversarial lifecycle test footholds and overlapping route attribution"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Verify module ownership and endpoint layering"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify error/cancellation behavior remains compatible"}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify no sensitive activity telemetry is logged"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/activity-approval.md", "reason": "Review telemetry scope and privacy boundary"}

@@ -1,0 +1,35 @@
+{
+  "id": "global-routing-canvas",
+  "name": "global-routing-canvas",
+  "title": "重构策略配置为全局画布",
+  "description": "将路由策略编辑器改为全局画布，节点详情采用受限浮窗，并将节点布局持久化为独立配置。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-26",
+  "completedAt": "2026-09-30",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "merged",
+      "merged_into": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul",
+      "acceptance_owner": ".trellis/tasks/archive/2026-10/09-28-strategy-canvas-visual-redesign",
+      "acceptance_map": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/legacy-task-consolidation.md",
+      "acceptance_complete": false,
+      "user_approved": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "mock 网络边界、查询来源、unknown/false 区别及无写入验收"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "发现来源证据和持久化规范 envelope 衔接验收"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/cc-switch-and-upstream-references.md", "reason": "CC Switch 参考与上游列表协议证据"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/config-and-model-discovery.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/planning-options.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/spec/backend/cli-lifecycle.md", "reason": "现有目录与凭证存储、原子写入及 CLI 兼容约束"}
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "配置写授权、overlay 与 baseline 分离、前端凭证约束"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/model-metadata-sources.md", "reason": "数据源失败与缓存、false/null 区别、条件价格、重复匹配和导入前完整性测试"}

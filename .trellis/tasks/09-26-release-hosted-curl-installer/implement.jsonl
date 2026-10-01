@@ -1,7 +1,0 @@
-{"file":".trellis/spec/backend/index.md","reason":"Backend docs, frontend packaging and cross-file quality gates"}
-{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Installer lifecycle, install provenance and runtime preservation"}
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Tests, wheel packaging, frontend bundle and verification standards"}
-{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Dashboard static asset generation and serving contract"}
-{"file":".trellis/tasks/09-24-release-latest-curl-publishing/research/installer-and-contract.md","reason":"Prior installer and CLI contract research"}
-{"file":".trellis/tasks/09-24-release-latest-curl-publishing/research/publishing-and-release-state.md","reason":"Existing release workflow and packaging findings"}
-{"file":".trellis/tasks/09-26-release-hosted-curl-installer/research/installer-iteration.md","reason":"Test gaps, delegation identity, docs anchors and clean-checkout frontend build risks"}

@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "配置/发现/metadata API 类型、write-only 凭证、选择确认与 stale 状态契约"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "配置底座交付的精确 snapshot、操作和规范 metadata envelope schema"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/cc-switch-and-upstream-references.md", "reason": "CC Switch 参考与上游列表协议证据"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/dashboard-provider-design-baseline.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/related-task-boundaries.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/planning-options.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/model-metadata-sources.md", "reason": "在线预填、来源/时间展示、未知与冲突、批量确认和用户编辑保护"}

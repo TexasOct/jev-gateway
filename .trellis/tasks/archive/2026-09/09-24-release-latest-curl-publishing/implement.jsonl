@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend conventions, documentation parity, and quality gates"}
+{"file": ".trellis/spec/backend/cli-lifecycle.md", "reason": "Installer lifecycle, provenance, and runtime data preservation contract"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Packaging and verification requirements"}
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Dashboard bundle build and packaging contract"}
+{"file": ".trellis/tasks/archive/2026-09/09-24-release-latest-curl-publishing/research/installer-and-contract.md", "reason": "Current installer, state, tests, and compatibility constraints"}
+{"file": ".trellis/tasks/archive/2026-09/09-24-release-latest-curl-publishing/research/publishing-and-release-state.md", "reason": "Current packaging and GitHub publishing state"}

@@ -30,7 +30,12 @@ curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/inst
 tag 的 URL 下载 `jev_gateway-X.Y.Z-py3-none-any.whl` 和同名 `.sha256` 文件，
 校验后才调用 `uv tool install`，不再解析 latest 或查询 GitHub API 寻找 wheel。
 安装完成后，`jev install init` 初始化运行目录。重复运行会保留已有的
-`models.json`、`.env` 和记录数据库。Release wheel 自带面板，安装和运行都不需要 Node.js。
+`models.json`、`.env` 和记录数据库。更新 Release wheel 后，如果指定运行目录中原有由
+`jev` 管理且归属可验证的后台网关，安装器会重启它，最多等待 10 秒健康检查通过后
+才报告成功。原本未运行时不会自动启动；无法确认 PID 归属时不会发送停止信号。
+如果重启失败，wheel 已安装但安装器返回非零状态。请检查 PID 文件和日志，运行
+`jev --home DIR status`，确认安全后再运行 `jev --home DIR start`。
+前台运行或由其他服务管理器管理的网关不受此流程影响。Release wheel 自带面板，安装和运行都不需要 Node.js。
 
 固定版本或回滚时，使用已发布 tag 的安装脚本；也可替换为明确的预发布 tag：
 
@@ -49,7 +54,8 @@ tag 的 `install.sh` 及其校验文件，检查 SHA256 和内嵌 tag 完全匹�
 
 `--yes` 允许在缺少 `uv` 时从 `astral.sh` 安装它。非交互环境若不传此参数，需先
 安装 `uv`；`--no-uv` 则禁止引导安装 `uv`。`--home DIR` 指定运行目录，
-`--no-init` 跳过运行目录初始化。`--dry-run` 只打印计划，不联网、不执行子脚本、
+`--no-init` 跳过运行目录初始化，但更新 Release wheel 后仍会重启原本运行中的受管理网关。
+`--dry-run` 只打印计划，不联网、不执行子脚本、
 不写入，也不验证文件是否存在或校验和是否正确。通过 `curl` 获取脚本本身仍会联网；
 完全离线预览时，应使用已下载的脚本。
 

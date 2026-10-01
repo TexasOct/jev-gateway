@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Verify Provider and Settings changes preserve route/theme authorization, credential safety and supported dashboard contracts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Apply repository verification expectations to the merged frontend and API work."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/acceptance.md", "reason": "Check exact mock-backed integration evidence and limitations without treating it as proof of every source-plan feature."}
+{"file": ".trellis/tasks/09-30-unified-settings-provider-config/research/provider-management-merge.md", "reason": "Review every source criterion, recorded disposition, evidence link and deferred capability in the receiver's acceptance map."}

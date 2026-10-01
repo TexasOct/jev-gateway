@@ -52,7 +52,7 @@ reuse of an existing Codex or Claude login or subscription.
 - `--secret-env SOURCE_NAME` reads from the named process environment variable; `--secret-stdin` reads a bounded line; an interactive terminal can use a no-echo prompt. Never add a `--api-key VALUE` argument. `.env` and `.env.backup` must have mode `0600`.
 - Provider addition validates the candidate catalog before replacing `models.json` atomically and retains `models.json.bak`. Login-before-add must be possible even though catalog parsing normally requires referenced credentials; use a temporary validation environment for the candidate, without weakening validation of existing providers or persisting that placeholder.
 - `--json` outputs one JSON object to stdout, with `ok`, `command`, and either `data` or `error.code` plus `error.message`. No prompt is permitted in JSON or non-TTY mode. Uninstall preserves runtime data by default; `--purge` explicitly opts into removal.
-- The background server is managed through an owned PID record under `run/gateway.pid` and a non-credential launch token. A PID alone is not proof of ownership: verify that PID still belongs to this home and launch token before signaling it. `logs/gateway.log` is the managed output path.
+- The background server is managed through an owned PID record under `run/gateway.pid` and a non-credential launch token. A PID alone is not proof of ownership: verify that PID still belongs to this home and launch token before signaling it. Parse the process command line as arguments rather than matching a raw substring so runtime paths containing spaces remain valid. Re-check ownership immediately before an update-triggered signal. `logs/gateway.log` is the managed output path.
 
 ## 4. Validation and error matrix
 

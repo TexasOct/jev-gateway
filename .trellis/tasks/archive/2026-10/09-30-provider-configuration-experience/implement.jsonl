@@ -1,0 +1,16 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "并发实施共享的管理 API、事务、私网发现、元数据确认与前端交互契约"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "配置底座交付的精确 snapshot、操作和规范 metadata envelope schema"}
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "规划范围涉及的现有契约与验收规范；文件超过单文件注入上限，必须主动读取全文"}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/cc-switch-and-upstream-references.md", "reason": "CC Switch 参考与上游列表协议证据"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/config-and-model-discovery.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/dashboard-provider-design-baseline.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/related-task-boundaries.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/planning-options.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": "DESIGN.md", "reason": "符合 Google DESIGN.md alpha specification 的产品界面设计基线；计划项不是已实现状态"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/design-md-format.md", "reason": "官方格式来源、固定版本 linter 和上下文全文读取要求"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/model-metadata-sources.md", "reason": "在线价格/能力来源、提供方匹配、单位与未知字段、实时性限制及已授权的存储优化建议"}

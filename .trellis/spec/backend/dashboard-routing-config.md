@@ -20,7 +20,9 @@ Three files next to the active `models.json` hold runtime edits:
 | `dashboard-theme.json` | one hex seed color | `PUT`/`DELETE /v1/dashboard/theme` |
 | `routing-canvas-layout.json` | node positions and scroll viewport | `PUT /v1/dashboard/canvas-layout` |
 
-`models.json` is the baseline and is never written by the gateway.
+`models.json` is the baseline. Routing-overlay, theme, and canvas-layout APIs
+leave its bytes unchanged. Provider-management writes have a separate contract
+and must not expand the routing-overlay schema.
 
 Module ownership: `jev_gateway/routing_overlay.py` owns overlay shape, merge,
 atomic write, and `load_catalog_with_overlay()`. It must not import
@@ -83,8 +85,10 @@ Overlay request body:
   sections are unreachable, so a credential cannot be smuggled in.
 - Label membership is tag-based: adding a model to a label adds `{strategy}/{label}`
   to that model's `tags`. Tags owned by other strategies must survive an edit.
-- Environment key: `gateway.api_key_env` must be configured for any write. The
-  key is resolved at catalog load; no new variable is introduced.
+- Environment key: `gateway.api_key_env` must be configured for routing-overlay
+  and canvas-layout writes. Theme writes follow the ordinary gateway Bearer rule
+  and remain available without a configured key. The key is resolved at catalog
+  load; no new variable is introduced.
 - The overlay file and theme file are created with the process umask.
 
 ### 4. Validation & Error Matrix
@@ -92,7 +96,8 @@ Overlay request body:
 | Condition | Behavior |
 | --- | --- |
 | Missing or wrong Bearer token, key configured | `401 invalid_api_key` |
-| Write attempted with no `gateway.api_key_env` | `403 config_writes_disabled` |
+| Routing-overlay or canvas-layout write attempted with no `gateway.api_key_env` | `403 config_writes_disabled` |
+| Theme save/reset with no configured gateway key | Normal theme write response |
 | Read route with no key configured | Normal response, unchanged from before |
 | Overlay shape or catalog validation fails | `400 invalid_configuration`, active catalog untouched |
 | Merged catalog changes `storage` | `400 invalid_configuration` (`restart_required` semantics) |
@@ -101,9 +106,9 @@ Overlay request body:
 | Assets absent from the install | `404 dashboard_not_built`, startup logs a warning |
 | No overlay file present | Baseline behavior; `overlay.applied` is `false` |
 
-The write guard is required because `require_gateway_key` returns without
-checking when no key is configured. A write route that only calls it would accept
-unauthenticated mutations in the default install.
+Routing-overlay and canvas-layout writes require the configured-key guard because
+`require_gateway_key` returns without checking when no key is configured. Theme
+save/reset uses that ordinary authorization rule as a separate preference boundary.
 
 ### 5. Good/Base/Bad Cases
 
@@ -162,6 +167,73 @@ with reload_lock:
         catalog, source=str(active.models_file), registry=registry
     )
 ```
+
+## Scenario: independent theme preferences
+
+### 1. Scope / Trigger
+
+Use when changing theme persistence, theme authorization, Settings color controls
+or their pending/read/write state. Theme preferences do not change the routing
+policy, provider catalog or credential files.
+
+### 2. Signatures
+
+`GET`, `PUT` and `DELETE /v1/dashboard/theme` live in `dashboard.py`.
+`read_theme`, `validate_theme_shape`, `write_theme` and `remove_theme` own the
+adjacent `dashboard-theme.json`. `AppearanceView` consumes the theme seed and
+loading/error/notice callbacks from `useDashboardTheme` through `AppShell`.
+
+### 3. Contracts
+
+PUT accepts only `{version: 1, seed: "#rrggbb"}` and stores a lowercase hex seed.
+GET returns `{version, seed, read_error}`; DELETE returns the default seed and
+`removed`. All three routes call `authorize(state.gateway_api_key, authorization)`.
+Without a configured gateway key, theme save/reset is allowed. A configured key
+still requires a correct Bearer token. Routing/provider `write_available` is not
+a theme-editing capability; canvas and catalog mutations keep `require_write`.
+
+Settings keeps three peer preference rows and three circular color presets.
+Selection uses a separated outer accent highlight, with no central tick or black
+selected border. The custom native color control is a peer circular multicolor
+affordance with a decorative Lucide Pencil, localized accessible name and visible
+keyboard focus. A non-preset seed highlights the custom control. Native input
+events change the preview draft; change commits one write. Loading/pending
+temporarily disables color controls. Save/reset shares the existing pending guard,
+and stale reads must not overwrite the latest saved seed. No additional browser
+storage, stylesheet entry, palette builder or CSP exception is introduced.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| No gateway key configured | Theme GET/PUT/DELETE available; configuration writes remain blocked |
+| Configured key with missing/wrong Bearer | `401 invalid_api_key`, no theme file change |
+| Invalid version/hex or unknown payload key | `400 invalid_theme`, no file replacement |
+| Theme PUT fails during atomic replacement | `500 theme_write_failed`, previous file remains |
+| Routing/provider write capability false | Theme controls remain usable after theme loading |
+| Theme operation pending | Color controls disabled; no duplicate commit |
+| Late theme read or failed write | Preserve latest valid state and report the current operation |
+
+### 5. Good/Base/Bad Cases
+
+Good: a default installation changes its theme while routing edits remain locked.
+Base: an installation with a gateway key uses the same Bearer for theme reads and
+writes. Bad: removing the global configuration-write guard to enable color edits.
+
+### 6. Tests Required
+
+Gateway tests cover no-key save/read/reset, configured-key missing/wrong denial,
+unchanged baseline/overlay/policy/version count, and unchanged canvas/routing/provider
+guards. Browser tests cover Settings before routing capability loads, false
+`write_available`, native input/change one-write behavior, custom selection,
+computed circular geometry and outer highlight, keyboard focus, both schemes and
+locales, 320px wrapping, stale reads, pending writes and failure/retry.
+
+### 7. Wrong vs Correct
+
+Wrong: theme PUT uses `require_write`, or Appearance uses the routing
+`write_available` flag. Correct: theme routes use the ordinary `authorize` callback;
+Appearance disables color edits only while the theme is loading or pending.
 
 ## Scenario: bundled dashboard assets
 
@@ -315,7 +387,7 @@ The layout is shared by browsers connected to the same installation. The API cur
 
 - `tests/test_canvas_layout.py`: strict shape, Unicode IDs, limits, corrupt-file fallback, and read-after-write at the byte limit.
 - `tests/test_gateway.py`: configured-key guard, Bearer checks, file failure, unchanged policy hash/version count and unchanged baseline/overlay bytes.
-- `frontend/src/config/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
+- `frontend/src/features/routing/model/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
 - Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works. For zoomed/scrolled canvases, `elementFromPoint(clientX, clientY)` must identify the intended `data-canvas-node`; verify with real browser mouse input because synthetic `PointerEvent` dispatch does not exercise browser pointer capture faithfully.
 - Browser checks for responsive canvas fitting should scroll the canvas into the visible page before measuring node bounds. Assert that the selected node's bounding box is inside the visible canvas after Fit, at a usable CSS size, rather than relying on absence of page-level horizontal overflow. When the whole board cannot fit at minimum readable zoom, focus a selected node or compact group and provide explicit pan controls; viewport changes remain layout-only and must not submit policy changes.
 - `RoutingEditor` selection is the source passed into canvas fitting and the inspector. Canvas node selection callbacks must update the parent `selectedNode`; otherwise Fit may focus a stale default node even when the user selected another module. Verify selection synchronization in browser tests after switching from an advanced panel.
@@ -425,16 +497,42 @@ Cursors contain a version, endpoint, optional session ID, and ordering key. HMAC
 
 Wrong: `session_request_evidence(id)[:limit]` loads every retained payload. Correct: call `session_request_page` through the existing writer queue and apply the compound key predicate in SQL.
 
+## Process-local route activity
+
+`GET /v1/routing/activity` is independent of session listing and retained evidence. `jev_gateway/activity.py` owns a bounded, lock-protected registry of in-flight request tokens keyed by immutable `(strategy, route, provider, upstream_model)` destination. The gateway registers after routing selects a destination and before the upstream call; stream tokens remain active through response delivery, including upstream wait and chunk gaps. Non-stream tokens end when the synchronous upstream call returns or fails. Completion, error, cancellation and disconnect cleanup are idempotent. ASGI response-level cleanup handles failures before body iteration and send failures.
+
+The projection carries an opaque process instance ID, completeness flag and aggregate in-flight request/stream counts only. It contains no request/session IDs or content. `complete: false` suppresses paths and means unknown; `paths: []` with `complete: true` means no observed in-flight requests on known attributed paths for that process. It does not establish global idle or worker-cluster coverage. Registry bounds are independent of sessions and evidence storage, survive catalog reloads, and clear at process shutdown. Chat serving remains independent of instrumentation capacity.
+
 ## Frontend conventions
 
 - One page, no client-side router. View state switches between monitoring and
-  configuration.
-- The gateway credential lives in a module-level variable in `src/api.ts` only.
+  configuration. At wide widths, center and bound the Monitoring view to 1280px,
+  Provider and Settings content to 768px, and the Strategy workspace to 1440px.
+  Keep the strategy shell full viewport height and preserve canvas pan, fit,
+  node-size and hit-target behavior within the centered workspace.
+- Keep `App.tsx` as the state/API orchestration boundary. Extract substantial
+  presentational views into view-owned components with typed props and narrowly
+  scoped CSS; pass existing callbacks through rather than duplicating API,
+  persistence, or request-state logic in the view.
+- Use progressive disclosure for dense operational detail: summarize the
+  selected live session and known recorded outcome first, then keep source
+  evidence and provider observations available through accessible controls.
+  Missing evidence remains unknown/unavailable and must not be relabeled as a
+  live request. When a virtual list uses fixed-height rows, preserve its geometry
+  and keep any keyboard-focused row mounted until focus moves elsewhere.
+- Overview timestamps and outcomes describe recorded request evidence, not live
+  process health. A latest-session preview remains explicitly unselected until
+  the operator chooses it. In request detail, a non-null selected session with a
+  null detail payload and no load error renders loading copy; only a null
+  selection renders "No session selected". Keep loading, empty evidence and
+  failed reads distinct in both locale catalogs and synthetic rendering tests.
+- The gateway credential lives in a module-level variable in `frontend/src/shared/api/client.ts` only. API response and write types live in
+  `frontend/src/shared/api/types.ts`, which has no credential or runtime state.
   Never persist it in `localStorage`, `sessionStorage`, a cookie, or the URL.
   `localStorage` may hold only the validated locale identifier under the fixed
   dashboard locale key.
-- Pure editor logic belongs in `src/config/draft.ts` and pure palette logic in
-  `src/theme/palette.ts`, so both are testable without a DOM. The overlay payload
+- Pure editor logic belongs in `frontend/src/features/routing/model/draft.ts` and pure palette logic in
+  `frontend/src/shared/theme/palette.ts`, so both are testable without a DOM. The overlay payload
   compares each model against `baseline_tags` / `baseline_priority`, not against
   the currently applied overlay, so repeated edits stay consistent.
 - `chroma-js` ships no types; `@types/chroma-js` is a dev dependency. Contrast
@@ -446,17 +544,56 @@ Wrong: `session_request_evidence(id)[:limit]` loads every retained payload. Corr
   setter synchronously.
 - The `chroma-js` lowercase hex form is the stored seed shape; reject anything
   else in both the API and the UI.
+- For strategy-level monitoring counts, enumerate strategies from
+  `/v1/routing/strategies`, then traverse every `/v1/routing/sessions` cursor
+  page. Deduplicate by stable `session_id`, group by latest known strategy and
+  provider/upstream model (recorded route fallback), and label results as a
+  current live-session snapshot. A live-session count is not request volume or
+  historical distribution. Keep missing attribution and incomplete/storage
+  error states explicit; never certify zero until traversal completed.
+- Keep provider-summary failures independent from session-list failures. A
+  missing provider observation must not suppress valid live-session counts.
+- When a session cursor page fails, preserve the last successful page/cursor so
+  retry can resume the complete traversal. When storage reports unavailable,
+  keep counts uncertified and expose a recovery action rather than rendering a
+  verified zero.
+- Theme save/reset operations share a single pending guard. Clear prior notices
+  when a write begins, surface the current failure in the appearance view, and
+  prevent stale theme reads or overlapping writes from replacing the latest
+  saved seed in the UI. Clear the view error when a new operation begins and
+  render the latest operation's notice/error consistently.
+- The native color input's `input` event updates a local picker draft; its
+  `change` event commits the theme once. React's synthetic color `onChange`
+  also fires during native input previews. Keep the native change listener and
+  its callback-ref cleanup so previews do not write and rerenders do not add
+  duplicate listeners. Browser regressions must dispatch input and change
+  separately and assert zero preview PUTs and one committed PUT.
+- Status colors used for small text must meet the normal-text contrast target
+  (4.5:1) on every surface where rendered. Do not mark 3:1 large-text contrast
+  as passing for small status labels.
+
+## Frontend Tailwind and geometry boundaries
+
+`frontend/src/styles/index.css` is the only imported stylesheet. It imports Tailwind theme and utilities without Preflight, then `tokens.css`, `base.css`, `shell.css`, `monitoring.css`, `routing.css`, `canvas-geometry.css`, `appearance.css`, and `virtual-list.css` in that order. Keep exactly these nine files; an owner file can be comments-only. `@theme inline` maps utility colors to the runtime palette variables applied by `frontend/src/shared/theme/palette.ts`. `data-scheme` selects the light/dark scheme; do not introduce a static `.dark` theme, remote assets, or browser theme persistence.
+
+Component-specific static appearance belongs in JSX Tailwind utilities, including canvas geometry, SVG paint, pointer-hit rules, mobile provider-table transformation, and virtual-list dimensions. CSS holds the small shared element/control defaults, runtime theme variables, Tailwind configuration, and named keyframes (`node-drag-pulse`, `configured-route-trace`, `monitoring-route-flow`). Keep dynamic measured coordinates (`top`, `left`, overlay bounds), per-row inline position/height, SVG viewBox, and data-derived colors on their elements. A class name such as `trace-stage-missing` or `configured-flow-active` may remain as a test/query hook only; it must not be relied on for presentation unless a CSS rule is documented in the allowlist. Assert visual states using emitted Tailwind classes or browser computed styles, not selector-marker presence alone. Do not substitute `@apply` or a generic selector-to-class registry for component utilities.
+
+The session list viewport is 480px on desktop and 280px at widths of 720px or less; the request timeline is 480px on desktop and 62vh at those narrow widths. Session and request rows stay 132px and 360px respectively. Emit the 280px utilities only for session lists and the 62vh utilities only for timelines: Tailwind's generated ordering does not guarantee that two competing `max-[720px]` height utilities on one element resolve by class-string order. Keep all three viewport properties (`height`, `min-height`, `max-height`) equal. Preserve focused-row retention and cursor pagination while moving the static row positioning to utilities.
+
+Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on the 190 × 56px canvas nodes, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
 
 ## Common mistakes
 
 - Do not call `load_catalog()` directly on a code path that should honor the
   overlay. Use `load_catalog_with_overlay()`.
-- Do not write `models.json`. Write the overlay, and let the merge produce the
-  effective document.
+- Routing edits must write the overlay and leave `models.json` unchanged. Provider
+  management uses its own baseline mutation boundary; never put provider or
+  credential operations in a routing overlay.
 - Do not send a partial overlay. The server replaces the rule list wholesale and
   replaces a named model's tags, so a partial payload reverts whatever it omits.
-- Do not let a write route rely on `require_gateway_key` alone; add the
-  `gateway.api_key_env` guard.
+- Routing/provider/canvas mutation routes require the `gateway.api_key_env`
+  guard. Theme preference save/reset deliberately uses ordinary gateway
+  authorization and is allowed without a configured key.
 - Do not run `npm ci` in build scripts or images. Vite's rolldown optional native
   bindings are pruned to the platform that generated the lockfile, so `npm ci`
   fails on a different OS/libc. Use `npm install`.

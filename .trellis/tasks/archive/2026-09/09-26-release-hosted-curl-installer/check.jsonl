@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Review documentation parity and package-level quality gates"}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Review installer, provenance and runtime lifecycle contracts"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Review tests, wheel contents, frontend build and validation"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Review the dashboard static asset build and packaging contract"}
+{"file":".trellis/tasks/archive/2026-09/09-24-release-latest-curl-publishing/research/installer-and-contract.md","reason":"Cross-check existing installer and CLI behavior"}
+{"file":".trellis/tasks/archive/2026-09/09-24-release-latest-curl-publishing/research/publishing-and-release-state.md","reason":"Cross-check publishing workflow and package assumptions"}
+{"file":".trellis/tasks/archive/2026-09/09-26-release-hosted-curl-installer/research/installer-iteration.md","reason":"Review exact installer delegation, validation tests and clean-build requirements"}

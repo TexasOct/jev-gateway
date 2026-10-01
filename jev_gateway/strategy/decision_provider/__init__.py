@@ -54,7 +54,10 @@ class DecisionClient:
                 *(provider for provider in providers if provider.name != preferred),
             )
         for provider in providers:
-            api_key = os.getenv(provider.api_key_env)
+            api_key = (
+                os.getenv(provider.api_key_env) if self.settings.credentials is None
+                else self.settings.credentials.get(provider.api_key_env)
+            )
             if not api_key:
                 continue
             adapter = _ADAPTERS.get(provider.protocol)

@@ -96,6 +96,11 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 `GET /healthz` 可以确认进程已启动。长期运行、容器与 wheel 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
+网关以有效目录启动后，打开 `/dashboard`，在 Provider 页浏览供应商预设或配置自定义
+LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作。模型发现会生成可搜索的
+候选列表；核对价格和能力元数据后，再显式导入选中模型。配置步骤与私网开启方式见
+[`docs/models-config.md`](docs/models-config.md#provider-页与模型导入)。
+
 ## 模型标识
 
 目录中的模型用包含提供方的完整 ID 索引，即 `<provider>/<upstream_model>`。`providers` 统一定义连接设置，每个模型引用一个提供方，再补充能力、上限、成本和路由标签：
@@ -132,7 +137,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `GET` | `/healthz` | 存活状态与配置快照。 |
-| `GET` | `/dashboard` | 内置的运维面板，用于监控与路由配置。 |
+| `GET` | `/dashboard` | 内置的运维面板，用于监控、提供方管理与路由配置。 |
 | `GET` | `/v1/models` | 策略名与目录模型 ID。 |
 | `GET` | `/v1/routing/policy` | 当前策略快照。 |
 | `GET` | `/v1/routing/strategies` | 已注册的策略及其策略配置。 |
@@ -143,6 +148,11 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 | `GET` | `/v1/routing/sessions/{session_id}` | 单个实时会话。 |
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | 某个会话保留的请求。 |
 | `GET` | `/v1/routing/providers/summary` | 提供方保留的活动统计。 |
+| `GET` | `/v1/provider-configuration` | 安全的提供方配置、预设与 revision。 |
+| `POST` | `/v1/provider-configuration/validate` | 校验提供方改动或已确认的模型导入。 |
+| `PUT` | `/v1/provider-configuration` | 应用提供方改动或已确认的模型导入。 |
+| `POST` | `/v1/provider-discovery` | 获取上游候选模型，不执行导入。 |
+| `POST` | `/v1/provider-metadata` | 查询元数据建议及其来源。 |
 | `GET` | `/v1/routing/configuration` | 可编辑的路由配置面。 |
 | `POST` | `/v1/routing/configuration/validate` | 校验覆盖内容但不应用。 |
 | `PUT` | `/v1/routing/configuration` | 在 `models.json` 旁应用覆盖内容。 |

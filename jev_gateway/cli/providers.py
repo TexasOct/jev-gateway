@@ -2,20 +2,34 @@ from __future__ import annotations
 
 import copy
 import os
+import json
+from functools import wraps
+from collections.abc import Callable
 from typing import Any
-
-from dotenv import dotenv_values
 
 from jev_gateway.cli.config_ops import read_document, validate_document, write_document_atomic
 from jev_gateway.cli.output import CliError, ExitCode
 from jev_gateway.cli.paths import RuntimePaths
 from jev_gateway.cli.secrets import remove_env, upsert_env
+from jev_gateway.provider_presets import PRESETS
+from jev_gateway.provider_config import credential_snapshot, env_update, _references
+from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
+from jev_gateway.catalog import catalog_from_document
+from jev_gateway.routing_overlay import read_overlay, merge_overlay
+from jev_gateway.strategy import StrategyRegistry
 
-PRESETS: dict[str, dict[str, str | None]] = {
-    "openai": {"type": "openai", "api_base": "https://api.openai.com/v1", "api_key_env": "OPENAI_API_KEY"},
-    "anthropic": {"type": "anthropic", "api_base": None, "api_key_env": "ANTHROPIC_API_KEY"},
-    "deepseek": {"type": "deepseek", "api_base": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"},
-}
+
+def _locked(function: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(function)
+    def invoke(paths: RuntimePaths, *args: Any, **kwargs: Any) -> Any:
+        try:
+            with configuration_read_lock(paths.models):
+                return function(paths, *args, **kwargs)
+        except (ValueError, TypeError) as error:
+            raise CliError("invalid_configuration", "Provider configuration validation failed.", ExitCode.INVALID_CONFIG) from error
+        except (OSError, RuntimeError) as error:
+            raise CliError("operation_failed", "Provider configuration operation failed.", ExitCode.FAILURE) from error
+    return invoke
 
 
 def provider_secret_name(document: dict[str, Any], provider_id: str) -> str:
@@ -31,6 +45,7 @@ def provider_secret_name(document: dict[str, Any], provider_id: str) -> str:
     raise CliError("provider_missing", f"Provider {provider_id!r} does not exist and is not a supported preset.", ExitCode.USAGE)
 
 
+@_locked
 def add_provider(paths: RuntimePaths, *, preset: str, provider_id: str | None, provider_type: str | None, api_base: str | None, api_key_env: str | None, models: list[str], tags: list[str], priority: int | None = None, quality: float | None = None, context_window: int | None = None, max_output_tokens: int | None = None, set_defaults: bool = False, secret: str | None = None, dry_run: bool = False) -> dict[str, Any]:
     if preset not in {*PRESETS, "custom"}:
         raise CliError("unknown_preset", f"Unknown provider preset {preset!r}.", ExitCode.USAGE)
@@ -48,6 +63,8 @@ def add_provider(paths: RuntimePaths, *, preset: str, provider_id: str | None, p
     kind = provider_type or template.get("type")
     base = api_base if api_base is not None else template.get("api_base")
     key_name = api_key_env or str(template.get("api_key_env") or "")
+    if secret is not None and key_name and _references(document, key_name):
+        raise CliError("credential_in_use", "Credential reference is shared by another configuration entry.", ExitCode.USAGE)
     if preset == "custom" and (not kind or not base or not key_name):
         raise CliError("missing_provider_option", "custom requires --type, --api-base, and --api-key-env.", ExitCode.USAGE)
     if not kind:
@@ -85,32 +102,34 @@ def add_provider(paths: RuntimePaths, *, preset: str, provider_id: str | None, p
     # The catalog parser resolves credentials while validating. Supply a temporary
     # sentinel for the new provider only, so adding a reference before login is
     # possible without weakening validation of existing providers.
-    config_env = dict(os.environ)
-    if paths.env.exists():
-        config_env.update({name: value for name, value in dotenv_values(paths.env).items() if isinstance(name, str) and isinstance(value, str)})
+    config_env = dict(credential_snapshot(paths.models))
     if key_name and (secret is not None or not config_env.get(key_name)):
         config_env[key_name] = secret or "jev-key-not-yet-configured"
-    previous = dict(os.environ)
     try:
-        os.environ.clear()
-        os.environ.update(config_env)
-        validate_document(candidate, str(paths.models))
+        validate_document(candidate, str(paths.models), config_env)
+        overlay, error = read_overlay(paths.models)
+        if error:
+            raise ValueError("Routing overlay must be repaired before changing providers.")
+        StrategyRegistry.from_catalog(catalog_from_document(merge_overlay(candidate, overlay), str(paths.models), config_env))
     except (ValueError, TypeError) as exc:
-        raise CliError("invalid_configuration", str(exc), ExitCode.INVALID_CONFIG) from exc
-    finally:
-        os.environ.clear()
-        os.environ.update(previous)
+        raise CliError("invalid_configuration", "Provider configuration validation failed.", ExitCode.INVALID_CONFIG) from exc
     if dry_run:
         return {"providers": [identifier], "models": new_ids, "dry_run": True, "secret_set": secret is not None, "api_key_env": key_name or None}
+    changes = {paths.models: (json.dumps(candidate, ensure_ascii=False, indent=2) + "\n").encode(), paths.models.with_name("models.json.bak"): optional_bytes(paths.models)}
     if secret is not None and key_name:
-        upsert_env(paths.env, key_name, secret)
-    write_document_atomic(paths.models, candidate, validate=False)
+        original_env = optional_bytes(paths.env)
+        changes[paths.env] = env_update(original_env, key_name, secret)
+        changes[paths.env.with_name(".env.backup")] = original_env
+    replace_configuration(paths.models, changes)
     return {"providers": [identifier], "models": new_ids, "api_key_env": key_name or None, "secret_set": secret is not None}
 
 
+@_locked
 def login(paths: RuntimePaths, provider_id: str, name: str, secret: str | None, dry_run: bool = False) -> dict[str, Any]:
     document = read_document(paths.models) if paths.models.exists() else {"providers": []}
     destination = provider_secret_name(document, provider_id)
+    if _references(document, destination, exclude=("llm", provider_id)):
+        raise CliError("credential_in_use", "Credential reference is shared by another configuration entry.", ExitCode.USAGE)
     if secret is not None and (not secret or any(character in secret for character in "\r\n\x00")):
         raise CliError("invalid_secret", "Credential must be nonempty and fit on one line.", ExitCode.USAGE)
     if dry_run:
@@ -121,13 +140,17 @@ def login(paths: RuntimePaths, provider_id: str, name: str, secret: str | None, 
     return {"provider": provider_id, "api_key_env": destination, "secret_set": True, "reload_required": True}
 
 
+@_locked
 def logout(paths: RuntimePaths, provider_id: str, dry_run: bool = False) -> dict[str, Any]:
     document = read_document(paths.models) if paths.models.exists() else {"providers": []}
     name = provider_secret_name(document, provider_id)
+    if _references(document, name, exclude=("llm", provider_id)):
+        raise CliError("credential_in_use", "Credential reference is shared by another configuration entry.", ExitCode.USAGE)
     removed = False if dry_run else remove_env(paths.env, name)
     return {"provider": provider_id, "api_key_env": name, "removed": removed, "dry_run": dry_run, "note": "This does not revoke the upstream key or remove exported shell values."}
 
 
+@_locked
 def list_providers(paths: RuntimePaths) -> list[dict[str, Any]]:
     document = read_document(paths.models)
     counts: dict[str, int] = {}
@@ -136,7 +159,7 @@ def list_providers(paths: RuntimePaths) -> list[dict[str, Any]]:
             provider = model.get("provider")
             if isinstance(provider, str):
                 counts[provider] = counts.get(provider, 0) + 1
-    local_keys = dotenv_values(paths.env) if paths.env.exists() else {}
+    local_keys = credential_snapshot(paths.models)
     result = []
     for provider in document.get("providers", []):
         if isinstance(provider, dict):
@@ -149,6 +172,7 @@ def list_providers(paths: RuntimePaths) -> list[dict[str, Any]]:
     return result
 
 
+@_locked
 def remove_provider(paths: RuntimePaths, provider_id: str, force: bool = False, dry_run: bool = False) -> dict[str, Any]:
     document = read_document(paths.models)
     providers = document.get("providers", [])
@@ -162,7 +186,12 @@ def remove_provider(paths: RuntimePaths, provider_id: str, force: bool = False, 
     candidate = copy.deepcopy(document)
     candidate["providers"] = [item for item in candidate["providers"] if item.get("id") != provider_id]
     candidate["models"] = [item for item in candidate["models"] if item.get("provider") != provider_id]
-    validate_document(candidate, str(paths.models))
+    credentials = credential_snapshot(paths.models)
+    validate_document(candidate, str(paths.models), credentials)
+    overlay, error = read_overlay(paths.models)
+    if error:
+        raise ValueError("Routing overlay must be repaired before changing providers.")
+    StrategyRegistry.from_catalog(catalog_from_document(merge_overlay(candidate, overlay), str(paths.models), credentials))
     if not dry_run:
         write_document_atomic(paths.models, candidate, validate=False)
     return {"provider": provider_id, "models_removed": len(owned), "affected_tags": affected, "dry_run": dry_run}

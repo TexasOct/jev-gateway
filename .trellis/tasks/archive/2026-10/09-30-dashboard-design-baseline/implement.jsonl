@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "规划范围涉及的现有契约与验收规范；文件超过单文件注入上限，必须主动读取全文"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "规划范围涉及的现有契约与验收规范"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Provider 交互状态、私网 opt-in、来源与确认的共享约束"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/dashboard-provider-design-baseline.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/related-task-boundaries.md", "reason": "源码现状、任务边界与尚待审核的规划建议"}
+{"file": "DESIGN.md", "reason": "根目录产品界面设计规范，与任务内小写 design.md 技术方案分离"}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/research/design-md-format.md", "reason": "官方 schema、标准章节顺序与格式验收命令"}

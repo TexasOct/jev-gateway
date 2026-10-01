@@ -1,0 +1,11 @@
+/* Geometry utilities live on the owning JSX elements. */
+@keyframes node-drag-pulse {
+    from {
+        border-color: var(--canvas-node-accent);
+    }
+    to {
+        border-color: var(--accent);
+    }
+}
+/* Canvas geometry and pointer-hit rules live on the owning elements. Measured
+   toolbar and inspector bounds remain inline for Fit/reveal calculations. */

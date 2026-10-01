@@ -1,0 +1,4 @@
+/* Measured connector coordinates remain inline on the monitoring SVG. */
+@keyframes monitoring-route-flow {
+    to { stroke-dashoffset: -0.42; }
+}

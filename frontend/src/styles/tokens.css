@@ -1,0 +1,20 @@
+:root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --surface-alt: #eef1f7;
+    --code-bg: #edf1f7;
+    --border: #d8dee8;
+    --text: #17202a;
+    --text-muted: #5c6b80;
+    --accent: #3b66d9;
+    --accent-hover: #3259c2;
+    --accent-active: #294ba9;
+    --on-accent: #ffffff;
+    --good: #1f7a4b;
+    --bad: #b33b3b;
+    --warn: #8a5a00;
+    color-scheme: light;
+}
+:root[data-scheme="dark"] {
+    color-scheme: dark;
+}

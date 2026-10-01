@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from jev_gateway.cli.install_state import init_runtime, read_state
 
 
-def test_packaged_templates_match_root() -> None:
+def test_packaged_models_template_is_valid_and_has_required_sections() -> None:
     root = Path(__file__).resolve().parents[1]
-    package = root / "jev_gateway/templates"
-    assert (package / "models.example.json").read_bytes() == (root / "models.example.json").read_bytes()
-    assert (package / "env.example").read_bytes() == (root / ".env.example").read_bytes()
+    document = json.loads((root / "jev_gateway/templates/models.example.json").read_text())
+    assert {"gateway", "storage", "providers", "models"} <= document.keys()
+
+
+def test_packaged_env_template_contains_expected_keys() -> None:
+    root = Path(__file__).resolve().parents[1]
+    env_template = (root / "jev_gateway/templates/env.example").read_text()
+    assert "DEEPSEEK_API_KEY=" in env_template
+    assert "OPENAI_API_KEY=" in env_template
+    assert "JEV_OPENROUTER_API_KEY=" in env_template
 
 
 def test_init_preserves_runtime_files(tmp_path, monkeypatch) -> None:

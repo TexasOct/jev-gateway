@@ -1,8 +1,8 @@
-"""The shipped `task_aware` matrix: tier pools and the Astra reserve.
+"""The documented `task_aware` matrix: tier pools and the Astra reserve.
 
-These tests read the repository's own `models.json`, so they fail when the
-shipped routing table drifts from the document that describes it. `models.json`
-is git-ignored and holds local credentials, so the file is skipped when absent.
+The fixture encodes the seven-label table in `docs/routing-design.md` and
+`docs/models-config.md`, using credential-free example model profiles. Provider
+keys are fake and decision HTTP is stubbed, so the matrix runs on clean checkouts.
 """
 
 from __future__ import annotations
@@ -21,16 +21,12 @@ from jev_gateway.strategy import RoutingRequest, StrategyRegistry
 from jev_gateway.strategy.policy import PolicyStrategy
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
-CONFIG_PATH = PROJECT_ROOT / "models.json"
+CONFIG_PATH = PROJECT_ROOT / "tests" / "fixtures" / "task_aware_matrix.json"
 
 DEEPSEEK = "deepseek/deepseek-flash"
 LUNA = "openai/gpt-6-luna"
 SOL = "openai/gpt-6-sol"
 ASTRA = "openai/gpt-6-astra"
-
-pytestmark = pytest.mark.skipif(
-    not CONFIG_PATH.is_file(), reason="models.json is a local, git-ignored file"
-)
 
 CASES: list[tuple[str, dict[str, str], str, str]] = [
     (
@@ -129,7 +125,7 @@ def route(
     monkeypatch: pytest.MonkeyPatch,
     answers: dict[str, str] | None,
 ):
-    """Run one turn through the shipped matrix, with JEV stubbed out."""
+    """Run one turn through the documented matrix, with JEV stubbed out."""
     monkeypatch.setenv("JEV_OPENROUTER_API_KEY", "test-key")
 
     def post(url: str, **kwargs: Any) -> httpx.Response:

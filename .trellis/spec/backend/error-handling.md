@@ -114,9 +114,14 @@ would alter cost, latency, session continuation, and evidence semantics and need
 a separate routing design.
 
 Streaming failures occur after headers may have been sent. They are logged as
-`routing stream failed`, recorded as failed outcomes, and raised as a
-fixed-message exception rather than converted to a new JSON response. The
-original upstream exception text must not reach the ASGI error handler.
+`routing stream failed` and recorded as failed outcomes. Once the gateway has
+handled the failure, it must not re-raise an exception into ASGI: Uvicorn would
+log an `Exception in ASGI application` traceback even though no replacement
+HTTP response can be sent. Finish the response body without `[DONE]` or an SSE
+error payload, and keep the original upstream exception text out of logs and
+responses.
+
+
 
 The external JEV classifier is a separate fallback chain. Its client catches
 network and response-validation failures, tries the next configured source, and
@@ -149,7 +154,7 @@ wording or source lines. There is no new configuration or environment key.
 | Condition | Behavior |
 | --- | --- |
 | Upstream call raises | Record failed outcome best effort; return fixed 502 text, bounded type, and `upstream_error` code |
-| Stream iterator raises after headers | Record failed outcome, log safe frame locations, and raise a fixed-message error |
+| Stream iterator raises after headers | Record failed outcome, log safe frame locations, and end without `[DONE]`; do not re-raise into ASGI |
 | Exception class name is not bounded | Use `Exception` as the exposed type |
 | Evidence writer fails | Chat availability remains independent of evidence |
 

@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Monitoring cursor and evidence contracts"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/routing-result-availability.md", "reason": "Registered strategies and live-session aggregation limits"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/activity-lifecycle.md", "reason": "Gateway request/stream lifecycle and safe activity-state boundaries"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/monitoring-refresh-and-geometry.md", "reason": "Existing monitoring layout, refresh behavior and SVG connector requirements"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Lifecycle, async streaming cleanup and backend test standards"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-reference-capture.md", "reason": "Diagram visual reference and non-transferable demo semantics"}
+{"file": ".trellis/tasks/archive/2026-09/09-28-strategy-monitoring-home/research/activity-lifecycle-edge-cases.md", "reason": "Request-time attribution and cancellation gaps; final design overrides broader active-work and TTL-pinning proposals"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Gateway endpoint/module placement and ownership"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Streaming cancellation and upstream failure behavior"}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Avoid introducing sensitive activity log fields"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/activity-approval.md", "reason": "User approved read-only process route activity endpoint and polling"}

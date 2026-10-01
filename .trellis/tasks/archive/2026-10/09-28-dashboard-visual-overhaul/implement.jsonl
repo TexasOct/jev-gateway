@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Dashboard API, frontend state, evidence and canvas persistence contract"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/current-baseline.md", "reason": "Current frontend state ownership and palette/canvas geometry findings"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/routing-result-availability.md", "reason": "Actual strategy/model live session data and pagination limits"}
+{"file": ".trellis/tasks/archive/2026-09/09-27-dashboard-ui-layout-redesign/research/magpie-reference-capture.md", "reason": "Observed Magpie routing diagram reference and non-transferable demo status"}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-visual-overhaul/research/legacy-task-consolidation.md", "reason": "用户批准合并的旧画布/UI 验收映射；保留未验证项及责任分工"}
