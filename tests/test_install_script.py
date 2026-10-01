@@ -147,8 +147,8 @@ def test_embedded_release_installs_directly_without_api_or_self_delegation(tmp_p
     wheel_url = f"{RELEASES}/v0.1.0/jev_gateway-0.1.0-py3-none-any.whl"
     assert _downloads(events) == [wheel_url, wheel_url + ".sha256"]
     assert [event[0] for event in events] == ["curl", "curl", "uv", "jev", "jev"]
-    assert events[2][1:4] == ["tool", "install", "--force"]
-    assert events[2][4].endswith("/jev_gateway-0.1.0-py3-none-any.whl")
+    assert events[2][1:7] == ["tool", "install", "--force", "--python", "3.12", "--managed-python"]
+    assert events[2][7].endswith("/jev_gateway-0.1.0-py3-none-any.whl")
     assert events[3][1:] == ["--home", str(tmp_path / "runtime"), "install", "init", "--version", "0.1.0", "--source", wheel_url, "--method", "isolated"]
     assert events[4][1:] == ["--home", str(tmp_path / "runtime"), "restart-if-running"]
 
@@ -330,6 +330,7 @@ def test_dry_run_does_not_download_execute_or_mutate(tmp_path: Path, args: list[
     assert result.returncode == 0, result.stderr
     assert events == []
     assert not (tmp_path / "runtime").exists()
+    assert "--python 3.12 --managed-python" in result.stdout
     if "--version" in args:
         assert "delegate once" in result.stdout
     elif "--ref" not in args:
@@ -399,7 +400,7 @@ def test_failed_wheel_install_never_restarts(tmp_path: Path) -> None:
 def test_explicit_git_ref_remains_separate(tmp_path: Path) -> None:
     result, events = _run_release(tmp_path, args=["--ref", "main"])
     assert result.returncode == 0, result.stderr
-    assert events[0] == ["uv", "tool", "install", "--force", "git+https://github.com/TexasOct/jev-gateway@main"]
+    assert events[0] == ["uv", "tool", "install", "--force", "--python", "3.12", "--managed-python", "git+https://github.com/TexasOct/jev-gateway@main"]
     assert events[1][-4:] == ["--ref", "main", "--method", "isolated"]
 
 

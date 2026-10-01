@@ -1,9 +1,9 @@
 # `models.json` 配置参考
 
-`models.json` 是网关的静态配置文件，默认从启动时的工作目录读取。它同时定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。可从 [`models.example.json`](../models.example.json) 复制起步；示例中的地址、模型名称和价格仅是配置示例，应按实际上游核对。
+`models.json` 是网关的静态配置文件，默认从启动时的工作目录读取。它同时定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。可从 [`jev_gateway/templates/models.example.json`](../jev_gateway/templates/models.example.json) 复制起步；示例中的地址、模型名称和价格仅是配置示例，应按实际上游核对。
 
 ```bash
-cp models.example.json models.json
+cp jev_gateway/templates/models.example.json models.json
 # 在 .env 中设置 providers[*].api_key_env 指向的密钥；启用 decision 时还需配置对应决策提供方的密钥
 uv run jev-gateway
 ```
@@ -324,7 +324,7 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | `providers[].brand_id` | `null` | 可选品牌标识，与 `protocol` 分开。 |
 | `providers[].icon_id` | `null` | 可选本地图标标识，缺失或未知时显示中性回退。 |
 
-例如，`models.example.json` 禁用外部决策并使用不带模型名的通用端点。启用时按实际端点填写地址和密钥环境变量；若端点要求模型名，再显式设置 `model`。不要把密钥明文放进 JSON。
+例如，`jev_gateway/templates/models.example.json` 禁用外部决策并使用不带模型名的通用端点。启用时按实际端点填写地址和密钥环境变量；若端点要求模型名，再显式设置 `model`。不要把密钥明文放进 JSON。
 
 旧顶层键 `jev` 已移除，配置中必须使用 `decision`：将 `sources` 改为 `providers`、`default_source` 改为 `default_provider`，并为每个提供方显式填写 `protocol: "system_one"`。若旧端点依赖原先省略 `model` 时的默认值，还需显式填写 `model`；新配置不会代填。旧策略类型 `jev`、`jev_matrix` 也已移除，分别改用 `decision`、`decision_matrix`。旧分类器前缀 `jev:` 和矩阵前缀 `jev_matrix:` 分别改为 `decision:` 和 `decision_matrix:`；`X-JEV-Reason` 响应头名称不变。
 

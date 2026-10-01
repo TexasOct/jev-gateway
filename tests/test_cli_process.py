@@ -67,7 +67,36 @@ def test_owned_parses_home_path_with_spaces(tmp_path, monkeypatch) -> None:
     assert _owned(34567, launch_marker, str(paths.home)) is True
 
 
-def test_stop_if_owned_does_not_signal_pid_after_ownership_changes(tmp_path, monkeypatch) -> None:
+def test_owned_matches_actual_ps_unquoted_arguments_for_home_with_spaces(tmp_path) -> None:
+    import subprocess
+    import sys
+    import time
+
+    paths = runtime_paths(tmp_path / "runtime with spaces")
+    token = "smoke-marker"
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)", "-m", "jev_gateway.cli.server", "--home", str(paths.home), "--token", token],
+        start_new_session=True,
+    )
+    try:
+        command = ""
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                command = subprocess.check_output(["ps", "-ww", "-p", str(child.pid), "-o", "args="], text=True)
+                if token in command:
+                    break
+            except subprocess.CalledProcessError:
+                pass
+            time.sleep(0.01)
+        assert token in command
+        assert _owned(child.pid, token, str(paths.home)) is False
+    finally:
+        child.terminate()
+        child.wait(timeout=3)
+
+
+def test_stop_if_owned_does_not_signal_pid_after_identity_changes(tmp_path, monkeypatch) -> None:
     paths = runtime_paths(tmp_path)
     paths.pid.parent.mkdir(parents=True)
     paths.pid.write_text(json.dumps({"pid": 34567, "token": "recorded"}))
@@ -76,14 +105,14 @@ def test_stop_if_owned_does_not_signal_pid_after_ownership_changes(tmp_path, mon
     signaled = []
     monkeypatch.setattr("jev_gateway.cli.process.os.kill", lambda pid, sig: signaled.append((pid, sig)))
     with pytest.raises(CliError, match="ownership changed") as error:
-        stop_if_owned(paths)
+        stop_if_owned(paths, expected=(34567, "previous"))
     assert error.value.code == "ownership_unverified"
     assert signaled == []
 
 
 def test_update_distinguishes_dead_pid_from_live_unowned_pid(tmp_path, monkeypatch) -> None:
     paths = runtime_paths(tmp_path)
-    assert running_for_update(paths) is False
+    assert running_for_update(paths) is None
     paths.pid.parent.mkdir(parents=True)
     paths.pid.write_text(json.dumps({"pid": 23456, "token": "nonce"}))
     monkeypatch.setattr("jev_gateway.cli.process._owned", lambda *args: False)
@@ -91,9 +120,9 @@ def test_update_distinguishes_dead_pid_from_live_unowned_pid(tmp_path, monkeypat
         assert sig == 0
         raise ProcessLookupError()
     monkeypatch.setattr("jev_gateway.cli.process.os.kill", dead)
-    assert running_for_update(paths) is False
+    assert running_for_update(paths) is None
     monkeypatch.setattr("jev_gateway.cli.process.os.kill", lambda pid, sig: None if sig == 0 else pytest.fail("unowned PID signalled"))
     with pytest.raises(CliError, match="ownership cannot be verified"):
         running_for_update(paths)
     monkeypatch.setattr("jev_gateway.cli.process._owned", lambda *args: True)
-    assert running_for_update(paths) is True
+    assert running_for_update(paths) == (23456, "nonce")

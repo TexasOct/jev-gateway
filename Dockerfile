@@ -30,7 +30,8 @@ RUN useradd --create-home --uid 10001 jev
 WORKDIR /opt/jev-gateway
 COPY --from=builder /build/dist/ /tmp/dist/
 RUN pip install --no-cache-dir /tmp/dist/*.whl && rm -rf /tmp/dist
-COPY models.example.json .env.example ./
+COPY jev_gateway/templates/models.example.json ./models.example.json
+COPY jev_gateway/templates/env.example ./.env.example
 COPY scripts/container-entrypoint.sh /usr/local/bin/jev-gateway-entrypoint
 RUN chmod +x /usr/local/bin/jev-gateway-entrypoint \
     && mkdir -p /home/jev/.jev-gateway \

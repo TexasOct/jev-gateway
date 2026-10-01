@@ -4,7 +4,7 @@
 
 ## Overview
 
-JEV Gateway is a Python 3.10+ FastAPI service in the flat `jev_gateway`
+JEV Gateway is a Python 3.12+ FastAPI service in the flat `jev_gateway`
 package. It presents an OpenAI-compatible API, selects provider-qualified models
 through pluggable routing strategies, and stores routing evidence in SQLite on a
 best-effort basis.

@@ -48,7 +48,7 @@ def test_install_init_rejects_invalid_source_without_mutation(tmp_path, monkeypa
 
 
 def test_update_restart_noop_does_not_read_configuration_or_start(tmp_path, monkeypatch, capsys) -> None:
-    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: False)
+    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: None)
     monkeypatch.setattr(cli_main.process, "start", lambda *args: pytest.fail("gateway started"))
     assert main(["--home", str(tmp_path), "--json", "restart-if-running"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -61,24 +61,25 @@ def test_update_restart_stops_owned_gateway_and_waits_for_health(tmp_path, monke
     records = tmp_path / "jev-records.sqlite3"
     for path in (models, env, records):
         path.write_text("preserved")
-    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: True)
+    identity = (12, "snapshot")
+    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: identity)
     events = []
     monkeypatch.setattr(cli_main, "_catalog_options", lambda paths: ({}, {}, "127.0.0.1", 8000))
-    monkeypatch.setattr(cli_main.process, "stop_if_owned", lambda paths: events.append("stop"))
+    monkeypatch.setattr(cli_main.process, "stop_if_owned", lambda paths, expected=None: events.append(("stop", expected)))
     monkeypatch.setattr(cli_main.process, "start", lambda *args: events.append("start") or {"pid": 12, "status": "starting"})
     monkeypatch.setattr(cli_main.process, "status", lambda paths: {"pid": 12})
     monkeypatch.setattr(cli_main, "probe", lambda *args, **kwargs: events.append("health") or {"reachable": True})
     assert main(["--home", str(tmp_path), "--json", "restart-if-running"]) == 0
-    assert events == ["stop", "start", "health"]
+    assert events == [("stop", identity), "start", "health"]
     assert json.loads(capsys.readouterr().out)["data"]["restarted"] is True
     assert [path.read_text() for path in (models, env, records)] == ["preserved"] * 3
 
 
 @pytest.mark.parametrize("failure", ["ownership_unverified", "stop_timeout"])
 def test_update_restart_refuses_failed_ownership_or_stop(tmp_path, monkeypatch, capsys, failure: str) -> None:
-    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: True)
+    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: (12, "snapshot"))
     monkeypatch.setattr(cli_main, "_catalog_options", lambda paths: ({}, {}, "127.0.0.1", 8000))
-    def refuse(paths):
+    def refuse(paths, expected=None):
         raise CliError(failure, "Cannot restart safely.", ExitCode.FAILURE)
     if failure == "ownership_unverified":
         monkeypatch.setattr(cli_main.process, "running_for_update", refuse)
@@ -91,8 +92,8 @@ def test_update_restart_refuses_failed_ownership_or_stop(tmp_path, monkeypatch, 
 
 @pytest.mark.parametrize("mode", ["exit", "timeout", "probe_error"])
 def test_update_restart_reports_start_health_failure(tmp_path, monkeypatch, capsys, mode: str) -> None:
-    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: True)
-    monkeypatch.setattr(cli_main.process, "stop_if_owned", lambda paths: {"status": "stopped"})
+    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: (12, "snapshot"))
+    monkeypatch.setattr(cli_main.process, "stop_if_owned", lambda paths, expected=None: {"status": "stopped"})
     monkeypatch.setattr(cli_main, "_catalog_options", lambda paths: ({}, {}, "127.0.0.1", 8000))
     monkeypatch.setattr(cli_main.process, "start", lambda *args: {"pid": 12})
     if mode == "exit":
@@ -113,6 +114,19 @@ def test_update_restart_reports_start_health_failure(tmp_path, monkeypatch, caps
     assert main(["--home", str(tmp_path), "--json", "restart-if-running"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["error"]["code"] == ("start_failed" if mode == "exit" else "start_timeout" if mode == "timeout" else "operation_failed")
+
+
+def test_update_restart_rejects_changed_pid_identity_snapshot(tmp_path, monkeypatch, capsys) -> None:
+    identity = (12, "original")
+    monkeypatch.setattr(cli_main.process, "running_for_update", lambda paths: identity)
+    monkeypatch.setattr(cli_main, "_catalog_options", lambda paths: ({}, {}, "127.0.0.1", 8000))
+    def stop(paths, expected=None):
+        assert expected == identity
+        raise CliError("ownership_unverified", "Gateway identity changed before stop.", ExitCode.FAILURE)
+    monkeypatch.setattr(cli_main.process, "stop_if_owned", stop)
+    monkeypatch.setattr(cli_main.process, "start", lambda *args: pytest.fail("gateway started"))
+    assert main(["--home", str(tmp_path), "--json", "restart-if-running"]) == 1
+    assert json.loads(capsys.readouterr().out)["error"]["code"] == "ownership_unverified"
 
 
 def test_config_path_json(tmp_path, capsys) -> None:

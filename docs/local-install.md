@@ -20,7 +20,8 @@ export JEV_GATEWAY_HOME="$HOME/.jev-gateway-staging"
 ## 方案一：curl 安装 CLI
 
 macOS 和 Linux 可直接安装 CLI，无需手动克隆仓库。需要 `curl` 和可通过
-`python3` 调用的 Python 3.10+：
+`python3` 调用的 Python 3 来校验安装文件。网关要求 Python 3.12+，
+安装器使用 uv 管理的 Python 3.12，缺少时会下载，不会使用系统的旧版 Python 运行网关：
 
 ```bash
 curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
@@ -28,7 +29,7 @@ curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/inst
 
 该 URL 获取最新稳定版 Release 的 `install.sh`。脚本内嵌自己的 tag，直接从该
 tag 的 URL 下载 `jev_gateway-X.Y.Z-py3-none-any.whl` 和同名 `.sha256` 文件，
-校验后才调用 `uv tool install`，不再解析 latest 或查询 GitHub API 寻找 wheel。
+校验后才调用 `uv tool install --python 3.12 --managed-python`，不再解析 latest 或查询 GitHub API 寻找 wheel。
 安装完成后，`jev install init` 初始化运行目录。重复运行会保留已有的
 `models.json`、`.env` 和记录数据库。更新 Release wheel 后，如果指定运行目录中原有由
 `jev` 管理且归属可验证的后台网关，安装器会重启它，最多等待 10 秒健康检查通过后
@@ -117,7 +118,7 @@ PY
 
 ## 方案二：uv 开发安装
 
-适用于开发、调试策略和运行测试。准备 Python 3.10+ 和带 npm 的 Node.js；
+适用于开发、调试策略和运行测试。准备 Python 3.12+ 和带 npm 的 Node.js；
 Release 工作流使用 Node.js 22。全新检出需要先安装前端依赖并构建面板：
 
 ```bash
@@ -185,7 +186,7 @@ scripts/build-frontend.sh
 
 脚本会：
 
-1. 使用 `uv tool install` 创建隔离工具环境。
+1. 使用 `uv tool install --python 3.12 --managed-python` 创建隔离工具环境；缺少 uv 管理的 Python 3.12 时会下载。
 2. 安装 `jev-gateway` CLI。
 3. 初始化 `$HOME/.jev-gateway/models.json` 和 `$HOME/.jev-gateway/.env`。
 4. 创建 `~/.local/bin/jev-gateway-local`，并自动设置 `JEV_GATEWAY_HOME`。
@@ -315,7 +316,7 @@ Compose 默认只将容器端口绑定到 `127.0.0.1`。如需对局域网开放
 ## 方案六：wheel 安装
 
 适合把固定版本交付给另一台机器。在源码仓库根目录先构建面板，再构建 wheel。
-下面以 `pyproject.toml` 中版本为 `0.1.0` 为例；校验脚本需要 Python 3.11+，
+下面以 `pyproject.toml` 中版本为 `0.1.0` 为例；构建和校验使用 Python 3.12+，
 传入的 tag 必须与项目版本完全对应，`dist/` 中只能有这一版 wheel：
 
 ```bash
@@ -324,7 +325,7 @@ npm --prefix frontend install
 scripts/build-frontend.sh
 uv build
 python3 scripts/validate-release.py v0.1.0 dist
-uv tool install --force dist/jev_gateway-0.1.0-py3-none-any.whl
+uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.0-py3-none-any.whl
 ```
 
 校验脚本检查 wheel 内容，把 tag 写入 `dist/install.sh`，并生成脚本和 wheel 的
@@ -334,8 +335,8 @@ uv tool install --force dist/jev_gateway-0.1.0-py3-none-any.whl
 
 ```bash
 mkdir -p "$HOME/.jev-gateway"
-cp models.example.json "$HOME/.jev-gateway/models.json"
-cp .env.example "$HOME/.jev-gateway/.env"
+cp jev_gateway/templates/models.example.json "$HOME/.jev-gateway/models.json"
+cp jev_gateway/templates/env.example "$HOME/.jev-gateway/.env"
 JEV_GATEWAY_HOME="$HOME/.jev-gateway" jev-gateway
 ```
 

@@ -30,17 +30,17 @@ config_dir=${JEV_GATEWAY_HOME:-"$HOME/.jev-gateway"}
 bin_dir=${UV_TOOL_BIN_DIR:-"$HOME/.local/bin"}
 
 if [ "$editable" = true ]; then
-    uv tool install --force --editable "$repo_dir"
+    uv tool install --force --python 3.12 --managed-python --editable "$repo_dir"
 else
-    uv tool install --force "$repo_dir"
+    uv tool install --force --python 3.12 --managed-python "$repo_dir"
 fi
 
 mkdir -p "$config_dir" "$bin_dir"
 if [ ! -f "$config_dir/models.json" ]; then
-    cp "$repo_dir/models.example.json" "$config_dir/models.json"
+    cp "$repo_dir/jev_gateway/templates/models.example.json" "$config_dir/models.json"
 fi
 if [ ! -f "$config_dir/.env" ]; then
-    cp "$repo_dir/.env.example" "$config_dir/.env"
+    cp "$repo_dir/jev_gateway/templates/env.example" "$config_dir/.env"
 fi
 
 launcher="$bin_dir/jev-gateway-local"

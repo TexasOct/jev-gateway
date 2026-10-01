@@ -175,11 +175,12 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
             raise CliError("invalid_timeout", "--timeout must be nonnegative.", ExitCode.USAGE)
         return process.stop(paths, args.timeout, args.force), 0
     if group == "restart-if-running":
-        if not process.running_for_update(paths):
+        identity = process.running_for_update(paths)
+        if identity is None:
             return {"status": "not_running", "restarted": False}, 0
         # Validate the new installation before stopping the known-good process.
         document, credentials, host, port = _catalog_options(paths)
-        process.stop_if_owned(paths)
+        process.stop_if_owned(paths, expected=identity)
         return {**_start_and_wait(paths, document, credentials, host, port, 10), "restarted": True}, 0
     if group == "restart":
         try:

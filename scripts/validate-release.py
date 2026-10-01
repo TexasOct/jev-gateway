@@ -37,6 +37,8 @@ def validate(tag: str, wheel_dir: Path) -> tuple[Path, bool]:
         entries.read_string(archive.read(f"jev_gateway-{version}.dist-info/entry_points.txt").decode())
         if "Name: jev-gateway\n" not in metadata or f"Version: {version}\n" not in metadata:
             raise ValueError("wheel metadata name/version mismatch")
+        if "Requires-Python: >=3.12\n" not in metadata:
+            raise ValueError("wheel Python requirement must be >=3.12")
         if "License-Expression: AGPL-3.0-or-later\n" not in metadata:
             raise ValueError("wheel license metadata missing")
         expected = {"jev": "jev_gateway.cli.main:main", "jev-gateway": "jev_gateway.gateway:run_gateway"}

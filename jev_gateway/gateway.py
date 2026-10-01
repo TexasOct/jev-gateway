@@ -59,7 +59,6 @@ from jev_gateway.records import (
     sanitize_upstream_payload,
 )
 from jev_gateway.routing_overlay import (
-    load_catalog_with_overlay,
     merge_overlay,
     merge_warnings,
     overlay_path,

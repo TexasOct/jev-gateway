@@ -134,3 +134,29 @@ def test_workflow_builds_frontend_before_packaging_and_uploads_exact_assets() ->
     assert workflow.count('"$wheel" "$wheel.sha256"') == 2
     assert "dist/*" not in workflow
     assert "--prerelease --latest=false" in workflow
+    assert "python-version: '3.12'" in workflow
+
+
+def test_python_requirement_matches_lock_typechecker_and_container() -> None:
+    tomllib = importlib.import_module("tomllib")
+    root = Path(__file__).resolve().parents[1]
+    assert tomllib.loads((root / "pyproject.toml").read_text())["project"]["requires-python"] == ">=3.12"
+    lock = tomllib.loads((root / "uv.lock").read_text())
+    assert lock["requires-python"] == ">=3.12"
+    assert '"pythonVersion": "3.12"' in (root / "pyrightconfig.json").read_text()
+    assert (root / "Dockerfile").read_text().count("FROM python:3.12-slim") == 2
+
+
+def test_wheel_with_old_python_requirement_cannot_be_released(release_validator, release_source) -> None:
+    wheel = release_source / f"jev_gateway-{_project_version()}-py3-none-any.whl"
+    with zipfile.ZipFile(wheel) as original:
+        entries = [(entry, original.read(entry.filename)) for entry in original.infolist()]
+    with zipfile.ZipFile(wheel, "w") as output:
+        for entry, content in entries:
+            if entry.filename.endswith("/METADATA"):
+                assert b"Requires-Python: >=3.12\n" in content
+                content = content.replace(b"Requires-Python: >=3.12\n", b"Requires-Python: >=3.10\n")
+            output.writestr(entry, content)
+    with pytest.raises(ValueError, match="Python requirement must be >=3.12"):
+        release_validator.validate(f"v{_project_version()}", release_source)
+    assert not list(release_source.glob("*.sha256"))
