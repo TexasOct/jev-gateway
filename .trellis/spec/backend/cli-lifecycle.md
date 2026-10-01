@@ -63,7 +63,7 @@ reuse of an existing Codex or Claude login or subscription.
 | Unsupported provider type or invalid candidate | Refuse before disk replacement; `invalid_configuration` for catalog validation |
 | Noninteractive login without secret source | Return `secret_missing` without waiting for input |
 | Unknown provider/preset or missing `api_key_env` | Return `provider_missing` or `provider_has_no_key_reference` without writing |
-| Dead or mismatched PID record | Report `not_running`; never signal the unrelated process |
+| Dead or mismatched PID record | `jev status` returns exit 4 and, in JSON mode, `ok: false` with `error.code: not_running`; never signal the unrelated process |
 | Caller changes cwd before running installed `jev-gateway` | Load the environment-selected, recorded, or default runtime directory |
 | Runtime or interpreter path contains spaces | Verify ownership using actual argv, preserving each path as one argument |
 | Process metadata access denied, zombie process, or spoofed `-c` wrapper | Refuse ownership and do not signal it |
@@ -84,7 +84,7 @@ Good: `jev provider login anthropic --secret-stdin` reads a key on stdin, writes
 ## 6. Tests required
 
 - `tests/test_cli_providers.py`: preset and custom addition, login before/after add, rotation, logout, credential absence in output, duplicate model rejection, and unchanged catalog on validation failure.
-- `tests/test_cli_process.py` and `tests/test_cli_review_regressions.py`: start/stop/status, ownership mismatch, stale PID, and no unrelated signal. Use a real module child to prove ownership for paths with spaces; cover `-c` spoofing, denied metadata access, and zombie/dead states.
+- `tests/test_cli_process.py` and `tests/test_cli_review_regressions.py`: start/stop/status, ownership mismatch, stale PID, and no unrelated signal. Use a real module child to prove ownership for paths with spaces; cover `-c` spoofing, denied metadata access, and zombie/dead states. Installed acceptance must expect exit 4 and `error.code: not_running` after stopping; it must not require exit 0 for every status command. Resolve expected runtime paths before comparison because macOS maps `/tmp` to `/private/tmp`.
 - `tests/test_cli_install_state.py`, `tests/test_install_script.py`, `tests/test_cli_templates.py`: isolated install state, legacy Git-state reading, Release provenance, preserved data on uninstall, purge confirmation, no-network dry-run, direct embedded-tag installs, one-time cross-version delegation, forwarded flags, prereleases, missing/malformed assets, identity and checksum failure ordering, no raw-main fallback, and byte-identical packaged templates.
 - `tests/test_release_validation.py`: tag/version agreement, wheel contents and metadata, exact source-to-wheel file parity, stamped installer identity, both checksum sidecars, and the workflow's four explicit upload paths. Dashboard-dependent packaging tests must build from frontend source rather than rely on Git-tracked output.
 - `uv run pytest -q`, `uvx pyright`, `uv build`, shell syntax checks, and a throwaway-home installed-tool smoke test for entry points and uninstall behavior.
