@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +36,61 @@ jobs:
           uvx pyright
           uv build --out-dir dist
           python scripts/validate-release.py "${GITHUB_REF_NAME}" dist
+      - name: Locate release wheel
+        id: assets
+        shell: bash
+        run: echo "wheel=dist/jev_gateway-${GITHUB_REF_NAME#v}-py3-none-any.whl" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/install.sh
+            dist/install.sh.sha256
+            ${{ steps.assets.outputs.wheel }}
+            ${{ steps.assets.outputs.wheel }}.sha256
+          if-no-files-found: error
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+      - name: Smoke installed release wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          python scripts/smoke-installed-release.py --wheel "$PWD/dist/jev_gateway-${version}-py3-none-any.whl" --version "$version" --work-dir "$RUNNER_TEMP/jev installed smoke"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-evidence-${{ matrix.os }}
+          path: ${{ runner.temp }}/jev installed smoke/evidence
+  release:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         shell: bash
         run: |

@@ -84,7 +84,7 @@ jev restart
 jev logs [-n N] [--follow]
 ```
 
-The managed background server records its PID under `run/gateway.pid` and output in `logs/gateway.log`. `jev-gateway` remains the foreground server entry point.
+The managed background server records its PID under `run/gateway.pid` and output in `logs/gateway.log`. `jev-gateway` remains the foreground server entry point. It resolves its runtime directory from `JEV_GATEWAY_HOME`, recorded install state, then `$HOME/.jev-gateway`, independently of the current working directory. Configuration, credentials, and relative storage paths use that directory.
 
 ## Configuration
 

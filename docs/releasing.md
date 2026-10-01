@@ -12,8 +12,7 @@ The public installer URL is
 A pinned URL, such as
 `https://github.com/TexasOct/jev-gateway/releases/download/v0.1.0/install.sh`,
 selects one published tag. These URLs require published assets; adding the
-workflow or running local validation does not publish a Release. No public
-Release was created as part of this installer change.
+workflow or running local validation does not publish a Release.
 
 ## Build and validate locally
 
@@ -66,6 +65,29 @@ generated or published artifact to test Release behavior. The template's
 
 ## Publish from the release commit
 
+An installed-wheel smoke on macOS is a release prerequisite. Run the same
+validated wheel that will be uploaded, with Python 3.12 and uv available:
+
+```sh
+python3 scripts/smoke-installed-release.py \
+  --wheel /absolute/path/dist/jev_gateway-0.1.0-py3-none-any.whl \
+  --version 0.1.0 \
+  --work-dir '/absolute/path/jev installed smoke'
+```
+
+The script installs managed Python 3.12 into isolated uv tool, binary, and state
+directories. It initializes packaged templates in a runtime home containing
+spaces, uses dummy credentials, and launches installed commands from an unrelated
+directory. Checks cover file create/read/update/rename/delete, CLI lifecycle,
+readiness with invalid proxy settings, dashboard assets, SQLite integrity and
+schema, authenticated provider and routing
+configuration writes, repeat installation, direct foreground startup, and
+uninstall preservation. It makes no upstream requests. Services are stopped on
+exit; sanitized command logs and `checks.json` remain under `work-dir/evidence`.
+The evidence includes a `success` boolean, which is true only after all checks pass.
+Each invocation creates a unique installation directory and preserves its runtime
+files for inspection. The script never uses the operator's default installation.
+
 1. Protect tags matching `v*` in repository rules so only authorized maintainers
    can publish. `.github/workflows/release.yml` uses `GITHUB_TOKEN` with
    `contents: write` and runs on tag pushes; it does not depend on a second
@@ -78,7 +100,10 @@ generated or published artifact to test Release behavior. The template's
    frontend lint/tests, builds the dashboard, and checks freshness before the
    Python tests, Pyright, and `uv build --out-dir dist`. The validator creates
    the stamped installer and both sidecars after checking the wheel.
-4. Only after those checks pass does the workflow publish the four explicit
+4. The build job uploads the four assets as one artifact. Ubuntu and macOS smoke
+   jobs download that same artifact and run the installed-wheel check from the
+   tagged checkout, without Node.js. Publication depends on both smoke jobs.
+   Only after those checks pass does the workflow publish the four explicit
    asset paths listed above with generated release notes. Stable versions are
    marked latest. Prereleases are marked prerelease with `--latest=false` and
    require an explicit version or tagged URL to install. The local sdist is not

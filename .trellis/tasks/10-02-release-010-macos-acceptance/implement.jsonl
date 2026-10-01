@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend boundaries and required verification"}
+{"file": ".trellis/spec/backend/cli-lifecycle.md", "reason": "Installed CLI, runtime paths, process ownership, and installer contracts"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Regression tests, Python checks, and release packaging"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Protect operator credentials and runtime data in diagnostics"}

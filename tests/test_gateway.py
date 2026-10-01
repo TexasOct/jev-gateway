@@ -149,6 +149,27 @@ def test_response_data_silences_litellm_usage_serializer_mismatch() -> None:
     }
 
 
+def test_foreground_runtime_precedence_is_independent_of_cwd(monkeypatch, tmp_path: Path) -> None:
+    from jev_gateway.cli.paths import state_path
+
+    home = tmp_path / "user home"
+    home.mkdir()
+    cwd = tmp_path / "unrelated cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.delenv("JEV_GATEWAY_HOME", raising=False)
+    assert gateway.runtime_directory() == home / ".jev-gateway"
+    recorded = tmp_path / "recorded runtime"
+    state_path().parent.mkdir(parents=True)
+    state_path().write_text(json.dumps({"runtime_dir": str(recorded)}))
+    assert gateway.runtime_directory() == recorded
+    explicit = tmp_path / "explicit runtime"
+    monkeypatch.setenv("JEV_GATEWAY_HOME", str(explicit))
+    assert gateway.runtime_directory() == explicit
+
+
 def test_runtime_directory_loads_config_env_and_storage_from_home(
     monkeypatch, tmp_path: Path
 ) -> None:

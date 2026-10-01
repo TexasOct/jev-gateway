@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import psutil
 import pytest
 
 from jev_gateway.cli.output import CliError
@@ -62,12 +63,12 @@ def test_update_refuses_unverifiable_pid_record(tmp_path, monkeypatch, record: s
 def test_owned_parses_home_path_with_spaces(tmp_path, monkeypatch) -> None:
     paths = runtime_paths(tmp_path / "runtime with spaces")
     launch_marker = "launch-marker"
-    command = f"/usr/bin/python3 -m jev_gateway.cli.server --home '{paths.home}' --token {launch_marker}"
-    monkeypatch.setattr("jev_gateway.cli.process.subprocess.check_output", lambda args, **kwargs: "S\\n" if args[1] == "-p" else command)
+    command = ["/python path/python3", "-m", "jev_gateway.cli.server", "--home", str(paths.home), "--token", launch_marker]
+    monkeypatch.setattr("jev_gateway.cli.process.psutil.Process", lambda pid: SimpleNamespace(status=lambda: psutil.STATUS_RUNNING, cmdline=lambda: command))
     assert _owned(34567, launch_marker, str(paths.home)) is True
 
 
-def test_owned_matches_actual_ps_unquoted_arguments_for_home_with_spaces(tmp_path) -> None:
+def test_owned_rejects_real_python_wrapper_with_module_suffix(tmp_path) -> None:
     import subprocess
     import sys
     import time
@@ -94,6 +95,57 @@ def test_owned_matches_actual_ps_unquoted_arguments_for_home_with_spaces(tmp_pat
     finally:
         child.terminate()
         child.wait(timeout=3)
+
+
+def test_owned_accepts_real_module_child_with_spaces(tmp_path) -> None:
+    import subprocess
+    import sys
+
+    paths = runtime_paths(tmp_path / "runtime with spaces")
+    executable = tmp_path / "python with spaces"
+    executable.symlink_to(sys.executable)
+    child = subprocess.Popen([str(executable), "-m", "jev_gateway.cli.server", "--home", str(paths.home), "--token", "module-marker"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        assert _owned(child.pid, "module-marker", str(paths.home))
+    finally:
+        child.terminate()
+        child.wait(timeout=3)
+
+
+@pytest.mark.parametrize("failure", ["home", "token", "wrapper", "zombie", "dead", "denied", "missing", "zombie_exception"])
+def test_stop_never_signals_unverified_process(tmp_path, monkeypatch, failure: str) -> None:
+    paths = runtime_paths(tmp_path)
+    paths.pid.parent.mkdir(parents=True)
+    paths.pid.write_text(json.dumps({"pid": 34567, "token": "marker"}))
+    command = ["/python path/python3", "-m", "jev_gateway.cli.server", "--home", str(paths.home), "--token", "marker"]
+    if failure == "home":
+        command[4] += "-other"
+    if failure == "token":
+        command[6] += "-other"
+    if failure == "wrapper":
+        command[1:1] = ["-c", "import time; time.sleep(30)"]
+
+    def process(pid):
+        if failure == "missing":
+            raise psutil.NoSuchProcess(pid)
+        def status():
+            if failure == "zombie_exception":
+                raise psutil.ZombieProcess(pid)
+            return {"zombie": psutil.STATUS_ZOMBIE, "dead": psutil.STATUS_DEAD}.get(failure, psutil.STATUS_RUNNING)
+        def cmdline():
+            if failure == "denied":
+                raise psutil.AccessDenied(pid)
+            return command
+        return SimpleNamespace(status=status, cmdline=cmdline)
+
+    monkeypatch.setattr("jev_gateway.cli.process.psutil.Process", process)
+    monkeypatch.setattr("jev_gateway.cli.process.os.kill", lambda *args: pytest.fail("unverified process signalled"))
+    assert not _owned(34567, "marker", str(paths.home))
+    with pytest.raises(CliError):
+        stop(paths, force=True)
+    with pytest.raises(CliError):
+        stop_if_owned(paths)
+    assert paths.pid.exists()
 
 
 def test_stop_if_owned_does_not_signal_pid_after_identity_changes(tmp_path, monkeypatch) -> None:

@@ -15,7 +15,7 @@ def probe(host: str, port: int, timeout: float = 1.0, api_key_env: str | None = 
         headers["Authorization"] = f"Bearer {resolved_key}"
     url = f"http://{browsable_host(host)}:{port}/healthz"
     try:
-        response = httpx.get(url, headers=headers, timeout=timeout)
+        response = httpx.get(url, headers=headers, timeout=timeout, trust_env=False)
         response.raise_for_status()
         body = response.json()
         return {"reachable": True, "status": body.get("status", "unknown")}

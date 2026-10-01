@@ -205,6 +205,21 @@ source tree. It also stamps the source installer's release-tag placeholder into
 sidecars. The workflow uploads those four explicit paths only, after frontend
 and Python verification passes. Local validation does not publish a Release.
 
+The tag workflow builds once on Ubuntu and passes those same four artifacts to
+installed-wheel smoke jobs on Ubuntu and macOS. Publication depends on both
+smoke jobs. Run `scripts/smoke-installed-release.py` with absolute `--wheel` and
+`--work-dir` paths and the expected `--version` to reproduce that gate locally.
+The script uses separate uv tool, executable, state, and runtime directories,
+launches outside the checkout, and verifies a runtime path containing spaces.
+Its configuration writes use dummy credentials and local APIs; it does not call
+real generation providers. Lifecycle checks include foreground startup, bundled
+dashboard assets, running/stopped update behavior, and uninstall preservation.
+
+When splitting publication into a job without checkout, provide repository
+context explicitly to `gh release create` through `--repo` or `GH_REPO`.
+An explicit repository path passed to `gh api` does not provide that context
+to a later command.
+
 Ruff is not currently configured. You may use `uvx ruff check` as an additional
 local diagnostic, but do not make it a completion requirement or run automatic
 formatting without a repository configuration and an explicit project decision.
