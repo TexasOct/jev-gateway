@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend acceptance and verification requirements"}
+{"file": ".trellis/spec/backend/cli-lifecycle.md", "reason": "Review macOS installed CLI and process lifecycle behavior"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Full regression, type checks, and packaged artifact checks"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Ensure evidence and diagnostics contain no secrets"}

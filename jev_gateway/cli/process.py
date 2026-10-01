@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import secrets
-import shlex
 import signal
 import subprocess
 import sys
@@ -13,6 +12,8 @@ import time
 from collections.abc import Callable
 from contextlib import suppress
 from typing import Any
+
+import psutil
 
 from jev_gateway.cli.output import CliError, ExitCode
 from jev_gateway.cli.paths import RuntimePaths
@@ -22,30 +23,16 @@ def _owned(pid: int, token: str, home: str) -> bool:
     if pid <= 0 or not token:
         return False
     try:
-        command = subprocess.check_output(
-            ["ps", "-ww", "-p", str(pid), "-o", "args="], stderr=subprocess.DEVNULL, text=True
-        )
-        state = subprocess.check_output(
-            ["ps", "-p", str(pid), "-o", "stat="], stderr=subprocess.DEVNULL, text=True
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return False
-    if state[:1] in {"Z", "X"}:
-        return False
-    try:
-        arguments = shlex.split(command)
-    except ValueError:
-        return False
-    try:
-        module_index = arguments.index("-m")
-        home_index = arguments.index("--home", module_index + 2)
-        token_index = arguments.index("--token", home_index + 2)
-    except ValueError:
+        process = psutil.Process(pid)
+        if process.status() in {psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD}:
+            return False
+        arguments = process.cmdline()
+    except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied, OSError):
         return False
     return (
-        arguments[module_index + 1:module_index + 2] == ["jev_gateway.cli.server"]
-        and arguments[home_index + 1:home_index + 2] == [home]
-        and arguments[token_index + 1:token_index + 2] == [token]
+        len(arguments) == 7
+        and bool(arguments[0])
+        and arguments[1:] == ["-m", "jev_gateway.cli.server", "--home", home, "--token", token]
     )
 
 

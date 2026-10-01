@@ -51,7 +51,7 @@ tag 的 `install.sh` 及其校验文件，检查 SHA256 和内嵌 tag 完全匹�
 
 没有稳定版时 latest URL 不可用；缺少所选版本的文件、校验文件格式错误、tag
 不符或摘要不符时，安装会停止，不会运行未通过校验的子脚本或替换 CLI，也不会
-回退到 Git `main`。这里记录的是安装和发布流程，本次改动没有创建任何公开 Release。
+回退到 Git `main`。
 
 `--yes` 允许在缺少 `uv` 时从 `astral.sh` 安装它。非交互环境若不传此参数，需先
 安装 `uv`；`--no-uv` 则禁止引导安装 `uv`。`--home DIR` 指定运行目录，
@@ -165,11 +165,12 @@ uv run jev-gateway
 过旧。使用面板的测试通过会话级 `dashboard_bundle` fixture 执行一次
 `npm --prefix frontend run build`，因此运行完整测试前仍需安装 npm 依赖。
 
-`uv run jev-gateway` 适合在 `$HOME/.jev-gateway` 内手动启动：
+`jev-gateway` 和 `uv run jev-gateway` 前台启动时，依次使用 `JEV_GATEWAY_HOME`、
+安装状态记录中的运行目录和 `$HOME/.jev-gateway`，不依赖当前工作目录。
+从源码仓库启动时可显式指定运行目录：
 
 ```bash
-cd "$HOME/.jev-gateway"
-uv --directory /path/to/jev-gateway run jev-gateway
+JEV_GATEWAY_HOME="$HOME/.jev-gateway" uv --directory /path/to/jev-gateway run jev-gateway
 ```
 
 ## 方案三：uv 隔离 CLI 安装

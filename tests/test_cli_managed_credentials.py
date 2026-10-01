@@ -143,6 +143,7 @@ def test_probe_retains_legacy_env_argument_and_explicit_empty_override(monkeypat
 
     def get(url: str, *, headers: dict[str, str], **kwargs: Any) -> Any:
         headers_seen.append(headers)
+        assert kwargs["trust_env"] is False
         return httpx.Response(200, json={"status": "ok"}, request=httpx.Request("GET", url))
 
     monkeypatch.setattr(health.httpx, "get", get)

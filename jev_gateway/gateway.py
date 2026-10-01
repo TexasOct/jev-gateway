@@ -157,9 +157,10 @@ class GatewayConfig:
 
 
 def runtime_directory() -> Path:
-    """Return the explicit runtime directory, or the current directory."""
-    configured = os.getenv("JEV_GATEWAY_HOME")
-    return Path(configured).expanduser() if configured else Path.cwd()
+    """Resolve the foreground runtime through the installed CLI path contract."""
+    from jev_gateway.cli.paths import runtime_paths
+
+    return runtime_paths().home
 
 
 def _resolve_storage_path(catalog: Any, models_file: Path):
