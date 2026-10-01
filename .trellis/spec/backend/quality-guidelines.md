@@ -4,7 +4,7 @@
 
 ## Overview
 
-The project targets Python 3.10 or newer, uses `uv` for dependency and command
+The project targets Python 3.12 or newer, uses `uv` for dependency and command
 execution, pytest for tests, and Pyright for static type checking. Packaging uses
 setuptools and exposes `jev-gateway = jev_gateway.gateway:run_gateway`.
 
@@ -93,7 +93,7 @@ that pattern unless the project deliberately adds an async test plugin.
 
 Tests must not require network access or real credentials.
 
-- Provider keys in `tests/conftest.py` are dummy environment values.
+- Provider keys in `tests/conftest.py` are dummy environment values. Because importing `jev_gateway.gateway` constructs the default application, configure an isolated test runtime before test modules are collected. Never rely on an ignored root `models.json` or the operator's runtime directory to make collection pass. Use `jev_gateway/templates/models.example.json` as the installation-template source; `tests/fixtures/task_aware_matrix.json` is a separate behavior fixture, not a byte-identical template copy. Keep production startup validation strict when runtime configuration is missing or invalid.
 - Gateway tests replace the `litellm` module with a `types.SimpleNamespace`
   containing a controlled `completion` function.
 - Time-sensitive tests use `FakeClock` and explicit `advance()` calls.
@@ -160,7 +160,7 @@ uv build
 ```
 
 Full tests and source wheel builds require Node.js with npm in addition to
-Python and uv. The Release workflow uses Node.js 22 and Python 3.11. Tests that
+Python and uv. The Release workflow uses Node.js 22 and Python 3.12. Tests that
 need the dashboard must request the session-scoped `dashboard_bundle` fixture
 from `tests/conftest.py`; it always runs `npm --prefix frontend run build` once,
 so it requires npm dependencies installed beforehand. Never assume generated
@@ -169,7 +169,7 @@ the dashboard and need no Node.js.
 
 `uv run pytest -q` and `uv build` are the repository's documented verification
 commands after the frontend setup above. Pyright is configured by
-`pyrightconfig.json` for Python 3.10 and includes both `jev_gateway` and `tests`.
+`pyrightconfig.json` for Python 3.12 and includes both `jev_gateway` and `tests`.
 It may be run through `uvx` because it is not declared in the development
 dependency group.
 
@@ -189,7 +189,7 @@ missing or stale output; it does not build. Do not commit generated bundles. See
 [Dashboard and routing configuration](./dashboard-routing-config.md) for the
 serving, CSP, and packaging contracts.
 
-For Release packaging, use Python 3.11+ and validate the built artifacts with
+For Release packaging, use Python 3.12+ and validate the built artifacts with
 the tag that exactly matches `pyproject.toml`:
 
 ```bash

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 
 JEV Gateway routes OpenAI-compatible chat requests across model providers using configurable
 cost, quality, and capability rules. Choose a strategy instead of hard-coding a model, and either
@@ -25,7 +25,8 @@ keep a session on one route or reconsider it each turn.
 ## Quick start
 
 Install the CLI on macOS or Linux without cloning the repository. You need
-Python 3.10+ available as `python3` and `curl`:
+Python 3 available as `python3` for asset verification and `curl`. The installer
+uses uv-managed Python 3.12 for the gateway, downloading it if needed:
 
 ```bash
 curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
@@ -50,7 +51,7 @@ download, review, and verification flow, see
 Windows is not supported by the curl installer. See the source checkout or
 Docker paths in [`docs/local-install.md`](docs/local-install.md).
 
-For source development, use Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and
+For source development, use Python 3.12+, [`uv`](https://docs.astral.sh/uv/), and
 Node.js with npm (the release workflow uses Node.js 22). Build the dashboard
 before installing from the checkout:
 

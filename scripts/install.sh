@@ -93,7 +93,7 @@ if [ "$dry_run" -eq 1 ]; then
   ensure_uv
   if [ -n "$ref" ]; then
     echo "Git ref: $ref (explicit developer install; no release checksum)"
-    echo "$uv_bin tool install --force git+https://github.com/TexasOct/jev-gateway@$ref"
+    echo "$uv_bin tool install --force --python 3.12 --managed-python git+https://github.com/TexasOct/jev-gateway@$ref"
     [ "$no_init" -eq 1 ] || echo "jev install init --home $home --ref $ref --method isolated"
   else
     echo "Release selector: ${version:-$RELEASE_TAG} (latest stable is selected by the public download URL)"
@@ -101,7 +101,7 @@ if [ "$dry_run" -eq 1 ]; then
       echo "Would download and verify release v$version installer, then delegate once."
     fi
     echo "Would download the selected tag's wheel and SHA256 and verify before installing. Dry-run does not query GitHub or verify the checksum."
-    echo "$uv_bin tool install --force <verified release wheel>"
+    echo "$uv_bin tool install --force --python 3.12 --managed-python <verified release wheel>"
     [ "$no_init" -eq 1 ] || echo "jev install init --home $home --version <resolved version> --source <release wheel URL> --method isolated"
   fi
   exit 0
@@ -138,7 +138,7 @@ fi
 if [ -n "$ref" ]; then
   source="git+https://github.com/TexasOct/jev-gateway@$ref"
   ensure_uv
-  "$uv_bin" tool install --force "$source"
+  "$uv_bin" tool install --force --python 3.12 --managed-python "$source"
   init_args=ref
 else
   command -v python3 >/dev/null 2>&1 || fail "python3 is required to verify release assets"
@@ -191,7 +191,7 @@ if metadata.get_all('Name') != ['jev-gateway'] or metadata.get_all('Version') !=
     sys.exit('wheel METADATA name/version mismatch (missing or duplicate fields are not allowed)')
 PY
   ensure_uv
-  "$uv_bin" tool install --force "$wheel"
+  "$uv_bin" tool install --force --python 3.12 --managed-python "$wheel"
   init_args=wheel
 fi
 bin_dir=${UV_TOOL_BIN_DIR:-"$HOME/.local/bin"}

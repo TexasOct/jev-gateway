@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 
 JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置的成本、质量和能力规则在多个提供方之间选择模型。客户端指定策略即可，无需写死模型；会话既可以固定模型，也可以逐轮重新选择。
 
@@ -23,7 +23,8 @@ JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置
 ## 快速开始
 
 macOS 和 Linux 可直接安装 CLI，无需克隆仓库。需要可通过 `python3` 调用的
-Python 3.10+ 和 `curl`：
+Python 3 校验安装文件，以及 `curl`。网关使用 uv 管理的 Python 3.12，
+安装器会在缺少时下载：
 
 ```bash
 curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
@@ -46,7 +47,7 @@ curl -fsSL https://github.com/TexasOct/jev-gateway/releases/download/v0.1.0/inst
 curl 安装脚本不支持 Windows。源码或 Docker 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
-源码开发需要 Python 3.10+、[`uv`](https://docs.astral.sh/uv/) 和带 npm 的 Node.js
+源码开发需要 Python 3.12+、[`uv`](https://docs.astral.sh/uv/) 和带 npm 的 Node.js
 （Release 工作流使用 Node.js 22）。从仓库安装前，先构建面板：
 
 ```bash

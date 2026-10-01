@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,41 @@ from tests.helpers import CATALOG_DOCUMENT, FakeClock, catalog_document
 os.environ.setdefault("TEST_SMALL_PROVIDER_KEY", "test-key-small")
 os.environ.setdefault("TEST_LARGE_PROVIDER_KEY", "test-key-large")
 os.environ.setdefault("TEST_PROVIDER_KEY", "test-route-key")
+
+
+_test_runtime_directory: Path | None = None
+_original_gateway_home: str | None = None
+_original_credentials: dict[str, str | None] = {}
+
+
+def pytest_configure() -> None:
+    """Give import-time gateway construction an isolated catalog during collection."""
+    global _test_runtime_directory, _original_gateway_home, _original_credentials
+    _original_gateway_home = os.environ.get("JEV_GATEWAY_HOME")
+    credential_names = ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "DECISION_API_KEY")
+    _original_credentials = {name: os.environ.get(name) for name in credential_names}
+    _test_runtime_directory = Path(tempfile.mkdtemp(prefix="jev-pytest-runtime-"))
+    template = Path(__file__).resolve().parents[1] / "jev_gateway/templates/models.example.json"
+    shutil.copyfile(template, _test_runtime_directory / "models.json")
+    os.environ["JEV_GATEWAY_HOME"] = str(_test_runtime_directory)
+    os.environ["DEEPSEEK_API_KEY"] = "test-deepseek-key"
+    os.environ["OPENAI_API_KEY"] = "test-openai-key"
+    os.environ["DECISION_API_KEY"] = "test-decision-key"
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Restore the caller environment and remove the temporary test runtime."""
+    if _test_runtime_directory is not None:
+        shutil.rmtree(_test_runtime_directory, ignore_errors=True)
+    if _original_gateway_home is None:
+        os.environ.pop("JEV_GATEWAY_HOME", None)
+    else:
+        os.environ["JEV_GATEWAY_HOME"] = _original_gateway_home
+    for name, value in _original_credentials.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
 
 
 @pytest.fixture(scope="session")

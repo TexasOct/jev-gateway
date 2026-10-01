@@ -4,7 +4,8 @@ The `jev` command manages the local gateway process, runtime configuration, and 
 
 ## Install and output
 
-On macOS or Linux, with Python 3.10+ available as `python3` and `curl`, install with:
+On macOS or Linux, with Python 3 available as `python3` for asset verification
+and `curl`, install with:
 
 ```sh
 curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/install.sh | sh -s -- --yes
@@ -13,7 +14,9 @@ curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/inst
 The URL selects the latest stable Release's `install.sh`. The script embeds its
 release tag and downloads `jev_gateway-X.Y.Z-py3-none-any.whl` plus its `.sha256`
 sidecar from that exact tag's asset URLs. It verifies the wheel before invoking
-`uv tool install`. It does not resolve latest again or query the GitHub API for a
+`uv tool install --python 3.12 --managed-python`. The gateway requires Python
+3.12+; uv downloads managed Python 3.12 if needed and does not use an older system
+interpreter for the tool. It does not resolve latest again or query the GitHub API for a
 wheel. Rerunning it preserves runtime configuration and records. After a successful
 Release wheel install, it restarts a gateway already running under CLI management
 for the selected `--home`, waiting up to 10 seconds for health. If no managed

@@ -60,29 +60,29 @@ def _read_pid(paths: RuntimePaths) -> tuple[int, str]:
     raise CliError("not_running", "No gateway process owned by this runtime is running.", ExitCode.NOT_RUNNING)
 
 
-def running_for_update(paths: RuntimePaths) -> bool:
+def running_for_update(paths: RuntimePaths) -> tuple[int, str] | None:
     """Check whether a live PID record belongs to this runtime."""
     try:
         data = json.loads(paths.pid.read_text(encoding="utf-8"))
         pid, token = data["pid"], data["token"]
     except FileNotFoundError:
-        return False
+        return None
     except (OSError, ValueError, TypeError, KeyError) as exc:
         raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE) from exc
     if type(pid) is not int or pid <= 0 or not isinstance(token, str) or not token:
         raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
     if _owned(pid, token, str(paths.home)):
-        return True
+        return pid, token
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
-        return False
+        return None
     except PermissionError:
         pass
     raise CliError("ownership_unverified", "The gateway PID is alive but ownership cannot be verified; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
 
 
-def stop_if_owned(paths: RuntimePaths, timeout: float = 10) -> dict[str, Any]:
+def stop_if_owned(paths: RuntimePaths, timeout: float = 10, *, expected: tuple[int, str] | None = None) -> dict[str, Any]:
     """Stop the recorded process only while its PID and token still match."""
     if sys.platform == "win32":
         raise CliError("unsupported_platform", "Windows process management is not supported.", ExitCode.USAGE)
@@ -92,6 +92,8 @@ def stop_if_owned(paths: RuntimePaths, timeout: float = 10) -> dict[str, Any]:
     except (OSError, ValueError, TypeError, KeyError) as exc:
         raise CliError("ownership_unverified", "Cannot verify the gateway PID record; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE) from exc
     if type(pid) is not int or not isinstance(token, str) or not token:
+        raise CliError("ownership_unverified", "Gateway ownership changed before stop; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
+    if expected is not None and (pid, token) != expected:
         raise CliError("ownership_unverified", "Gateway ownership changed before stop; inspect jev status and the PID file before restarting manually.", ExitCode.FAILURE)
     # Check the PID and token again immediately before signaling. This narrows
     # the PID-reuse window and ensures a changed process is never signaled.

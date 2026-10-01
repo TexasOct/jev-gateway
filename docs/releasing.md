@@ -23,8 +23,8 @@ and must be built before Python tests or wheel packaging. Installed Release
 wheels include those assets and do not need Node.js. Docker builds its own
 frontend in a Node stage before creating the wheel.
 
-For release validation, use Python 3.11+ (the validator uses `tomllib`), uv, and
-Node.js with npm. The workflow uses Python 3.11 and Node.js 22. From a fresh
+For release validation, use Python 3.12+, uv, and Node.js with npm.
+The workflow uses Python 3.12 and Node.js 22. From a fresh
 checkout, run:
 
 ```sh
@@ -73,7 +73,7 @@ generated or published artifact to test Release behavior. The template's
 2. Set `project.version` in `pyproject.toml`, complete the local checks above,
    and review the release commit before creating and pushing its matching tag.
    Pushing that tag starts publication.
-3. The workflow checks out the tag, installs Python 3.11 and Node.js 22, and
+3. The workflow checks out the tag, installs Python 3.12 and Node.js 22, and
    validates the tag/version match. It installs frontend dependencies, runs
    frontend lint/tests, builds the dashboard, and checks freshness before the
    Python tests, Pyright, and `uv build --out-dir dist`. The validator creates
