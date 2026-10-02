@@ -32,7 +32,7 @@ The source research's existing behavior and safety boundaries remain inputs to t
 | User must review the final plan before deciding on implementation | Receiver acceptance item 9 and Open questions; check whether saved Provider implementation approval covers each flow and seek a decision on any uncovered behavior | Prior approval evidence may be reused when it matches; merge alone is not implementation approval |
 | Preferred management entry/workflow still required investigation or confirmation | Receiver's top-level Provider workspace is established; reconcile browse/preset/custom flows with saved user decisions, and leave any remaining workflow choice explicit | Do not treat scope overlap as proof the original decision is resolved |
 
-Original sources: [source PRD](../../archive/2026-10/09-30-unified-provider-management-ui/prd.md) and [source surface research](../../archive/2026-10/09-30-unified-provider-management-ui/research/current-provider-surfaces.md). The receiver's implementation and check manifests retain these sources and this map as context.
+Original sources: [source PRD](../../09-30-unified-provider-management-ui/prd.md) and [source surface research](../../09-30-unified-provider-management-ui/research/current-provider-surfaces.md). The receiver's implementation and check manifests retain these sources and this map as context.
 
 ## Evidence and remaining work
 

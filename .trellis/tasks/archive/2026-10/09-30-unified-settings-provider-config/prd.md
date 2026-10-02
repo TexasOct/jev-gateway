@@ -30,20 +30,20 @@ The current user goal authorizes implementation, verification, and replacement p
 
 ### Continuation acceptance
 
-- [ ] Packaged defaults have no providers/models/decision-provider instances or provider credential assignments.
-- [ ] Missing default runtime starts with editable strategies and renders first-run initialization.
-- [ ] Local setup persists a protected management key atomically; repeat/remote/cross-origin setup cannot replace it; invalid/stale/failing writes preserve files and live state.
-- [ ] CLI setup supports a bounded secret source without printing or logging credentials.
-- [ ] Provider save, explicit model import, strategy assignment, reload, restart and ordinary file-backed editing work from an empty installation.
-- [ ] Invalid configuration still fails; no-model routing returns a controlled error without upstream calls; an empty matched tag selects the global default and reports default. Missing global default remains editable and returns a controlled error only when a fallback is needed.
-- [ ] Browser verification covers first run, auth reconnect, incomplete progress, English/Chinese and narrow/desktop layouts.
-- [ ] Full backend/frontend/type/build checks and installed-wheel acceptance pass.
-- [ ] Replacement v0.1.0 release is public/latest with the four verified assets; Ubuntu/macOS publication gates pass for its exact commit; downloaded public-wheel and public-installer acceptance pass.
-- [ ] Real model discovery/import, configuration edits/reload, successful stream
+- [x] Packaged defaults have no providers/models/decision-provider instances or provider credential assignments.
+- [x] Missing default runtime starts with editable strategies and renders first-run initialization.
+- [x] Local setup persists a protected management key atomically; repeat/remote/cross-origin setup cannot replace it; invalid/stale/failing writes preserve files and live state.
+- [x] CLI setup supports a bounded secret source without printing or logging credentials.
+- [x] Provider save, explicit model import, strategy assignment, reload, restart and ordinary file-backed editing work from an empty installation.
+- [x] Invalid configuration still fails; no-model routing returns a controlled error without upstream calls; an empty matched tag selects the global default and reports default. Missing global default remains editable and returns a controlled error only when a fallback is needed.
+- [x] Browser verification covers first run, auth reconnect, incomplete progress, English/Chinese and narrow/desktop layouts.
+- [x] Full backend/frontend/type/build checks and installed-wheel acceptance pass.
+- [x] Replacement v0.1.0 release is public/latest with the four verified assets; Ubuntu/macOS publication gates pass for its exact commit; downloaded public-wheel and public-installer acceptance pass.
+- [x] Real model discovery/import, configuration edits/reload, successful stream
   termination and default-labelled continuation are verified with the installed
   artifact and authorized credentials. Unsupported provider-specific flows are
   distinguished from passed application flows.
-- [ ] Actual local configuration is privately backed up and removed, the public
+- [x] Actual local configuration is privately backed up and removed, the public
   installer recreates the defaults, setup/import/edit/reload/real-stream acceptance
   passes, existing records survive, and the final report states the installed
   version, endpoint, local state, tag/workflow and evidence paths.
@@ -72,18 +72,22 @@ Provider 管理规划任务的用户目标和未决范围并入本任务。沿�
 
 ## Acceptance criteria
 
-- [ ] 顶层导航提供 Monitoring、Strategy workflow、Provider 与模型配置、通用设置四个彼此清晰的入口；Provider 与模型配置与 Monitoring 同级。
-- [ ] Theme 不再作为单独顶层页面出现，其现有主题模式与 seed 配置可从通用设置页面进入。
-- [ ] 主题仍使用现有主题 API 和独立存储，不改变 provider/model catalog 或策略配置。
-- [ ] 通用设置页只包含程序本体设置；首期至少承载现有语言偏好，不混入策略或 provider 专属选项。
-- [ ] 现有 dashboard 写入保护、凭据内存存储与双语体验保持有效。
-- [ ] 页面视觉与交互遵循 dashboard 当前设计系统，并适配桌面与窄屏导航。
-- [ ] 对照合并任务逐项核实 Provider 创建、编辑、启用/禁用、凭据处理、验证能力和各自的结果状态；实际不支持的场景明确标为限制或未完成。
-- [ ] 常用 provider 快捷配置复用现有预设、字段和默认值；每项可推导值的自动填充有明确依据，不能改变实例 ID 或已有模型引用。
-- [ ] 整合后的页面信息架构、主要操作流程和用户决策已形成当前任务内记录，并经用户审阅；未确认的行为保持待定。
+- [x] 顶层导航提供 Monitoring、Strategy workflow、Provider 与模型配置、通用设置四个彼此清晰的入口；Provider 与模型配置与 Monitoring 同级。
+- [x] Theme 不再作为单独顶层页面出现，其现有主题模式与 seed 配置可从通用设置页面进入。
+- [x] 主题仍使用现有主题 API 和独立存储，不改变 provider/model catalog 或策略配置。
+- [x] 通用设置页只包含程序本体设置；首期至少承载现有语言偏好，不混入策略或 provider 专属选项。
+- [x] 现有 dashboard 写入保护、凭据内存存储与双语体验保持有效。
+- [x] 页面视觉与交互遵循 dashboard 当前设计系统，并适配桌面与窄屏导航。
+- [x] 对照合并任务逐项核实 Provider 创建、编辑、启用/禁用、凭据处理、验证能力和各自的结果状态；实际不支持的场景明确标为限制或未完成。
+- [x] 常用 provider 快捷配置复用现有预设、字段和默认值；每项可推导值的自动填充有明确依据，不能改变实例 ID 或已有模型引用。
+- [x] 整合后的页面信息架构、主要操作流程和用户决策已形成当前任务内记录，并经用户审阅；未确认的行为保持待定。
 
 ## Open questions
 
 当前 Goal 已明确授权继续实施、验收和通过验证后的正式发版。接收任务的页面、预设、凭据与导入边界保存在设计和合并映射中，最终报告交付这些决策及其实际验收证据。
 
 已核实的支持边界：Provider 实例没有启用/禁用字段或管理开关，也没有独立的主动健康检查 API。这两项依照来源规划排除项保留为 deferred。现有全局 `decision.enabled`、配置验证、模型发现和真实生成各有不同含义，不能相互替代。详见 `research/provider-management-merge.md` 的当前源码核实记录。
+
+## Final acceptance closure
+
+当前受支持范围已通过源码、native、候选真实安装、公开安装和实际 reset 后的业务验收。完整结果见 `research/final-acceptance-report.md` 及独立最终审阅。当前 Goal 明确授权继续实施与最终交付，覆盖旧规划中先审阅再决定实施的阶段要求；没有添加未确认的 lifecycle 或主动 health 能力。Deferred 范围、主题 reset 的 API/UI 区别及历史失败继续保留。

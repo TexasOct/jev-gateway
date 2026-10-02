@@ -95,7 +95,7 @@ Top-level navigation contains Monitoring, Strategy workflow, Provider & models, 
 
 ## Compatibility and migration
 
-No backend schema or endpoint changes are required. Existing theme files and locale storage remain readable without migration. Existing links or internal state that target `appearance` must be redirected or mapped to `settings` if such references exist. Provider configuration APIs and UI were delivered in the archived Provider configuration task. Compare the older management plan with that implementation before further changes; do not expose unsupported lifecycle, connection-test or deletion affordances. Preserve the source plan's user-review requirement for unresolved flows. A merge authorizes task consolidation, not new product behavior.
+The initial navigation/theme move required no backend schema or endpoint changes. The later authorized initialization continuation adds setup endpoints, optional catalog defaults, provider default-model transactions and explicit route-source evidence. Existing theme files and locale storage remain readable without migration; route source uses the existing retained JSON rather than new database columns. Existing links or internal state that target `appearance` map to `settings`. Provider configuration APIs and UI were delivered in the archived Provider configuration task. Per-instance lifecycle and independent upstream-health controls remain deferred. Theme reset remains supported by its existing DELETE API; the current Settings view has no separate reset button. The active Goal authorizes the continuation described above, and the final report records supported flows and verification scope.
 
 ## Risks and rollback
 

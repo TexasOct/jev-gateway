@@ -1,0 +1,45 @@
+{
+  "id": "unified-settings-provider-config",
+  "name": "unified-settings-provider-config",
+  "title": "统一设置与 provider 配置页面",
+  "description": "设计统一设置页及与监控同级的 provider 和模型配置页，并调整主题设置归属。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-30",
+  "completedAt": "2026-10-03",
+  "branch": "fix/v0.1.0-macos-release",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "019a3030ad735db63167bc5176f245f89293c0e4",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "implemented",
+      "acceptance_complete": true,
+      "verified_product_commit": "019a3030ad735db63167bc5176f245f89293c0e4",
+      "release_version": "0.1.0",
+      "release_id": 402022958,
+      "workflow_id": 37040920350,
+      "final_report": "research/final-acceptance-report.md",
+      "independent_review": "research/final-delivery-review.md",
+      "actual_checks": 239,
+      "actual_generation_calls": 4,
+      "preserved_historical_failures": true,
+      "deferred": [
+        "per-instance lifecycle",
+        "independent upstream health",
+        "per-strategy default"
+      ]
+    }
+  }
+}
