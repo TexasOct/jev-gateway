@@ -22,6 +22,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes, assets, and packaging | Complete |
 | [Provider configuration](./provider-configuration.md) | Provider transactions, discovery network boundaries, metadata suggestions, and confirmed imports | Implementation contract |
 | [CLI lifecycle](./cli-lifecycle.md) | Curl installation, CLI output, provider credentials, process ownership, and uninstall | Complete |
+| [Runtime initialization](./initialization.md) | Strategy-only defaults, local management-key setup and valid incomplete catalogs | Implementation contract |
 | [Error handling](./error-handling.md) | Domain exceptions, OpenAI error envelopes, and degradation | Complete |
 | [Quality guidelines](./quality-guidelines.md) | Types, tests, forbidden patterns, and verification | Complete |
 | [Logging guidelines](./logging-guidelines.md) | Structured fields, formats, levels, and sensitive data | Complete |
@@ -68,6 +69,8 @@ cannot drift apart.
    also read [Decision providers](./decision-providers.md).
 5. Search for an existing helper, registry, protocol, or test builder before
    adding another implementation.
+6. For startup, installation templates or empty provider/model states, read
+   [Runtime initialization](./initialization.md).
 
 ## Quality check
 

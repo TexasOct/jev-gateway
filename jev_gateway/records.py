@@ -313,7 +313,7 @@ class DecisionRecord:
     reasoning_effort: str | None
     reasoning_effort_source: str
     candidates: tuple[str, ...]
-    # Retained to satisfy the legacy required SQLite column; new decisions write {}.
+    # Optional source evidence shares the existing structured signals column.
     signals: dict[str, Any]
     created_at: float
 
@@ -807,6 +807,13 @@ def _optional_bool(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
+def _decision_source(signals_json: Any) -> dict[str, bool]:
+    """Project only an explicit boolean source; older evidence stays unknown."""
+    signals = _decoded_json(signals_json, {})
+    value = signals.get("defaulted") if isinstance(signals, dict) else None
+    return {"defaulted": value} if isinstance(value, bool) else {}
+
+
 def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
     request = {
         "request_id": row["request_id"],
@@ -843,6 +850,7 @@ def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
             "provider": row["provider"],
             "upstream_model": row["upstream_model"],
             "label": row["tier"],
+            **_decision_source(row["signals_json"]),
             "reason": row["reason"],
             "mode": row["mode"],
             "turn_index": row["decision_turn_index"],
@@ -1086,7 +1094,7 @@ class _SqliteBackend:
                 latest_decisions AS (
                     SELECT d.decision_id, d.session_id, d.created_at,
                         d.strategy, d.route, d.provider, d.upstream_model,
-                        d.tier, o.ok, ROW_NUMBER() OVER (
+                        d.tier, d.signals_json, o.ok, ROW_NUMBER() OVER (
                         PARTITION BY d.session_id
                         ORDER BY d.created_at DESC, d.rowid DESC
                     ) AS rank
@@ -1097,7 +1105,8 @@ class _SqliteBackend:
                 SELECT live.session_id,
                     r.request_id, r.received_at, r.capture_content,
                     d.decision_id, d.strategy, d.route, d.provider,
-                    d.upstream_model, d.tier, r.request_ok, d.ok AS decision_ok
+                    d.upstream_model, d.tier, d.signals_json,
+                    r.request_ok, d.ok AS decision_ok
                 FROM live
                 LEFT JOIN latest_requests r
                     ON r.session_id = live.session_id AND r.rank = 1
@@ -1125,6 +1134,7 @@ class _SqliteBackend:
                     "provider": row["provider"],
                     "upstream_model": row["upstream_model"],
                     "label": row["tier"],
+                    **_decision_source(row["signals_json"]),
                     "ok": _optional_bool(row["decision_ok"]),
                 }
             evidence[row["session_id"]] = {

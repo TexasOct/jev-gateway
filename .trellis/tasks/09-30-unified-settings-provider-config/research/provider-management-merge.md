@@ -39,3 +39,38 @@ Original sources: [source PRD](../../archive/2026-10/09-30-unified-provider-mana
 The archived `09-30-provider-configuration-experience` task records AC1-AC13 complete and final mock-backed checks (including 720 backend tests, 210 frontend unit tests and 81 browser cases after the theme follow-up). This is relevant implementation/verification evidence, not proof that every item in the older management plan was separately delivered. Official provider artwork coverage was recorded as 1/3; OpenAI and Anthropic have neutral fallbacks. No real credentials or live upstream accounts were used.
 
 The receiver must compare current code and this evidence against each row above, update its design/implementation artifacts and test the actual Settings/Provider navigation, locale, responsive behavior and credential/write guards. The source planning task required user review before implementation; record whether existing user-approved Provider implementation decisions satisfy that gate or ask before making new product decisions.
+
+## Current continuation: verified support boundaries
+
+The active user Goal expressly authorizes continued implementation, business-flow
+verification, replacement publication after passing checks, and actual local
+configuration reset/reinstall. It supplies the execution authorization for this
+continuation. The page, preset, credential and confirmed-import decisions remain
+documented in the receiver artifacts and final acceptance report.
+
+Current source was rechecked directly in `provider_from_dict()`,
+`decision_from_dict()`, `ProviderConfiguration.command()` and `ProviderView`:
+
+- Create/edit uses revisioned `upsert`; editing locks the existing instance ID.
+  Presets initialize a new draft and do not rename existing model references.
+- Credential actions are `keep`, `set` and `clear`. Dry validation precedes apply;
+  protected local dotenv writes retain existing credential bindings and backups.
+  Credential presence denotes configuration, not provider health.
+- Explicit discovery queries a supported provider's model listing. It does not
+  probe chat generation or decision endpoints. Manual import requires explicit
+  model metadata and `confirmed: true`; public metadata remains distinct from
+  operator-confirmed estimates and capabilities.
+- Neither provider field allowlist has an enabled flag. Global `decision.enabled`
+  is an existing classifier setting, distinct from per-instance lifecycle.
+  No management command or Provider-view lifecycle switch is implemented.
+- The supported management actions are `upsert`, guarded `delete`, confirmed
+  `import`, and global `set_default_model`. No new provider-delete UI is introduced.
+  There is no separate upstream health/connection-test API. Gateway `/healthz`
+  reports gateway state rather than upstream health.
+
+Per-instance lifecycle switches and a separate active-health UI remain deferred
+features under the source plan's exclusions. Their absence is recorded explicitly;
+configuration validation, real discovery and real generation are accepted only
+for the behavior each actually verifies. Current full frontend/browser suites
+exercise the existing navigation, guards, presets and state feedback. Native,
+installed/public and real evidence retain their separate scopes.

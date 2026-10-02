@@ -10,6 +10,7 @@ Apply these contracts when changing the `jev` CLI, curl installer, provider onbo
 jev [--home PATH] [--json] <command>
 jev install init [--home PATH] [--ref REF | --version VERSION --source RELEASE_WHEEL_URL] [--method isolated]
 jev doctor | status | start | stop | restart | logs
+jev setup [--secret-env SOURCE_NAME | --secret-stdin]
 jev config path | show | validate | reload
 jev provider list | add PRESET | login ID | logout ID | remove ID
 jev uninstall [--dry-run] [--purge] [--yes]
@@ -48,7 +49,17 @@ reuse of an existing Codex or Claude login or subscription.
 - The initial `curl | sh` invocation cannot verify its own script bytes before execution. Documentation must provide a pinned-tag download/review/checksum/execute example, using the same tag for script and sidecar. A sidecar from the same publisher detects mismatches but is not an independent signature.
 - Runtime directory precedence: `--home`, `JEV_GATEWAY_HOME`, recorded install state, then `$HOME/.jev-gateway`. The server child receives its resolved directory in `JEV_GATEWAY_HOME`. The foreground `jev-gateway` entry point uses the same resolver without `--home`; the caller's working directory does not select its catalog. Explicit `models_file` arguments in application APIs remain supported.
 - Local lifecycle health probes set `trust_env=False` so exported HTTP proxy settings cannot redirect loopback readiness checks.
-- `models.json` remains the only static catalog. The CLI writes providers and models only. A provider's `api_key_env` names its credential; the value belongs in the runtime `.env` and its protected backup, not in JSON, arguments, logs, or install state.
+- `models.json` remains the only static catalog. General CLI management writes
+  providers and models; initial setup establishes the gateway key reference.
+  A provider's `api_key_env` names its credential; the value belongs in the runtime
+  `.env` and its protected backup, not in JSON, arguments, logs, or install state.
+- Initial `jev setup` also establishes gateway.api_key_env through the shared
+  management-key transaction. Packaged defaults contain strategy plans without
+  provider/model instances. Provider/model configuration may happen later;
+  startup and console access remain available with an empty catalog. Default
+  foreground startup initializes absent files without installation-state writes,
+  preserving existing files. Read [Runtime initialization](./initialization.md)
+  for bootstrap, revision, secret and incomplete-state contracts.
 - Login can precede addition for a known preset, or set/rotate the declared key for an existing provider. Logout removes the variable from the runtime `.env` without deleting the catalog entry or revoking the upstream key. An exported shell variable can still supply the credential.
 - `--secret-env SOURCE_NAME` reads from the named process environment variable; `--secret-stdin` reads a bounded line; an interactive terminal can use a no-echo prompt. Never add a `--api-key VALUE` argument. `.env` and `.env.backup` must have mode `0600`.
 - Provider addition validates the candidate catalog before replacing `models.json` atomically and retains `models.json.bak`. Login-before-add must be possible even though catalog parsing normally requires referenced credentials; use a temporary validation environment for the candidate, without weakening validation of existing providers or persisting that placeholder.

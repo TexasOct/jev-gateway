@@ -7,6 +7,10 @@ model discovery, metadata lookup, and explicit model import. Read the dashboard
 routing guide for overlays, theme, canvas layout, shell privacy, and packaging.
 Provider management owns baseline changes; routing overlays keep their separate
 schema and leave baseline bytes unchanged.
+Read [Runtime initialization](./initialization.md) for strategy-only defaults and
+management-key setup. Empty catalogs and unassigned tag pools are valid editable
+states. Save a provider before importing its first model; never seed synthetic
+instances merely to satisfy validation.
 
 ## 2. Signatures
 
@@ -37,7 +41,7 @@ the same presets as the CLI.
 
 ## 3. Contracts
 
-GET returns `{revision, write_available, providers, decision, models, presets,
+GET returns `{revision, write_available, defaults, providers, decision, models, presets,
 provider_types, decision_protocols}`. Safe provider views include display metadata,
 Credential values never
 appear in a response. Advanced parameters use a safe projection; callers omit
@@ -52,6 +56,18 @@ Validation and apply accept `{expected_revision, operations}`. Operations use:
 - `{action: "upsert", kind: "llm"|"decision", provider, credential}`;
 - `{action: "delete", kind: "llm"|"decision", id}`;
 - `{action: "import", provider_id, models, confirmed: true}`.
+- `{action: "set_default_model", model: string|null}`.
+
+The last operation edits baseline defaults.default_model and exposes only its
+canonical provider/upstream_model ID in the safe defaults projection. It shares
+normal authorization, revision, baseline/effective validation, registry preparation
+and recoverable activation. It never writes the strategy overlay or a secret file.
+Reject unknown keys, wrong types and missing model IDs. Null clears the default.
+All strategies inherit this global value; per-strategy default controls are deferred.
+The Settings selector reuses this configuration owner and model records. Referenced
+provider/model removal, including CLI force, cannot leave a dangling global default.
+CLI add supports omitted provider/model arrays in the packaged template and keeps
+explicit invalid shapes strict.
 
 Credential actions are `keep`, `set`, and `clear`; `set` includes a non-empty
 `value`. Empty text is not keep. Continue resolving only environment names declared

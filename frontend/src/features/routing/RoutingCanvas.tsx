@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Hand, Minus, MousePointer2, 
 import { api } from "@/shared/api/client";
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
 import CanvasNodeContent, { getCanvasNodeKind } from "./components/CanvasNodeContent";
 import { BOARD_HEIGHT, BOARD_WIDTH, MIN_ZOOM, boardPoint, canonicalViewport, canvasAvailableRect, canvasToolShortcut, classifyConnection, compatibleTargets, connectPoolEdge, createLayoutWriteQueue, crossedDragThreshold, defaultPosition, disconnectPoolEdge, dragDisplacement, draggedLayout, marqueeNodes, nodeDragScrollLock, planFitViewport, planNodeReveal, reconcileRuleLayout, reconnectEdge, restoreCanvasViewport, translateNodes, validLayout } from "./model/canvas";
 import type { ConnectionIntent, ConnectionReason, RuleLayoutMutation } from "./model/canvas";
@@ -529,7 +530,8 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     };
     requestAnimationFrame(() => requestAnimationFrame(fitPageScroll));
   };
-  const edgeDescription = (edge: WorkflowEdge) => `${edge.from} ${edge.kind === "context" ? t("firstMatch") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} ${edge.to}`;
+  const defaultPath = t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true }));
+  const edgeDescription = (edge: WorkflowEdge) => `${edge.from} ${edge.kind === "default" ? defaultPath : edge.kind === "context" ? t("firstMatch") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} ${edge.to}`;
   return <section className="canvas-section absolute inset-0 min-w-0" aria-label={t("routingCanvas")}>
     <div className="workspace-chrome" data-canvas-occlusion="top">
     {heading}
@@ -588,8 +590,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
             const sx = from.x + port.x; const sy = from.y + port.y;
             const tx = to.x + target.x; const ty = to.y + target.y;
             return <g key={`${edge.from}:${edge.kind}:${edge.to}`}>
-              <path d={`M ${sx} ${sy} C ${sx + 70} ${sy}, ${tx - 70} ${ty}, ${tx} ${ty}`} pointerEvents="none" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={edge.kind === "unmatched" ? "6 5" : undefined} />
-              {edge.kind !== "context" && <circle cx={sx} cy={sy} r={port.radius} className="canvas-edge-handle cursor-grab fill-primary stroke-panel [pointer-events:all] [stroke-width:2px] tool-pan:cursor-grab" style={{ strokeWidth: Math.min(2, port.radius / 5) }}
+              <path data-workflow-edge={edge.kind} d={`M ${sx} ${sy} C ${sx + 70} ${sy}, ${tx - 70} ${ty}, ${tx} ${ty}`} pointerEvents="none" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={edge.kind === "unmatched" || edge.kind === "default" ? "6 5" : undefined} />
+              {edge.kind === "default" && <text x={(sx + tx) / 2} y={(sy + ty) / 2 - 8} className="fill-ink-muted text-xs" pointerEvents="none">{defaultPath}</text>}
+              {edge.kind !== "context" && edge.kind !== "default" && <circle cx={sx} cy={sy} r={port.radius} className="canvas-edge-handle cursor-grab fill-primary stroke-panel [pointer-events:all] [stroke-width:2px] tool-pan:cursor-grab" style={{ strokeWidth: Math.min(2, port.radius / 5) }}
                 onPointerDown={(event) => { if (!canEdit || tool === "pan") return; event.currentTarget.setPointerCapture(event.pointerId); dragEdge.current = edge; setActiveIntent({ kind: "reconnect", edge }); setEdgePointer({ x: sx, y: sy }); }}
                 onPointerMove={(event) => { if (dragEdge.current) { setEdgePointer(pointerOnBoard(event)); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node]")?.getAttribute("data-canvas-node") ?? ""; setHoverTarget(target); setPointerCandidate(target); } }}
                 onPointerUp={finishEdge} onPointerCancel={() => { dragEdge.current = null; setActiveIntent(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate(""); }} />}

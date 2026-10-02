@@ -103,15 +103,31 @@ def env_update(content: bytes | None, name: str, value: str | None) -> bytes:
         raise ValueError("Credential variable name must be an ASCII identifier.")
     if value is not None and (not isinstance(value, str) or not value or len(value.encode()) > 8192 or any(c in value for c in "\r\n\x00")):
         raise ValueError("Credential must be nonempty and fit on one line within 8 KiB.")
-    lines = (content or b"").decode().splitlines()
-    # Handle dotenv's export and whitespace syntax without preserving duplicate assignments.
-    pattern = re.compile(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=")
-    output = [line for line in lines if not pattern.match(line)]
+    text = (content or b"").decode()
+    output: list[str] = []
+    # Dotenv bindings retain their original record bytes, including multiline
+    # values. Remove only the selected assignments and keep adjacent blank lines.
+    for binding in parse_stream(io.StringIO(text)):
+        original = binding.original.string
+        if binding.key != name:
+            output.append(original)
+            continue
+        prefix = re.match(r"\s*", original)
+        assert prefix is not None
+        whitespace = prefix.group()
+        boundary = max(whitespace.rfind("\n"), whitespace.rfind("\r"))
+        if boundary >= 0:
+            output.append(whitespace[:boundary + 1])
+    result = "".join(output)
     if value is not None:
         escaped = value.replace("\\", "\\\\").replace("'", "\\'")
         marker = f" {_LITERAL_MARKER}" if "${" in value else ""
-        output.append(f"{name}='{escaped}'{marker}")
-    return ("\n".join(output) + ("\n" if output else "")).encode()
+        line_ending = re.search(r"\r\n|\n|\r", text)
+        newline = line_ending.group() if line_ending is not None else "\n"
+        if result and not result.endswith(("\r", "\n")):
+            result += newline
+        result += f"{name}='{escaped}'{marker}{newline}"
+    return result.encode()
 
 
 def _references(document: dict[str, Any], name: str, *, exclude: tuple[str, str] | None = None) -> int:
@@ -174,6 +190,7 @@ class ProviderConfiguration:
             "revision": token, "write_available": write_available,
             "providers": [item.as_dict() for item in catalog.providers],
             "decision": catalog.decision.as_dict(),
+            "defaults": catalog.defaults.as_dict(),
             "models": [item.as_dict() for item in catalog.profiles],
             "presets": provider_presets(), "provider_types": list(provider_list),
             "decision_protocols": list(registered_protocols()),
@@ -190,6 +207,8 @@ class ProviderConfiguration:
                 raise RevisionConflict("Configuration changed. Refresh before applying.")
             document = read_models_document(self.models_file)
             candidate = copy.deepcopy(document)
+            candidate.setdefault("providers", [])
+            candidate.setdefault("models", [])
             env_path = self.models_file.parent / ".env"
             original_env = optional_bytes(env_path)
             env_content = original_env
@@ -198,6 +217,14 @@ class ProviderConfiguration:
                 if not isinstance(operation, dict):
                     raise ValueError("Operation must be an object.")
                 action = operation.get("action")
+                if action == "set_default_model":
+                    if set(operation) != {"action", "model"}:
+                        raise ValueError("Invalid default model operation.")
+                    model = operation["model"]
+                    if model is not None and (not isinstance(model, str) or not model.strip()):
+                        raise ValueError("Default model must be a nonempty string or null.")
+                    candidate.setdefault("defaults", {})["default_model"] = model
+                    continue
                 if action == "import":
                     if set(operation) != {"action", "provider_id", "models", "confirmed"} or operation["confirmed"] is not True:
                         raise ValueError("Import requires confirmed: true and explicit model records.")
@@ -297,7 +324,7 @@ class ProviderConfiguration:
             document = read_models_document(self.models_file)
             env = credential_snapshot(self.models_file, external=self.external)
             if "provider_id" in body:
-                provider = next((p for p in document["providers"] if p["id"] == body["provider_id"]), None)
+                provider = next((p for p in document.get("providers", []) if p["id"] == body["provider_id"]), None)
                 if provider is None:
                     raise ValueError("LLM provider does not exist.")
                 provider = copy.deepcopy(provider)
@@ -322,5 +349,5 @@ class ProviderConfiguration:
                         raise ValueError("Set requires a credential value.")
                     env = MappingProxyType({**env, reference: credential["value"]})
             profile = provider_from_dict(provider, 0, env)
-            imported = {f"{m['provider']}/{m['upstream_model']}" for m in document["models"]}
+            imported = {f"{m['provider']}/{m['upstream_model']}" for m in document.get("models", [])}
             return provider, profile.api_key, imported

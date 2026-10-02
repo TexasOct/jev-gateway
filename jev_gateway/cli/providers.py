@@ -14,7 +14,7 @@ from jev_gateway.cli.secrets import remove_env, upsert_env
 from jev_gateway.provider_presets import PRESETS
 from jev_gateway.provider_config import credential_snapshot, env_update, _references
 from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
-from jev_gateway.catalog import catalog_from_document
+from jev_gateway.catalog import catalog_from_document, defaults_from_dict
 from jev_gateway.routing_overlay import read_overlay, merge_overlay
 from jev_gateway.strategy import StrategyRegistry
 
@@ -53,8 +53,8 @@ def add_provider(paths: RuntimePaths, *, preset: str, provider_id: str | None, p
         raise CliError("model_required", "At least one --model is required.", ExitCode.USAGE)
     document = read_document(paths.models)
     identifier = provider_id or preset
-    providers = document.get("providers")
-    entries = document.get("models")
+    providers = document.setdefault("providers", [])
+    entries = document.setdefault("models", [])
     if not isinstance(providers, list) or not isinstance(entries, list):
         raise CliError("invalid_configuration", "Catalog providers and models must be arrays.", ExitCode.INVALID_CONFIG)
     if any(item.get("id") == identifier for item in providers if isinstance(item, dict)):
@@ -180,12 +180,15 @@ def remove_provider(paths: RuntimePaths, provider_id: str, force: bool = False, 
     if not any(isinstance(item, dict) and item.get("id") == provider_id for item in providers):
         raise CliError("provider_missing", f"Provider {provider_id!r} does not exist.", ExitCode.USAGE)
     owned = [item for item in models if isinstance(item, dict) and item.get("provider") == provider_id]
+    default_model = defaults_from_dict(document.get("defaults", {}), str(paths.models)).default_model
+    if default_model is not None and any(default_model == f"{provider_id}/{item.get('upstream_model')}" for item in owned):
+        raise CliError("provider_in_use", "Provider contains the global default model; clear defaults.default_model before removal.", ExitCode.USAGE)
     if owned and not force:
         raise CliError("provider_in_use", f"Provider {provider_id!r} has models; use --force to remove them.", ExitCode.USAGE)
     affected = sorted({tag for item in owned for tag in item.get("tags", [])})
     candidate = copy.deepcopy(document)
     candidate["providers"] = [item for item in candidate["providers"] if item.get("id") != provider_id]
-    candidate["models"] = [item for item in candidate["models"] if item.get("provider") != provider_id]
+    candidate["models"] = [item for item in models if item.get("provider") != provider_id]
     credentials = credential_snapshot(paths.models)
     validate_document(candidate, str(paths.models), credentials)
     overlay, error = read_overlay(paths.models)

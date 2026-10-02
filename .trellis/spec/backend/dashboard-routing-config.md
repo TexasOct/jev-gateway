@@ -21,8 +21,21 @@ Three files next to the active `models.json` hold runtime edits:
 | `routing-canvas-layout.json` | node positions and scroll viewport | `PUT /v1/dashboard/canvas-layout` |
 
 `models.json` is the baseline. Routing-overlay, theme, and canvas-layout APIs
-leave its bytes unchanged. Provider-management writes have a separate contract
-and must not expand the routing-overlay schema.
+keep their own write surfaces. Provider-management writes have a separate
+contract and must not expand the routing-overlay schema.
+
+The overlay accepts the same matrix choices as the baseline: an omitted label
+uses the first configured label, `{}` is a legal choice, and `tier` is the
+existing alias for `label`. Reject both names in one choice and reject unknown
+keys. Validation, merge and reload preserve unedited choice fields in the JSON
+document. An explicit label edit removes its former alias; display resolution
+alone must not add a choice field to an overlay.
+
+Default installations contain strategies without supplier or model instances.
+The local setup form establishes management access, then allows console use
+while providers/models are configured later. Empty tag-based pools remain
+editable. See [Runtime initialization](./initialization.md) for its API, CLI,
+authorization and persistence contracts.
 
 Module ownership: `jev_gateway/routing_overlay.py` owns overlay shape, merge,
 atomic write, and `load_catalog_with_overlay()`. It must not import

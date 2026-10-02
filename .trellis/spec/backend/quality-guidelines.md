@@ -93,7 +93,7 @@ that pattern unless the project deliberately adds an async test plugin.
 
 Tests must not require network access or real credentials.
 
-- Provider keys in `tests/conftest.py` are dummy environment values. Because importing `jev_gateway.gateway` constructs the default application, configure an isolated test runtime before test modules are collected. Never rely on an ignored root `models.json` or the operator's runtime directory to make collection pass. Use `jev_gateway/templates/models.example.json` as the installation-template source; `tests/fixtures/task_aware_matrix.json` is a separate behavior fixture, not a byte-identical template copy. Keep production startup validation strict when runtime configuration is missing or invalid.
+- Provider keys in `tests/conftest.py` are dummy environment values. Because importing `jev_gateway.gateway` constructs the default application, configure an isolated test runtime before test modules are collected. Never rely on an ignored root `models.json` or the operator's runtime directory to make collection pass. Use `jev_gateway/templates/models.example.json` as the strategy-only installation-template source; populated routing tests use `tests/fixtures/task_aware_matrix.json` or shared builders. Default startup initializes absent files; invalid existing configuration and explicit missing file paths retain strict errors. Empty catalogs are valid incomplete configuration states, not substitute fallback data.
 - Gateway tests replace the `litellm` module with a `types.SimpleNamespace`
   containing a controlled `completion` function.
 - Time-sensitive tests use `FakeClock` and explicit `advance()` calls.
@@ -106,6 +106,22 @@ Test both the successful path and the boundary that owns failure behavior. For a
 configuration field, cover parsing, serialization, runtime behavior, and invalid
 input. For schema evolution, test a database created with the earlier shape.
 For streaming behavior, test both stream consumption and final outcome recording.
+
+Streaming SDK doubles must match the installed public resource interface.
+LiteLLM's synchronous iterator can expose only asynchronous `aclose()`. Keep
+sync-close compatibility coverage, and include an async-only fixture whose
+completed-close counter increments after an async cancellation checkpoint.
+Assert once-only awaited cleanup under cancellation and after an executing
+worker exits, along with terminal delivery, durable capture and failed-send
+behavior. A flag set before cleanup completes cannot prove resource closure.
+
+Continuation keys identify normalized assistant content. Separate turns can
+produce the same key in one session. Durable captures append per occurrence,
+and provider replay matches occurrences in order. Verify the new record for
+each completed turn and preservation of earlier records; requiring exactly one
+same-key record across the whole session incorrectly rejects repeated answers.
+When inspecting completed evidence, the request/outcome window can distinguish
+the new capture from older same-content turns.
 
 ## Packaging
 
@@ -236,10 +252,9 @@ uv run pytest -q
 ## pi-lens configuration
 
 The repository root carries `.pi-lens.json`, the project-scoped pi-lens config.
-It exists for one reason: this repository contains no hand-written JavaScript or
-TypeScript, so the only JS/TS in the tree is the generated Trellis integration
-tooling under `.pi/`, `.agents/`, and `.trellis/`. Static analysis of that
-regenerated code produces findings nobody can act on.
+It excludes generated Trellis integration tooling under `.pi/`, `.agents/`, and
+`.trellis/` from application checks. The repository also has authored TypeScript
+under `frontend/`; its lint, type, unit and browser gates remain required.
 
 The config draws one line: content Trellis owns or regenerates is out of scope,
 and content this project authors stays in scope.
@@ -253,7 +268,7 @@ and content this project authors stays in scope.
 | `.trellis/workspace/**` | Machine-written session journals |
 | `.trellis/workflow.md`, `.trellis/config.yaml` | Trellis runtime templates |
 
-Still analyzed: `jev_gateway/`, `tests/`, `docs/`, `README.md`, `scripts/`, and
+Authored application scope: `jev_gateway/`, `frontend/`, `tests/`, `docs/`, `README.md`, `scripts/`, and
 the authored `.trellis/spec/backend/` and `.trellis/tasks/` artifacts.
 
 ### Why the config also disables rules
@@ -265,10 +280,10 @@ paths it is given. The only durable lever that also covers that lane is
 `rules.<id>.disable`, because a disposition mark is content-anchored and stops
 matching as soon as Trellis rewrites the file.
 
-Those twelve ids are ast-grep rules for hand-written application code. Keep them
-in mind if this repository ever gains hand-written JavaScript or TypeScript:
-remove the id you need from `rules.generated-trellis-tooling.disable` rather than
-excluding the file.
+Those twelve ids are ast-grep rules for authored application code. Their current
+project-wide disable state does not certify `frontend/`. If changing that policy,
+remove the needed id from `rules.generated-trellis-tooling.disable` rather than
+excluding authored files. This task does not change the analyzer configuration.
 
 Two limits of the config are known and accepted:
 

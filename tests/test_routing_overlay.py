@@ -76,6 +76,52 @@ def test_empty_rules_explicitly_disables_conditional_rules() -> None:
     assert catalog_from_document(merged, "test catalog")
 
 
+@pytest.mark.parametrize("choice", [{}, {"selection": "quality_first"}, {"tier": "simple"}, {"tier": "simple", "selection": "balanced"}])
+@pytest.mark.parametrize("field", ["rules", "fallback"])
+def test_overlay_preserves_legal_implicit_and_legacy_choices(field: str, choice: dict[str, str]) -> None:
+    baseline = matrix_document()
+    original = copy.deepcopy(baseline)
+    changes = [{"when": {"scale": "small"}, "select": choice}] if field == "rules" else choice
+    payload = {"version": 1, "strategy": "task_aware", field: changes}
+    assert validate_overlay_shape(payload) == payload
+    merged = merge_overlay(baseline, payload)
+    assert merged["strategies"]["task_aware"]["options"][field] == changes
+    assert catalog_from_document(merged, "test catalog")
+    assert baseline == original
+    assert payload[field] == changes
+
+
+@pytest.mark.parametrize("field", ["rules", "fallback"])
+@pytest.mark.parametrize("choice,message", [
+    ({"label": "simple", "tier": "simple"}, "both label and tier"),
+    ({"tier": "simple", "unknown": "simple"}, "unknown key"),
+])
+def test_overlay_choice_alias_support_keeps_strict_shape(field: str, choice: dict[str, str], message: str) -> None:
+    changes = [{"when": {"scale": "small"}, "select": choice}] if field == "rules" else choice
+    with pytest.raises(ValueError, match=message):
+        validate_overlay_shape({"version": 1, "strategy": "task_aware", field: changes})
+
+
+def test_priority_overlay_keeps_implicit_rules_empty_fallback_and_legacy_alias_on_reload(tmp_path: Path) -> None:
+    baseline = matrix_document()
+    rules = [
+        {"when": {"scale": "small"}, "select": {"selection": "quality_first"}},
+        {"when": {"scale": "large"}, "select": {"tier": "complex"}},
+    ]
+    baseline["strategies"]["task_aware"]["options"].update(rules=rules, fallback={})
+    models_file = tmp_path / "models.json"
+    models_file.write_text(json.dumps(baseline), encoding="utf-8")
+    original_bytes = models_file.read_bytes()
+    payload = {"version": 1, "strategy": "task_aware", "rules": rules, "fallback": {}, "models": {SMALL_MODEL_ID: {"priority": 7}}}
+    write_overlay(models_file, payload)
+    assert json.loads(overlay_path(models_file).read_text()) == payload
+    catalog = load_catalog_with_overlay(models_file)
+    profile = catalog.by_name(SMALL_MODEL_ID)
+    assert profile is not None and profile.priority == 7
+    assert models_file.read_bytes() == original_bytes
+    assert read_overlay(models_file) == (payload, None)
+
+
 def test_tags_and_priority_override_only_target_model() -> None:
     baseline = matrix_document()
     merged = merge_overlay(baseline, {

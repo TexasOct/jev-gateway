@@ -13,7 +13,7 @@ function modelView(provider: string, upstream_model: string, imported?: ImportMo
 
 export function providerFixture(): ProviderConfiguration {
   return {
-    revision: "r1", write_available: true,
+    revision: "r1", write_available: true, defaults: { default_model: null },
     providers: [{ id: "fixture", display_name: "Fixture provider", type: "openai", api_base: "https://example.test/v1", api_key_env: "FIXTURE_KEY", has_api_key: true, allow_private_network: false, brand_id: null, icon_id: null, params: { timeout: "[configured]" }, param_env: { extra_header: "FIXTURE_HEADER" } }],
     decision: { enabled: false, default_provider: null, timeout_seconds: 1.5, providers: [{ id: "judge", display_name: "Fixture judge", protocol: "system_one", api_base: "https://example.test/evaluate", api_key_env: "JUDGE_KEY", has_api_key: true, brand_id: null, icon_id: null, model: null }] },
     models: [modelView("fixture", "existing")],
@@ -27,6 +27,8 @@ export type ProviderFixtureState = {
   validations: ProviderMutation[];
   selectors: ProviderSelector[];
   rejectWrite?: number;
+  delayWrite?: () => Promise<void>;
+  rejectValidation?: number;
   rejectDiscovery?: number;
   delayDiscovery?: () => Promise<void>;
   metadataUnknown?: boolean;
@@ -52,13 +54,20 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     const request = route.request(); const path = new URL(request.url()).pathname;
     const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/v1/provider-configuration" && request.method() === "GET") return state.rejectRead ? reply({ error: { message: "synthetic-read-error" } }, state.rejectRead) : reply(state.configuration);
-    if (path === "/v1/provider-configuration/validate") { state.validations.push(request.postDataJSON()); return reply({ ...state.configuration, valid: true, applied: false, imported: 0, skipped: 0 }); }
+    if (path === "/v1/provider-configuration/validate") {
+      state.validations.push(request.postDataJSON());
+      if (state.rejectValidation) return reply({ error: { message: "synthetic-validation-error" } }, state.rejectValidation);
+      return reply({ ...state.configuration, valid: true, applied: false, imported: 0, skipped: 0 });
+    }
     if (path === "/v1/provider-configuration" && request.method() === "PUT") {
       const body = request.postDataJSON() as ProviderMutation; state.writes.push(body);
       let imported = 0; let skipped = 0;
+      if (state.delayWrite) { const delay = state.delayWrite; state.delayWrite = undefined; await delay(); }
       if (state.rejectWrite) { const status = state.rejectWrite; state.rejectWrite = undefined; return reply({ error: { message: "synthetic-rejected-secret-must-not-render" } }, status); }
       for (const operation of body.operations) {
-        if (operation.action === "upsert") {
+        if (operation.action === "set_default_model") {
+          state.configuration.defaults = { default_model: operation.model };
+        } else if (operation.action === "upsert") {
           const list = operation.kind === "llm" ? state.configuration.providers : state.configuration.decision.providers;
           const existing = list.findIndex((provider) => provider.id === operation.provider.id);
           const view = { ...operation.provider, has_api_key: operation.credential.action === "set" || state.inheritedCredential === true || (operation.credential.action === "keep" && list[existing]?.has_api_key === true), ...(operation.kind === "llm" ? { params: list[existing]?.params ?? {}, param_env: list[existing]?.param_env ?? {} } : {}) };

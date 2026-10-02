@@ -48,7 +48,8 @@ def test_get_validate_apply_and_revision_conflict(tmp_path: Path) -> None:
     app, config = setup_app(tmp_path)
     auth = headers(config)
     initial = request(app, "GET", "/v1/provider-configuration", headers=auth).json()
-    assert set(initial) == {"revision", "write_available", "providers", "decision", "models", "presets", "provider_types", "decision_protocols"}
+    assert set(initial) == {"revision", "write_available", "defaults", "providers", "decision", "models", "presets", "provider_types", "decision_protocols"}
+    assert initial["defaults"] == {"default_model": None}
     assert "system_one" in initial["decision_protocols"]
     assert all({"kind", "id", "display_name", "brand_id", "icon_id", "api_base", "api_key_env"} <= set(preset) for preset in initial["presets"])
     before = config.models_file.read_bytes()

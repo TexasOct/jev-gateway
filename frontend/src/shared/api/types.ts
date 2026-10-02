@@ -8,6 +8,7 @@ export interface OverlayState {
 
 export interface RuleChoice {
   label?: string;
+  tier?: string;
   selection?: string;
 }
 
@@ -27,7 +28,7 @@ export interface Question {
 
 export interface LabelRow {
   name: string;
-  score: number;
+  score?: number;
   reasoning_effort: string | null;
   description: string;
   tag: string;
@@ -52,6 +53,7 @@ export interface ConfigurationWarning {
 }
 
 export interface ConfigurationPayload {
+  defaults?: { default_model: string | null };
   write_available: boolean;
   write_disabled_reason: string | null;
   strategy: string;
@@ -87,6 +89,8 @@ export interface SessionRow {
   upstream_model?: string | null;
   strategy?: string | null;
   label?: string | null;
+  defaulted?: boolean;
+  reason?: string | null;
   turn_count?: number;
   updated_at?: number;
   first_request_at?: number | null;
@@ -138,6 +142,7 @@ export interface StrategiesPayload {
 export interface PolicyCatalog {
   models: { name: string; tags: string[] }[];
   strategies: StrategyRow[];
+  defaults?: { default_model: string | null };
 }
 
 export type EvidenceSection = Record<string, unknown>;
@@ -228,6 +233,7 @@ export type ProviderPreset = ProviderProfile & { kind: ProviderKind; display_nam
 export type ProviderConfiguration = {
   revision: string;
   write_available: boolean;
+  defaults?: { default_model: string | null };
   providers: ProviderProfile[];
   decision: { enabled: boolean; default_provider: string | null; timeout_seconds: number; providers: ProviderProfile[] };
   models: ProviderModelView[];
@@ -250,6 +256,7 @@ export type ImportModel = {
 export type ProviderModelView = ImportModel & { name: string; provider: string; tags: string[]; api_base: string | null; provider_type: string; has_api_key: boolean; priority: number; quality: number };
 export type ProviderCommandResult = ProviderConfiguration & { valid: true; applied: boolean; imported: number; skipped: number };
 export type ProviderOperation =
+  | { action: "set_default_model"; model: string | null }
   | { action: "upsert"; kind: ProviderKind; provider: ProviderProfile; credential: CredentialChange }
   | { action: "delete"; kind: ProviderKind; id: string }
   | { action: "import"; provider_id: string; models: ImportModel[]; confirmed: true };
@@ -299,3 +306,12 @@ export type DiscoveryItem = { upstream_model: string; qualified_id: string; impo
 export type DiscoveryResult = { provider_id: string | null; supported: boolean; complete: boolean; items: DiscoveryItem[]; warnings: string[] };
 export type MetadataItem = ModelEvidence & { upstream_model: string; metadata: ModelMetadata };
 export type MetadataResult = { items: MetadataItem[]; fetched_at: string | null; stale: boolean; warnings?: string[] };
+export type SetupStatus = {
+  required: boolean;
+  local_setup_available: boolean;
+  revision: string;
+  has_providers: boolean;
+  has_models: boolean;
+  routing_ready: boolean;
+  next_step: "gateway_key" | "provider" | "model" | "routing" | "ready";
+};

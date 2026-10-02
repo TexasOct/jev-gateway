@@ -18,8 +18,10 @@ import type {
   SessionsPayload,
   StrategiesPayload,
   ThemePayload,
+  SetupStatus,
 } from "./types";
 import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, DiscoveryResult, MetadataResult } from "./types";
+import { isValidSetupKey } from "./setup-key";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -63,6 +65,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  setup: () => request<SetupStatus>("/v1/setup"),
+  initialize: async (expected_revision: string, api_key: string) => {
+    if (!isValidSetupKey(api_key)) throw new ApiError("Invalid management key format.", 400, "invalid_setup_key");
+    return request<SetupStatus>("/v1/setup", {
+      method: "POST", body: JSON.stringify({ expected_revision, api_key }),
+    });
+  },
   providerConfiguration: (signal?: AbortSignal) => request<ProviderConfiguration>("/v1/provider-configuration", { signal }),
   validateProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration/validate", { method: "POST", body: JSON.stringify(payload) }),
   saveProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration", { method: "PUT", body: JSON.stringify(payload) }),

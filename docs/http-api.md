@@ -82,6 +82,15 @@ session list still shows live state, and session detail returns an empty request
 list when evidence is unavailable. The requests route accepts slashes in session
 IDs (`{session_id:path}` internally); the single-session snapshot route does not.
 
+New previews and decisions expose `defaulted: true|false` beside the final label.
+Session list rows, live snapshots and retained request decisions expose this
+optional boolean when their selection source is known. True identifies the
+global fallback; false preserves an ordinary configured label, including a
+literal label named `default`. Legacy evidence with unknown source omits it.
+Retained decisions read this flag from the existing `signals_json` column;
+there is no database-column migration. Pins retain the source after event-history
+eviction, and the list flag describes the selection whose label it displays.
+
 Both monitoring lists accept `limit` (default 30, maximum 100) and an opaque
 `cursor`. Without a cursor, each returns the first page. Responses retain their
 existing `data` or `requests` array and add `page_size`, `has_more`, and
@@ -110,6 +119,54 @@ with `dashboard_not_built` and startup logs a warning.
 
 ## Configuration writes
 
+### Initialization
+
+The packaged default contains strategy plans with no provider instances or
+models. The gateway and dashboard can start in that state. Adding suppliers
+and models is optional during initialization and can be done later.
+
+`GET /v1/setup` returns `{required, local_setup_available, revision,
+has_providers, has_models, routing_ready, next_step}`. `next_step` is
+`gateway_key`, `provider`, `model`, `routing`, or `ready`; progress describes
+configuration and does not block console access. `routing_ready` means a global
+default model is configured or all default-strategy label pools have models. With a configured gateway key,
+this read follows the normal Bearer rule.
+
+`POST /v1/setup` accepts exactly `{expected_revision, api_key}`. The key contains
+16 to 8192 printable ASCII characters with no surrounding whitespace. The
+first setup requires a loopback connection and loopback Host; a supplied Origin
+must match the request origin. Forwarding headers do not grant local access.
+Remote deployments can run `jev setup` locally before connecting to the
+dashboard. Setup uses the configuration transaction to store only the key
+reference in `models.json` and the value in the protected `.env`, prepare and
+activate the catalog, and restore files and runtime state on failure. Stale
+revisions conflict. Setup cannot replace an existing management key. Responses
+never include the key.
+
+With no configured models, chat and preview return `503 setup_incomplete`
+without calling an upstream service. Provider saves, model imports and routing
+assignments can proceed separately. Dashboard saves activate changes; reload
+rereads the same files after manual edits.
+
+Settings saves the single global default model through the existing guarded
+provider-configuration transaction. The operation is
+`{action: "set_default_model", model: "provider/upstream_model"}`; use `model: null`
+to clear it. The safe snapshot includes `defaults: {default_model: string|null}`.
+The model ID must be an exact configured canonical ID. Validation, stale-revision
+and rollback rules are the same as other baseline operations, and the routing
+overlay does not store this value.
+
+When a matched tag has no models, every strategy inherits this global default;
+preview, response route headers, records and sessions report final `label`/`tier`
+as `default`, with `defaulted: true`. Views display Default/默认 for this reserved
+result and preserve a configured literal `default` label when `defaulted: false`.
+Per-strategy defaults are deferred.
+If no global default is configured when this fallback is needed, chat/preview
+return `503 setup_incomplete` before generation. A populated tag pool continues
+to use normal selection rules without requiring a global fallback.
+
+### Routing and preferences
+
 `POST /v1/routing/reload` rereads the catalog and any existing overlay; it keeps
 its existing authentication behavior and does not write either file. The routing
 `PUT`/`DELETE` routes change live routing and write or remove
@@ -135,7 +192,12 @@ fallback, labels, and model pools at the saved coordinates. Reconnecting a match
 edge changes its rule or fallback label; reconnecting an unmatched edge moves a
 later rule immediately after its source. Tag-resolved label edges can add, move,
 or remove model membership, subject to whole-catalog validation; explicit-model
-labels cannot be rewired. The edge list offers keyboard controls, and node
+labels cannot be rewired. The edge list offers keyboard controls. Configured path
+and monitoring views show inherited global destinations for empty selectable
+pools. These dashed fallback edges have no membership handle and cannot be
+reconnected or removed. They do not add tags to a model or write inherited
+membership into an overlay. `GET /v1/routing/configuration` includes the safe
+root `defaults`; edit its global model in Settings. Node
 positions can also be moved with Alt + arrow keys. Layout edits save separately
 from policy edits. Policy edits remain pending until review, validation, and
 confirmation. A failed layout write reports an error and restores the last
@@ -144,8 +206,9 @@ Routing, canvas-layout, and theme writes leave `models.json` unchanged.
 
 Routing overlays are validated before they touch disk. The overlay is merged into the
 `models.json` document and passed through the normal parser and strategy
-registry, so an edit that would leave a label without a model, name an unknown
-label or selection mode, or change storage settings is rejected with the parser's
+registry. Unassigned tag-based label pools remain valid editable states. An edit
+that names an unknown model, label or selection mode, or changes storage settings
+is rejected with the parser's
 own message and the active catalog is left alone. A write that fails after the
 file was replaced restores the previous content and reloads the previous catalog,
 then returns `500 overlay_apply_failed`. Each applied change registers a

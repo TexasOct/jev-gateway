@@ -237,3 +237,34 @@ test("keeps the latest-session preview unselected until an operator chooses a se
   await page.getByText("Inspect sessions, retained requests and provider observations").click();
   expect(mockApi.requests.some(({ path }) => /\/sessions\/[^/]+\/requests/.test(path))).toBe(false);
 });
+
+for (const locale of ["en", "zh-CN"] as const) {
+  test(`final default labels render in previews, sessions and traces (${locale})`, async ({ page, mockApi }) => {
+    await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
+    const finalLabel = locale === "en" ? "Default" : "默认";
+    mockApi.detailOverrides["session-1"] = {
+      session: { session_id: "session-1", strategy: "balanced", label: "default" },
+      storage: { enabled: true }, evidence_available: true,
+      requests: [{ request: { request_id: "default-result", received_at: 1700000000 }, decision: { strategy: "balanced", label: "default", provider: "fixture-provider", upstream_model: "fixture-model" }, upstream_request: null, outcome: { ok: true } }],
+      page_size: 8, next_cursor: null, has_more: false,
+    };
+    mockApi.detailOverrides["session-2"] = {
+      ...mockApi.detailOverrides["session-1"],
+      requests: [{ ...mockApi.detailOverrides["session-1"].requests[0]!, decision: { strategy: "balanced", label: "My custom label", provider: "fixture-provider", upstream_model: "fixture-model" } }],
+    };
+    await page.goto("/dashboard/");
+    await page.getByText(locale === "en" ? "Inspect sessions, retained requests and provider observations" : "查看会话、留存请求与服务商观察记录").click();
+    await expect(page.locator(".monitoring-meta")).toContainText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
+    const firstSession = page.locator('.sessions .virtual-row[data-key="session-1"] button');
+    await expect(firstSession).toContainText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
+    await firstSession.click();
+    await expect(firstSession).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.trace-stage[data-trace-index="1"] > span').last()).toHaveText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
+    // Distribution remains grouped by raw model identity, including default-labelled sessions.
+    await expect(page.locator(".monitoring-route-map")).toContainText("fixture-provider/fixture-model");
+    await expect(page.locator(".monitoring-route-map")).toContainText("20");
+    await page.locator('.sessions .virtual-row[data-key="session-2"] button').click();
+    await expect(page.locator('.trace-stage[data-trace-index="1"] > span').last()).toHaveText("balanced · My custom label · fixture-provider/fixture-model");
+    expect(mockApi.requests.some(({ path }) => path.includes("/sessions/session-1/requests"))).toBe(true);
+  });
+}

@@ -1,12 +1,35 @@
 import { describe, expect, it } from "vitest";
 import type { PolicyCatalog, RoutingActivityPayload } from "@/shared/api/types";
-import { activePaths, configuredModels, connectorAnchors, connectorPath, pathForModel, routeDestinations, strategyChoices, validActivity } from "../model/route-activity";
+import { activePaths, configuredModels, configuredRouteModels, connectorAnchors, connectorPath, pathForModel, routeDestinations, strategyChoices, validActivity } from "../model/route-activity";
 
 const activity: RoutingActivityPayload = { object: "routing.activity", scope: "process", instance_id: "worker", complete: true,
   paths: [{ strategy: "balanced", route: "p/m", provider: "p", upstream_model: "m", in_flight_requests: 1, in_flight_streams: 0 },
     { strategy: "balanced", route: "p/n", provider: "p", upstream_model: "n", in_flight_requests: 1, in_flight_streams: 1 }] };
 
 describe("process route activity", () => {
+  it("includes an untagged global destination only when a selectable empty tag can use it", () => {
+    const policy = { labels: { default: {}, missing: {} } };
+    const strategy = { name: "balanced", kind: "decision_matrix", policy, options: { rules: [{ select: { label: "missing" } }], fallback: { label: "default" } } };
+    const catalog: PolicyCatalog = { defaults: { default_model: "p/global" }, models: [{ name: "p/literal", tags: ["balanced/default"] }, { name: "p/global", tags: [] }], strategies: [{ ...strategy, description: null }] };
+    expect(configuredRouteModels(strategy, catalog)).toEqual({ models: ["p/literal", "p/global"], defaultModel: "p/global", incomplete: false });
+    expect(routeDestinations([], [], configuredModels(strategy, catalog))).toContainEqual({ id: "p/global", source: "model", count: 0, route: null, activityOnly: false, configured: true });
+    const unused = { ...strategy, options: { rules: [], fallback: { label: "default" } } };
+    expect(configuredRouteModels(unused, { ...catalog, strategies: [{ ...unused, description: null }] })).toEqual({ models: ["p/literal"], defaultModel: null, incomplete: false });
+    const assigned = { ...catalog, models: [...catalog.models, { name: "p/n", tags: ["balanced/missing"] }] };
+    expect(configuredModels(strategy, assigned)).toEqual(["p/literal", "p/n"]);
+    expect(configuredRouteModels(strategy, { ...catalog, defaults: { default_model: null } })).toEqual({ models: ["p/literal"], defaultModel: null, incomplete: true });
+    expect(configuredModels(strategy, { ...catalog, defaults: undefined })).toEqual(["p/literal"]);
+    for (const options of [
+      { fallback: { tier: "missing" }, rules: [] },
+      { fallback: { label: "default" }, rules: [{ select: { tier: "missing" } }] },
+      { fallback: { tier: "default" }, rules: [{ select: { label: "missing" } }] },
+    ]) {
+      const legacy = { ...strategy, options };
+      expect(configuredRouteModels(legacy, { ...catalog, strategies: [{ ...legacy, description: null }] }).defaultModel).toBe("p/global");
+    }
+    const selectionOnly = { ...strategy, policy: { labels: { missing: {}, default: {} } }, options: { fallback: { label: "default" }, rules: [{ select: { selection: "quality_first" } }] } };
+    expect(configuredRouteModels(selectionOnly, { ...catalog, strategies: [{ ...selectionOnly, description: null }] }).defaultModel).toBe("p/global");
+  });
   it("keeps model paths active while requests remain in flight with no timed expiry", () => {
     expect(activePaths(activity).map((path) => path.upstream_model)).toEqual(["m", "n"]);
     expect(activePaths({ ...activity, paths: [] })).toEqual([]);

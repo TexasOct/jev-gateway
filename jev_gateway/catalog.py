@@ -36,6 +36,7 @@ __all__ = [
     "SELECTION_MODES",
     "BudgetPolicy",
     "Catalog",
+    "CatalogDefaults",
     "DecisionProvider",
     "DecisionSettings",
     "EscalationPolicy",
@@ -53,6 +54,7 @@ __all__ = [
     "StrategyDefinition",
     "catalog_from_document",
     "decision_from_dict",
+    "defaults_from_dict",
     "load_catalog",
     "policy_from_dict",
     "profile_from_dict",
@@ -517,6 +519,17 @@ class StrategyDefinition:
 
 
 @dataclass(frozen=True)
+class CatalogDefaults:
+    """Shared model selection inherited by routing strategies."""
+
+    default_model: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        """Serialize the canonical model reference without connection secrets."""
+        return {"default_model": self.default_model}
+
+
+@dataclass(frozen=True)
 class Catalog:
     """The routable models plus the policy that picks between them."""
 
@@ -528,6 +541,7 @@ class Catalog:
     default_strategy: str = "task_aware"
     storage: StorageSettings = field(default_factory=StorageSettings)
     decision: DecisionSettings = field(default_factory=DecisionSettings)
+    defaults: CatalogDefaults = field(default_factory=CatalogDefaults)
 
     def by_name(self, name: str | None) -> ModelProfile | None:
         """Look up a model by its provider-qualified catalog id."""
@@ -566,9 +580,9 @@ class Catalog:
 
     def validate(self) -> None:
         """Reject configurations that cannot serve every configured tier."""
-        if not self.profiles:
-            raise ValueError("At least one model route is required.")
         names = {profile.name for profile in self.profiles}
+        if self.defaults.default_model is not None and self.defaults.default_model not in names:
+            raise ValueError("defaults.default_model must reference a configured canonical model id.")
         provider_names = {provider.name for provider in self.providers}
         if len(provider_names) != len(self.providers):
             raise ValueError("A provider is configured more than once.")
@@ -624,6 +638,7 @@ class Catalog:
             "strategies": [definition.as_dict() for definition in self.strategies],
             "storage": self.storage.as_dict(),
             "decision": self.decision.as_dict(),
+            "defaults": self.defaults.as_dict(),
             "providers": [provider.as_dict() for provider in self.providers],
             "models": [profile.as_dict() for profile in self.profiles],
         }
@@ -652,16 +667,9 @@ def _validate_policy(
                 f"{label} labels[{name!r}] references unknown model ids: "
                 f"{', '.join(unknown_models)}."
             )
-        tag = route.tag or f"{strategy_name}/{name}"
-        tagged = [profile for profile in profiles if tag in profile.tags]
         if route.models and route.tag is not None:
             raise ValueError(
                 f"{label} labels[{name!r}] cannot declare both models and tag."
-            )
-        if not route.models and not tagged:
-            raise ValueError(
-                f"{label} labels[{name!r}] resolves tag {tag!r}, but no model "
-                "declares that tag."
             )
     if not isinstance(policy.mode, RoutingMode):
         raise TypeError(
@@ -1503,6 +1511,19 @@ def decision_from_dict(value: Any, source: str, credentials: Mapping[str, str] |
     return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers), MappingProxyType(dict(credentials)) if credentials is not None else None)
 
 
+def defaults_from_dict(value: Any, source: str) -> CatalogDefaults:
+    """Parse the optional defaults object; callers supply {} when omitted."""
+    if not isinstance(value, dict):
+        raise TypeError(f"{source} defaults must be an object.")
+    unknown = set(value) - {"default_model"}
+    if unknown:
+        raise ValueError(f"{source} defaults has unknown keys: {', '.join(sorted(unknown))}.")
+    model = value.get("default_model")
+    if model is not None and (not isinstance(model, str) or not model.strip()):
+        raise ValueError(f"{source} defaults.default_model must be a nonempty string or null.")
+    return CatalogDefaults(default_model=model)
+
+
 def storage_from_dict(value: Any, source: str) -> StorageSettings:
     """Build the optional record-store settings from the catalog document."""
     if value is None:
@@ -1696,6 +1717,7 @@ def _build_catalog(
     default_strategy: str,
     storage: StorageSettings,
     decision: DecisionSettings,
+    defaults: CatalogDefaults,
 ) -> Catalog:
     """Attach reusable provider connections to each concrete model."""
     provider_by_name = {provider.name: provider for provider in providers}
@@ -1723,6 +1745,7 @@ def _build_catalog(
         default_strategy=default_strategy,
         storage=storage,
         decision=decision,
+        defaults=defaults,
     )
     catalog.validate()
     return catalog
@@ -1732,15 +1755,13 @@ def catalog_from_document(document: dict[str, Any], source: str, credentials: Ma
     """Build a catalog from a parsed models.json document."""
     if not isinstance(document, dict):
         raise TypeError(f"{source} must contain a JSON object.")
-    allowed = {"providers", "models", "policy", "strategies", "default_strategy", "gateway", "storage", "decision"}
+    allowed = {"providers", "models", "policy", "strategies", "default_strategy", "gateway", "storage", "decision", "defaults"}
     unknown = set(document) - allowed
     if unknown:
         raise ValueError(f"{source} has unknown keys: {', '.join(sorted(unknown))}.")
-    raw_providers = document.get("providers")
+    raw_providers = document.get("providers", [])
     if not isinstance(raw_providers, list):
         raise TypeError(f"{source} providers must be a list.")
-    if not raw_providers:
-        raise ValueError(f"{source} must contain a non-empty providers list.")
     providers: list[ProviderProfile] = []
     provider_names: set[str] = set()
     for index, item in enumerate(raw_providers):
@@ -1754,11 +1775,9 @@ def catalog_from_document(document: dict[str, Any], source: str, credentials: Ma
         provider_names.add(provider.name)
         providers.append(provider)
 
-    raw_models = document.get("models")
+    raw_models = document.get("models", [])
     if not isinstance(raw_models, list):
         raise TypeError(f"{source} models must be a list.")
-    if not raw_models:
-        raise ValueError(f"{source} must contain a non-empty models list.")
 
     profiles: list[ModelProfile] = []
     seen_names: set[str] = set()
@@ -1812,6 +1831,7 @@ def catalog_from_document(document: dict[str, Any], source: str, credentials: Ma
         default_strategy,
         storage_from_dict(document.get("storage"), source),
         decision_from_dict(document.get("decision"), source, credentials),
+        defaults_from_dict(document.get("defaults", {}), source),
     )
 
 

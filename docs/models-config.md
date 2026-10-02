@@ -1,11 +1,13 @@
 # `models.json` 配置参考
 
-`models.json` 是网关的静态配置文件，默认从启动时的工作目录读取。它同时定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。可从 [`jev_gateway/templates/models.example.json`](../jev_gateway/templates/models.example.json) 复制起步；示例中的地址、模型名称和价格仅是配置示例，应按实际上游核对。
+`models.json` 是网关的静态配置文件，从统一运行目录读取，默认目录为 `$HOME/.jev-gateway`。
+它定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。
+安装和默认启动会在文件不存在时初始化配置，保留已有文件。默认模板只包含运行参数与
+`task_aware`、`quality`、`economy` 策略方案，没有供应商、模型或上游密钥。
 
 ```bash
-cp jev_gateway/templates/models.example.json models.json
-# 在 .env 中设置 providers[*].api_key_env 指向的密钥；启用 decision 时还需配置对应决策提供方的密钥
-uv run jev-gateway
+jev start
+# 打开 http://127.0.0.1:8000/dashboard 设置管理密钥；供应商和模型可稍后配置
 ```
 
 `models.json` 是唯一的静态配置来源：providers、models、策略、重路由和网关运行参数都从这里读取。进程不读取固定的 `JEV_API_BASE`、`JEV_API_KEY`、`JEV_ROUTES`、`JEV_MODELS_FILE`，也不读取路由或策略覆盖变量。密钥只按配置中声明的名字解析，包括 `providers[].api_key_env`、`providers[].param_env`、`decision.providers[].api_key_env` 和 `gateway.api_key_env`。前两类用于上游调用，后两类分别用于分类器调用和入站鉴权；策略与检查响应只返回变量名或密钥是否存在的标记，不返回密钥内容。
@@ -16,17 +18,45 @@ uv run jev-gateway
 
 | 字段 | 含义 |
 | --- | --- |
-| `providers` | 必填、非空数组；上游服务的地址和密钥引用。 |
-| `models` | 必填、非空数组；可路由的具体模型。 |
-| `policy` | 顶层路由策略，注册为名为 `default` 的策略；没有 `strategies` 时必须提供有效的 `labels` 或兼容格式 `tier_models`。如果 `strategies.default` 指向一个显式定义的策略，可省略。 |
-| `strategies` | 可选；具名策略及默认策略名称。 |
+| `providers` | 可省略或为空数组；上游服务的地址和密钥引用。 |
+| `models` | 可省略或为空数组；可路由的具体模型。 |
+| `defaults` | 可选；全局默认模型，所有策略共同继承。 |
+| `policy` | 可选；具名策略可继承的公共策略设置。默认模板通过各策略自己的 `policy` 定义设置，无需顶层样例策略。 |
+| `strategies` | 必填；具名策略与默认策略。支持紧凑格式及 `{default, definitions}` 包装格式，默认模板使用后者。 |
 | `gateway` | 可选；监听、入站鉴权、会话及内存决策日志设置。 |
 | `storage` | 可选；SQLite 请求和决策记录。 |
 | `decision` | 可选；外部决策提供方配置。 |
 
+## `defaults` 全局默认模型
+
+`defaults.default_model` 使用已配置模型的完整 `provider/upstream_model` ID，
+不能指向不存在的模型。省略、空对象或 `default_model: null` 表示尚未设置；
+`defaults` 本身必须是对象，不能写成 `null`，也不能包含其他字段。
+
+```json
+{
+  "defaults": {
+    "default_model": "my-service/confirmed-model"
+  }
+}
+```
+
+该 ID 是示例，需替换为实际导入的模型。Settings 提供一处全局默认模型选择，
+通过现有带 revision 的配置事务保存到 `models.json` 并加载。所有策略命中的
+tag 没有模型时，使用这个全局模型，最终 label/tier 为 `default`，中文显示“默认”。
+策略的第一标签、矩阵 fallback 和选模偏好不能覆盖它；每个策略的独立默认配置延后。
+尚未设置全局默认且需要空 tag 回退时，返回 `503 setup_incomplete`，不调用生成上游。
+有模型的标签池仍可独立服务。清除默认值会恢复待配置状态，不删除模型或策略。
+模型删除或 CLI 强制移除供应商不能留下失效的全局引用，应先明确清除默认值。
+
 ## `providers` 与 `models`
 
 每个 provider 可以供多个模型共用。`providers` 中的 `id` 必须唯一；`models` 中的 `(provider, upstream_model)` 组合也必须唯一。
+
+空数组和未分配模型的标签池是有效的待配置状态，可以启动、编辑、保存和重载。
+没有模型时，对话与路由预览返回 `503 setup_incomplete`，不会调用上游。
+已有模型时仍须满足实际请求的能力与模型选择约束。显式引用不存在的模型、错误字段、
+重复 ID 和已声明却缺失的供应商凭据仍会导致校验失败。
 
 | 字段 | 类型 / 默认值 | 含义 |
 | --- | --- | --- |
@@ -73,7 +103,12 @@ LLM 模型发现支持 OpenAI 兼容、Anthropic 和 DeepSeek transport；不支
 
 发现默认要求公网 HTTPS。`allow_private_network: true` 允许 localhost/私网的 HTTP 或 HTTPS；重定向、link-local、云 metadata、未指定地址和组播仍被拒绝，HTTPS 证书校验保持开启。公共元数据查询使用固定公开源，不接收用户的上游密钥或自定义地址。
 
-Provider 配置写入需要已配置的 `gateway.api_key_env`。管理操作在同一事务中验证 baseline、凭证引用与 overlay；旧 revision 返回冲突，失败恢复旧配置。密钥保存在邻近 `.env`，JSON 继续只保存环境变量引用。高级 `params` 和 `param_env` 在普通表单操作中省略时保留原值；配置读取只返回安全投影，不能把投影当原始高级参数写回。HTTP 请求格式见 [`http-api.md`](./http-api.md)。
+Provider 配置写入需要已配置的 `gateway.api_key_env`。首次打开本机面板时，初始化表单设置
+管理密钥和对应引用；终端或远程部署可先执行 `jev setup`。供应商与模型可以稍后配置，
+也可以先保存供应商，再导入模型。管理操作在同一事务中验证 baseline、凭证引用与 overlay；
+旧 revision 返回冲突，失败恢复旧配置。密钥保存在邻近 `.env`，JSON 继续只保存环境变量引用。
+高级 `params` 和 `param_env` 在普通表单操作中省略时保留原值；配置读取只返回安全投影，
+不能把投影当原始高级参数写回。HTTP 请求格式见 [`http-api.md`](./http-api.md)。
 
 `clear` 清除本地 `.env` 条目；启动 shell 仍提供该引用时，有效凭证继续存在，读取的 `has_api_key` 反映这一状态。凭证解析使用局部映射，不临时修改进程环境。
 
@@ -355,7 +390,10 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 - 未知策略名或未知模型 ID 会被拒绝。
 - 标签与模型的绑定靠标签：把模型放入某个标签就是给它加上 `{策略}/{标签}` 标签；改标签时只动这个标签，其它策略的标签（如 `quality/*`、`economy/*`）保持原样。
 
-覆盖文件会先合并进 `models.json` 文档，再走原有的解析与策略注册流程，所以标签没有对应模型、规则指向不存在的标签或选择模式等错误，都会用解析器自己的报错信息被拒绝，现役路由不受影响。写入是原子的：校验通过才落盘，落盘后重新加载；写盘后若加载失败，会恢复上一个文件内容并切回旧目录。每次成功应用都会在 `config_versions` 里留下一条记录。
+覆盖文件会先合并进 `models.json` 文档，再走解析与策略注册流程。尚未分配模型的标签池
+允许保存；未知模型引用、规则指向不存在的标签或选择模式等错误仍会被拒绝，现役路由
+不受影响。写入是原子的：校验通过才落盘，落盘后重新加载；写盘后若加载失败，会恢复
+上一个文件内容并切回旧目录。每次成功应用都会在 `config_versions` 里留下一条记录。
 
 `dashboard-theme.json` 只存面板主题的种子色，不存派生结果：
 

@@ -17,6 +17,13 @@ export JEV_GATEWAY_HOME="$HOME/.jev-gateway-staging"
 
 网关启动时从该目录加载 `models.json` 和 `.env`。`storage.path` 使用相对路径时，也会相对于该目录保存。因此，配置、密钥和记录不会散落到启动终端所在目录。
 
+首次安装和默认前台启动只在文件不存在时初始化。默认配置保留三套策略方案，不包含
+供应商、模型或上游密钥。启动后打开本机 `/dashboard` 设置管理密钥，即可进入控制台；
+供应商和模型可稍后配置。终端和远程部署可先执行 `jev setup`；服务已运行时，再执行
+`jev config reload` 加载管理密钥。面板保存会加载新配置，手工修改文件后也可用
+`jev config reload` 重载。没有模型时，对话返回
+`503 setup_incomplete`，不会影响控制台或进程存活。
+
 ## 方案一：curl 安装 CLI
 
 macOS 和 Linux 可直接安装 CLI，无需手动克隆仓库。需要 `curl` 和可通过
@@ -135,18 +142,16 @@ scripts/build-frontend.sh
 # 初始化持久运行目录，只在文件不存在时复制模板
 ./scripts/install-local.sh --editable
 
-# 编辑运行配置和密钥
-$EDITOR "$HOME/.jev-gateway/models.json"
-$EDITOR "$HOME/.jev-gateway/.env"
-
 # 启动
 ~/.local/bin/jev-gateway-local
+# 打开本机面板设置管理密钥，供应商和模型可稍后配置
 ```
 
 `--editable` 使工具命令直接读取当前仓库代码。修改 Python 文件后重启网关即可，无需重新安装。修改 `models.json` 或轮换 `.env` 中已声明的密钥后可调用 reload：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/routing/reload
+curl -X POST http://127.0.0.1:8000/v1/routing/reload \
+  -H 'Authorization: Bearer <your-gateway-key>'
 ```
 
 开发常用命令：
@@ -331,13 +336,10 @@ uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.0-py
 
 校验脚本检查 wheel 内容，把 tag 写入 `dist/install.sh`，并生成脚本和 wheel 的
 两个 SHA256 文件。这些本地产物不会自动发布为 GitHub Release。安装好的 wheel
-包含面板，不需要 Node.js，也不包含用户配置、密钥和运行数据。安装后可将仓库中的
-模板复制到尚未初始化的标准目录；已有运行目录不要再次执行下面的复制命令：
+包含面板，不需要 Node.js，也不包含用户配置、密钥和运行数据。默认前台启动会初始化
+尚不存在的配置文件，保留已有运行目录。启动后用本机面板完成管理密钥设置：
 
 ```bash
-mkdir -p "$HOME/.jev-gateway"
-cp jev_gateway/templates/models.example.json "$HOME/.jev-gateway/models.json"
-cp jev_gateway/templates/env.example "$HOME/.jev-gateway/.env"
 JEV_GATEWAY_HOME="$HOME/.jev-gateway" jev-gateway
 ```
 

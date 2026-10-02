@@ -1,5 +1,6 @@
 import type { PolicyCatalog, RoutingActivityPayload } from "@/shared/api/types";
 import type { ObservedDestination, RegisteredStrategy } from "./strategy-distribution";
+import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 
 export function validActivity(value: RoutingActivityPayload | null): value is RoutingActivityPayload {
   return value !== null && value.object === "routing.activity" && value.scope === "process"
@@ -60,13 +61,28 @@ export interface RouteDestination extends ObservedDestination {
 
 /** Resolve only built-in label selectors. A policy read from a different catalog
  * revision must not supply pools for the current strategy listing. */
-export function configuredModels(strategy: RegisteredStrategy | undefined, catalog: PolicyCatalog | null): string[] {
-  if (!strategy || !["auto", "policy", "decision", "decision_matrix"].includes(strategy.kind ?? "")) return [];
+export function configuredRouteModels(strategy: RegisteredStrategy | undefined, catalog: PolicyCatalog | null): { models: string[]; defaultModel: string | null; incomplete: boolean } {
+  const unavailable = { models: [], defaultModel: null, incomplete: false };
+  if (!strategy || !["auto", "policy", "decision", "decision_matrix"].includes(strategy.kind ?? "")) return unavailable;
   const definition = catalog?.strategies?.find((entry) => entry.name === strategy.name);
-  if (!definition || definition.kind !== strategy.kind || JSON.stringify(definition.policy) !== JSON.stringify(strategy.policy)) return [];
+  if (!definition || definition.kind !== strategy.kind || JSON.stringify(definition.policy) !== JSON.stringify(strategy.policy) ||
+      strategy.options !== undefined && JSON.stringify(definition.options) !== JSON.stringify(strategy.options)) return unavailable;
   const labels = strategy.policy?.["labels"];
-  if (!labels || typeof labels !== "object" || Array.isArray(labels) || !Array.isArray(catalog?.models)) return [];
+  if (!labels || typeof labels !== "object" || Array.isArray(labels) || !Array.isArray(catalog?.models)) return unavailable;
+  const selectable = new Set(Object.keys(labels));
+  if (strategy.kind === "decision_matrix") {
+    selectable.clear();
+    const options = definition.options ?? {};
+    const first = Object.keys(labels)[0];
+    const fallbackLabel = matrixChoiceLabel(options["fallback"], first);
+    if (fallbackLabel) selectable.add(fallbackLabel);
+    if (Array.isArray(options["rules"])) for (const rule of options["rules"]) {
+      const selected = matrixChoiceLabel(rule?.select, first);
+      if (selected) selectable.add(selected);
+    }
+  }
   const models = new Set<string>();
+  let emptyTag = false;
   for (const [name, value] of Object.entries(labels)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     const label = value as Record<string, unknown>;
@@ -78,11 +94,20 @@ export function configuredModels(strategy: RegisteredStrategy | undefined, catal
       continue;
     }
     const tag = typeof label["tag"] === "string" ? label["tag"] : `${strategy.name}/${name}`;
+    let members = 0;
     for (const model of catalog.models) {
-      if (typeof model.name === "string" && Array.isArray(model.tags) && model.tags.includes(tag)) models.add(model.name);
+      if (typeof model.name === "string" && Array.isArray(model.tags) && model.tags.includes(tag)) { models.add(model.name); members += 1; }
     }
+    if (members === 0 && selectable.has(name)) emptyTag = true;
   }
-  return [...models];
+  const globalModel = catalog.defaults?.default_model;
+  const defaultModel = emptyTag && globalModel && catalog.models.some((model) => model.name === globalModel) ? globalModel : null;
+  if (defaultModel) models.add(defaultModel);
+  return { models: [...models], defaultModel, incomplete: emptyTag && defaultModel === null };
+}
+
+export function configuredModels(strategy: RegisteredStrategy | undefined, catalog: PolicyCatalog | null): string[] {
+  return configuredRouteModels(strategy, catalog).models;
 }
 
 export function routeDestinations(

@@ -20,6 +20,9 @@ from jev_gateway.cli.paths import RuntimePaths, runtime_paths
 from jev_gateway.cli.secrets import obtain_secret
 from jev_gateway.config_transaction import ConfigurationRecoveryRequired
 from jev_gateway.dashboard import browsable_host
+from jev_gateway.initialization import initialize_configuration
+from jev_gateway.setup import ManagementSetup, SetupAlreadyConfigured
+from jev_gateway.provider_config import RevisionConflict
 
 
 def _package_version() -> str:
@@ -39,6 +42,10 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="group", required=True)
     sub.add_parser("doctor")
     sub.add_parser("status")
+    setup = sub.add_parser("setup")
+    secret_source = setup.add_mutually_exclusive_group()
+    secret_source.add_argument("--secret-env")
+    secret_source.add_argument("--secret-stdin", action="store_true")
     start = sub.add_parser("start")
     start.add_argument("--foreground", action="store_true")
     start.add_argument("--wait", type=float, default=10)
@@ -139,6 +146,23 @@ def _start_and_wait(paths: RuntimePaths, document: dict[str, Any], credentials: 
 
 def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
     group, action = args.group, getattr(args, "action", None)
+    if group == "setup":
+        try:
+            initialize_configuration(paths.models)
+            service = ManagementSetup(paths.models)
+            status = service.read()
+            if not status["required"]:
+                raise SetupAlreadyConfigured("Management key is already configured.")
+            secret = obtain_secret(env_name=args.secret_env, stdin_secret=args.secret_stdin, json_mode=args.json_mode, quiet=args.quiet)
+            return service.configure({"expected_revision": status["revision"], "api_key": secret}), 0
+        except ConfigurationRecoveryRequired:
+            raise
+        except SetupAlreadyConfigured as exc:
+            raise CliError("setup_already_configured", "Management key is already configured.", ExitCode.INVALID_CONFIG) from exc
+        except RevisionConflict as exc:
+            raise CliError("revision_conflict", "Configuration changed. Run setup again.", ExitCode.INVALID_CONFIG) from exc
+        except (ValueError, TypeError, OSError, RuntimeError) as exc:
+            raise CliError("setup_failed", "Could not configure the management key. Check configuration and secret input.", ExitCode.INVALID_CONFIG) from exc
     if group == "doctor":
         data: dict[str, Any] = {"install_state": install_state.read_state() or {"status": "unmanaged"}, "runtime_dir": str(paths.home), "models_exists": paths.models.exists(), "env_exists": paths.env.exists(), "credentials": []}
         if paths.models.exists():

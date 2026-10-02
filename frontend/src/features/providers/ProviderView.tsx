@@ -86,7 +86,7 @@ export function ProviderView({ manager, t }: Props) {
 
   return <section ref={root} className="mx-auto grid w-full min-w-0 max-w-3xl gap-4 text-ink" aria-label={t("providerModels")} onKeyDown={(event) => { if (event.key === "Escape" && !manager.pending) { event.preventDefault(); leave(); } }}>
     <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-outline pb-3">
-      <h2 className="m-0 mr-auto text-sm font-semibold">{t("providerModels")}</h2>
+      <h2 className="m-0 mr-auto shrink-0 text-sm font-semibold">{t("providerModels")}</h2>
       {(["llm", "decision"] as const).map((target) => <Button className="min-h-11 aria-pressed:border-primary aria-pressed:bg-panel-muted aria-pressed:text-primary" key={target} variant="outline" aria-pressed={kind === target} disabled={manager.pending} onClick={() => { if (target !== kind && leave()) { setKind(target); setSearch(""); setSupplierSearch(""); } }}>{t(target === "llm" ? "pmLLM" : "pmDecision")}</Button>)}
     </div>
     {manager.loading && <p role="status" className="m-0 text-sm text-ink-muted">{t("loading")}</p>}
@@ -114,7 +114,7 @@ export function ProviderView({ manager, t }: Props) {
       <div className="flex flex-wrap gap-2"><Button className="min-h-11" type="submit" disabled={disabled || !editor.draft.id.trim() || (!(kind === "llm" && editor.draft.api_base === null) && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)}>{t("pmSave")}</Button><Button className="min-h-11" type="button" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmCancel")}</Button>{kind === "llm" && <Button className="min-h-11" type="button" variant="ghost" disabled={disabled || !editor.draft.id.trim() || (editor.draft.api_base !== null && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)} onClick={() => { manager.cancelQuery(); setCandidatePreview(true); }}>{t("pmCandidate")}</Button>}</div>
       </fieldset>
     </form>{candidatePreview && candidateSelector && <ProviderModels key={editor.draft.id} providerId={editor.draft.id} selector={candidateSelector} manager={manager} t={t} onDirtyChange={setModelDirty} candidate />}</> : modelProvider ? <>
-      <div className="flex min-w-0 flex-wrap items-center gap-3"><ProviderIdentity provider={modelProvider} t={t} /><h3 className="m-0 min-w-0 flex-1 break-all text-sm font-semibold">{modelProvider.display_name || modelProvider.id}</h3><Button className="min-h-11" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmBack")}</Button></div>
+      <div className="flex min-w-0 flex-wrap items-center gap-3"><ProviderIdentity provider={modelProvider} t={t} /><h3 className="m-0 min-w-0 basis-36 flex-1 break-words text-sm font-semibold">{modelProvider.display_name || modelProvider.id}</h3><Button className="min-h-11" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmBack")}</Button></div>
       <ProviderModels key={modelProvider.id} providerId={modelProvider.id} selector={{ provider_id: modelProvider.id }} manager={manager} t={t} onDirtyChange={setModelDirty} />
     </> : browsing ? <>
       <div className="flex flex-wrap items-center gap-2"><h3 className="m-0 mr-auto text-sm font-semibold">{t("pmSuppliers")}</h3><Button className="min-h-11" variant="ghost" onClick={leave}>{t("pmCancel")}</Button></div>

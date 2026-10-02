@@ -3,6 +3,8 @@ import type { ConfigurationPayload } from "@/shared/api/types";
 import type { RoutingDraft } from "./model/draft";
 import { projectConfiguredRouteFlow } from "./model/configured-route-flow";
 import type { ConfiguredBranch } from "./model/configured-route-flow";
+import { messages } from "@/shared/i18n";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
 
 export interface ConfiguredRouteFlowProps {
   draft: RoutingDraft;
@@ -86,6 +88,8 @@ function useReducedMotion(override: boolean | undefined): boolean {
 /** A read-only explanation. The editor remains the sole draft and write owner. */
 export default function ConfiguredRouteFlow({ draft, config, locale, initialSelectedBranchId = null, reducedMotion: motionOverride }: ConfiguredRouteFlowProps) {
   const text = copy[locale];
+  const shared = messages[locale];
+  const defaultPath = shared.inheritedDefaultPath.replace("{label}", formatRouteLabel("default", () => shared.defaultRouteLabel, { defaulted: true }));
   const projection = useMemo(() => projectConfiguredRouteFlow(draft, config), [draft, config]);
   const reducedMotion = useReducedMotion(motionOverride);
   const [selection, setSelection] = useState<{ id: string; draft: RoutingDraft; config: ConfigurationPayload; revision: number } | null>(() => initialSelectedBranchId ? { id: initialSelectedBranchId, draft, config, revision: 0 } : null);
@@ -99,8 +103,8 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
   const isSelected = (from: string, to: string, kind: string) => selectedEdges.has(`${from}|${to}|${kind}`);
   const motionKey = `${selection?.revision ?? 0}-${reducedMotion ? "static" : "motion"}`;
 
-  function wire(from: string, to: string, kind: "context" | "unmatched" | "match", label: string) {
-    const highlighted = isSelected(from, to, kind);
+  function wire(from: string, to: string, kind: "context" | "unmatched" | "match" | "default", label: string, branchId?: string) {
+    const highlighted = isSelected(from, to, kind) && (branchId === undefined || active?.id === branchId);
     return <div className="flex min-h-7 items-center gap-2" aria-label={label} key={`${from}-${to}-${kind}`}>
       <svg viewBox="0 0 48 22" width="48" height="22" className="shrink-0" aria-hidden="true">
         <path key={highlighted ? motionKey : "idle"} d="M 2 11 H 42 L 37 6 M 42 11 L 37 16" className={`fill-none [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke] ${highlighted ? "stroke-primary stroke-[2.5] [transition:stroke_140ms_ease,stroke-width_140ms_ease]" : "stroke-outline stroke-[1.5] [transition:stroke_140ms_ease,stroke-width_140ms_ease]"} ${kind === "unmatched" ? "[stroke-dasharray:3_3]" : ""} ${highlighted && !reducedMotion ? "animate-[configured-route-trace_900ms_ease-out_1_both]" : ""} motion-reduce:transition-none motion-reduce:animate-none`} data-flow-state={highlighted ? "active" : "idle"} data-flow-kind={kind} data-flow-motion={highlighted && !reducedMotion ? "tracing" : undefined} />
@@ -114,7 +118,10 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
       <span className="text-xs text-ink-muted">{text.pool}</span>
       <p className="mt-1 break-words text-sm font-semibold text-ink">{branch.label ?? text.unbound}</p>
       {branch.selection && <p className="mt-1 text-xs text-ink-muted">{text.selection}: {branch.selection}</p>}
-      {branch.models.length ? <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={text.member}>{branch.models.map((model) => <li key={model} className="max-w-full break-all rounded-md border border-outline bg-panel px-2 py-1 text-xs text-ink">{model}</li>)}</ul> : <p className="mt-2 text-xs text-ink-muted">{text.noMembers}</p>}
+      {branch.defaulted && <p className="mt-2 text-xs text-primary">{defaultPath}</p>}
+      {branch.models.length ? <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={branch.defaulted ? defaultPath : text.member}>{branch.models.map((model) => <li key={model} className="max-w-full break-all rounded-md border border-outline bg-panel px-2 py-1 text-xs text-ink">{model}</li>)}</ul> : <p className="mt-2 text-xs text-ink-muted">{text.noMembers}</p>}
+      {branch.defaulted && <p className="mt-2 text-xs text-ink-muted">{shared.inheritedDefaultHelp}</p>}
+      {branch.incomplete && <p className="mt-2 text-xs text-ink-muted">{shared.emptyTagPath}</p>}
     </div>;
   }
 
@@ -139,6 +146,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
           {branch.poolId ? wire(branch.id, branch.poolId, "match", text.match) : <span className="text-xs text-ink-muted">{text.missingPool}</span>}
           {pool(branch)}
         </div>
+        {branch.defaulted && branch.poolId && wire(branch.poolId, `model::${branch.models[0]}`, "default", defaultPath, branch.id)}
         {index < projection.branches.length - 1 && wire(branch.id, projection.branches[index + 1]!.id, "unmatched", index === projection.branches.length - 2 ? text.fallbackNext : text.unmatched)}
       </li>)}
     </ol>
@@ -147,7 +155,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
         <p>{active.order === null ? text.final : text.chosen}{active.label ? `: ${active.label}.` : "."}</p>
         {active.path.some((edge) => edge.kind === "unmatched") && <p>{text.skip}</p>}
         {active.poolId === null && <p>{text.missingPool}</p>}
-        <p>{text.membership}</p>
+        <p>{active.defaulted ? shared.inheritedDefaultHelp : active.incomplete ? shared.emptyTagPath : text.membership}</p>
       </> : <p>{text.choose}</p>}
     </div>
   </section>;

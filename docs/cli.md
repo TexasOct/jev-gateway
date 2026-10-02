@@ -88,6 +88,27 @@ The managed background server records its PID under `run/gateway.pid` and output
 
 ## Configuration
 
+Fresh defaults contain strategy plans without providers or models. Start the
+service and use the local dashboard initialization form, or set the initial
+management key through the CLI:
+
+```sh
+jev setup
+jev setup --secret-env GATEWAY_KEY_INPUT
+printf '%s\n' "$KEY" | jev setup --secret-stdin
+```
+
+The interactive command uses a no-echo prompt. Noninteractive use requires an
+explicit secret source; the key is never an argument or command result. Setup
+stores its reference in `gateway.api_key_env` and its value in the protected
+runtime `.env`. It preserves existing configuration and cannot replace an
+already configured management key. Providers and models may be configured later.
+If the service is already running when CLI setup writes the files, run
+`jev config reload` to activate the key before connecting to the dashboard.
+New management keys must contain 16 to 8192 printable ASCII characters with no
+surrounding whitespace. This keeps the saved value valid in browser Authorization
+headers. Existing credential files retain their original bytes and key parsing.
+
 ```sh
 jev config path
 jev config show
@@ -95,7 +116,12 @@ jev config validate
 jev config reload
 ```
 
-The CLI can write provider and model entries. Policy, strategies, gateway, storage, and decision are read-only. Secret variables are displayed by name and presence only.
+The CLI can write provider and model entries. Initial setup also establishes the
+gateway key reference. The dashboard edits routing strategies; gateway, storage
+and other runtime settings are edited in the configuration file. Secret variables are displayed
+by name and presence only. After file changes, `jev config reload` validates and
+activates configuration without reinstalling the service. Host/port and storage
+changes still require a process restart.
 
 ## Providers and credentials
 

@@ -74,8 +74,10 @@ def validate_overlay_shape(value: Any) -> dict[str, Any]:
             select = rule.get("select")
             if not isinstance(select, dict):
                 raise ValueError(f"{field}.select must be an object.")
-            _unknown_keys(select, {"label", "selection"}, f"{field}.select")
-            if not select or any(
+            _unknown_keys(select, {"label", "tier", "selection"}, f"{field}.select")
+            if "label" in select and "tier" in select:
+                raise ValueError(f"{field}.select cannot contain both label and tier.")
+            if any(
                 not isinstance(item, str) or not item.strip()
                 for item in select.values()
             ):
@@ -105,8 +107,10 @@ def validate_overlay_shape(value: Any) -> dict[str, Any]:
     if "fallback" in value:
         if not isinstance(fallback, dict):
             raise ValueError("Overlay fallback must be an object.")
-        _unknown_keys(fallback, {"label", "selection"}, "Overlay fallback")
-        if not fallback or any(not isinstance(item, str) or not item.strip() for item in fallback.values()):
+        _unknown_keys(fallback, {"label", "tier", "selection"}, "Overlay fallback")
+        if "label" in fallback and "tier" in fallback:
+            raise ValueError("Overlay fallback cannot contain both label and tier.")
+        if any(not isinstance(item, str) or not item.strip() for item in fallback.values()):
             raise ValueError("Overlay fallback must contain non-empty choices.")
     models = value.get("models")
     if "models" in value:
@@ -175,7 +179,7 @@ def merge_overlay(document: dict[str, Any], overlay: dict[str, Any]) -> dict[str
         if "rules" in changes:
             options["rules"] = changes["rules"]
     if "models" in changes:
-        entries = merged.get("models")
+        entries = merged.get("models", [])
         if not isinstance(entries, list):
             raise ValueError("Catalog models must be an array.")
         by_id = {
@@ -201,7 +205,7 @@ def merge_warnings(
         return []
     baseline = {
         f"{item['provider']}/{item['upstream_model']}": item
-        for item in document["models"]
+        for item in document.get("models", [])
     }
     warnings: list[dict[str, str]] = []
     changed_tags: set[str] = set()

@@ -15,6 +15,7 @@ __all__ = [
     "DecisionMaker",
     "RoutingRequest",
     "RoutingStrategy",
+    "SetupIncompleteError",
     "StrategyContractError",
     "StrategyOutcome",
     "UnknownStrategyError",
@@ -54,6 +55,10 @@ class StrategyContractError(RuntimeError):
     """Raised when a strategy returns an outcome the engine cannot honour."""
 
 
+class SetupIncompleteError(ValueError):
+    """No model is configured for the requested route or its global default."""
+
+
 @dataclass(frozen=True)
 class RoutingRequest:
     """Every input a strategy may read. Nothing else is passed to it."""
@@ -85,6 +90,7 @@ class StrategyOutcome:
     mode: str
     switched_from: str | None = None
     blocked_by: str | None = None
+    defaulted: bool = False
 
 
 class RoutingStrategy(Protocol):

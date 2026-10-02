@@ -65,30 +65,36 @@ scripts/build-frontend.sh
 ./scripts/install-local.sh --editable
 ```
 
-编辑 `$HOME/.jev-gateway/` 下的两个文件：
+默认配置保留 `task_aware`、`quality`、`economy` 策略方案，不包含供应商实例、模型或
+上游密钥。可以先启动网关，稍后再配置这些内容：
 
 ```bash
-${EDITOR:-vi} "$HOME/.jev-gateway/models.json"  # 提供方、模型、策略
-${EDITOR:-vi} "$HOME/.jev-gateway/.env"         # models.json 声明引用的密钥
+jev start
 ```
 
-把示例地址和模型名替换为你的提供方实际支持的值。模板声明了两个提供方，对应的 `.env` 需要：
-
-```dotenv
-DEEPSEEK_API_KEY=replace-with-deepseek-key
-OPENAI_API_KEY=replace-with-openai-key
-```
-
-curl 安装后用 `jev start` 启动网关；源码安装使用本地启动器：
+源码安装使用本地启动器：
 
 ```bash
 ~/.local/bin/jev-gateway-local
 ```
 
-在另一个终端发出第一个请求：
+打开 `http://127.0.0.1:8000/dashboard`，在初始化表单中设置网关管理密钥，即可进入
+控制台。供应商和模型可以稍后配置。浏览器仅在内存中保存密钥，刷新页面后需要重新
+连接。终端操作或远程部署可先用 `jev setup` 的无回显提示设置密钥，再打开面板。
+服务已经运行时，CLI 设置后再执行 `jev config reload` 加载密钥。
+导入模型后，可在 Settings 选择全局默认模型。所有策略命中空 tag 时都继承它，
+分流结果显示“默认”；每个策略单独配置默认模型延后。有模型的标签池仍按原规则选择。
+
+在 Provider 页面保存供应商及凭据，发现或手动添加模型，核对元数据后显式导入。
+在策略页面将模型分配到模型池。面板保存会加载配置；手工修改文件后也可使用
+`jev config reload` 重载。尚未配置模型时，对话请求返回 `503 setup_incomplete`，
+控制台仍可使用。
+
+配置模型后，使用网关密钥发出第一个请求：
 
 ```bash
 curl http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Authorization: Bearer <your-gateway-key>' \
   -H 'Content-Type: application/json' \
   -d '{"model": "task_aware", "messages": [{"role": "user", "content": "Summarize this design."}]}'
 ```
@@ -97,9 +103,8 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 `GET /healthz` 可以确认进程已启动。长期运行、容器与 wheel 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
-网关以有效目录启动后，打开 `/dashboard`，在 Provider 页浏览供应商预设或配置自定义
-LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作。模型发现会生成可搜索的
-候选列表；核对价格和能力元数据后，再显式导入选中模型。配置步骤与私网开启方式见
+Provider 页面支持供应商预设以及自定义 LLM、decision 提供方。初始化将网关密钥保存在
+受保护的 `.env`，并在 `gateway.api_key_env` 中保存引用。配置步骤与私网开启方式见
 [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入)。
 
 ## 模型标识
@@ -139,6 +144,8 @@ LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作
 | --- | --- | --- |
 | `GET` | `/healthz` | 存活状态与配置快照。 |
 | `GET` | `/dashboard` | 内置的运维面板，用于监控、提供方管理与路由配置。 |
+| `GET` | `/v1/setup` | 初始化状态与可稍后完成的配置进度。 |
+| `POST` | `/v1/setup` | 从本机连接设置首次管理密钥。 |
 | `GET` | `/v1/models` | 策略名与目录模型 ID。 |
 | `GET` | `/v1/routing/policy` | 当前策略快照。 |
 | `GET` | `/v1/routing/strategies` | 已注册的策略及其策略配置。 |

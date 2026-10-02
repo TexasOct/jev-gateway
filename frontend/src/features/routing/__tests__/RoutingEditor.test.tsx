@@ -84,12 +84,12 @@ describe("full canvas editor structure", () => {
     const html = renderEditor();
     expect(html).not.toMatch(/<details[^>]*\bopen(?:="")?/);
     expect(html).toContain('aria-expanded="false" aria-controls="routing-information"');
-    expect(html).toContain('id="routing-information" class="workflow-info space-y-3 p-3 text-ink" hidden=""');
+    expect(html).toMatch(/id="routing-information"[^>]* hidden=""/);
     expect(html).not.toContain('class="workflow-inspector absolute');
     expect(html).not.toMatch(/class="routing-canvas-node[^"]* selected/);
     expect(html.indexOf('class="canvas-frame absolute')).toBeLessThan(html.indexOf('class="canvas-tools absolute'));
     expect(html.indexOf('class="routing-canvas-scroll')).toBeLessThan(html.indexOf('Canvas help'));
-    expect(html.indexOf('class="workflow-info"')).toBeLessThan(html.indexOf("models.json"));
+    expect(html.indexOf('id="routing-information"')).toBeLessThan(html.indexOf("models.json"));
   });
   it("composes chrome, help, advanced controls and review actions in the same workspace", () => {
     const html = renderEditor();

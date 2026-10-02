@@ -9,6 +9,7 @@ export const test = base.extend<{ isolatedGateway: boolean }>({
     const unexpected: string[] = [];
     const origin = new URL(baseURL!).origin;
     const reads: Record<string, unknown> = {
+      "/v1/setup": { required: false, local_setup_available: true, revision: "fixture-setup", has_providers: true, has_models: true, routing_ready: true, next_step: "ready" },
       "/v1/routing/providers/summary": providers, "/v1/routing/activity": activity,
       "/v1/routing/strategies": strategies, "/v1/routing/policy": policy,
       "/v1/routing/configuration": configuration,

@@ -135,6 +135,7 @@ export function classifyConnection(draft: RoutingDraft, config: ConfigurationPay
   if (intent.kind === "remove" || intent.kind === "reconnect") {
     if (!workflowEdgeExists(draft, config, intent.edge)) return block("stale");
     if (intent.edge.kind === "context") return block("context");
+    if (intent.edge.kind === "default") return block("fixed");
   }
   if (intent.kind === "new-pool" || (intent.kind === "reconnect" && intent.edge.kind === "pool") || intent.kind === "remove") {
     const source = intent.kind === "new-pool" ? intent.from : intent.edge.from;

@@ -4,11 +4,11 @@ import json
 import os
 from contextlib import suppress
 from datetime import datetime, timezone
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 from jev_gateway.cli.paths import state_path
+from jev_gateway.initialization import initialize_configuration
 
 
 def read_state(path: Path | None = None) -> dict[str, Any] | None:
@@ -45,18 +45,8 @@ def clear_state(path: Path | None = None) -> bool:
 
 def init_runtime(runtime: Path, *, ref: str, method: str, version: str | None = None, source: str | None = None) -> dict[str, Any]:
     runtime.mkdir(parents=True, exist_ok=True)
-    templates = files("jev_gateway").joinpath("templates")
-    results: dict[str, str] = {}
-    for name, packaged in (("models.json", "models.example.json"), (".env", "env.example")):
-        target = runtime / name
-        if target.exists():
-            results[name] = "preserved"
-        else:
-            target.write_bytes(templates.joinpath(packaged).read_bytes())
-            if name == ".env":
-                os.chmod(target, 0o600)
-            results[name] = "created"
+    results = initialize_configuration(runtime / "models.json")
     (runtime / "run").mkdir(exist_ok=True)
     (runtime / "logs").mkdir(exist_ok=True)
     state = write_state(runtime, ref="" if version else ref, method=method, source=source if source is not None else f"git+https://github.com/TexasOct/jev-gateway@{ref}", version=version)
-    return {"runtime_dir": str(runtime), "files": results, "state": str(state)}
+    return {"runtime_dir": str(runtime), "files": results, "state": str(state), "setup_hint": "Run jev setup or open the local dashboard to configure a management key. Providers and models can be added later."}

@@ -6,6 +6,48 @@
 
 整理应用设置入口，让程序本体设置与 provider、模型配置各有清晰归属，同时沿用当前 dashboard 的 UI 风格。
 
+## Current authorized continuation: initialization and v0.1.0 replacement
+
+The current user goal authorizes implementation, verification, and replacement publication of v0.1.0. This continues the existing in-progress configuration task. The requirements below supersede the earlier restriction against backend/API changes for this continuation; existing unrelated acceptance remains visible until verified.
+
+- File-backed configuration must support normal dashboard editing after an explicit first-run management-key setup, without requiring operators to edit JSON or dotenv by hand.
+- Packaged defaults contain the existing default strategy plans, with no LLM providers, decision providers, models, or upstream credentials. Provider presets remain available as optional onboarding choices.
+- Fresh installation and default foreground startup initialize absent configuration files without replacing existing files. Invalid existing files remain errors.
+- An empty provider/model catalog and unassigned tag-based strategy pools are valid editable configuration states. Unknown explicit model references, invalid schema, unsupported types, missing declared provider credentials, and malformed policy remain errors.
+- Initialization guides operators through management key, provider, model import, and strategy assignment, with English/Chinese copy, retry, loading, and useful incomplete-state feedback.
+- Providers and models may be configured later. Management setup permits immediate console access; onboarding progress is optional guidance. Saving configuration and reloading the service to enable connections is supported.
+- Management-key bootstrap is available locally with same-origin protection and through the CLI. Once configured, all existing configuration write guards require that key. Browser credentials remain memory-only and API responses never include secrets.
+- Requests without a usable model return a documented controlled error and never invoke an upstream provider. Saving providers before importing models must work.
+- When a matched tag has no model, inherit the global default model and report final distribution as default (默认 in Chinese), consistently in preview, responses, sessions, records and dashboard views. Per-strategy default-model configuration is deferred.
+- Existing configuration, credentials, overlays, records, and installation state survive reinstall. No retired-schema migration is added.
+- Keep version 0.1.0. Back up the existing release/tag/assets before the explicitly authorized replacement; publish through build plus Ubuntu/macOS installed-wheel gates, then verify public assets and fresh public installation.
+- Latest authorization permits local application file reads/edits/deletion and
+  relevant other-agent credential reads for real configuration and stream tests.
+  Verify supported business flows against a real upstream as well as synthetic
+  regressions, then reset local application configuration and reinstall the public
+  release for final acceptance. Keep credential values and private request data out
+  of logs/reports; provide a complete evidence-backed acceptance report.
+
+### Continuation acceptance
+
+- [ ] Packaged defaults have no providers/models/decision-provider instances or provider credential assignments.
+- [ ] Missing default runtime starts with editable strategies and renders first-run initialization.
+- [ ] Local setup persists a protected management key atomically; repeat/remote/cross-origin setup cannot replace it; invalid/stale/failing writes preserve files and live state.
+- [ ] CLI setup supports a bounded secret source without printing or logging credentials.
+- [ ] Provider save, explicit model import, strategy assignment, reload, restart and ordinary file-backed editing work from an empty installation.
+- [ ] Invalid configuration still fails; no-model routing returns a controlled error without upstream calls; an empty matched tag selects the global default and reports default. Missing global default remains editable and returns a controlled error only when a fallback is needed.
+- [ ] Browser verification covers first run, auth reconnect, incomplete progress, English/Chinese and narrow/desktop layouts.
+- [ ] Full backend/frontend/type/build checks and installed-wheel acceptance pass.
+- [ ] Replacement v0.1.0 release is public/latest with the four verified assets; Ubuntu/macOS publication gates pass for its exact commit; downloaded public-wheel and public-installer acceptance pass.
+- [ ] Real model discovery/import, configuration edits/reload, successful stream
+  termination and default-labelled continuation are verified with the installed
+  artifact and authorized credentials. Unsupported provider-specific flows are
+  distinguished from passed application flows.
+- [ ] Actual local configuration is privately backed up and removed, the public
+  installer recreates the defaults, setup/import/edit/reload/real-stream acceptance
+  passes, existing records survive, and the final report states the installed
+  version, endpoint, local state, tag/workflow and evidence paths.
+
 ## Confirmed requirements
 
 - 提供一个程序本体级的统一设置页面，其设置不属于策略或 provider。
@@ -42,5 +84,6 @@ Provider 管理规划任务的用户目标和未决范围并入本任务。沿�
 
 ## Open questions
 
-- 旧 Provider 管理规划要求用户审阅最终方案后再决定是否进入实现。该审阅是否已由已完成的 Provider 配置任务覆盖，需对照保存的用户决策和验收证据确认；不能只依据新旧需求重叠推断。
-- 对照当前实现确认启用/禁用和主动连接验证是否可用；若不支持，明确记录为 deferred，而非要求不存在的 API。
+当前 Goal 已明确授权继续实施、验收和通过验证后的正式发版。接收任务的页面、预设、凭据与导入边界保存在设计和合并映射中，最终报告交付这些决策及其实际验收证据。
+
+已核实的支持边界：Provider 实例没有启用/禁用字段或管理开关，也没有独立的主动健康检查 API。这两项依照来源规划排除项保留为 deferred。现有全局 `decision.enabled`、配置验证、模型发现和真实生成各有不同含义，不能相互替代。详见 `research/provider-management-merge.md` 的当前源码核实记录。
