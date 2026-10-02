@@ -31,7 +31,7 @@ new correct-origin capture belongs to this request/outcome window.
 
 The separate read-only verifier checks one new correct-origin capture for each
 of the three ordinary strategy streams, the post-reinstall supplied-assistant
-followup and the fresh assigned-tag stream. All 21 checks pass. The original
+followup and the fresh assigned-tag stream. All 20 checks pass. The original
 `results.json` hash is unchanged. The verifier runs through the candidate's
 installed Python with `-I -B`, outside the checkout. Its script and result are
 `verify-retained-business.py` and `retained-business-verification.json`.
@@ -70,5 +70,6 @@ match the wheel and frozen source before and after reinstall. Auth sources and
 
 The original failure report stays separate from this corrected evidence audit.
 Public release, public downloads/installations and the actual operator reset
-remain required and unverified here. An independent requirements review will
-assess publication eligibility without changing the length-probe result.
+remain required and unverified here. The independent
+[requirements review](./installed-business-requirements-review.md) confirms
+publication eligibility while retaining the failed length-probe assertion.
