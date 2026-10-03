@@ -1,0 +1,150 @@
+
+> jev-gateway-dashboard@0.1.0 test:browser
+> npm run build && tsc -p tests/tsconfig.json && playwright test -c playwright.config.ts --output=/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/10-03-strategy-workflow-canvas-editing/verification/browser-scoped
+
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 2046 modules transformed.
+rendering chunks...
+computing gzip size...
+../jev_gateway/static/index.html                      0.46 kB │ gzip:   0.28 kB
+../jev_gateway/static/assets/deepseek-Bl9-59Mi.svg   10.65 kB │ gzip:   4.27 kB
+../jev_gateway/static/assets/index-Dbp4ciod.css      50.84 kB │ gzip:  10.09 kB
+../jev_gateway/static/assets/index-CrVqAEyE.js      598.29 kB │ gzip: 186.90 kB
+
+✓ built in 226ms
+
+Running 103 tests using 7 workers
+
+  ✓    1 tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once (798ms)
+  ✓    2 tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event (920ms)
+  ✓    6 tests/browser/canvas-connections.spec.ts:59:3 › selects the exact question result wire and names its output in en (1.6s)
+  ✓    9 tests/browser/canvas-connections.spec.ts:105:1 › selects native wires, disconnects and repairs match outputs before review (986ms)
+  ✓    8 tests/browser/canvas-connections.spec.ts:59:3 › selects the exact question result wire and names its output in zh-CN (1.2s)
+  ✓    4 tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese (2.4s)
+  ✓    7 tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese (2.5s)
+  ✓    5 tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese (2.5s)
+  ✓    3 tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese (2.6s)
+  ✓   10 tests/browser/canvas-connections.spec.ts:131:1 › adds and disconnects pool members with native drag and preserves foreign tags through apply (1.1s)
+  ✓   12 tests/browser/canvas-connections.spec.ts:184:1 › question options grow and shrink ports and dense handles keep full size and exact wire centers (666ms)
+  ✓   11 tests/browser/canvas-connections.spec.ts:157:1 › reconnects an empty failure fallback by pointer drag and cancels keyboard connection controls (1.1s)
+  ✓   15 tests/browser/canvas-connections.spec.ts:260:1 › blocks unsupported question drafts with a specific error (554ms)
+  ✓   16 tests/browser/canvas-connections.spec.ts:271:3 › blocks blank instructions and restores result ports after repair (866ms)
+  ✓   13 tests/browser/canvas-connections.spec.ts:220:1 › aligns a selected group and restores its layout without policy writes (1.1s)
+  ✓   17 tests/browser/canvas-connections.spec.ts:271:3 › blocks blank criterion description and restores result ports after repair (705ms)
+  ✓   18 tests/browser/canvas-connections.spec.ts:287:1 › a stale native connection gesture cannot overwrite a newer inspector edit (755ms)
+  ✓   19 tests/browser/canvas-connections.spec.ts:302:1 › rejects an oversized arrange-all operation visibly without a layout or policy PUT (629ms)
+  ✓   14 tests/browser/canvas-connections.spec.ts:235:1 › guards fixed paths, explicit pools, last members and read-only connection actions (1.3s)
+  ✓   20 tests/browser/canvas-visual-acceptance.spec.ts:13:3 › dense strategy nodes remain readable and reachable at 320x900 (2.0s)
+  ✓   21 tests/browser/canvas-visual-acceptance.spec.ts:13:3 › dense strategy nodes remain readable and reachable at 390x900 (1.9s)
+  ✓   23 tests/browser/canvas-visual-acceptance.spec.ts:13:3 › dense strategy nodes remain readable and reachable at 1280x900 (1.9s)
+  ✓   22 tests/browser/canvas-visual-acceptance.spec.ts:13:3 › dense strategy nodes remain readable and reachable at 1430x2511 (2.1s)
+  ✓   24 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with system font (3.3s)
+  ✓   25 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 1280px with system font (3.4s)
+  ✓   26 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 390px with system font (3.3s)
+  ✓   31 tests/browser/monitoring.spec.ts:8:1 › restores the first cursor page when a later page fails, then loads the next page on retry (480ms)
+  ✓   32 tests/browser/monitoring.spec.ts:26:1 › supports keyboard session selection and selected detail (337ms)
+  ✓   33 tests/browser/monitoring.spec.ts:39:1 › request-detail list loads a cursor page on scroll and retains its focused row (504ms)
+  ✓   35 tests/browser/monitoring.spec.ts:137:1 › keeps request-detail loading, failure, unavailable evidence, and empty states distinct (473ms)
+  ✓   36 tests/browser/monitoring.spec.ts:157:1 › keeps request-detail loading copy visible while its synthetic response is delayed (347ms)
+  ✓   37 tests/browser/monitoring.spec.ts:170:1 › keeps mobile provider cells' data-label records readable (276ms)
+  ✓   39 tests/browser/monitoring.spec.ts:223:1 › activity sample failure is shown as unavailable and can be retried without policy writes (277ms)
+  ✓   28 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 320px with system font (3.1s)
+  ✓   30 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in en at 1280px with serif font (3.0s)
+  ✓   29 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 320px with system font (3.2s)
+  ✓   27 tests/browser/icons.spec.ts:43:5 › icon controls preserve names, geometry and interactions in zh-CN at 390px with system font (3.8s)
+  ✓   40 tests/browser/monitoring.spec.ts:234:1 › keeps the latest-session preview unselected until an operator chooses a session (374ms)
+  ✓   38 tests/browser/monitoring.spec.ts:189:1 › activity honors reduced motion and keeps refresh outside the route map (1.2s)
+  ✓   41 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after endpoint changes (1.1s)
+  ✓   43 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after credential revision changes (984ms)
+  ✓   42 tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after transport changes (1.0s)
+  ✓   45 tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for discovery to lookup, unknowns and manual overrides (737ms)
+  ✓   44 tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for lookup to discovery, unknowns and manual overrides (838ms)
+  ✓   34 tests/browser/monitoring.spec.ts:58:1 › utility geometry keeps virtual windows, recorded trace and mobile table readable (2.7s)
+  ✓   46 tests/browser/provider-management.spec.ts:104:1 › null beside known evidence prefills, reference-only stays unknown and real conflicts block import (842ms)
+  ✓   47 tests/browser/provider-management.spec.ts:124:3 › candidate credential action edits respect rejected and accepted discard (673ms)
+  ✓   49 tests/browser/provider-management.spec.ts:152:1 › credential clear sends a value-free local clear and reports inherited effective presence (638ms)
+  ✓   51 tests/browser/provider-management.spec.ts:167:3 › save remains applied after catalog GET failure and read retry never duplicates PUT (615ms)
+  ✓   48 tests/browser/provider-management.spec.ts:124:3 › candidate credential password edits respect rejected and accepted discard (917ms)
+  ✓   53 tests/browser/provider-management.spec.ts:204:1 › broken local supplier image uses the neutral fallback without changing identity geometry (437ms)
+  ✓   50 tests/browser/provider-management.spec.ts:167:3 › import remains applied after catalog GET failure and read retry never duplicates PUT (937ms)
+  ✓   52 tests/browser/provider-management.spec.ts:213:1 › provider editing preserves ID, clears secrets, and sends the shared contract (733ms)
+  ✓   56 tests/browser/provider-management.spec.ts:289:1 › unknown metadata blocks import and failed operations remain retryable (638ms)
+  ✓   59 tests/browser/provider-management.spec.ts:349:1 › read-only and unauthorized configuration reads expose the appropriate recovery (444ms)
+  ✓   55 tests/browser/provider-management.spec.ts:260:1 › selection scope, metadata edits and explicit import refresh the catalog (823ms)
+  ✓   54 tests/browser/provider-management.spec.ts:235:1 › supplier aliases, custom entry, icon picker and System One are usable (841ms)
+  ✓   58 tests/browser/provider-management.spec.ts:328:1 › candidate private-network discovery is explicit and canceled results stay out of other tabs (787ms)
+  ✓   57 tests/browser/provider-management.spec.ts:307:1 › revision conflicts preserve the draft, clear the secret and use the refreshed revision (838ms)
+  ✓   60 tests/browser/provider-management.spec.ts:361:1 › verified DeepSeek artwork loads locally, preserves proportions and retains attribution (709ms)
+  ✓   61 tests/browser/provider-management.spec.ts:406:1 › native endpoint presets preserve null and fill their declared credential reference (787ms)
+  ✓   66 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en dark (599ms)
+  ✓   65 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN light (673ms)
+  ✓   64 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en light (983ms)
+  ✓   67 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN dark (685ms)
+  ✓   63 tests/browser/provider-management.spec.ts:421:1 › saving a previewed provider keeps model selection and reviewed metadata for explicit import (1.2s)
+  ✓   62 tests/browser/provider-management.spec.ts:375:1 › metadata retry remains a metadata operation and batch values need an explicit null decision (1.4s)
+  ✓   68 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en light (660ms)
+  ✓   69 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en dark (615ms)
+  ✓   72 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en light (470ms)
+  ✓   70 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN light (640ms)
+  ✓   73 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en dark (414ms)
+  ✓   71 tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN dark (647ms)
+  ✓   74 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN light (458ms)
+  ✓   75 tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN dark (548ms)
+  ✓   77 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en dark (549ms)
+  ✓   76 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en light (675ms)
+  ✓   78 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN light (583ms)
+  ✓   79 tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN dark (605ms)
+  ✓   80 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en light (593ms)
+  ✓   81 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en dark (550ms)
+  ✓   82 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN light (560ms)
+  ✓   83 tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN dark (589ms)
+  ✓   85 tests/browser/responsive.spec.ts:43:3 › view containers remain centered and bounded at 320px (1.6s)
+  ✓   86 tests/browser/responsive.spec.ts:43:3 › view containers remain centered and bounded at 390px (1.6s)
+  ✓   90 tests/browser/responsive.spec.ts:103:3 › has no document-level horizontal overflow at 1280x900 in English and Chinese (1.2s)
+  ✓   87 tests/browser/responsive.spec.ts:43:3 › view containers remain centered and bounded at 1280px (1.7s)
+  ✓   88 tests/browser/responsive.spec.ts:43:3 › view containers remain centered and bounded at 1920px (2.1s)
+  ✓   89 tests/browser/responsive.spec.ts:43:3 › view containers remain centered and bounded at 2560px (2.0s)
+  ✓   94 tests/browser/routing-editor.spec.ts:8:1 › shows configured route explanation with and without reduced motion (665ms)
+  ✓   92 tests/browser/responsive.spec.ts:103:3 › has no document-level horizontal overflow at 390x820 in English and Chinese (1.3s)
+  ✓   96 tests/browser/routing-editor.spec.ts:96:1 › canvas supports keyboard node focus and real pointer drag without policy writes (717ms)
+  ✓   91 tests/browser/responsive.spec.ts:103:3 › has no document-level horizontal overflow at 1430x2511 in English and Chinese (1.4s)
+  ✓   93 tests/browser/responsive.spec.ts:103:3 › has no document-level horizontal overflow at 320x820 in English and Chinese (1.3s)
+  ✓   95 tests/browser/routing-editor.spec.ts:51:1 › routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset (990ms)
+  ✓   84 tests/browser/responsive.spec.ts:10:1 › top-level view buttons stay compact on desktop and usable on mobile (3.3s)
+  ✓  100 tests/browser/settings.spec.ts:51:1 › settings re-entry during a theme write keeps the write pending and skips reads (378ms)
+  ✓  101 tests/browser/settings.spec.ts:78:1 › a failed settings theme read is visible and can be retried (380ms)
+  ✓   99 tests/browser/settings.spec.ts:29:1 › a late settings read cannot overwrite a newer theme read (475ms)
+  ✓   98 tests/browser/settings.spec.ts:4:1 › settings permits theme writes while provider and routing writes remain unavailable (626ms)
+  ✓  102 tests/browser/settings.spec.ts:88:1 › a settings write rejected with 401 requires reconnection without persisting credentials (387ms)
+  ✓   97 tests/browser/routing-editor.spec.ts:121:1 › canvas utilities preserve measured geometry, toolbar controls and real hit targets at supported widths (1.2s)
+  ✓  103 tests/browser/settings.spec.ts:105:1 › a failed theme write preserves the saved seed and permits one successful retry (501ms)
+
+  103 passed (19.1s)
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:90160) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+(node:91358) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91357) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91354) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91364) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91366) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91355) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91362) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT=0

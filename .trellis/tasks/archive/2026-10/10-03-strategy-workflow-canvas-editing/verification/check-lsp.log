@@ -1,0 +1,35 @@
+Active probes used lens_diagnostics source=lsp, scope=paths, waitMs=2000.
+
+Initial all-severity probe: 15 files checked; clean=9, findings=6, unsupported=0, unavailable=0, failed=0, too_large=0, inconclusive=0. No TypeScript errors. 28 auxiliary ast-grep hints/advisories: 10 dynamic inline style hints, 11 extensionless import warnings, five filter/map suggestions, two string-sort warnings. Dynamic geometry is required by the project spec; extensionless imports are supported by Vite, sort operates on strings, and filter/map suggestions do not indicate a behavioral defect. No disposition/config edits were made.
+
+Final error probe: 26 files checked, total diagnostics=0; clean=23, findings=0, unsupported=0, unavailable=0, failed=0, too_large=0, inconclusive=3. Three push-only silent rechecks cannot confirm cleanliness, so zero diagnostics is not reported as full LSP confirmation. Fresh TypeScript source and browser test compilation passed separately.
+
+Final paths:
+frontend/src/features/routing/RoutingCanvas.tsx
+frontend/src/features/routing/RoutingEditor.tsx
+frontend/src/features/routing/ConfiguredRouteFlow.tsx
+frontend/src/features/routing/components/CanvasNodeContent.tsx
+frontend/src/features/routing/model/canvas.ts
+frontend/src/features/routing/model/draft.ts
+frontend/src/features/routing/model/node-card.ts
+frontend/src/features/routing/model/outputs.ts
+frontend/src/features/routing/model/selection.ts
+frontend/src/features/routing/model/configured-route-flow.ts
+frontend/src/features/routing/__tests__/ConfiguredRouteFlow.test.tsx
+frontend/src/features/routing/__tests__/RoutingEditor.test.tsx
+frontend/src/features/routing/__tests__/canvas.test.ts
+frontend/src/features/routing/__tests__/draft.test.ts
+frontend/src/features/routing/__tests__/node-card.test.ts
+frontend/src/features/routing/__tests__/outputs.test.ts
+frontend/src/features/routing/__tests__/selection.test.ts
+frontend/src/shared/i18n/en.ts
+frontend/src/shared/i18n/zh-CN.ts
+frontend/src/shared/ui/theme-contract.test.js
+frontend/tests/browser/canvas-connections.spec.ts
+frontend/tests/browser/canvas-visual-acceptance.spec.ts
+frontend/tests/browser/icons.spec.ts
+frontend/tests/browser/routing-editor.spec.ts
+frontend/tests/fixtures/configuration.ts
+frontend/tests/setup/mock-api.ts
+
+Targeted visual-selection follow-up: active error probe on RoutingCanvas.tsx and canvas-connections.spec.ts returned zero diagnostics; clean=1, findings=0, unsupported=0, unavailable=0, failed=0, too_large=0, inconclusive=1 (silent push-only recheck). Source and browser test TypeScript compilation passed in the final full browser command.

@@ -104,7 +104,8 @@ for (const { width, locale, font } of scenarios) {
         const node = nodes.filter({ has: page.locator(`[data-node-kind="${kind}"]`) }).first();
         const svg = node.locator("svg.lucide");
         await expect(node).toHaveCSS("width", "190px");
-        await expect(node).toHaveCSS("height", "56px");
+        const outputCount = await page.locator(`[data-output-node="${await node.getAttribute("data-canvas-node")}"]`).count();
+        await expect(node).toHaveCSS("height", `${56 + outputCount * 28}px`);
         await expect(svg).toHaveCSS("width", "14px");
         await expect(svg).toHaveCSS("height", "14px");
         await expect(svg).toHaveAttribute("stroke-width", "1.8");

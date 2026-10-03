@@ -1,0 +1,159 @@
+{
+  "viewport": {
+    "width": 320,
+    "height": 900
+  },
+  "locale": "en",
+  "scheme": "dark",
+  "canvas": {
+    "x": 1,
+    "y": 107.5,
+    "width": 318,
+    "height": 792.5
+  },
+  "header": {
+    "x": 0,
+    "y": 0,
+    "width": 320,
+    "height": 107.5
+  },
+  "nodes": [
+    {
+      "id": "questions",
+      "left": 50,
+      "top": 80,
+      "width": 190,
+      "height": 252,
+      "fontSize": "14px"
+    },
+    {
+      "id": "rule-0",
+      "left": 400,
+      "top": 80,
+      "width": 190,
+      "height": 112,
+      "fontSize": "14px"
+    },
+    {
+      "id": "fallback",
+      "left": 400,
+      "top": 240,
+      "width": 190,
+      "height": 84,
+      "fontSize": "14px"
+    },
+    {
+      "id": "zone::balanced/default",
+      "left": 850,
+      "top": 80,
+      "width": 190,
+      "height": 420,
+      "fontSize": "14px"
+    },
+    {
+      "id": "zone::balanced/quality",
+      "left": 850,
+      "top": 548,
+      "width": 190,
+      "height": 112,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-1",
+      "left": 2200,
+      "top": 80,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-2",
+      "left": 2200,
+      "top": 184,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-3",
+      "left": 2200,
+      "top": 288,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-4",
+      "left": 2200,
+      "top": 392,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-5",
+      "left": 2200,
+      "top": 496,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-6",
+      "left": 2200,
+      "top": 600,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-7",
+      "left": 2200,
+      "top": 704,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-8",
+      "left": 2200,
+      "top": 808,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-9",
+      "left": 2200,
+      "top": 912,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-10",
+      "left": 2200,
+      "top": 1016,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-11",
+      "left": 2200,
+      "top": 1120,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    },
+    {
+      "id": "model::fixture-provider/模型名称较长的可选输出-12",
+      "left": 2200,
+      "top": 1224,
+      "width": 190,
+      "height": 56,
+      "fontSize": "14px"
+    }
+  ],
+  "documentWidth": 320
+}

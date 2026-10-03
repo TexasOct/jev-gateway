@@ -11,10 +11,10 @@ test("shows configured route explanation with and without reduced motion", async
   const expand = page.locator(".workflow-drawer button[aria-controls='routing-information']");
   await expect(expand).toBeVisible();
   await expand.click();
-  const fallbackBranch = page.getByRole("region", { name: "Configured route" }).getByRole("button", { name: "Fallback" });
+  const fallbackBranch = page.getByRole("region", { name: "Configured route" }).getByRole("button", { name: "No rule matches" });
   await expect(fallbackBranch).toBeVisible();
   await fallbackBranch.click();
-  await expect(page.getByRole("status").filter({ hasText: "No rule matches" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "No rule matches, so the first policy label" })).toBeVisible();
   const activePath = page.locator('[data-flow-state="active"]').first();
   await expect(activePath).toHaveCSS("stroke-width", "2.5px");
   await expect(activePath).toHaveCSS("stroke", /rgb\(\d+, \d+, \d+\)/);
@@ -128,7 +128,7 @@ test("canvas utilities preserve measured geometry, toolbar controls and real hit
     await expect(node).toBeVisible();
     await expect(node).toHaveCSS("position", "absolute");
     await expect(node).toHaveCSS("width", "190px");
-    await expect(node).toHaveCSS("height", "56px");
+    await expect(node).toHaveCSS("height", "140px");
     await expect(node).toHaveCSS("overflow", "hidden");
     await expect(node).toHaveCSS("touch-action", "none");
     await expect(canvas).toHaveCSS("position", "absolute");

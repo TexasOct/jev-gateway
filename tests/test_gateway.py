@@ -911,7 +911,9 @@ def test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth(
     assert "localStorage" in bundle.text
     assert "jev-dashboard-locale" in bundle.text
     assert "Routing workflow" in bundle.text
-    assert "first matching rule selects its label" in bundle.text
+    assert "first match selects its label; no match uses the first policy label" in bundle.text
+    assert "Decision failure fallback" in bundle.text
+    assert "策略工作流" in bundle.text
     for forbidden in ("sessionStorage", "document.cookie", "indexedDB"):
         assert forbidden not in bundle.text
     assert "gateway.api_key_env" in bundle.text  # UI configuration copy only
@@ -2051,6 +2053,45 @@ def test_configuration_validate_and_invalid_put_never_swap_catalog(tmp_path: Pat
     assert "scale" in invalid.json()["error"]["message"]
     assert config.engine.policy_snapshot() == before
     assert not (tmp_path / "routing-overrides.json").exists()
+    config.engine.close()
+
+
+@pytest.mark.parametrize("disconnected", ["rule", "fallback"])
+def test_disconnected_canvas_match_cannot_replace_applied_policy(
+    tmp_path: Path, disconnected: str,
+) -> None:
+    from jev_gateway.routing_overlay import overlay_path
+
+    config = matrix_config(tmp_path)
+    app = gateway.create_app(config)
+    auth = {"Authorization": "Bearer client-key"}
+    endpoint = "/v1/routing/configuration"
+    assert request(app, "PUT", endpoint, json=reordered_rules(), headers=auth).status_code == 200
+    baseline = config.models_file.read_bytes()
+    overlay = overlay_path(config.models_file).read_bytes()
+    snapshot = config.engine.policy_snapshot()
+    config_hash = config.engine.config_hash
+    versions = config.engine.record_store.counts()["config_versions"]
+    payload = reordered_rules()
+    if disconnected == "rule":
+        payload["rules"][0]["select"]["label"] = ""
+    else:
+        payload["fallback"] = {"label": ""}
+
+    for method, target in (("POST", f"{endpoint}/validate"), ("PUT", endpoint)):
+        response = request(app, method, target, json=payload, headers=auth)
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "invalid_configuration"
+        assert "non-empty choices" in response.json()["error"]["message"]
+        assert config.models_file.read_bytes() == baseline
+        assert overlay_path(config.models_file).read_bytes() == overlay
+        assert config.engine.policy_snapshot() == snapshot
+        assert config.engine.config_hash == config_hash
+        assert config.engine.record_store.counts()["config_versions"] == versions
+
+    repaired = reordered_rules()
+    assert request(app, "POST", f"{endpoint}/validate", json=repaired, headers=auth).status_code == 200
+    assert overlay_path(config.models_file).read_bytes() == overlay
     config.engine.close()
 
 

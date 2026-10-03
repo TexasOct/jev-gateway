@@ -74,3 +74,35 @@ Implemented and accepted a separate gateway connection page. Six acceptance crit
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: Strategy workflow canvas editing and visual acceptance
+<!-- trellis-session: v=2 fp=82753ea1f9dc8646 -->
+
+**Date**: 2026-10-03
+**Task**: Strategy workflow canvas editing and visual acceptance
+**Branch**: `feat/strategy-workflow-canvas-editing`
+
+### Summary
+
+Completed Chinese workflow copy, node roles and alignment, visible side ports and direct canvas connection editing. Verified semantic output growth, repairable disconnection and distinct default/failure paths.
+
+### Main Changes
+
+- Share output-driven geometry across render, drag, marquee, Fit and layout persistence; keep policy edits behind validation, review and explicit application.
+- Select each visual criterion wire independently and show its exact source, output and destination; preserve keyboard, stale-draft and fixed/pool restrictions.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d51f359427ef15331b3c37ebac025a5660db021c` | feat(routing): add dynamic ports and canvas connection editing |
+
+### Testing
+
+- [OK] Shared workspace: 233 frontend unit, 118 browser and 764 backend tests passed; lint, TypeScript, Pyright, build and freshness passed.
+- [OK] Task-only checkout: 232 unit and 103 browser tests passed; wheel/sdist built and four static assets matched; 18 screenshots and 16 geometry records retained.
+
+### Status
+
+[OK] **Completed**

@@ -1,0 +1,62 @@
+
+> jev-gateway-dashboard@0.1.0 test:browser
+> npm run build && tsc -p tests/tsconfig.json && playwright test -c playwright.config.ts canvas-connections.spec.ts canvas-visual-acceptance.spec.ts --output=../.trellis/tasks/10-03-strategy-workflow-canvas-editing/verification/browser-geometry
+
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 2047 modules transformed.
+rendering chunks...
+computing gzip size...
+../jev_gateway/static/index.html                      0.46 kB │ gzip:   0.28 kB
+../jev_gateway/static/assets/deepseek-Bl9-59Mi.svg   10.65 kB │ gzip:   4.27 kB
+../jev_gateway/static/assets/index-Bm5nAnFv.css      51.37 kB │ gzip:  10.18 kB
+../jev_gateway/static/assets/index-Cg5ndxSz.js      600.04 kB │ gzip: 187.18 kB
+
+✓ built in 304ms
+
+Running 15 tests using 7 workers
+
+  ✓   3 tests/browser/canvas-connections.spec.ts:200:1 › blocks unsupported question drafts with a specific error (896ms)
+  ✓   7 tests/browser/canvas-connections.spec.ts:160:1 › aligns a selected group and restores its layout without policy writes (1.2s)
+  ✓   4 tests/browser/canvas-connections.spec.ts:102:1 › reconnects an empty failure fallback by pointer drag and cancels keyboard connection controls (1.3s)
+  ✓   5 tests/browser/canvas-connections.spec.ts:124:1 › question options grow and shrink ports and dense handles keep full size and exact wire centers (1.3s)
+  ✓   2 tests/browser/canvas-connections.spec.ts:175:1 › guards fixed paths, explicit pools, last members and read-only connection actions (1.4s)
+  ✓   6 tests/browser/canvas-connections.spec.ts:54:1 › selects native wires, disconnects and repairs match outputs before review (1.4s)
+  ✓   8 tests/browser/canvas-connections.spec.ts:211:3 › blocks blank instructions and restores result ports after repair (582ms)
+  ✓   1 tests/browser/canvas-connections.spec.ts:79:1 › adds and disconnects pool members with native drag and preserves foreign tags through apply (1.5s)
+  ✓   9 tests/browser/canvas-connections.spec.ts:211:3 › blocks blank criterion description and restores result ports after repair (627ms)
+  ✓  11 tests/browser/canvas-connections.spec.ts:242:1 › rejects an oversized arrange-all operation visibly without a layout or policy PUT (671ms)
+  ✓  10 tests/browser/canvas-connections.spec.ts:227:1 › a stale native connection gesture cannot overwrite a newer inspector edit (767ms)
+  ✓  12 tests/browser/canvas-visual-acceptance.spec.ts:12:3 › dense strategy nodes remain readable and reachable at 390x900 (1.9s)
+  ✓  14 tests/browser/canvas-visual-acceptance.spec.ts:12:3 › dense strategy nodes remain readable and reachable at 320x900 (2.0s)
+  ✓  13 tests/browser/canvas-visual-acceptance.spec.ts:12:3 › dense strategy nodes remain readable and reachable at 1280x900 (2.1s)
+  ✓  15 tests/browser/canvas-visual-acceptance.spec.ts:12:3 › dense strategy nodes remain readable and reachable at 1430x2511 (2.1s)
+
+  15 passed (5.2s)
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:7414) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+(node:8421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8420) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8418) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8419) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8400) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8414) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT=0

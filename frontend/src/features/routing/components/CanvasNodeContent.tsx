@@ -81,7 +81,7 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
     }
   }
 
-  return <span className={`canvas-node-content canvas-node-kind-${kind} grid h-full min-w-0 grid-rows-[12px_16px_12px] content-center select-none`} data-node-kind={kind}>
+  return <span className={`canvas-node-content canvas-node-kind-${kind} absolute left-0 right-0 top-0 grid h-[56px] min-w-0 grid-rows-[12px_16px_12px] content-center select-none px-1.5`} data-node-kind={kind}>
     <span className="canvas-node-type flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase leading-3 tracking-wide text-ink-muted" title={typeName}>
       <Icon className="canvas-node-icon shrink-0" size={14} strokeWidth={1.8} aria-hidden="true" focusable="false" />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{typeName}</span>

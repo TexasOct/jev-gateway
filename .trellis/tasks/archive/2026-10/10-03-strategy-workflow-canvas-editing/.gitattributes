@@ -1,0 +1,2 @@
+# Preserve native verification output byte-for-byte without source-style diffs.
+verification/*.log -diff

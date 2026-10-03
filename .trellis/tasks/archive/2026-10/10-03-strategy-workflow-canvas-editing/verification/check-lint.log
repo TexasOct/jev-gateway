@@ -1,0 +1,15 @@
+
+> jev-gateway-dashboard@0.1.0 lint
+> eslint .
+
+
+/Users/texas/Workspace/jev-llmroute-test/frontend/src/shared/i18n/index.tsx
+  13:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  82:26  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  82:37  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  82:53  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+✖ 4 problems (0 errors, 4 warnings)
+
+
+EXIT=0
