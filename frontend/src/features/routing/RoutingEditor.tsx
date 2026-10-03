@@ -50,6 +50,8 @@ interface EditorProps {
   error?: string | null;
   onReloaded: () => Promise<void>;
   onError: (message: string) => void;
+  informationOpen?: boolean;
+  onInformationOpenChange?: (open: boolean) => void;
 }
 
 const POOL_ID = "pool";
@@ -305,7 +307,7 @@ function DropZone({
   );
 }
 
-export default function RoutingEditor({ config, error, onReloaded, onError }: EditorProps) {
+export default function RoutingEditor({ config, error, onReloaded, onError, informationOpen, onInformationOpenChange }: EditorProps) {
   const [draft, setDraft] = useState<RoutingDraft>(() => draftFromConfiguration(config));
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -314,7 +316,12 @@ export default function RoutingEditor({ config, error, onReloaded, onError }: Ed
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeDragging, setNodeDragging] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
+  const [localInformationOpen, setLocalInformationOpen] = useState(false);
+  const infoOpen = informationOpen ?? localInformationOpen;
+  const setInfoOpen = useCallback((open: boolean) => {
+    setLocalInformationOpen(open);
+    onInformationOpenChange?.(open);
+  }, [onInformationOpenChange]);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const [inspectorAt, setInspectorAt] = useState<(NonNullable<ReturnType<typeof inspectorPosition>> & { fallback: boolean }) | null>(null);
   const [revealNode, setRevealNode] = useState<{ id: string; serial: number } | null>(null);
@@ -332,7 +339,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError }: Ed
       if (body && item) body.scrollTop += item.getBoundingClientRect().top - body.getBoundingClientRect().top;
       (item?.querySelector<HTMLElement>("select, input, button") ?? item)?.focus({ preventScroll: true });
     });
-  }, []);
+  }, [setInfoOpen]);
   const handoffFocus = () => {
     const workspace = workspaceRef.current;
     const canvas = workspace?.querySelector<HTMLElement>(".routing-canvas-scroll") ?? null;
@@ -521,6 +528,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError }: Ed
         setServerWarnings(response.warnings.map((warning) => tr("validationWarning", { code: warning.code, message: warning.message })));
         setNotice(t("routingApplied"));
         setReview(null);
+        setInfoOpen(false);
         await onReloaded();
       } catch (caught) {
         onError(caught instanceof Error ? caught.message : String(caught));
@@ -528,7 +536,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError }: Ed
         setBusy(false);
       }
     })();
-  }, [review, busy, writeDisabled, acknowledged, onError, onReloaded, t, tr]);
+  }, [review, busy, writeDisabled, acknowledged, onError, onReloaded, t, tr, setInfoOpen]);
 
   const reset = useCallback(() => {
     if (writeDisabled || busy || !resetReview) return;

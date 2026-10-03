@@ -82,6 +82,7 @@ test("routing draft validates before review, requires warning acknowledgement, t
   const applyWrite = mockApi.allowedWrites.find(({ method }) => method === "PUT");
   expect(validateWrite?.body).toEqual(applyWrite?.body);
   await expect.poll(() => mockApi.configurationApplied).toBe(true);
+  await expect(page.locator(".workspace-heading [data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
   await page.locator(".workflow-drawer button[aria-controls='routing-information']").click();
   await expect(page.getByRole("region", { name: "Configured route" }).getByText("Draft policy preview · matches the currently applied policy")).toBeVisible();
   await page.getByRole("button", { name: "Reset to baseline" }).click();
@@ -90,6 +91,7 @@ test("routing draft validates before review, requires warning acknowledgement, t
   await page.getByRole("button", { name: "Confirm reset" }).click();
   await expect.poll(() => mockApi.requests.filter(({ method, path }) => method === "DELETE" && path === "/v1/routing/configuration").length).toBe(1);
   await expect.poll(() => mockApi.configurationApplied).toBe(false);
+  await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
   await expect(page.getByRole("region", { name: "Configured route" }).getByText("Draft policy preview · matches the currently applied policy")).toBeVisible();
 });
 

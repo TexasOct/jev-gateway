@@ -1,0 +1,21 @@
+{
+  "success": true,
+  "scope": "corrected source bundle served by loopback Vite preview with synthetic API fixtures",
+  "private_evidence_directory": ".git/jev-release-011-acceptance/preview-fix-20261003-220024",
+  "source_sha256": {
+    "frontend/src/app/AppShell.tsx": "39bcd01fa616282ef61fbcf1f98db161c29179d1cab3b5533fb75dee10587576",
+    "frontend/src/features/routing/RoutingEditor.tsx": "1b46d6bdac16f07edc04ca4461a024f938a3f546b934d2ea485702c33a1390d5",
+    "frontend/tests/browser/routing-editor.spec.ts": "f006c816afb515b571bdfe4c4ecd190f3b647780aaa8471f101d6b6b80bb1ed7"
+  },
+  "full_source_manifest": {"file": "full-source-hashes.json", "files": 120, "sha256": "12f6dbe325a0647c86ca0ff7b3289de65051085f44b737d0d4cc079c6dcb7c20"},
+  "gates": [
+    {"name": "lint", "command": "npm --prefix frontend run lint", "exit_code": 0, "duration_seconds": 5.56, "log": "lint.log"},
+    {"name": "unit", "command": "npm --prefix frontend run test", "exit_code": 0, "duration_seconds": 2.09, "passed": 233, "files_passed": 33, "log": "unit.log"},
+    {"name": "build", "command": "npm --prefix frontend run build", "exit_code": 0, "duration_seconds": 3.36, "log": "build.log"},
+    {"name": "browser-typescript", "command": "frontend/node_modules/.bin/tsc -p frontend/tests/tsconfig.json", "exit_code": 0, "duration_seconds": 1.03, "log": "browser-typescript.log"},
+    {"name": "browser", "cwd": "frontend", "command": "./node_modules/.bin/playwright test -c playwright.config.ts --retries=0 --workers=2 --output=<private_evidence_directory>/browser-results", "exit_code": 0, "duration_seconds": 53.35, "passed": 118, "failed": 0, "retries": 0, "workers": 2, "log": "browser.log"},
+    {"name": "freshness", "command": "scripts/build-frontend.sh --check", "exit_code": 0, "duration_seconds": 0.03, "log": "freshness.log"}
+  ],
+  "preservation": {"workspace_and_public_reports_hashes_unchanged": true, "operator_services_touched": false, "real_upstream_calls": false, "release_or_tag_changes": false},
+  "published_wheel_reverified": false
+}

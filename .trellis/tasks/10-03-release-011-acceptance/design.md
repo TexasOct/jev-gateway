@@ -21,3 +21,9 @@ Synthetic installs isolate uv tool, executable, state and managed Python directo
 ## Evidence and closeout
 
 Raw logs, installed environments, operator backups and artifacts remain in .git/jev-release-011-acceptance with private permissions. Commit sanitized metadata, command results, hashes, criterion mappings, curated UI artifacts and independent review under the task. Report-only commits may follow publication without moving the verified tag.
+
+## Reset disclosure repair
+
+The first public wheel reproduces a hidden configured preview after reset in two complete browser runs. The config-hash key correctly rebuilds draft and inspector state, but also discards the information drawer's open state. A mounted strategy-view wrapper retains that disclosure state across the keyed editor, with an optional controlled prop and the existing direct-editor local fallback. A successful save explicitly collapses review before reloading; reset keeps the information drawer open. Browser synchronization waits for the applied draft to become unchanged and for the restored baseline fallback to render, while retaining the original preview assertion.
+
+All first-publication and failed harness evidence stays intact. Rebuild and republish the same authorized tag after source verification and private backups of the exact existing Release/tag/assets.

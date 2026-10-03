@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ConfigurationPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
@@ -66,6 +66,19 @@ type Props = {
   onError: (error: string | null) => void;
   onRetryMonitoring: () => void;
 };
+
+function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError }: Pick<Props, "error" | "onReloadConfiguration" | "onError"> & { configuration: ConfigurationPayload }) {
+  const [informationOpen, setInformationOpen] = useState(false);
+  return <RoutingEditor
+    key={configuration.config_hash}
+    config={configuration}
+    error={error}
+    onReloaded={onReloadConfiguration}
+    onError={onError}
+    informationOpen={informationOpen}
+    onInformationOpenChange={setInformationOpen}
+  />;
+}
 
 export function AppShell({
   providerManagement,
@@ -244,11 +257,10 @@ export function AppShell({
             </div>
           </Card>
         ) : (
-          <RoutingEditor
-            key={configuration.config_hash}
-            config={configuration}
+          <RoutingWorkspace
+            configuration={configuration}
             error={error}
-            onReloaded={onReloadConfiguration}
+            onReloadConfiguration={onReloadConfiguration}
             onError={onError}
           />
         )}
