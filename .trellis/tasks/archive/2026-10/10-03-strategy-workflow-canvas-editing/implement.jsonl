@@ -1,5 +1,5 @@
 {"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Frontend ownership, layout/policy write separation, Tailwind geometry, actual pointer validation and review/apply constraints"}
 {"file":".trellis/spec/backend/quality-guidelines.md","reason":"Mandatory frontend/backend quality gates and synthetic test isolation"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Share geometry and connection classification rather than duplicate output calculations"}
-{"file":".trellis/tasks/10-03-strategy-workflow-canvas-editing/research/editor-contracts.md","reason":"Existing owner paths, output semantics and compatibility constraints"}
-{"file":".trellis/tasks/10-03-strategy-workflow-canvas-editing/research/design-review.md","reason":"Verified default-versus-failure behavior, supported question types and layout-capacity boundaries"}
+{"file":".trellis/tasks/archive/2026-10/10-03-strategy-workflow-canvas-editing/research/editor-contracts.md","reason":"Existing owner paths, output semantics and compatibility constraints"}
+{"file":".trellis/tasks/archive/2026-10/10-03-strategy-workflow-canvas-editing/research/design-review.md","reason":"Verified default-versus-failure behavior, supported question types and layout-capacity boundaries"}

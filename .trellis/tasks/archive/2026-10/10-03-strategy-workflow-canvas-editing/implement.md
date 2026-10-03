@@ -14,7 +14,7 @@
 - [x] Run backend regression and Pyright because the dashboard bundle and write boundary are part of the integrated artifact.
 - [x] Independently review all changes, inspect actual screenshots and computed geometry, and record criterion-by-criterion evidence in `verification.md`.
 - [x] Capture the shared geometry and connection contracts in `.trellis/spec/backend/dashboard-routing-config.md`.
-- [ ] Commit and archive only task-owned changes, preserving the concurrent Key-page task and journal updates.
+- [x] Commit and archive only task-owned changes, preserving the concurrent Key-page task and journal updates.
 
 ## Validation commands
 
