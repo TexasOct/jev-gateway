@@ -1,0 +1,33 @@
+{
+  "commit": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+  "full_package_reference_compared": true,
+  "jobs": [
+    {
+      "conclusion": "success",
+      "name": "build"
+    },
+    {
+      "conclusion": "success",
+      "name": "smoke (macos-latest)"
+    },
+    {
+      "conclusion": "success",
+      "name": "smoke (ubuntu-latest)"
+    },
+    {
+      "conclusion": "success",
+      "name": "release"
+    }
+  ],
+  "release_id": 402521532,
+  "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37125487119",
+  "sha256": {
+    "install.sh": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "jev_gateway-0.1.1-py3-none-any.whl": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+  },
+  "source_files_compared": 48,
+  "success": true,
+  "tag": "v0.1.1",
+  "url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.1",
+  "version": "0.1.1"
+}

@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "head_sha": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+  "run_id": 37125487119,
+  "url": "https://github.com/TexasOct/jev-gateway/actions/runs/37125487119",
+  "jobs": [
+    {
+      "name": "build",
+      "conclusion": "success"
+    },
+    {
+      "name": "smoke (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "smoke (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "release",
+      "conclusion": "success"
+    }
+  ],
+  "platform_smoke": {
+    "ubuntu": {
+      "success": true,
+      "checks": 59,
+      "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+    },
+    "macos": {
+      "success": true,
+      "checks": 59,
+      "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+    }
+  }
+}

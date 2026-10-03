@@ -1,0 +1,28 @@
+{
+  "success": true,
+  "version": "0.1.1",
+  "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+  "run_id": 37132156378,
+  "release_id": 402565482,
+  "stable_and_latest": true,
+  "ci_jobs": 4,
+  "ci_jobs_successful": 4,
+  "ubuntu_checks": 59,
+  "macos_checks": 59,
+  "same_wheel_sha256_on_both_platforms": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+  "all_four_public_ci_asset_bytes_equal": true,
+  "all_four_github_digests_verified": true,
+  "asset_sha256": {
+    "install.sh": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "install.sh.sha256": "b402cff962889260f41065ca4e861868a09b727a63f311f2d5afc2d232268855",
+    "jev_gateway-0.1.1-py3-none-any.whl": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+    "jev_gateway-0.1.1-py3-none-any.whl.sha256": "325af9af681da6f63c631bd6e2a8594c1e31b7e102fefa5651e09d0bd9c21132"
+  },
+  "tagged_python_and_template_files_compared": 48,
+  "public_ci_candidate_package_files_compared": 52,
+  "static_files": 4,
+  "all_public_candidate_package_bytes_equal": true,
+  "latest_installer_equals_pinned": true,
+  "native_verifier_exit": 0,
+  "native_evidence_root": ".git/jev-release-011-acceptance/replacement"
+}

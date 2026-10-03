@@ -1,0 +1,39 @@
+{
+  "scope": "Parent independent verification after final operator installer acceptance",
+  "success": true,
+  "version": "0.1.1",
+  "package_files_compared": 52,
+  "native_driver_exit_code": 0,
+  "native_child_command_count": 16,
+  "all_child_commands_exited_zero": true,
+  "native_owned_state": "running",
+  "authenticated_health": "ok",
+  "authenticated_dashboard_assets": 2,
+  "approved_baseline_and_original_typed_rows_preserved": true,
+  "non_bookkeeping_row_multisets_exact": true,
+  "untouched_original_entries": 5,
+  "untouched_existing_files": 4,
+  "preserved_absent_entries": 1,
+  "sqlite_integrity": "ok",
+  "process_cleanup": {
+    "current_user_processes": 708,
+    "native_ps_commands_checked_for_all_current_user_processes": true,
+    "psutil_command_line_denials": 0,
+    "unresolved_commands": 0,
+    "remaining_acceptance_processes": 0,
+    "browser_port_4178_bindable": true,
+    "unrelated_source_development_service_preserved": true
+  },
+  "evidence": {
+    "operator_audit": {
+      "path": ".git/jev-release-011-acceptance/replacement/parent-final-audit/parent-operator-audit.json",
+      "sha256": "3a669f5a327ae4f7f1f95dc5e7d247d9e2a9f223c9c10a3f6095444233b8d79b"
+    },
+    "process_audit": {
+      "path": ".git/jev-release-011-acceptance/replacement/parent-final-audit/parent-process-audit.json",
+      "sha256": "77da691fe887e71cb5f7478a833e26e2320e42842e6e71e7a41d90dd19b6b435"
+    }
+  },
+  "closeout_complete": false,
+  "remaining": ["Independent final review", "Report and archive push", "Release notes publication", "Final remote/runtime preservation recheck"]
+}

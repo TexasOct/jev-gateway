@@ -1,0 +1,413 @@
+{
+  "approval_exception": {
+    "additional_configuration_changes_in_this_run": false,
+    "applied_by_parent_before_acceptance": true,
+    "approved_adjustment_all_native_commands_exited_zero": true,
+    "approved_adjustment_native_commands": 11,
+    "approved_adjustment_native_exit": 0,
+    "baseline_authenticated_health_and_assets": true,
+    "baseline_native_owned_state": "running",
+    "baseline_version": "0.1.0",
+    "only_original_configuration_hash_exceptions": {
+      "models.json": "19e0d5ba7e8c32913d74580794dd24c33d6f0454181bb9d7012d41902c48aea5",
+      "routing-overrides.json": "3bf44d7ee7af15240fa1a92dda94623264e48efcf7251897861aac643e0a6967"
+    },
+    "original_file_modes_preserved": true,
+    "original_tables_and_typed_multiplicities_preserved": true,
+    "preserved_absent_original_file": "dashboard-theme.json",
+    "untouched_original_entries": 5,
+    "untouched_original_existing_files": 4
+  },
+  "cleanup": {
+    "browser_port": 4178,
+    "browser_port_stopped_and_bindable": true,
+    "captured_at": "2026-10-03T19:20:53.155464+00:00",
+    "current_user_processes_checked": 681,
+    "driver_supervisor_gone": true,
+    "evidence_directory_mode": "0700",
+    "metadata_denied_current_user_processes": 7,
+    "native_log_mode": "0600",
+    "remaining_accessible_acceptance_processes": 0,
+    "unrelated_pre_existing_source_development_servers_preserved": 1
+  },
+  "cleanup_success": true,
+  "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+  "coverage_limits": [
+    "Process cleanup covers accessible current-user processes; seven processes denied metadata access.",
+    "The full release closeout and independent review remain with the parent.",
+    "The existing driver retains child exit records; the controller retains native driver stdout, stderr, timestamps and duration privately."
+  ],
+  "evidence": {
+    "approval_controller_exit": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/controller-native-exit.json",
+      "sha256": "d093a68c0ffea11d808de4cc2062be6644422ef59566ec90044d0408a7bf1ced"
+    },
+    "approval_controller_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/adjustment-controller-result.json",
+      "sha256": "dfd3338017f1e66bd84655d7cc60db626fe106d516920dbabb4a323833344857"
+    },
+    "approved_manifest": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/approved-manifest.json",
+      "sha256": "9ef5a7c5ab595ac4e319e048b071559471cb249634bc39208102895f0dc458bd"
+    },
+    "assets_manifest": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-download/public-assets-result.json",
+      "sha256": "962585034adbd678e1cdbf8c5e9748cc31b87e83c757d364daa0a7788395ef84"
+    },
+    "driver": {
+      "path": ".trellis/tasks/10-03-release-011-acceptance/verification/tools/public-installed-acceptance.py",
+      "sha256": "eb8fb69065569d0fdb096ffd173cb210b97af0aef0d5ea38640775de27d6bbb0"
+    },
+    "driver_native_exit": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/driver-native-exit.json",
+      "sha256": "3a2b1c68859c7f95be5588a7f5f732abc96d7dbd315ec61de52d4a09ab32f595"
+    },
+    "driver_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-operator-approved/public-installed-result.json",
+      "sha256": "8827f472f12a91c69fad3a9a780d222fc01731dc7fea5739674a00942127350e"
+    },
+    "driver_stderr": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/driver.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "driver_stdout": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/driver.stdout.log",
+      "sha256": "598359f1452ffb153fb9ce67ea173359402a6900f9b28d4a95bdbd065a89cdc7"
+    },
+    "fresh_approved_baseline": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-operator-approved/operator-backup/manifest.json",
+      "sha256": "beec3c05403732d97222de7afcc13dc5a14e6387b30acbd59240d168f9f4d1a2"
+    },
+    "initial_inspection_failure": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/postflight-attempt-1-result.json",
+      "sha256": "a3e3bc45c9d2d9e5e0bf048943dbd6d52bfa1f91b0a578414e3e51d3eaa70477"
+    },
+    "native_after_install_owner": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-operator-approved/after-install-native-owner.json",
+      "sha256": "3f93a02a88b4e54bcfdf74aff167e4ed68ba427af871d0250b5c031928c648e6"
+    },
+    "native_baseline_owner": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-operator-approved/baseline-native-owner.json",
+      "sha256": "6a53deab2fae277ae3783cf3378ef2d0f44d65fb84b37d505f0525a5498ebfc8"
+    },
+    "native_final_owner": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/native-final.json",
+      "sha256": "3f93a02a88b4e54bcfdf74aff167e4ed68ba427af871d0250b5c031928c648e6"
+    },
+    "original_manifest": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-operator/operator-backup/manifest.json",
+      "sha256": "7bc813afea206015a996ef86afc5e772d66955ec18481a531e4a688fed30b910"
+    },
+    "postflight": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/postflight-result.json",
+      "sha256": "730786f4f4445c0e69551ccfb446478c3413c6cbe7623087b268cebea4d2c89c"
+    },
+    "postflight_native_commands": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/postflight-commands.json",
+      "sha256": "cf6704a535cd8ff5555e13d223be96058c51128d9c73876158cc3e3e9e8a8f31"
+    },
+    "preflight": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/preflight-result.json",
+      "sha256": "51d2571e9a959ab75666c08314c5c5d020144e8fbb0876a341eb45e18bf86059"
+    },
+    "process_cleanup": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/process-cleanup-private.json",
+      "sha256": "a17107dd84c8e3c1c56cadc52b36a409476ab185cecb74f60c3d8a7254d7e452"
+    },
+    "reviewed_inputs_and_historical_hashes": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-final-controller/reviewed-input-hashes.json",
+      "sha256": "dad56ab17884b8b688965579c7879b585b3858ec21fab90a42b5cd8849ca232e"
+    }
+  },
+  "final_install": {
+    "authenticated_dashboard_asset_count": 2,
+    "authenticated_health": "ok",
+    "bearer_authentication_used": true,
+    "exact_package_file_set_and_bytes_match_public_wheel": true,
+    "managed_python": "3.12",
+    "metadata_operator_paths_verified": true,
+    "metadata_source_type": "release_wheel",
+    "metadata_source_url": "https://github.com/TexasOct/jev-gateway/releases/download/v0.1.1/jev_gateway-0.1.1-py3-none-any.whl",
+    "normal_jev_and_jev_gateway_shims_verified": true,
+    "package_files_compared": 52,
+    "version": "0.1.1"
+  },
+  "historical_evidence": {
+    "all_acceptance_helpers_unchanged": true,
+    "first_upgrade_recovery_and_preview_reports_unchanged": true,
+    "pre_adjustment_original_and_approved_manifests_unchanged": true,
+    "reports_compared": 12
+  },
+  "initial_inspection_failure": {
+    "classification": "inspection_scope_error",
+    "corrected_by": "Match acceptance helper paths and private runtime paths; preserve the unrelated server.",
+    "corrected_cleanup_scan_passed": true,
+    "exit_code": 1,
+    "failed_check": "accessible current-user acceptance processes remain",
+    "native_operator_acceptance_affected": false,
+    "reason": "The first scan included a pre-existing source development server outside acceptance port 4178."
+  },
+  "native_driver": {
+    "all_native_child_commands_exited_zero": true,
+    "check_count": 14,
+    "checks": [
+      "public installer supplied one verified wheel to uv",
+      "installer uv input matches exact public wheel SHA256",
+      "ordinary installer restores both public shims",
+      "installed version and managed Python 3.12",
+      "installer installed the verified public wheel SHA256",
+      "recorded installation home",
+      "all installed package files match downloaded public wheel",
+      "native upgrade preserves initial service state",
+      "ordinary upgrade preserves initial service state",
+      "ordinary running upgrade changes owned PID",
+      "installed authenticated health ready",
+      "installed bundled dashboard JS and CSS reachable",
+      "operator bytes backups permissions and original typed row multisets preserved",
+      "initial running or stopped service state restored"
+    ],
+    "cleanup_success": true,
+    "duration_seconds": 31.384426083008293,
+    "exit_code": 0,
+    "finished_at": "2026-10-03T19:15:23.475021+00:00",
+    "native_child_command_count": 16,
+    "native_child_command_exits": [
+      {
+        "exit_code": 0,
+        "name": "native process ownership"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI doctor"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI config validate"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI status"
+      },
+      {
+        "exit_code": 0,
+        "name": "native process ownership"
+      },
+      {
+        "exit_code": 0,
+        "name": "public installer ordinary"
+      },
+      {
+        "exit_code": 0,
+        "name": "installed wheel provenance"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI config path"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI doctor"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI config validate"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI status"
+      },
+      {
+        "exit_code": 0,
+        "name": "native process ownership"
+      },
+      {
+        "exit_code": 0,
+        "name": "authenticated installed dashboard probe"
+      },
+      {
+        "exit_code": 0,
+        "name": "native process ownership"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI status"
+      },
+      {
+        "exit_code": 0,
+        "name": "CLI status"
+      }
+    ],
+    "scope": "operator",
+    "started_at": "2026-10-03T19:14:52.090695+00:00",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "598359f1452ffb153fb9ce67ea173359402a6900f9b28d4a95bdbd065a89cdc7",
+    "success": true,
+    "unchanged_reviewed_driver_sha256": "eb8fb69065569d0fdb096ffd173cb210b97af0aef0d5ea38640775de27d6bbb0"
+  },
+  "native_ownership": {
+    "final_state": "running",
+    "initial_and_final_native_ownership_verified": true,
+    "initial_state": "running",
+    "intended_operator_service_left_running": true,
+    "owned_pid_changed": true,
+    "preflight_and_postflight_native_probes_exit_zero": true
+  },
+  "operator_paths": {
+    "bin": "/Users/texas/.local/bin",
+    "home": "/Users/texas/.jev-gateway",
+    "owner_cli": "/Users/texas/.local/share/uv/tools/jev-gateway/bin/jev",
+    "uv_tools": "/Users/texas/.local/share/uv/tools"
+  },
+  "overall_release_acceptance_complete": false,
+  "preservation": {
+    "approved_manifest_preserved": true,
+    "bookkeeping_rows_added_by_operator_upgrade": 1,
+    "credential_modes": {
+      ".env": "0600",
+      ".env.backup": "0600"
+    },
+    "fresh_approved_baseline_all_seven_entries_preserved": true,
+    "fresh_approved_baseline_files_match_approved_manifest": true,
+    "fresh_preservation": {
+      "integrity": "ok",
+      "protected_files": 7,
+      "tables": {
+        "assistant_continuations": {
+          "current_rows": 4,
+          "original_rows": 4
+        },
+        "config_versions": {
+          "current_rows": 12,
+          "original_rows": 11
+        },
+        "decisions": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "outcomes": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "requests": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "upstream_requests": {
+          "current_rows": 10,
+          "original_rows": 10
+        }
+      }
+    },
+    "non_bookkeeping_row_multisets_exact": true,
+    "only_additional_table_rows": "config_versions",
+    "original_and_fresh_typed_row_multisets_preserved": true,
+    "original_file_modes_preserved": true,
+    "original_preservation": {
+      "integrity": "ok",
+      "protected_files": 7,
+      "tables": {
+        "assistant_continuations": {
+          "current_rows": 4,
+          "original_rows": 4
+        },
+        "config_versions": {
+          "current_rows": 12,
+          "original_rows": 10
+        },
+        "decisions": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "outcomes": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "requests": {
+          "current_rows": 10,
+          "original_rows": 10
+        },
+        "upstream_requests": {
+          "current_rows": 10,
+          "original_rows": 10
+        }
+      }
+    },
+    "original_preserved_with_only_two_approved_hash_exceptions": true,
+    "rows": {
+      "assistant_continuations": {
+        "approved_manifest": 4,
+        "final": 4,
+        "fresh_baseline": 4,
+        "original": 4
+      },
+      "config_versions": {
+        "approved_manifest": 10,
+        "final": 12,
+        "fresh_baseline": 11,
+        "original": 10
+      },
+      "decisions": {
+        "approved_manifest": 10,
+        "final": 10,
+        "fresh_baseline": 10,
+        "original": 10
+      },
+      "outcomes": {
+        "approved_manifest": 10,
+        "final": 10,
+        "fresh_baseline": 10,
+        "original": 10
+      },
+      "requests": {
+        "approved_manifest": 10,
+        "final": 10,
+        "fresh_baseline": 10,
+        "original": 10
+      },
+      "upstream_requests": {
+        "approved_manifest": 10,
+        "final": 10,
+        "fresh_baseline": 10,
+        "original": 10
+      }
+    },
+    "sqlite_integrity": "ok",
+    "untouched_original_five_entries_preserved": true
+  },
+  "public_assets": {
+    "installer_sha256": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "wheel_filename": "jev_gateway-0.1.1-py3-none-any.whl",
+    "wheel_sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038"
+  },
+  "release_id": 402565482,
+  "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.1",
+  "run_id": 37132156378,
+  "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37132156378",
+  "scope": "ordinary public 0.1.1 installer upgrade of the approved running default-path operator installation",
+  "scope_discipline": {
+    "commits_tag_or_release_changes_performed": false,
+    "configuration_reset_or_further_migration_performed": false,
+    "gateway_probes": "local authenticated health and Dashboard shell/assets only",
+    "generation_discovery_or_decision_provider_calls_made": false,
+    "prd_plan_or_journals_edited": false,
+    "process_wide_outbound_installer_block_applied": false,
+    "recursive_agents_started": false,
+    "source_tests_or_helpers_changed": false
+  },
+  "success": true,
+  "tag": "v0.1.1",
+  "uv_boundary": {
+    "installer_wheel_inputs": [
+      {
+        "filename": "jev_gateway-0.1.1-py3-none-any.whl",
+        "sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+        "size_bytes": 355988
+      }
+    ],
+    "ordinary_installer_invocations": 1,
+    "uv_archive_sha256_recorded": false,
+    "verified_wheel_inputs": 1,
+    "wheel_identity_method": "observed installer input joined to installed file URL"
+  },
+  "version": "0.1.1"
+}

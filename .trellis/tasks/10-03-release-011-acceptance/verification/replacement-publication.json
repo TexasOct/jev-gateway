@@ -1,0 +1,16 @@
+{
+  "version": "0.1.1",
+  "tag": "v0.1.1",
+  "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+  "old_commit": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+  "old_tag_object": "dc0a41cb8528e2f75e164709a760315fa1e0d983",
+  "deleted_release_id": 402521532,
+  "replacement_run": 37132156378,
+  "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37132156378",
+  "commit_and_tag_signatures_verified": true,
+  "main_and_tag_pushed_atomically": true,
+  "force_with_lease_scope": "refs/tags/v0.1.1",
+  "previous_release_assets_and_tag_backed_up": true,
+  "v010_tag_unchanged": true,
+  "public_acceptance_complete": false
+}

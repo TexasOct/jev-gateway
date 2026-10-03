@@ -1,0 +1,259 @@
+{
+  "additional_repaired_draft_screenshot": 1,
+  "artifacts": [
+    {
+      "bytes": 54929,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-en-dark.png",
+      "kind": "screenshot",
+      "sha256": "645f69382512ade7ef25634b28d6d187301969a6f6db4b163aaae2a0263f90d2",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-en-dark.png"
+    },
+    {
+      "bytes": 55203,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-en-light.png",
+      "kind": "screenshot",
+      "sha256": "7fa9005dffb0e449279fb5891770de3c979972df06b9ac83da16574d979d1a28",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-en-light.png"
+    },
+    {
+      "bytes": 56237,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-zh-CN-dark.png",
+      "kind": "screenshot",
+      "sha256": "d4d13d7fae10ae9a8f191877994e9aa2b95fbea4a1bc44850783cf84c34a9fc4",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-zh-CN-dark.png"
+    },
+    {
+      "bytes": 56606,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-zh-CN-light.png",
+      "kind": "screenshot",
+      "sha256": "2c6e8c8b8eddddd80f262e3a527a53d2609e8868b244d49cd2cebd67918a4b77",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-zh-CN-light.png"
+    },
+    {
+      "bytes": 68603,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-en-dark.png",
+      "kind": "screenshot",
+      "sha256": "54a46bec59353ff4ec5bae57fcd548511308e947a195b6cfc49fb62e03c236d6",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-en-dark.png"
+    },
+    {
+      "bytes": 68631,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-en-light.png",
+      "kind": "screenshot",
+      "sha256": "79ec9e796673c5b13bf5073fcb28a2422110cc07c5ab91b77672bb9a0ece1870",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-en-light.png"
+    },
+    {
+      "bytes": 68434,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-zh-CN-dark.png",
+      "kind": "screenshot",
+      "sha256": "1da27a81f2913fc8b6133af62dd57baba11361940bc300bd2c9b18b7fdff1710",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-zh-CN-dark.png"
+    },
+    {
+      "bytes": 68934,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-zh-CN-light.png",
+      "kind": "screenshot",
+      "sha256": "24f100950b6d89ed80f7985a9dec49828042c310708d09177cea076ae54a0e3d",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-zh-CN-light.png"
+    },
+    {
+      "bytes": 187644,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-en-dark.png",
+      "kind": "screenshot",
+      "sha256": "1fb8ba467c71bb10d8d539a121917caab26d4fe74c8ee4e619f3ce93e4172327",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-en-dark.png"
+    },
+    {
+      "bytes": 187016,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-en-light.png",
+      "kind": "screenshot",
+      "sha256": "0d671d829878080567c34e9c97a4fe55aab4d7dac2c548e30bffdce72f28fcf1",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-en-light.png"
+    },
+    {
+      "bytes": 192668,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-zh-CN-dark.png",
+      "kind": "screenshot",
+      "sha256": "2faeaeaef81544c50881b9d971051cec2a62fae3fff510a8acd311f1fe1fb318",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-zh-CN-dark.png"
+    },
+    {
+      "bytes": 192168,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-zh-CN-light.png",
+      "kind": "screenshot",
+      "sha256": "761b707e135a2ff99050580556c4ada66b8edb5dc0edb089ac1f5b2c5a9a6afd",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-zh-CN-light.png"
+    },
+    {
+      "bytes": 256776,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-en-dark.png",
+      "kind": "screenshot",
+      "sha256": "52c2dab2670700cdb946c75a3a102a34ede9b6255245a330c3f3583f10ff6db5",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-en-dark.png"
+    },
+    {
+      "bytes": 254778,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-en-light.png",
+      "kind": "screenshot",
+      "sha256": "62f2c2f90d9e869aed7729f0bcd4145522379efe3b30b7a1eb6831343cc7d030",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-en-light.png"
+    },
+    {
+      "bytes": 258568,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-zh-CN-dark.png",
+      "kind": "screenshot",
+      "sha256": "9bbde79b5996a0da49b02330f1fda5ef106af2533cbc019f547c82ae4c8579d0",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-zh-CN-dark.png"
+    },
+    {
+      "bytes": 257453,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-zh-CN-light.png",
+      "kind": "screenshot",
+      "sha256": "c5bf69f1645e0fb0eef2a62a677aabfdde87caa556f633436eda6ad46d2fd351",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-zh-CN-light.png"
+    },
+    {
+      "bytes": 159048,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/connection-zh-CN.png",
+      "kind": "screenshot",
+      "sha256": "b173026bb1335f2f8d4401ac739d0e0569f57e8a8e1bb8df7f5c858b4bf72101",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-209ec-d-names-its-output-in-zh-CN/connection-zh-CN.png"
+    },
+    {
+      "bytes": 154708,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/connection-en.png",
+      "kind": "screenshot",
+      "sha256": "3a6eddd71d313e25b671140fe4991cacdc06a0d1c327c00e0c2f6addc34aa62c",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-258a5--and-names-its-output-in-en/connection-en.png"
+    },
+    {
+      "bytes": 3323,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-en-dark.json",
+      "kind": "geometry",
+      "sha256": "6c3ddf64001d5b477b62a1ad50b20ef975cc3234c369e1f8fd892e9b1f6f5110",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-en-dark.json"
+    },
+    {
+      "bytes": 3324,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-en-light.json",
+      "kind": "geometry",
+      "sha256": "7da7bb735dedbf4193e76499e6364b7c77b8f0f68071a2fc85419b35c833fe7d",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-en-light.json"
+    },
+    {
+      "bytes": 3326,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-zh-CN-dark.json",
+      "kind": "geometry",
+      "sha256": "04950edebca0ed29850e53f8103668925e45c358f5ee5b4696da459468fc71a9",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-zh-CN-dark.json"
+    },
+    {
+      "bytes": 3327,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-zh-CN-light.json",
+      "kind": "geometry",
+      "sha256": "4242334520719b1890c5ab23348c5c7d5a233cdbde664b5458d586067a0c214b",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-zh-CN-light.json"
+    },
+    {
+      "bytes": 3323,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-en-dark.json",
+      "kind": "geometry",
+      "sha256": "7301206d53cd181f9a90a7bb70cf3b0bde903ef6e3e1827f90d23c3527ad4de6",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-en-dark.json"
+    },
+    {
+      "bytes": 3324,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-en-light.json",
+      "kind": "geometry",
+      "sha256": "805d42d067dcacceefaa7d922f5bac1c536b8c25347dac9a07ae155740210674",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-en-light.json"
+    },
+    {
+      "bytes": 3326,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-zh-CN-dark.json",
+      "kind": "geometry",
+      "sha256": "81267e053a73bccff84aea00e355d18dc98235fdb11f697da7dbc8aa4f9a2426",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-zh-CN-dark.json"
+    },
+    {
+      "bytes": 3327,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-zh-CN-light.json",
+      "kind": "geometry",
+      "sha256": "278c04aa0a0f02b2f76ba71b109c5c7a52ea6a6f051e4e5b8ed7dccd1d20afc1",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-zh-CN-light.json"
+    },
+    {
+      "bytes": 3319,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-en-dark.json",
+      "kind": "geometry",
+      "sha256": "a17940041066e8d60b5a29d27a49e2ccbd93cd17bed3cd797ba78f217f4011bd",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-en-dark.json"
+    },
+    {
+      "bytes": 3320,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-en-light.json",
+      "kind": "geometry",
+      "sha256": "9f69a8dfcaccd2fdac173e961b7ac8cd005d33c95e3abaf2c547346200c4a088",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-en-light.json"
+    },
+    {
+      "bytes": 3322,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-zh-CN-dark.json",
+      "kind": "geometry",
+      "sha256": "6341a8be3cd894aaee1a7f9ad3c9be5902651f78cf50f766e6768fd5fa8ca77a",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-zh-CN-dark.json"
+    },
+    {
+      "bytes": 3323,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-zh-CN-light.json",
+      "kind": "geometry",
+      "sha256": "68a8da1036507041b211cb4668c57edd04129b7dc6de27abe53968b0a7a83210",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-zh-CN-light.json"
+    },
+    {
+      "bytes": 3321,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-en-dark.json",
+      "kind": "geometry",
+      "sha256": "fe9ac6cf3a9440806b6532d636b6d51eafbee84d342a5604aff1206a5f6d309f",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-en-dark.json"
+    },
+    {
+      "bytes": 3322,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-en-light.json",
+      "kind": "geometry",
+      "sha256": "a5a536be3e0a53e6b6b62f57f93ea7ce43dbb00deea72e7ba81b4e6746b5e6f4",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-en-light.json"
+    },
+    {
+      "bytes": 3324,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-zh-CN-dark.json",
+      "kind": "geometry",
+      "sha256": "cf25e3235e10dd0e05c3ea833db89b47653ec022c90cb8c5b57a46bf3ef45979",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-zh-CN-dark.json"
+    },
+    {
+      "bytes": 3325,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-zh-CN-light.json",
+      "kind": "geometry",
+      "sha256": "41b080abea82d74714320913732726dafc1828db360d24f4d3e51bfd43f2be04",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-zh-CN-light.json"
+    },
+    {
+      "bytes": 136249,
+      "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/canvas-repaired-draft.png",
+      "kind": "additional_repaired_draft_screenshot",
+      "sha256": "a15a5996686348c75fa2c8062b9ff406e8fcbdb7f1ac12aebce6481603490c0c",
+      "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/canvas-repaired-draft.png"
+    }
+  ],
+  "credential_review": {
+    "geometry_contains_only_fixture_ids_and_numeric_measurements": true,
+    "operator_data_used": false,
+    "scope": "All 16 dense screenshots through four contact sheets, both selected-wire screenshots and the repaired-draft screenshot; exact geometry schemas and node IDs checked.",
+    "visible_credentials_found": false
+  },
+  "geometry_json": 16,
+  "screenshots": 18,
+  "source_bytes_preserved": true
+}

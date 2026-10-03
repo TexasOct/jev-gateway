@@ -1,0 +1,483 @@
+{
+  "acceptance_blockers": [
+    {
+      "classification": "acceptance driver assumption",
+      "detail": "uv 0.7.16 wrote empty archive_info for the installer local wheel; the expected direct_url SHA256 assertion failed, although 52 installed package files match the verified public wheel.",
+      "id": "missing_installer_provenance_hash",
+      "owner": "parent and acceptance-tool maintainer"
+    },
+    {
+      "classification": "reproduced browser expectation and editor disclosure mismatch",
+      "detail": "Both fresh full suites fail routing-editor.spec.ts:93 after reset because the Configured route region is absent when the information drawer closes. Synthetic configuration requests succeeded.",
+      "id": "reset_preview_disclosure",
+      "owner": "parent and developer"
+    }
+  ],
+  "browser_attempts": [
+    {
+      "all_original_assertions_retained": true,
+      "asgi_log": ".git/jev-release-011-acceptance/public-wheel-browser/asgi.log",
+      "attempt": 1,
+      "derived_config": ".git/jev-release-011-acceptance/public-wheel-browser/derived-config.json",
+      "discovered_tests": 118,
+      "driver_result_sha256": "79e614d67bf872235fab4bda4c5d1705270caed15f2d8ba2adf0ad518fc4bd8a",
+      "driver_success": false,
+      "escaped_api_requests": 0,
+      "evidence_directory": ".git/jev-release-011-acceptance/public-wheel-browser",
+      "executed_tests": 118,
+      "failed": 1,
+      "failed_cases": [
+        {
+          "assertion_file": "routing-editor.spec.ts",
+          "assertion_line": 93,
+          "file": "routing-editor.spec.ts",
+          "result_statuses": [
+            "failed"
+          ],
+          "status": "unexpected",
+          "test_definition_line": 51,
+          "title": "routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset"
+        }
+      ],
+      "failure_artifacts": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/routing-editor-routing-dra-850c6--applies-and-confirms-reset",
+      "html_report": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/html/index.html",
+      "native_driver_exit_code": 1,
+      "native_elapsed_seconds": 88.067,
+      "native_exit_record": ".git/jev-release-011-acceptance/public-browser-execution/browser-exit.json",
+      "owned_asgi_child_stopped": true,
+      "passed": 117,
+      "playwright_duration_ms": 85570.353,
+      "playwright_log": ".git/jev-release-011-acceptance/public-wheel-browser/playwright.log",
+      "report_flaky": 0,
+      "report_global_errors": 0,
+      "results_path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/results.json",
+      "results_sha256": "2e9fd39a8024e99d256c5f7c7ee25f73340bce9d0fa25e053037feca2213a38c",
+      "retried_cases": 0,
+      "screenshot_destination_replacements": 1,
+      "skipped": 0,
+      "source_config_unchanged": true,
+      "source_spec_files_rechecked": 10,
+      "static_files_compared": 4,
+      "tests_by_spec": {
+        "appearance.spec.ts": 6,
+        "canvas-connections.spec.ts": 13,
+        "canvas-visual-acceptance.spec.ts": 4,
+        "connection.spec.ts": 15,
+        "icons.spec.ts": 7,
+        "monitoring.spec.ts": 10,
+        "provider-management.spec.ts": 43,
+        "responsive.spec.ts": 10,
+        "routing-editor.spec.ts": 4,
+        "settings.spec.ts": 6
+      },
+      "unchanged_spec_files": 9,
+      "workers": 2
+    },
+    {
+      "all_original_assertions_retained": true,
+      "asgi_log": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/asgi.log",
+      "attempt": 2,
+      "derived_config": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/derived-config.json",
+      "discovered_tests": 118,
+      "driver_result_sha256": "79e614d67bf872235fab4bda4c5d1705270caed15f2d8ba2adf0ad518fc4bd8a",
+      "driver_success": false,
+      "escaped_api_requests": 0,
+      "evidence_directory": ".git/jev-release-011-acceptance/public-wheel-browser-fresh",
+      "executed_tests": 118,
+      "failed": 1,
+      "failed_cases": [
+        {
+          "assertion_file": "routing-editor.spec.ts",
+          "assertion_line": 93,
+          "file": "routing-editor.spec.ts",
+          "result_statuses": [
+            "failed"
+          ],
+          "status": "unexpected",
+          "test_definition_line": 51,
+          "title": "routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset"
+        }
+      ],
+      "failure_artifacts": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/browser-results/artifacts/routing-editor-routing-dra-850c6--applies-and-confirms-reset",
+      "html_report": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/browser-results/html/index.html",
+      "native_driver_exit_code": 1,
+      "native_elapsed_seconds": 81.988,
+      "native_exit_record": ".git/jev-release-011-acceptance/public-browser-execution/browser-fresh-exit.json",
+      "owned_asgi_child_stopped": true,
+      "passed": 117,
+      "playwright_duration_ms": 79985.95300000001,
+      "playwright_log": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/playwright.log",
+      "report_flaky": 0,
+      "report_global_errors": 0,
+      "results_path": ".git/jev-release-011-acceptance/public-wheel-browser-fresh/browser-results/results.json",
+      "results_sha256": "70e76d3157a6e18ae3eba5977f48f59540da035649711c221688e567d5cb187d",
+      "retried_cases": 0,
+      "screenshot_destination_replacements": 1,
+      "skipped": 0,
+      "source_config_unchanged": true,
+      "source_spec_files_rechecked": 10,
+      "static_files_compared": 4,
+      "tests_by_spec": {
+        "appearance.spec.ts": 6,
+        "canvas-connections.spec.ts": 13,
+        "canvas-visual-acceptance.spec.ts": 4,
+        "connection.spec.ts": 15,
+        "icons.spec.ts": 7,
+        "monitoring.spec.ts": 10,
+        "provider-management.spec.ts": 43,
+        "responsive.spec.ts": 10,
+        "routing-editor.spec.ts": 4,
+        "settings.spec.ts": 6
+      },
+      "unchanged_spec_files": 9,
+      "workers": 2
+    }
+  ],
+  "browser_install": {
+    "cleanup_success": true,
+    "direct_url_archive_info": {},
+    "driver_success": false,
+    "failed_check": "installer installed the verified public wheel SHA256",
+    "independent_package_bytes_match": true,
+    "independent_package_files_compared": 52,
+    "installed_package_version": "0.1.1",
+    "managed_python": [
+      3,
+      12
+    ],
+    "native_driver_exit_code": 1,
+    "native_exit_record": ".git/jev-release-011-acceptance/public-browser-execution/install-exit.json",
+    "native_final_status_error_code": "not_running",
+    "native_final_status_exit_code": 4,
+    "public_installer_exit_code": 0,
+    "result_path": ".git/jev-release-011-acceptance/public-browser-install/public-installed-result.json"
+  },
+  "cleanup": {
+    "active_exact_acceptance_asgi_processes": 0,
+    "all_driver_owned_asgi_children_stopped": true,
+    "isolated_install_retained_for_parent_review": true,
+    "isolated_managed_gateway": "not_running",
+    "native_process_check": ".git/jev-release-011-acceptance/public-browser-execution/native-cleanup.json",
+    "operator_service_and_installation_touched": false,
+    "port_4178_bindable_after_attempts": true,
+    "recorded_first_attempt_asgi_and_playwright_pids_gone": true
+  },
+  "failure_diagnosis": ".git/jev-release-011-acceptance/public-browser-execution/failure-diagnosis.json",
+  "feature_acceptance_mapping": {
+    "canvas": [
+      {
+        "ac": "AC1",
+        "browser_status": "passed_in_covered_scenarios",
+        "coverage": "EN/ZH exact selected-wire descriptions and dense rendering; no exhaustive translation-string audit.",
+        "evidence": [
+          "canvas-connections.spec.ts:59",
+          "canvas-visual-acceptance.spec.ts:13"
+        ]
+      },
+      {
+        "ac": "AC2",
+        "browser_status": "passed_in_covered_scenarios",
+        "coverage": "Node geometry and dense long names, keyboard hit targets, alignment save/reload; representative screenshots inspected.",
+        "evidence": [
+          "canvas-connections.spec.ts:220",
+          "canvas-visual-acceptance.spec.ts:13"
+        ]
+      },
+      {
+        "ac": "AC3",
+        "browser_status": "passed",
+        "coverage": "Left/right port placement, arrow marker and native wire endpoint centers.",
+        "evidence": [
+          "canvas-connections.spec.ts:184"
+        ]
+      },
+      {
+        "ac": "AC4",
+        "browser_status": "passed",
+        "coverage": "Pointer/keyboard wire selection, native drag connect/reconnect, disconnect/repair, focus/cancel and fixed/read-only/last-member guards.",
+        "evidence": [
+          "canvas-connections.spec.ts:59",
+          "canvas-connections.spec.ts:105",
+          "canvas-connections.spec.ts:131",
+          "canvas-connections.spec.ts:157",
+          "canvas-connections.spec.ts:235"
+        ]
+      },
+      {
+        "ac": "AC5",
+        "browser_status": "passed_in_covered_scenarios",
+        "coverage": "Port growth/shrink, 18px dense handles with 28px spacing, exact anchors, measured node bounds, Fit and responsive reachability.",
+        "evidence": [
+          "canvas-connections.spec.ts:131",
+          "canvas-connections.spec.ts:184",
+          "canvas-visual-acceptance.spec.ts:13",
+          "routing-editor.spec.ts:121"
+        ]
+      },
+      {
+        "ac": "AC6",
+        "browser_status": "blocked",
+        "coverage": "Draft-before-apply, validation/warning acknowledgement, layout-only writes and read-only guards pass their covered assertions; reset leaves the configured preview hidden in both full-suite attempts.",
+        "evidence": [
+          "canvas-connections.spec.ts",
+          "routing-editor.spec.ts:51",
+          "routing-editor.spec.ts:96"
+        ]
+      },
+      {
+        "ac": "AC7",
+        "browser_status": "blocked",
+        "coverage": "117/118 passed twice; all screenshots and native evidence retained. Other source/backend gates were not rerun here.",
+        "evidence": [
+          "native results.json for both attempts"
+        ]
+      },
+      {
+        "ac": "AC8",
+        "browser_status": "partial",
+        "coverage": "Configured no-match preview, rule preview and failure-fallback reconnection are covered. The full distinct-label/selection/zero-rule backend decision matrix is outside this synthetic browser run.",
+        "evidence": [
+          "routing-editor.spec.ts:8",
+          "canvas-connections.spec.ts:157"
+        ]
+      },
+      {
+        "ac": "AC9",
+        "browser_status": "partial",
+        "coverage": "Visible 257-node arrange rejection without PUT, alignment persistence and dense layout covered. Coordinate/encoded-byte overflow and restoration after growth need the separate source/unit evidence.",
+        "evidence": [
+          "canvas-connections.spec.ts:302",
+          "canvas-connections.spec.ts:220",
+          "canvas-visual-acceptance.spec.ts:13"
+        ]
+      }
+    ],
+    "key_page": [
+      {
+        "ac": "AC1",
+        "browser_status": "passed",
+        "coverage": "401 hides navigation and panels; validated connection reveals the dashboard.",
+        "evidence": [
+          "connection.spec.ts:59",
+          "connection.spec.ts:196"
+        ]
+      },
+      {
+        "ac": "AC2",
+        "browser_status": "passed",
+        "coverage": "Blank inputs, password input, Enter submission, pending state and duplicate-probe prevention.",
+        "evidence": [
+          "connection.spec.ts:59",
+          "connection.spec.ts:90"
+        ]
+      },
+      {
+        "ac": "AC3",
+        "browser_status": "passed",
+        "coverage": "Wrong key, network abort, retry, activity 401 and anonymous access with synthetic responses.",
+        "evidence": [
+          "connection.spec.ts:122",
+          "connection.spec.ts:144",
+          "connection.spec.ts:196"
+        ]
+      },
+      {
+        "ac": "AC4",
+        "browser_status": "passed",
+        "coverage": "Trimmed Bearer value, empty credential persistence, reload without stored key.",
+        "evidence": [
+          "connection.spec.ts:59",
+          "connection.spec.ts:144",
+          "connection.spec.ts:178"
+        ]
+      },
+      {
+        "ac": "AC5",
+        "browser_status": "passed",
+        "coverage": "Eight locale/width/scheme cases; focus, overflow and contrast; connected views remain reachable.",
+        "evidence": [
+          "connection.spec.ts:210",
+          "responsive.spec.ts",
+          "icons.spec.ts"
+        ]
+      },
+      {
+        "ac": "AC6",
+        "browser_status": "blocked",
+        "coverage": "Original browser assertion coverage retained; full suite fails one routing reset-preview case. Lint, unit, type and source build gates are outside this execution.",
+        "evidence": [
+          "all 118 browser cases"
+        ]
+      }
+    ]
+  },
+  "network_scope": {
+    "allowed_install_network_scope": "downloaded installer pinned public wheel/checksum, uv managed Python and package dependency installation",
+    "api_escape_requests_across_attempts": 0,
+    "asgi_outbound_socket_connect_and_dns": "denied",
+    "backend_authentication_exercised_by_browser": false,
+    "browser_external_dns": "disabled; loopback exempted",
+    "fixture_unknown_origins_and_apis_fail_closed": true,
+    "real_generation_requests": false,
+    "real_persistence_exercised_by_browser": false,
+    "real_provider_discovery": false,
+    "service_workers": "blocked",
+    "synthetic_api_fixtures": true
+  },
+  "other_acceptance_owners": "Public wheel smoke, isolated lifecycle and default operator upgrade are separate assignments; no result from those scopes is asserted here.",
+  "release": {
+    "commit": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+    "installer_sha256": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "manifest_success": true,
+    "run_id": 37125487119,
+    "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37125487119",
+    "tag": "v0.1.1",
+    "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+  },
+  "scene_summary": {
+    "connection_geometry_cases": 8,
+    "dense_geometry_scenes": 16,
+    "dense_locales": [
+      "en",
+      "zh-CN"
+    ],
+    "dense_schemes": [
+      "light",
+      "dark"
+    ],
+    "dense_viewport_cases": 4,
+    "minimum_button_contrast": 5.147499321854971
+  },
+  "schema_version": 1,
+  "scope": "installed public DashboardStatic with original synthetic browser API fixtures",
+  "selected_private_artifacts": [
+    {
+      "name": "en-1280-light.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/connection-connection-geom-e21d1-board-focus-en-1280px-light/en-1280-light.png",
+      "sha256": "3fa6ca14915a4804f23f7322e6755a9daf3c224bd600ab268d10ef854b01d156",
+      "visually_inspected": true
+    },
+    {
+      "name": "en-1280-dark.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/connection-connection-geom-8ffd2-yboard-focus-en-1280px-dark/en-1280-dark.png",
+      "sha256": "32dce7f1b7da548fa41b1b249d37ec889dc65554afe5d31e83c1bfcc6d64d24f",
+      "visually_inspected": false
+    },
+    {
+      "name": "zh-CN-320-light.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/connection-connection-geom-267a4-ard-focus-zh-CN-320px-light/zh-CN-320-light.png",
+      "sha256": "9f1b007efa0db9e95ac26b4a0707564fa64cd318f4f6cc89dea8661bb11a62cf",
+      "visually_inspected": false
+    },
+    {
+      "name": "zh-CN-320-dark.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/connection-connection-geom-12d38-oard-focus-zh-CN-320px-dark/zh-CN-320-dark.png",
+      "sha256": "0061e31bd695ff0ee7cf0cb9a65b55e66b2fda395027b82492721f397905d455",
+      "visually_inspected": true
+    },
+    {
+      "name": "connection-en.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-258a5--and-names-its-output-in-en/connection-en.png",
+      "sha256": "3a6eddd71d313e25b671140fe4991cacdc06a0d1c327c00e0c2f6addc34aa62c",
+      "visually_inspected": true
+    },
+    {
+      "name": "connection-zh-CN.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-209ec-d-names-its-output-in-zh-CN/connection-zh-CN.png",
+      "sha256": "e3eac0ec58663037d791f7002ffe8dd68638f774764a2c5e8d13373e0c0de316",
+      "visually_inspected": true
+    },
+    {
+      "name": "strategy-1280-en-light.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-en-light.png",
+      "sha256": "0d671d829878080567c34e9c97a4fe55aab4d7dac2c548e30bffdce72f28fcf1",
+      "visually_inspected": true
+    },
+    {
+      "name": "strategy-320-zh-CN-dark.png",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-zh-CN-dark.png",
+      "sha256": "144290a54ae7e173662d57137d2a6b8a2310af6990bc539ea432993661e1a068",
+      "visually_inspected": true
+    },
+    {
+      "name": "geometry-en-light.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-en-light.json",
+      "sha256": "7da7bb735dedbf4193e76499e6364b7c77b8f0f68071a2fc85419b35c833fe7d",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-en-light.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-en-light.json",
+      "sha256": "805d42d067dcacceefaa7d922f5bac1c536b8c25347dac9a07ae155740210674",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-en-light.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-en-light.json",
+      "sha256": "9f69a8dfcaccd2fdac173e961b7ac8cd005d33c95e3abaf2c547346200c4a088",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-en-light.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-en-light.json",
+      "sha256": "a5a536be3e0a53e6b6b62f57f93ea7ce43dbb00deea72e7ba81b4e6746b5e6f4",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-zh-CN-dark.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-zh-CN-dark.json",
+      "sha256": "04950edebca0ed29850e53f8103668925e45c358f5ee5b4696da459468fc71a9",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-zh-CN-dark.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-zh-CN-dark.json",
+      "sha256": "81267e053a73bccff84aea00e355d18dc98235fdb11f697da7dbc8aa4f9a2426",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-zh-CN-dark.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-zh-CN-dark.json",
+      "sha256": "6341a8be3cd894aaee1a7f9ad3c9be5902651f78cf50f766e6768fd5fa8ca77a",
+      "visually_inspected": false
+    },
+    {
+      "name": "geometry-zh-CN-dark.json",
+      "path": ".git/jev-release-011-acceptance/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-zh-CN-dark.json",
+      "sha256": "cf25e3235e10dd0e05c3ea833db89b47653ec022c90cb8c5b57a46bf3ef45979",
+      "visually_inspected": false
+    }
+  ],
+  "source_preservation": {
+    "head": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+    "original_failures_retained_unchanged": true,
+    "product_and_test_git_diff_paths": [],
+    "source_builds_executed_in_this_scope": false,
+    "source_reconstruction": false
+  },
+  "static_files": [
+    {
+      "installed_bytes_match": true,
+      "sha256": "bc75bff245d277ee4dbaf24e8e24bb15d5fb130f7140c6166f0f962f5f392268",
+      "wheel_path": "jev_gateway/static/index.html"
+    },
+    {
+      "installed_bytes_match": true,
+      "sha256": "ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b",
+      "wheel_path": "jev_gateway/static/assets/deepseek-Bl9-59Mi.svg"
+    },
+    {
+      "installed_bytes_match": true,
+      "sha256": "621fde520d581c4471158660585b6bd06acd602bf9a8429ab9d0fc5dd15bd0a9",
+      "wheel_path": "jev_gateway/static/assets/index-DUdxukOW.css"
+    },
+    {
+      "installed_bytes_match": true,
+      "sha256": "7a7cc6e2ee73f654027dad2fb8d76102aa6ea4b9ba8894f3e7da8747d3d2ad25",
+      "wheel_path": "jev_gateway/static/assets/index-E3UL3hRq.js"
+    }
+  ],
+  "status": "blocked",
+  "success": false,
+  "version": "0.1.1"
+}

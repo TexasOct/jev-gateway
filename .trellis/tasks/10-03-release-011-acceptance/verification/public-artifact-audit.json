@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "assets": {
+    "install.sh": {
+      "sha256": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+      "github_digest_match": true,
+      "ci_artifact_match": true
+    },
+    "install.sh.sha256": {
+      "sha256": "b402cff962889260f41065ca4e861868a09b727a63f311f2d5afc2d232268855",
+      "github_digest_match": true,
+      "ci_artifact_match": true
+    },
+    "jev_gateway-0.1.1-py3-none-any.whl": {
+      "sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f",
+      "github_digest_match": true,
+      "ci_artifact_match": true
+    },
+    "jev_gateway-0.1.1-py3-none-any.whl.sha256": {
+      "sha256": "c0d765cbe3c30c629fe654b7f21bcd674c206f0f735bcba0e350e92a685d15cf",
+      "github_digest_match": true,
+      "ci_artifact_match": true
+    }
+  },
+  "ci_checks": {
+    "ubuntu": {
+      "success": true,
+      "checks": 59,
+      "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+    },
+    "macos": {
+      "success": true,
+      "checks": 59,
+      "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f"
+    }
+  },
+  "local_candidate_package_files_identical": 52,
+  "release_id": 402521532,
+  "commit": "e5cdf2b9418624ccd95a302a65beda6f41b0d443"
+}

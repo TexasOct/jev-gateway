@@ -1,0 +1,79 @@
+{
+  "scope": "User-approved two-file operator adjustment and restoration of the old running baseline",
+  "authorization": "User explicitly replied 继续 and 批准 to the reviewed proposal",
+  "success": true,
+  "native_exit_code": 0,
+  "native_commands": 11,
+  "all_native_command_exits_zero": true,
+  "applied": true,
+  "changed_files": ["models.json", "routing-overrides.json"],
+  "changes": {
+    "unsupported_defaults_removed": true,
+    "empty_pools_given_original_model_reference": 11,
+    "empty_overlay_choices_given_existing_label": 8,
+    "existing_strategy_count": 3,
+    "other_reviewed_values_preserved": true
+  },
+  "approved_sha256": {
+    "models.json": "19e0d5ba7e8c32913d74580794dd24c33d6f0454181bb9d7012d41902c48aea5",
+    "routing-overrides.json": "3bf44d7ee7af15240fa1a92dda94623264e48efcf7251897861aac643e0a6967"
+  },
+  "original_backup_retained": true,
+  "untouched_original_entries": 5,
+  "untouched_original_existing_files": 4,
+  "preserved_absent_original_file": "dashboard-theme.json",
+  "all_original_file_modes_preserved": true,
+  "credential_modes": "0600",
+  "original_typed_row_multisets_preserved": true,
+  "sqlite_integrity": "ok",
+  "original_rows": {
+    "assistant_continuations": 4,
+    "config_versions": 10,
+    "decisions": 10,
+    "outcomes": 10,
+    "requests": 10,
+    "upstream_requests": 10
+  },
+  "approved_running_baseline_rows": {
+    "assistant_continuations": 4,
+    "config_versions": 11,
+    "decisions": 10,
+    "outcomes": 10,
+    "requests": 10,
+    "upstream_requests": 10
+  },
+  "initial_service_state": "running",
+  "final_service_state": "running",
+  "baseline_product_version": "0.1.0",
+  "old_installed_package_files_compared": 54,
+  "authenticated_health_and_dashboard": true,
+  "real_generation_or_discovery_calls": false,
+  "default_path_011_acceptance_complete": false,
+  "evidence": {
+    "application_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/result.json",
+      "sha256": "a5281f1c0a32b9137f881362c688a42a9e67f73d7f3f6d3f8721248a69abfafe"
+    },
+    "controller_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/adjustment-controller-result.json",
+      "sha256": "dfd3338017f1e66bd84655d7cc60db626fe106d516920dbabb4a323833344857"
+    },
+    "native_log": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/controller-native.log",
+      "sha256": "1f02d9afff7d2529b8c853ffb8d9ad68baf05e18ef24234378b9390cbfabddb4"
+    },
+    "approved_manifest": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/approved-manifest.json",
+      "sha256": "9ef5a7c5ab595ac4e319e048b071559471cb249634bc39208102895f0dc458bd"
+    },
+    "application_helper": {
+      "path": ".git/jev-release-011-acceptance/replacement/operator-approved-update/apply-approved-preview.py",
+      "sha256": "6703abd5d07c1d37e63d7786175e84ba30d59385d1d8baefccffcf9f7a5697b2"
+    }
+  },
+  "limits": [
+    "The two approved original files changed; seven-file immutability against the pre-approval baseline is not claimed.",
+    "The approved model references remain subject to current capability, context, output, exclusion, continuation and failure rules.",
+    "This establishes the valid running baseline for the separate public 0.1.1 upgrade, not its acceptance result."
+  ]
+}

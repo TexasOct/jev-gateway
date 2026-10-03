@@ -1,0 +1,873 @@
+{
+  "cleanup": {
+    "installation_retained": true,
+    "installed_status_error": "not_running",
+    "installed_status_exit": 4,
+    "matching_asgi_children": [],
+    "port_4178_bindable": true
+  },
+  "counts_by_module": {
+    "tests/test_canvas_layout.py": 10,
+    "tests/test_decision_matrix.py": 19,
+    "tests/test_gateway.py": 87,
+    "tests/test_routing_overlay.py": 17
+  },
+  "executed_cases": [
+    {
+      "id": "P001",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value0]",
+      "status": "passed"
+    },
+    {
+      "id": "P002",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value1]",
+      "status": "passed"
+    },
+    {
+      "id": "P003",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value2]",
+      "status": "passed"
+    },
+    {
+      "id": "P004",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value3]",
+      "status": "passed"
+    },
+    {
+      "id": "P005",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value4]",
+      "status": "passed"
+    },
+    {
+      "id": "P006",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value5]",
+      "status": "passed"
+    },
+    {
+      "id": "P007",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value6]",
+      "status": "passed"
+    },
+    {
+      "id": "P008",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_rejects_invalid_shape[value7]",
+      "status": "passed"
+    },
+    {
+      "id": "P009",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_round_trip_and_corrupt_default",
+      "status": "passed"
+    },
+    {
+      "id": "P010",
+      "nodeid": "tests/test_canvas_layout.py::test_layout_size_check_matches_written_encoding",
+      "status": "passed"
+    },
+    {
+      "id": "P011",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_accepts_a_settings_free_decision_maker",
+      "status": "passed"
+    },
+    {
+      "id": "P012",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_cached_session_queries_once_and_honors_pin",
+      "status": "passed"
+    },
+    {
+      "id": "P013",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_falls_back_when_source_or_answers_fail",
+      "status": "passed"
+    },
+    {
+      "id": "P014",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_no_match_default_is_distinct_from_decision_failure_fallback[False-False]",
+      "status": "passed"
+    },
+    {
+      "id": "P015",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_no_match_default_is_distinct_from_decision_failure_fallback[False-True]",
+      "status": "passed"
+    },
+    {
+      "id": "P016",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_no_match_default_is_distinct_from_decision_failure_fallback[True-False]",
+      "status": "passed"
+    },
+    {
+      "id": "P017",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_no_match_default_is_distinct_from_decision_failure_fallback[True-True]",
+      "status": "passed"
+    },
+    {
+      "id": "P018",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>0]",
+      "status": "passed"
+    },
+    {
+      "id": "P019",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>1]",
+      "status": "passed"
+    },
+    {
+      "id": "P020",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>2]",
+      "status": "passed"
+    },
+    {
+      "id": "P021",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>3]",
+      "status": "passed"
+    },
+    {
+      "id": "P022",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>4]",
+      "status": "passed"
+    },
+    {
+      "id": "P023",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>5]",
+      "status": "passed"
+    },
+    {
+      "id": "P024",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>6]",
+      "status": "passed"
+    },
+    {
+      "id": "P025",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>7]",
+      "status": "passed"
+    },
+    {
+      "id": "P026",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_rejects_invalid_options_at_startup[<lambda>8]",
+      "status": "passed"
+    },
+    {
+      "id": "P027",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_respects_manual_model_without_calling_decision_provider",
+      "status": "passed"
+    },
+    {
+      "id": "P028",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_retries_next_source_after_invalid_answers",
+      "status": "passed"
+    },
+    {
+      "id": "P029",
+      "nodeid": "tests/test_decision_matrix.py::test_matrix_routes_multiple_answers_and_sends_structured_state",
+      "status": "passed"
+    },
+    {
+      "id": "P030",
+      "nodeid": "tests/test_gateway.py::test_a_level_the_route_cannot_name_is_clamped_not_forwarded",
+      "status": "passed"
+    },
+    {
+      "id": "P031",
+      "nodeid": "tests/test_gateway.py::test_a_route_without_a_declared_ladder_forwards_the_clients_value",
+      "status": "passed"
+    },
+    {
+      "id": "P032",
+      "nodeid": "tests/test_gateway.py::test_auth_failure_uses_the_openai_error_shape",
+      "status": "passed"
+    },
+    {
+      "id": "P033",
+      "nodeid": "tests/test_gateway.py::test_canvas_layout_auth_isolation_and_atomic_failure",
+      "status": "passed"
+    },
+    {
+      "id": "P034",
+      "nodeid": "tests/test_gateway.py::test_canvas_layout_requires_configured_key",
+      "status": "passed"
+    },
+    {
+      "id": "P035",
+      "nodeid": "tests/test_gateway.py::test_cap_never_raises_above_what_the_client_asked_for",
+      "status": "passed"
+    },
+    {
+      "id": "P036",
+      "nodeid": "tests/test_gateway.py::test_concurrent_first_requests_share_canonical_continuation_session",
+      "status": "passed"
+    },
+    {
+      "id": "P037",
+      "nodeid": "tests/test_gateway.py::test_configuration_put_persists_and_delete_restores_baseline",
+      "status": "passed"
+    },
+    {
+      "id": "P038",
+      "nodeid": "tests/test_gateway.py::test_configuration_rejects_storage_change_without_swapping",
+      "status": "passed"
+    },
+    {
+      "id": "P039",
+      "nodeid": "tests/test_gateway.py::test_configuration_rejects_unknown_keys_and_empty_label_pool",
+      "status": "passed"
+    },
+    {
+      "id": "P040",
+      "nodeid": "tests/test_gateway.py::test_configuration_restores_previous_bytes_after_reload_failure",
+      "status": "passed"
+    },
+    {
+      "id": "P041",
+      "nodeid": "tests/test_gateway.py::test_configuration_validate_and_invalid_put_never_swap_catalog",
+      "status": "passed"
+    },
+    {
+      "id": "P042",
+      "nodeid": "tests/test_gateway.py::test_configuration_writes_require_a_configured_and_correct_key",
+      "status": "passed"
+    },
+    {
+      "id": "P043",
+      "nodeid": "tests/test_gateway.py::test_dashboard_captures_transformed_payload_and_redacts_provider_secrets",
+      "status": "passed"
+    },
+    {
+      "id": "P044",
+      "nodeid": "tests/test_gateway.py::test_dashboard_content_opt_out_and_failed_upstream_keep_safe_evidence",
+      "status": "passed"
+    },
+    {
+      "id": "P045",
+      "nodeid": "tests/test_gateway.py::test_dashboard_detail_supports_session_ids_with_slashes",
+      "status": "passed"
+    },
+    {
+      "id": "P046",
+      "nodeid": "tests/test_gateway.py::test_dashboard_lists_only_live_sessions_and_returns_retained_stages",
+      "status": "passed"
+    },
+    {
+      "id": "P047",
+      "nodeid": "tests/test_gateway.py::test_dashboard_request_pages_tie_break_and_scope_cursor",
+      "status": "passed"
+    },
+    {
+      "id": "P048",
+      "nodeid": "tests/test_gateway.py::test_dashboard_sanitizer_failure_does_not_gate_upstream",
+      "status": "passed"
+    },
+    {
+      "id": "P049",
+      "nodeid": "tests/test_gateway.py::test_dashboard_session_pages_include_memory_only_and_reject_cross_endpoint_cursor",
+      "status": "passed"
+    },
+    {
+      "id": "P050",
+      "nodeid": "tests/test_gateway.py::test_dashboard_shell_is_content_free_and_data_api_requires_bearer_auth",
+      "status": "passed"
+    },
+    {
+      "id": "P051",
+      "nodeid": "tests/test_gateway.py::test_dashboard_sorts_sessions_by_latest_request_then_live_update",
+      "status": "passed"
+    },
+    {
+      "id": "P052",
+      "nodeid": "tests/test_gateway.py::test_dashboard_theme_configured_key_denies_missing_and_wrong_bearer",
+      "status": "passed"
+    },
+    {
+      "id": "P053",
+      "nodeid": "tests/test_gateway.py::test_dashboard_theme_rejects_invalid_payloads",
+      "status": "passed"
+    },
+    {
+      "id": "P054",
+      "nodeid": "tests/test_gateway.py::test_dashboard_theme_reports_unreadable_file",
+      "status": "passed"
+    },
+    {
+      "id": "P055",
+      "nodeid": "tests/test_gateway.py::test_dashboard_theme_round_trip_reset_and_write_guard",
+      "status": "passed"
+    },
+    {
+      "id": "P056",
+      "nodeid": "tests/test_gateway.py::test_dashboard_theme_writes_without_key_leave_routing_unchanged",
+      "status": "passed"
+    },
+    {
+      "id": "P057",
+      "nodeid": "tests/test_gateway.py::test_dashboard_url_is_browsable_for_every_bind",
+      "status": "passed"
+    },
+    {
+      "id": "P058",
+      "nodeid": "tests/test_gateway.py::test_dashboard_uses_live_fallback_when_storage_is_disabled_or_degraded",
+      "status": "passed"
+    },
+    {
+      "id": "P059",
+      "nodeid": "tests/test_gateway.py::test_deepseek_bridges_openai_history_in_same_session",
+      "status": "passed"
+    },
+    {
+      "id": "P060",
+      "nodeid": "tests/test_gateway.py::test_deepseek_restores_reasoning_after_gateway_restart",
+      "status": "passed"
+    },
+    {
+      "id": "P061",
+      "nodeid": "tests/test_gateway.py::test_deepseek_restores_reasoning_content_from_session_history",
+      "status": "passed"
+    },
+    {
+      "id": "P062",
+      "nodeid": "tests/test_gateway.py::test_deepseek_uses_native_litellm_provider",
+      "status": "passed"
+    },
+    {
+      "id": "P063",
+      "nodeid": "tests/test_gateway.py::test_default_pin_holds_the_first_turn_model",
+      "status": "passed"
+    },
+    {
+      "id": "P064",
+      "nodeid": "tests/test_gateway.py::test_disconnected_canvas_match_cannot_replace_applied_policy[fallback]",
+      "status": "passed"
+    },
+    {
+      "id": "P065",
+      "nodeid": "tests/test_gateway.py::test_disconnected_canvas_match_cannot_replace_applied_policy[rule]",
+      "status": "passed"
+    },
+    {
+      "id": "P066",
+      "nodeid": "tests/test_gateway.py::test_each_model_uses_its_own_base_and_key",
+      "status": "passed"
+    },
+    {
+      "id": "P067",
+      "nodeid": "tests/test_gateway.py::test_errors_use_the_openai_error_wrapper",
+      "status": "passed"
+    },
+    {
+      "id": "P068",
+      "nodeid": "tests/test_gateway.py::test_explicit_session_header_is_used",
+      "status": "passed"
+    },
+    {
+      "id": "P069",
+      "nodeid": "tests/test_gateway.py::test_first_turn_routes_and_reports_the_decision",
+      "status": "passed"
+    },
+    {
+      "id": "P070",
+      "nodeid": "tests/test_gateway.py::test_foreground_runtime_precedence_is_independent_of_cwd",
+      "status": "passed"
+    },
+    {
+      "id": "P071",
+      "nodeid": "tests/test_gateway.py::test_gateway_api_key_is_enforced",
+      "status": "passed"
+    },
+    {
+      "id": "P072",
+      "nodeid": "tests/test_gateway.py::test_manual_model_selection",
+      "status": "passed"
+    },
+    {
+      "id": "P073",
+      "nodeid": "tests/test_gateway.py::test_missing_user_message_is_rejected",
+      "status": "passed"
+    },
+    {
+      "id": "P074",
+      "nodeid": "tests/test_gateway.py::test_model_list_entries_match_the_openai_schema",
+      "status": "passed"
+    },
+    {
+      "id": "P075",
+      "nodeid": "tests/test_gateway.py::test_preview_reports_the_level_it_would_send",
+      "status": "passed"
+    },
+    {
+      "id": "P076",
+      "nodeid": "tests/test_gateway.py::test_provider_summary_all_observed_attempts_failed",
+      "status": "passed"
+    },
+    {
+      "id": "P077",
+      "nodeid": "tests/test_gateway.py::test_provider_summary_counts_stream_only_after_completion",
+      "status": "passed"
+    },
+    {
+      "id": "P078",
+      "nodeid": "tests/test_gateway.py::test_provider_summary_disabled_and_degraded_storage_have_null_metrics",
+      "status": "passed"
+    },
+    {
+      "id": "P079",
+      "nodeid": "tests/test_gateway.py::test_provider_summary_observed_condition_tracks_completed_outcomes",
+      "status": "passed"
+    },
+    {
+      "id": "P080",
+      "nodeid": "tests/test_gateway.py::test_provider_summary_reports_retained_attempts_and_zero_traffic_providers",
+      "status": "passed"
+    },
+    {
+      "id": "P081",
+      "nodeid": "tests/test_gateway.py::test_provider_type_forwards_declared_completion_parameters",
+      "status": "passed"
+    },
+    {
+      "id": "P082",
+      "nodeid": "tests/test_gateway.py::test_reasoning_mode_off_never_touches_the_field",
+      "status": "passed"
+    },
+    {
+      "id": "P083",
+      "nodeid": "tests/test_gateway.py::test_reload_accepts_unchanged_relative_storage_path",
+      "status": "passed"
+    },
+    {
+      "id": "P084",
+      "nodeid": "tests/test_gateway.py::test_reload_endpoint_applies_gateway_runtime_settings",
+      "status": "passed"
+    },
+    {
+      "id": "P085",
+      "nodeid": "tests/test_gateway.py::test_reload_endpoint_keeps_the_old_catalog_on_bad_input",
+      "status": "passed"
+    },
+    {
+      "id": "P086",
+      "nodeid": "tests/test_gateway.py::test_reload_endpoint_swaps_the_catalog",
+      "status": "passed"
+    },
+    {
+      "id": "P087",
+      "nodeid": "tests/test_gateway.py::test_reload_prioritizes_restart_required_for_degraded_storage_change",
+      "status": "passed"
+    },
+    {
+      "id": "P088",
+      "nodeid": "tests/test_gateway.py::test_reload_reapplies_overlay_after_baseline_changes",
+      "status": "passed"
+    },
+    {
+      "id": "P089",
+      "nodeid": "tests/test_gateway.py::test_reload_rejects_continuation_retention_changes",
+      "status": "passed"
+    },
+    {
+      "id": "P090",
+      "nodeid": "tests/test_gateway.py::test_reload_rejects_storage_changes_that_require_restart[enabled]",
+      "status": "passed"
+    },
+    {
+      "id": "P091",
+      "nodeid": "tests/test_gateway.py::test_reload_rejects_storage_changes_that_require_restart[path]",
+      "status": "passed"
+    },
+    {
+      "id": "P092",
+      "nodeid": "tests/test_gateway.py::test_reload_rejects_storage_changes_that_require_restart[queue_size]",
+      "status": "passed"
+    },
+    {
+      "id": "P093",
+      "nodeid": "tests/test_gateway.py::test_reload_reports_degraded_storage_as_unavailable",
+      "status": "passed"
+    },
+    {
+      "id": "P094",
+      "nodeid": "tests/test_gateway.py::test_reload_requires_the_gateway_key",
+      "status": "passed"
+    },
+    {
+      "id": "P095",
+      "nodeid": "tests/test_gateway.py::test_reload_strategy_preflight_failure_keeps_storage_and_catalog",
+      "status": "passed"
+    },
+    {
+      "id": "P096",
+      "nodeid": "tests/test_gateway.py::test_response_data_silences_litellm_usage_serializer_mismatch",
+      "status": "passed"
+    },
+    {
+      "id": "P097",
+      "nodeid": "tests/test_gateway.py::test_response_model_can_keep_the_upstream_name",
+      "status": "passed"
+    },
+    {
+      "id": "P098",
+      "nodeid": "tests/test_gateway.py::test_response_model_echoes_the_requested_name",
+      "status": "passed"
+    },
+    {
+      "id": "P099",
+      "nodeid": "tests/test_gateway.py::test_routing_endpoints_expose_policy_decisions_and_sessions",
+      "status": "passed"
+    },
+    {
+      "id": "P100",
+      "nodeid": "tests/test_gateway.py::test_routing_reads_max_completion_tokens",
+      "status": "passed"
+    },
+    {
+      "id": "P101",
+      "nodeid": "tests/test_gateway.py::test_runtime_directory_loads_config_env_and_storage_from_home",
+      "status": "passed"
+    },
+    {
+      "id": "P102",
+      "nodeid": "tests/test_gateway.py::test_same_provider_models_share_connection_and_keep_their_upstream_model",
+      "status": "passed"
+    },
+    {
+      "id": "P103",
+      "nodeid": "tests/test_gateway.py::test_session_does_not_switch_for_prompt_complexity",
+      "status": "passed"
+    },
+    {
+      "id": "P104",
+      "nodeid": "tests/test_gateway.py::test_session_stays_on_its_model_across_turns",
+      "status": "passed"
+    },
+    {
+      "id": "P105",
+      "nodeid": "tests/test_gateway.py::test_sse_chunks_silences_only_litellm_usage_serializer_warning",
+      "status": "passed"
+    },
+    {
+      "id": "P106",
+      "nodeid": "tests/test_gateway.py::test_startup_and_reload_without_overlay_preserve_baseline",
+      "status": "passed"
+    },
+    {
+      "id": "P107",
+      "nodeid": "tests/test_gateway.py::test_startup_announces_the_dashboard_url",
+      "status": "passed"
+    },
+    {
+      "id": "P108",
+      "nodeid": "tests/test_gateway.py::test_stream_failure_has_safe_logs_and_null_persisted_message",
+      "status": "passed"
+    },
+    {
+      "id": "P109",
+      "nodeid": "tests/test_gateway.py::test_streaming_echoes_the_requested_model",
+      "status": "passed"
+    },
+    {
+      "id": "P110",
+      "nodeid": "tests/test_gateway.py::test_streaming_returns_openai_sse",
+      "status": "passed"
+    },
+    {
+      "id": "P111",
+      "nodeid": "tests/test_gateway.py::test_temperature_is_dropped_for_models_that_reject_it",
+      "status": "passed"
+    },
+    {
+      "id": "P112",
+      "nodeid": "tests/test_gateway.py::test_the_gateway_sends_the_level_it_clamped_to_the_route",
+      "status": "passed"
+    },
+    {
+      "id": "P113",
+      "nodeid": "tests/test_gateway.py::test_unknown_model_is_rejected",
+      "status": "passed"
+    },
+    {
+      "id": "P114",
+      "nodeid": "tests/test_gateway.py::test_upstream_failure_becomes_a_gateway_error",
+      "status": "passed"
+    },
+    {
+      "id": "P115",
+      "nodeid": "tests/test_gateway.py::test_upstream_failure_bounds_exception_type",
+      "status": "passed"
+    },
+    {
+      "id": "P116",
+      "nodeid": "tests/test_gateway.py::test_upstream_failure_does_not_persist_or_log_provider_exception_text",
+      "status": "passed"
+    },
+    {
+      "id": "P117",
+      "nodeid": "tests/test_routing_overlay.py::test_atomic_write_and_remove_leave_no_temp_file",
+      "status": "passed"
+    },
+    {
+      "id": "P118",
+      "nodeid": "tests/test_routing_overlay.py::test_empty_overlay_produces_identical_catalog",
+      "status": "passed"
+    },
+    {
+      "id": "P119",
+      "nodeid": "tests/test_routing_overlay.py::test_empty_rules_explicitly_disables_conditional_rules",
+      "status": "passed"
+    },
+    {
+      "id": "P120",
+      "nodeid": "tests/test_routing_overlay.py::test_explicit_models_label_warns_when_its_tag_changes",
+      "status": "passed"
+    },
+    {
+      "id": "P121",
+      "nodeid": "tests/test_routing_overlay.py::test_new_overlay_fields_from_newer_binary_warn_on_old_binary",
+      "status": "passed"
+    },
+    {
+      "id": "P122",
+      "nodeid": "tests/test_routing_overlay.py::test_optional_questions_and_fallback_override_and_rules_can_be_omitted",
+      "status": "passed"
+    },
+    {
+      "id": "P123",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload0-Unknown overlay strategy]",
+      "status": "passed"
+    },
+    {
+      "id": "P124",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload1-Unknown overlay catalog id]",
+      "status": "passed"
+    },
+    {
+      "id": "P125",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload2-storage]",
+      "status": "passed"
+    },
+    {
+      "id": "P126",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload3-api_key]",
+      "status": "passed"
+    },
+    {
+      "id": "P127",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload4-secret]",
+      "status": "passed"
+    },
+    {
+      "id": "P128",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload5-version]",
+      "status": "passed"
+    },
+    {
+      "id": "P129",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload6-questions, rules, fallback, or models]",
+      "status": "passed"
+    },
+    {
+      "id": "P130",
+      "nodeid": "tests/test_routing_overlay.py::test_overlay_rejects_invalid_or_partial_payloads[payload7-fallback]",
+      "status": "passed"
+    },
+    {
+      "id": "P131",
+      "nodeid": "tests/test_routing_overlay.py::test_read_overlay_missing_and_malformed_are_nonfatal",
+      "status": "passed"
+    },
+    {
+      "id": "P132",
+      "nodeid": "tests/test_routing_overlay.py::test_rules_replacement_preserves_questions_and_fallback",
+      "status": "passed"
+    },
+    {
+      "id": "P133",
+      "nodeid": "tests/test_routing_overlay.py::test_tags_and_priority_override_only_target_model",
+      "status": "passed"
+    }
+  ],
+  "helper_adaptation": {
+    "helper_modified": false,
+    "offline_environment_adjustment_only": true,
+    "prior_qualification": "verification/backend-harness-qualification.json",
+    "reason": "LiteLLM import-time cost-map fetch otherwise fails under the guard; its installed version supports the bundled local cost map."
+  },
+  "installed_package_integrity": {
+    "file_count": 52,
+    "file_set_and_bytes_match_public_wheel_before_and_after": true,
+    "imports_from_site_packages": true,
+    "package_file_sha256": {
+      "jev_gateway/__init__.py": "329de6298cbd1212b43edcd7b0c9aa708962513224b26451d3dea56156957bd9",
+      "jev_gateway/activity.py": "86f8b9a886be9d99fbcc1f79a6c9a14a1141cc1d8cce6aac47e3bd6c23a5d0da",
+      "jev_gateway/canvas_layout.py": "348ab0091197f921e9114d7f924379f687dc7446465954063fc4b98fe3a2027d",
+      "jev_gateway/catalog.py": "5d5e08333ca9cd767c985d31aafb728c610b1053939641961e8ab91e3cdbebc2",
+      "jev_gateway/cli/__init__.py": "463d4be63abf0742eba7184f6d0c3820d737dbbd965cc206f013a339c96c1a1f",
+      "jev_gateway/cli/config_ops.py": "72a6cfb9fdfb7d58d7197f62c03f316ec625685af174bd279478bb6a4676ec96",
+      "jev_gateway/cli/health.py": "35fc51c7f06d220e77abbb82bfc7288b58f89152d694b0032d2664750bd46087",
+      "jev_gateway/cli/install_state.py": "275489f88969c19b69f33e15910cc6097861ac80f5d0b198a6fe845f4c80534d",
+      "jev_gateway/cli/main.py": "66d2c1ecbfac292adc851f333467e9d7817d00cd74dd4e94ddbf3c9f6db9db5f",
+      "jev_gateway/cli/output.py": "5a7597d914ea6317268c7d37536a38db22ed60ecffd01c226321d8f533b600cd",
+      "jev_gateway/cli/paths.py": "5a86c9d22a2941a57cf02d2acd10517538ba7d838594b2b865641200c5e97e8f",
+      "jev_gateway/cli/process.py": "22269d146c4a4b9ec970fd85d2f31d0c35da71ba506ac661375384913ace083e",
+      "jev_gateway/cli/providers.py": "90c9c7d12f15e26f54cbbd6a0a2283869b7ef3dc964ffd767d66e7b7bd02d71b",
+      "jev_gateway/cli/secrets.py": "00ae1d85b7814e994ec0511ef18647a3c71c81fa895f8f7b5f49129c8cf72bb3",
+      "jev_gateway/cli/server.py": "89f2349b421fd89a52e52b8ffaf001cc0be12e3f283831bd8334864ebf1edc24",
+      "jev_gateway/cli/uninstall.py": "49c714276dd589ea58db740b2ef6c0162fc8b5b1639463f2acf08d5e1a2e77f3",
+      "jev_gateway/config.py": "9f841f0be59a4e89a6ac286efd57b9c0cf65368391f44894f617d3b2eb42eb14",
+      "jev_gateway/config_transaction.py": "ddeff4dbb345028311d1a0e5cfbd05552dd9f8cafc50847b1bc15f9cb0fa5a84",
+      "jev_gateway/dashboard.py": "b41049ef7228175df1949a4203c44086afd8a5c5e47e32afc20717bda7c3b14b",
+      "jev_gateway/decision.py": "d751d0af81e76f932d931bf3ffda1deb41f0fe0056e4b743373f1a72e82ac014",
+      "jev_gateway/discovery_network.py": "efd44674340c2568d1d271d2ea53b4ec3b20addd18d1b384a90ea8f1616f20e4",
+      "jev_gateway/gateway.py": "639e0cd514a27ecb99fa873a0a6835550c7ae93143191176aa7e6b676138d193",
+      "jev_gateway/logging/__init__.py": "0309940836d04046ea13e7adbbe2aa041f87d52d4fa39a64406576f769258b70",
+      "jev_gateway/logging/catalog.py": "4b39e0b080b710c79f43027e64fe69bb739491b2a358aa19e42754a77e8a07b5",
+      "jev_gateway/logging/config.py": "116607216913f9961b2a03eb9171a8b759ba4719d664fd05c7ccd8e70d71c8fe",
+      "jev_gateway/model_discovery.py": "aedd8461cd8d0f589243511e36465c32db11faaa0d4da18728d5a4625ce0e690",
+      "jev_gateway/model_metadata.py": "d8b2ca8ae935c85d4a70543fefeba744db9b6f4e1a94b29934a757404afcb432",
+      "jev_gateway/provider/__init__.py": "50ffe4e203deaa46f6032abbd84cfe113f439444228c61c4dd21f38c084e3702",
+      "jev_gateway/provider/base.py": "c9dca2ce4a0728c2908b7527dbb405dea810a6df2df1d495e26dcaad53751e87",
+      "jev_gateway/provider/deepseek.py": "51aa76183e8db40791e2df91f8bb8ccb0efebd239f0edfb3b24d6ee0a7502a39",
+      "jev_gateway/provider_config.py": "942e296cba9bb1feebc92e15140cc55fd6f5a212ff978aec291e132f3ae22696",
+      "jev_gateway/provider_presets.py": "4eeb356cfcd556abe1a42c43e09de4d2c711d330d6cc14cdee68aa0b25a7591a",
+      "jev_gateway/reasoning.py": "77bdbccf3475ddbe297647242a530030c8a6957ba88f6a12737c786de1cc15e3",
+      "jev_gateway/records.py": "5b0575e69f31436c37ae9d2281a99eb88da9a068c88473bd28e96cce53a3f121",
+      "jev_gateway/request_facts.py": "85a9a84868f682f16e809a1b7769841fcda06fe240178e7915b699ff091810a4",
+      "jev_gateway/routing_overlay.py": "50f680ef4b341c211c1ff7271afb99e252e6c499b4869cd8dc8236732cfa74d8",
+      "jev_gateway/sessions.py": "8093226dc017b4635c455ec07aa11f5b24753f42917a8190f18619a7403fc52b",
+      "jev_gateway/static/assets/deepseek-Bl9-59Mi.svg": "ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b",
+      "jev_gateway/static/assets/index-DUdxukOW.css": "621fde520d581c4471158660585b6bd06acd602bf9a8429ab9d0fc5dd15bd0a9",
+      "jev_gateway/static/assets/index-DiAhKErC.js": "54a214554b162ced0207a2d64fdc8d84483e8f409a377b69bdcf914df45660be",
+      "jev_gateway/static/index.html": "b2c66a9f61d2d73c946c229b907c90128d892d5bc545ec868d7ec8b0660f17a7",
+      "jev_gateway/strategy/__init__.py": "f8921c5ece6a47a18d08dfcab3017570b2c1760415ce33710024eb53fa99b92b",
+      "jev_gateway/strategy/classifier.py": "72edcbbfc57014855447451de2d6eb593ec19e55666e65b2c2e8f8435d1e2a9f",
+      "jev_gateway/strategy/contracts.py": "9790dd4cac1b0fcaa720649c414621e30d966beade3085127184685c64aa2d1b",
+      "jev_gateway/strategy/decision_provider/__init__.py": "16c490f7dcb18fc3591e73f002344d89d66e41827b0036600ebd77bb6dfe7677",
+      "jev_gateway/strategy/decision_provider/base.py": "4961e0ca38279fd1e813b5920196089e09d98ae827886fbf99abf49a0c0c984a",
+      "jev_gateway/strategy/decision_provider/system_one.py": "537d62334391629fd9d9407569eb9b70cf73ef174ce4fc8c59a6789eb3651ef2",
+      "jev_gateway/strategy/matrix.py": "f98e56d756837c8b769d047c692db6d8d538d236793c73d9150b832b0cefcb82",
+      "jev_gateway/strategy/policy.py": "7a4babae23fee078b535520db448783a5a4569eeab9251b5f58d78b6f977a9f1",
+      "jev_gateway/strategy/registry.py": "3695c238679eec90d5767283c14b9d9dd3802d2680bf403b0d2e171761a54e4b",
+      "jev_gateway/templates/env.example": "ede5fde73be271b5032f680efe4409d1016016ae0f0ca3a736335dd0b6ed21eb",
+      "jev_gateway/templates/models.example.json": "a83f3eb8aabff6f27fad0fdf7f1de727c7d0b475d0d0b9b68f7f4f19fddefa07"
+    }
+  },
+  "layout_cases": [
+    "P001",
+    "P002",
+    "P003",
+    "P004",
+    "P005",
+    "P006",
+    "P007",
+    "P008",
+    "P009",
+    "P010",
+    "P033",
+    "P034"
+  ],
+  "limitations": [
+    "Four requested backend modules were run, not the entire backend suite.",
+    "Generation and discovery used mocks; external provider service behavior was not tested.",
+    "Operator upgrade/preservation and public installed lifecycle acceptance belong to the parent and other workers."
+  ],
+  "native_invocation": {
+    "argv": [
+      "/Users/texas/Workspace/jev-llmroute-test/.venv/bin/python3",
+      "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/10-03-release-011-acceptance/verification/tools/installed-backend-regression.py",
+      "--source-repo",
+      "/Users/texas/Workspace/jev-llmroute-test",
+      "--installed-python",
+      "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/bin/python3",
+      "--assets-manifest",
+      "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-download/public-assets-result.json",
+      "--work-dir",
+      "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-installed-backend"
+    ],
+    "elapsed_seconds": 8.686,
+    "exit_code": 0,
+    "native_exit_record": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installed-backend-native-exit.json",
+      "sha256": "6238b371a4178a5e3347e17bc722cd5beba47ab58ffab07bbb2d93544a460dfb"
+    },
+    "native_log": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installed-backend-native.log",
+      "sha256": "02ba7e141570bd78a7e9daf2df1b5fcabdb281352b5ef90b200a3ecfc014d728"
+    }
+  },
+  "native_pytest_exit": 0,
+  "native_pytest_log": {
+    "path": ".git/jev-release-011-acceptance/replacement/public-installed-backend/pytest.log",
+    "sha256": "bf94760386044bf0759f3c70719462bc061b76838415665ad9f12c4b0989cd01"
+  },
+  "native_pytest_summary": "133 passed in 3.20s",
+  "network": {
+    "LITELLM_LOCAL_MODEL_COST_MAP": "True",
+    "denied_audit_events": [
+      "socket.connect",
+      "socket.getaddrinfo"
+    ],
+    "generation_and_provider_discovery": "Synthetic APIs and mocked upstreams; no real requests.",
+    "outbound_networking_disabled": true
+  },
+  "nodeid_evidence": {
+    "basis": "Native pytest node cache entries scoped to this fresh private test directory; all 133 passed in the full native run.",
+    "private_file": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installed-backend/executed-nodeids.json",
+      "sha256": "70296af05597ca9e6b57e90bb3fc2680fb10c9b3150ace37079ed2bf75f80d18"
+    }
+  },
+  "policy_guard_cases": [
+    "P037",
+    "P038",
+    "P039",
+    "P040",
+    "P041",
+    "P042",
+    "P064",
+    "P065"
+  ],
+  "provenance": {
+    "package": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/lib/python3.12/site-packages/jev_gateway",
+    "package_files_compared": 52,
+    "version": "0.1.1",
+    "wheel_sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038"
+  },
+  "public_asset_identity": {
+    "ci_run_id": 37132156378,
+    "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+    "release_id": 402565482,
+    "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37132156378",
+    "sha256": {
+      "install.sh": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+      "jev_gateway-0.1.1-py3-none-any.whl": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038"
+    },
+    "tag": "v0.1.1",
+    "version": "0.1.1"
+  },
+  "scope": "Replacement public v0.1.1 installed backend regression; actual product from site-packages with mocked upstreams and temporary runtime files.",
+  "semantic_cases": [
+    "P014",
+    "P015",
+    "P016",
+    "P017"
+  ],
+  "success": true,
+  "test_counts": {
+    "collected": 133,
+    "deselected": 0,
+    "executed": 133,
+    "failed": 0,
+    "passed": 133,
+    "skipped": 0
+  },
+  "test_integrity": {
+    "assertions_weakened": false,
+    "copied_tests_byte_identical": true,
+    "dashboard_fixture_decorators_unchanged": true,
+    "fixture_adaptation": "dashboard_bundle returns installed static directory; assertions unchanged",
+    "non_dashboard_conftest_ast_unchanged": true,
+    "source_fixtures_unchanged": true,
+    "source_test_hashes": {
+      "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "helpers.py": "c02a0c018676993381fa383dc0b7bad1048695d528a8b5447581b1c974434b7f",
+      "test_canvas_layout.py": "8e4e062185944a9861e798b828357009e9ce74f25be0ef1380bc55c882d5d2f3",
+      "test_decision_matrix.py": "db02ec411a494595b7f38be06235ecbe6d0b106c26f8a56a58ff9c796fb19d40",
+      "test_gateway.py": "4d42a78c692c25287196d7fd591223dbb08d049114b036caf62a71dadf628c34",
+      "test_routing_overlay.py": "e305fa7ca526c9bffa9b42ff3616a7d9f7b4598be1ec1ae147f8f328453973ad"
+    },
+    "source_tests_match_tag": true
+  }
+}

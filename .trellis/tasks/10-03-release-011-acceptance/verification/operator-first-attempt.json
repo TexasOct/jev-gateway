@@ -1,0 +1,30 @@
+{
+  "success": false,
+  "native_exit": 1,
+  "cleanup_success": false,
+  "initial_service_state": "running",
+  "last_verified_service_state": "stopped",
+  "installed_package_version": "0.1.1",
+  "installed_package_files_match_public_wheel": 52,
+  "installer_input_matches_public_wheel_sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+  "both_public_shims_restored": true,
+  "startup_exception": "ValueError",
+  "unsupported_baseline_top_level_field": "defaults",
+  "v010_v011_tagged_catalog_and_config_ops_bytes_identical": true,
+  "protected_files_preserved": 7,
+  "credential_mode": "0600",
+  "original_typed_row_multisets_preserved": true,
+  "rows_before_and_after": {
+    "assistant_continuations": 4,
+    "config_versions": 10,
+    "decisions": 10,
+    "outcomes": 10,
+    "requests": 10,
+    "upstream_requests": 10
+  },
+  "sqlite_integrity": "ok",
+  "operator_configuration_rewritten": false,
+  "compatibility_for_retired_fields_added": false,
+  "recovery_pending": true,
+  "native_evidence_root": ".git/jev-release-011-acceptance/replacement/public-installer-operator"
+}

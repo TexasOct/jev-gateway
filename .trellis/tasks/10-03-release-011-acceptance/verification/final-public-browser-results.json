@@ -1,0 +1,2420 @@
+{
+  "acceptance_criteria": {
+    "canvas": {
+      "AC1": {
+        "browser_cases": [
+          "B007",
+          "B008",
+          "B020",
+          "B021",
+          "B022",
+          "B023"
+        ],
+        "covered": "Covered Chinese and English node/connection copy in selection and 16 dense scenes.",
+        "scope_limit": "No exhaustive translation-string audit."
+      },
+      "AC2": {
+        "backend_cases": [
+          "P009"
+        ],
+        "browser_cases": [
+          "B013",
+          "B020",
+          "B021",
+          "B022",
+          "B023",
+          "B112"
+        ],
+        "covered": "Five node roles, long names, dense bounds, saved/reloaded alignment and hit targets; actual backend layout round trip."
+      },
+      "AC3": {
+        "browser_cases": [
+          "B012"
+        ],
+        "covered": "Left input/right output centers, exact native wire endpoints and arrow markers."
+      },
+      "AC4": {
+        "backend_cases": [
+          "P064",
+          "P065"
+        ],
+        "browser_cases": [
+          "B007",
+          "B008",
+          "B009",
+          "B010",
+          "B011",
+          "B014",
+          "B018"
+        ],
+        "covered": "Mouse and keyboard selection, connect/reconnect/disconnect, cancellation/focus return, illegal/read-only/last-member guards and stale gesture exclusion."
+      },
+      "AC5": {
+        "browser_cases": [
+          "B010",
+          "B012",
+          "B020",
+          "B021",
+          "B022",
+          "B023",
+          "B111",
+          "B112"
+        ],
+        "covered": "Option/pool growth and shrink, 18px ports at 28px spacing, exact centers, bounds, Fit, pointer drag and utility geometry.",
+        "scope_limit": "Shared marquee/inspector geometry also has separate source unit evidence."
+      },
+      "AC6": {
+        "backend_cases": [
+          "P033",
+          "P037",
+          "P041",
+          "P042",
+          "P064",
+          "P065"
+        ],
+        "browser_cases": [
+          "B009",
+          "B013",
+          "B014",
+          "B015",
+          "B016",
+          "B017",
+          "B110",
+          "B111"
+        ],
+        "covered": "Draft/validate/review/apply/reset, warning acknowledgement, layout-only writes and read-only/auth guards. Installed real API tests preserve applied state after invalid/disconnected writes."
+      },
+      "AC7": {
+        "backend_cases": [
+          "P001",
+          "P002",
+          "P003",
+          "P004",
+          "P005",
+          "P006",
+          "P007",
+          "P008",
+          "P009",
+          "P010",
+          "P011",
+          "P012",
+          "P013",
+          "P014",
+          "P015",
+          "P016",
+          "P017",
+          "P018",
+          "P019",
+          "P020",
+          "P021",
+          "P022",
+          "P023",
+          "P024",
+          "P025",
+          "P026",
+          "P027",
+          "P028",
+          "P029",
+          "P030",
+          "P031",
+          "P032",
+          "P033",
+          "P034",
+          "P035",
+          "P036",
+          "P037",
+          "P038",
+          "P039",
+          "P040",
+          "P041",
+          "P042",
+          "P043",
+          "P044",
+          "P045",
+          "P046",
+          "P047",
+          "P048",
+          "P049",
+          "P050",
+          "P051",
+          "P052",
+          "P053",
+          "P054",
+          "P055",
+          "P056",
+          "P057",
+          "P058",
+          "P059",
+          "P060",
+          "P061",
+          "P062",
+          "P063",
+          "P064",
+          "P065",
+          "P066",
+          "P067",
+          "P068",
+          "P069",
+          "P070",
+          "P071",
+          "P072",
+          "P073",
+          "P074",
+          "P075",
+          "P076",
+          "P077",
+          "P078",
+          "P079",
+          "P080",
+          "P081",
+          "P082",
+          "P083",
+          "P084",
+          "P085",
+          "P086",
+          "P087",
+          "P088",
+          "P089",
+          "P090",
+          "P091",
+          "P092",
+          "P093",
+          "P094",
+          "P095",
+          "P096",
+          "P097",
+          "P098",
+          "P099",
+          "P100",
+          "P101",
+          "P102",
+          "P103",
+          "P104",
+          "P105",
+          "P106",
+          "P107",
+          "P108",
+          "P109",
+          "P110",
+          "P111",
+          "P112",
+          "P113",
+          "P114",
+          "P115",
+          "P116",
+          "P117",
+          "P118",
+          "P119",
+          "P120",
+          "P121",
+          "P122",
+          "P123",
+          "P124",
+          "P125",
+          "P126",
+          "P127",
+          "P128",
+          "P129",
+          "P130",
+          "P131",
+          "P132",
+          "P133"
+        ],
+        "browser_cases": [
+          "B001",
+          "B002",
+          "B003",
+          "B004",
+          "B005",
+          "B006",
+          "B007",
+          "B008",
+          "B009",
+          "B010",
+          "B011",
+          "B012",
+          "B013",
+          "B014",
+          "B015",
+          "B016",
+          "B017",
+          "B018",
+          "B019",
+          "B020",
+          "B021",
+          "B022",
+          "B023",
+          "B024",
+          "B025",
+          "B026",
+          "B027",
+          "B028",
+          "B029",
+          "B030",
+          "B031",
+          "B032",
+          "B033",
+          "B034",
+          "B035",
+          "B036",
+          "B037",
+          "B038",
+          "B039",
+          "B040",
+          "B041",
+          "B042",
+          "B043",
+          "B044",
+          "B045",
+          "B046",
+          "B047",
+          "B048",
+          "B049",
+          "B050",
+          "B051",
+          "B052",
+          "B053",
+          "B054",
+          "B055",
+          "B056",
+          "B057",
+          "B058",
+          "B059",
+          "B060",
+          "B061",
+          "B062",
+          "B063",
+          "B064",
+          "B065",
+          "B066",
+          "B067",
+          "B068",
+          "B069",
+          "B070",
+          "B071",
+          "B072",
+          "B073",
+          "B074",
+          "B075",
+          "B076",
+          "B077",
+          "B078",
+          "B079",
+          "B080",
+          "B081",
+          "B082",
+          "B083",
+          "B084",
+          "B085",
+          "B086",
+          "B087",
+          "B088",
+          "B089",
+          "B090",
+          "B091",
+          "B092",
+          "B093",
+          "B094",
+          "B095",
+          "B096",
+          "B097",
+          "B098",
+          "B099",
+          "B100",
+          "B101",
+          "B102",
+          "B103",
+          "B104",
+          "B105",
+          "B106",
+          "B107",
+          "B108",
+          "B109",
+          "B110",
+          "B111",
+          "B112",
+          "B113",
+          "B114",
+          "B115",
+          "B116",
+          "B117",
+          "B118"
+        ],
+        "covered": "118 installed browser and 133 installed backend cases passed; curated screenshots and measurements retained.",
+        "scope_limit": "Lint, type, source unit and build/freshness are separate source gates.",
+        "source_gate_reference": "verification/repaired-source-gates.json and verification/preview-fix-gates.json"
+      },
+      "AC8": {
+        "backend_cases": [
+          "P014",
+          "P015",
+          "P016",
+          "P017",
+          "P029",
+          "P119",
+          "P132"
+        ],
+        "browser_cases": [
+          "B007",
+          "B008",
+          "B011",
+          "B109"
+        ],
+        "covered": "Actual installed matrix independently covers different default/fallback labels and selection modes for rules present/absent and valid/invalid answers. Browser path/copy/fallback tests use fixtures.",
+        "scope_limit": "The four terminal-path matrix combinations are backend evidence; the browser fixtures do not independently cover all four combinations."
+      },
+      "AC9": {
+        "backend_cases": [
+          "P001",
+          "P002",
+          "P003",
+          "P004",
+          "P005",
+          "P006",
+          "P007",
+          "P008",
+          "P009",
+          "P010",
+          "P033"
+        ],
+        "browser_cases": [
+          "B012",
+          "B013",
+          "B019",
+          "B020",
+          "B021",
+          "B022",
+          "B023"
+        ],
+        "covered": "Visible 257-node arrange rejection without PUT, saved alignment, output growth, dense nonoverlap, backend coordinate/node bounds, overlong stored-file rejection and atomic-failure preservation.",
+        "scope_limit": "Cumulative-height overflow-column placement, encoded Unicode payload rejection, and saved positions after output growth remain separate source-unit evidence. This installed browser run does not independently prove those subcases.",
+        "source_gate_reference": "frontend/src/features/routing/__tests__/outputs.test.ts, RoutingEditor.test.tsx; verification/preview-fix-gates.json"
+      }
+    },
+    "key_page": {
+      "AC1": {
+        "backend_cases": [
+          "P050",
+          "P071"
+        ],
+        "browser_cases": [
+          "B024",
+          "B030"
+        ],
+        "covered": "Independent connection page, hidden console, successful validation and anonymous access."
+      },
+      "AC2": {
+        "browser_cases": [
+          "B024",
+          "B025",
+          "B026"
+        ],
+        "covered": "Password input, empty-input request exclusion, Enter, pending and one probe at a time."
+      },
+      "AC3": {
+        "backend_cases": [
+          "P032"
+        ],
+        "browser_cases": [
+          "B027",
+          "B028",
+          "B030"
+        ],
+        "covered": "Wrong-key/network retry, later 401 with stopped polling, anonymous gateway navigation."
+      },
+      "AC4": {
+        "backend_cases": [
+          "P050"
+        ],
+        "browser_cases": [
+          "B024",
+          "B028",
+          "B029"
+        ],
+        "covered": "Trimmed Bearer key, no credential in URL/cookies/storage, fresh key required after reload."
+      },
+      "AC5": {
+        "browser_cases": [
+          "B030",
+          "B031",
+          "B032",
+          "B033",
+          "B034",
+          "B035",
+          "B036",
+          "B037",
+          "B038",
+          "B099",
+          "B105",
+          "B106",
+          "B107",
+          "B108"
+        ],
+        "covered": "Eight EN/ZH, 1280/320px and light/dark connection cases; connected navigation and responsive overflow cases."
+      },
+      "AC6": {
+        "browser_cases": [
+          "B001",
+          "B002",
+          "B003",
+          "B004",
+          "B005",
+          "B006",
+          "B007",
+          "B008",
+          "B009",
+          "B010",
+          "B011",
+          "B012",
+          "B013",
+          "B014",
+          "B015",
+          "B016",
+          "B017",
+          "B018",
+          "B019",
+          "B020",
+          "B021",
+          "B022",
+          "B023",
+          "B024",
+          "B025",
+          "B026",
+          "B027",
+          "B028",
+          "B029",
+          "B030",
+          "B031",
+          "B032",
+          "B033",
+          "B034",
+          "B035",
+          "B036",
+          "B037",
+          "B038",
+          "B039",
+          "B040",
+          "B041",
+          "B042",
+          "B043",
+          "B044",
+          "B045",
+          "B046",
+          "B047",
+          "B048",
+          "B049",
+          "B050",
+          "B051",
+          "B052",
+          "B053",
+          "B054",
+          "B055",
+          "B056",
+          "B057",
+          "B058",
+          "B059",
+          "B060",
+          "B061",
+          "B062",
+          "B063",
+          "B064",
+          "B065",
+          "B066",
+          "B067",
+          "B068",
+          "B069",
+          "B070",
+          "B071",
+          "B072",
+          "B073",
+          "B074",
+          "B075",
+          "B076",
+          "B077",
+          "B078",
+          "B079",
+          "B080",
+          "B081",
+          "B082",
+          "B083",
+          "B084",
+          "B085",
+          "B086",
+          "B087",
+          "B088",
+          "B089",
+          "B090",
+          "B091",
+          "B092",
+          "B093",
+          "B094",
+          "B095",
+          "B096",
+          "B097",
+          "B098",
+          "B099",
+          "B100",
+          "B101",
+          "B102",
+          "B103",
+          "B104",
+          "B105",
+          "B106",
+          "B107",
+          "B108",
+          "B109",
+          "B110",
+          "B111",
+          "B112",
+          "B113",
+          "B114",
+          "B115",
+          "B116",
+          "B117",
+          "B118"
+        ],
+        "covered": "Full installed browser suite passed, including state transitions and request boundaries.",
+        "scope_limit": "Lint, TypeScript, unit and build/freshness are separately recorded source gates and were not rerun or counted as installed acceptance.",
+        "source_gate_reference": "verification/repaired-source-gates.json and verification/preview-fix-gates.json"
+      }
+    }
+  },
+  "artifacts": {
+    "additional_repaired_draft_screenshot": 1,
+    "artifacts": [
+      {
+        "bytes": 54929,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-en-dark.png",
+        "kind": "screenshot",
+        "sha256": "645f69382512ade7ef25634b28d6d187301969a6f6db4b163aaae2a0263f90d2",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-en-dark.png"
+      },
+      {
+        "bytes": 55203,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-en-light.png",
+        "kind": "screenshot",
+        "sha256": "7fa9005dffb0e449279fb5891770de3c979972df06b9ac83da16574d979d1a28",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-en-light.png"
+      },
+      {
+        "bytes": 56237,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-zh-CN-dark.png",
+        "kind": "screenshot",
+        "sha256": "d4d13d7fae10ae9a8f191877994e9aa2b95fbea4a1bc44850783cf84c34a9fc4",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-zh-CN-dark.png"
+      },
+      {
+        "bytes": 56606,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-320-zh-CN-light.png",
+        "kind": "screenshot",
+        "sha256": "2c6e8c8b8eddddd80f262e3a527a53d2609e8868b244d49cd2cebd67918a4b77",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/strategy-320-zh-CN-light.png"
+      },
+      {
+        "bytes": 68603,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-en-dark.png",
+        "kind": "screenshot",
+        "sha256": "54a46bec59353ff4ec5bae57fcd548511308e947a195b6cfc49fb62e03c236d6",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-en-dark.png"
+      },
+      {
+        "bytes": 68631,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-en-light.png",
+        "kind": "screenshot",
+        "sha256": "79ec9e796673c5b13bf5073fcb28a2422110cc07c5ab91b77672bb9a0ece1870",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-en-light.png"
+      },
+      {
+        "bytes": 68434,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-zh-CN-dark.png",
+        "kind": "screenshot",
+        "sha256": "1da27a81f2913fc8b6133af62dd57baba11361940bc300bd2c9b18b7fdff1710",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-zh-CN-dark.png"
+      },
+      {
+        "bytes": 68934,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-390-zh-CN-light.png",
+        "kind": "screenshot",
+        "sha256": "24f100950b6d89ed80f7985a9dec49828042c310708d09177cea076ae54a0e3d",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/strategy-390-zh-CN-light.png"
+      },
+      {
+        "bytes": 187644,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-en-dark.png",
+        "kind": "screenshot",
+        "sha256": "1fb8ba467c71bb10d8d539a121917caab26d4fe74c8ee4e619f3ce93e4172327",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-en-dark.png"
+      },
+      {
+        "bytes": 187016,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-en-light.png",
+        "kind": "screenshot",
+        "sha256": "0d671d829878080567c34e9c97a4fe55aab4d7dac2c548e30bffdce72f28fcf1",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-en-light.png"
+      },
+      {
+        "bytes": 192668,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-zh-CN-dark.png",
+        "kind": "screenshot",
+        "sha256": "2faeaeaef81544c50881b9d971051cec2a62fae3fff510a8acd311f1fe1fb318",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-zh-CN-dark.png"
+      },
+      {
+        "bytes": 192168,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1280-zh-CN-light.png",
+        "kind": "screenshot",
+        "sha256": "761b707e135a2ff99050580556c4ada66b8edb5dc0edb089ac1f5b2c5a9a6afd",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/strategy-1280-zh-CN-light.png"
+      },
+      {
+        "bytes": 256776,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-en-dark.png",
+        "kind": "screenshot",
+        "sha256": "52c2dab2670700cdb946c75a3a102a34ede9b6255245a330c3f3583f10ff6db5",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-en-dark.png"
+      },
+      {
+        "bytes": 254778,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-en-light.png",
+        "kind": "screenshot",
+        "sha256": "62f2c2f90d9e869aed7729f0bcd4145522379efe3b30b7a1eb6831343cc7d030",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-en-light.png"
+      },
+      {
+        "bytes": 258568,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-zh-CN-dark.png",
+        "kind": "screenshot",
+        "sha256": "9bbde79b5996a0da49b02330f1fda5ef106af2533cbc019f547c82ae4c8579d0",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-zh-CN-dark.png"
+      },
+      {
+        "bytes": 257453,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/strategy-1430-zh-CN-light.png",
+        "kind": "screenshot",
+        "sha256": "c5bf69f1645e0fb0eef2a62a677aabfdde87caa556f633436eda6ad46d2fd351",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/strategy-1430-zh-CN-light.png"
+      },
+      {
+        "bytes": 159048,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/connection-zh-CN.png",
+        "kind": "screenshot",
+        "sha256": "b173026bb1335f2f8d4401ac739d0e0569f57e8a8e1bb8df7f5c858b4bf72101",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-209ec-d-names-its-output-in-zh-CN/connection-zh-CN.png"
+      },
+      {
+        "bytes": 154708,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/connection-en.png",
+        "kind": "screenshot",
+        "sha256": "3a6eddd71d313e25b671140fe4991cacdc06a0d1c327c00e0c2f6addc34aa62c",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-connections-selects-258a5--and-names-its-output-in-en/connection-en.png"
+      },
+      {
+        "bytes": 3323,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-en-dark.json",
+        "kind": "geometry",
+        "sha256": "6c3ddf64001d5b477b62a1ad50b20ef975cc3234c369e1f8fd892e9b1f6f5110",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-en-dark.json"
+      },
+      {
+        "bytes": 3324,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-en-light.json",
+        "kind": "geometry",
+        "sha256": "7da7bb735dedbf4193e76499e6364b7c77b8f0f68071a2fc85419b35c833fe7d",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-en-light.json"
+      },
+      {
+        "bytes": 3326,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-zh-CN-dark.json",
+        "kind": "geometry",
+        "sha256": "04950edebca0ed29850e53f8103668925e45c358f5ee5b4696da459468fc71a9",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-zh-CN-dark.json"
+      },
+      {
+        "bytes": 3327,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-320-zh-CN-light.json",
+        "kind": "geometry",
+        "sha256": "4242334520719b1890c5ab23348c5c7d5a233cdbde664b5458d586067a0c214b",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-11a19-le-and-reachable-at-320x900/geometry-zh-CN-light.json"
+      },
+      {
+        "bytes": 3323,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-en-dark.json",
+        "kind": "geometry",
+        "sha256": "7301206d53cd181f9a90a7bb70cf3b0bde903ef6e3e1827f90d23c3527ad4de6",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-en-dark.json"
+      },
+      {
+        "bytes": 3324,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-en-light.json",
+        "kind": "geometry",
+        "sha256": "805d42d067dcacceefaa7d922f5bac1c536b8c25347dac9a07ae155740210674",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-en-light.json"
+      },
+      {
+        "bytes": 3326,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-zh-CN-dark.json",
+        "kind": "geometry",
+        "sha256": "81267e053a73bccff84aea00e355d18dc98235fdb11f697da7dbc8aa4f9a2426",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-zh-CN-dark.json"
+      },
+      {
+        "bytes": 3327,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-390-zh-CN-light.json",
+        "kind": "geometry",
+        "sha256": "278c04aa0a0f02b2f76ba71b109c5c7a52ea6a6f051e4e5b8ed7dccd1d20afc1",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-30e99-le-and-reachable-at-390x900/geometry-zh-CN-light.json"
+      },
+      {
+        "bytes": 3319,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-en-dark.json",
+        "kind": "geometry",
+        "sha256": "a17940041066e8d60b5a29d27a49e2ccbd93cd17bed3cd797ba78f217f4011bd",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-en-dark.json"
+      },
+      {
+        "bytes": 3320,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-en-light.json",
+        "kind": "geometry",
+        "sha256": "9f69a8dfcaccd2fdac173e961b7ac8cd005d33c95e3abaf2c547346200c4a088",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-en-light.json"
+      },
+      {
+        "bytes": 3322,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-zh-CN-dark.json",
+        "kind": "geometry",
+        "sha256": "6341a8be3cd894aaee1a7f9ad3c9be5902651f78cf50f766e6768fd5fa8ca77a",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-zh-CN-dark.json"
+      },
+      {
+        "bytes": 3323,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1280-zh-CN-light.json",
+        "kind": "geometry",
+        "sha256": "68a8da1036507041b211cb4668c57edd04129b7dc6de27abe53968b0a7a83210",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-e29b5-e-and-reachable-at-1280x900/geometry-zh-CN-light.json"
+      },
+      {
+        "bytes": 3321,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-en-dark.json",
+        "kind": "geometry",
+        "sha256": "fe9ac6cf3a9440806b6532d636b6d51eafbee84d342a5604aff1206a5f6d309f",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-en-dark.json"
+      },
+      {
+        "bytes": 3322,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-en-light.json",
+        "kind": "geometry",
+        "sha256": "a5a536be3e0a53e6b6b62f57f93ea7ce43dbb00deea72e7ba81b4e6746b5e6f4",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-en-light.json"
+      },
+      {
+        "bytes": 3324,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-zh-CN-dark.json",
+        "kind": "geometry",
+        "sha256": "cf25e3235e10dd0e05c3ea833db89b47653ec022c90cb8c5b57a46bf3ef45979",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-zh-CN-dark.json"
+      },
+      {
+        "bytes": 3325,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/geometry-1430-zh-CN-light.json",
+        "kind": "geometry",
+        "sha256": "41b080abea82d74714320913732726dafc1828db360d24f4d3e51bfd43f2be04",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/artifacts/canvas-visual-acceptance-d-ea036--and-reachable-at-1430x2511/geometry-zh-CN-light.json"
+      },
+      {
+        "bytes": 136249,
+        "file": ".trellis/tasks/10-03-release-011-acceptance/verification/final/canvas-repaired-draft.png",
+        "kind": "additional_repaired_draft_screenshot",
+        "sha256": "a15a5996686348c75fa2c8062b9ff406e8fcbdb7f1ac12aebce6481603490c0c",
+        "source": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/canvas-repaired-draft.png"
+      }
+    ],
+    "credential_review": {
+      "geometry_contains_only_fixture_ids_and_numeric_measurements": true,
+      "operator_data_used": false,
+      "scope": "All 16 dense screenshots through four contact sheets, both selected-wire screenshots and the repaired-draft screenshot; exact geometry schemas and node IDs checked.",
+      "visible_credentials_found": false
+    },
+    "geometry_json": 16,
+    "screenshots": 18,
+    "source_bytes_preserved": true
+  },
+  "backend_evidence": "verification/final-installed-backend-results.json",
+  "browser": {
+    "discovered_tests": 118,
+    "executed_tests": 118,
+    "origin": "http://127.0.0.1:4178",
+    "owned_asgi_child_stopped": true,
+    "retries": 0,
+    "served_wheel": {
+      "server": "installed jev_gateway.dashboard.DashboardStatic ASGI",
+      "static_directory": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/lib/python3.12/site-packages/jev_gateway/static",
+      "static_files_compared": 4,
+      "synthetic_apis": true,
+      "version": "0.1.1"
+    },
+    "success": true,
+    "synthetic_apis": true,
+    "version": "0.1.1"
+  },
+  "browser_stats": {
+    "duration": 78411.082,
+    "expected": 118,
+    "flaky": 0,
+    "skipped": 0,
+    "startTime": "2026-10-03T15:27:58.493Z",
+    "unexpected": 0
+  },
+  "cleanup": {
+    "installation_retained": true,
+    "installed_status_error": "not_running",
+    "installed_status_exit": 4,
+    "matching_asgi_children": [],
+    "port_4178_bindable": true
+  },
+  "connection_contrast": {
+    "measurements": [
+      {
+        "background": "rgb(106, 134, 210)",
+        "contrast": 5.147499321854971,
+        "foreground": "rgb(16, 22, 31)",
+        "locale": "zh-CN",
+        "opacity": "1",
+        "scheme": "dark",
+        "width": 320
+      },
+      {
+        "background": "rgb(106, 134, 210)",
+        "contrast": 5.147499321854971,
+        "foreground": "rgb(16, 22, 31)",
+        "locale": "en",
+        "opacity": "1",
+        "scheme": "dark",
+        "width": 320
+      },
+      {
+        "background": "rgb(41, 88, 214)",
+        "contrast": 6.067293758693058,
+        "foreground": "rgb(255, 255, 255)",
+        "locale": "en",
+        "opacity": "1",
+        "scheme": "light",
+        "width": 320
+      },
+      {
+        "background": "rgb(41, 88, 214)",
+        "contrast": 6.067293758693058,
+        "foreground": "rgb(255, 255, 255)",
+        "locale": "zh-CN",
+        "opacity": "1",
+        "scheme": "light",
+        "width": 320
+      },
+      {
+        "background": "rgb(41, 88, 214)",
+        "contrast": 6.067293758693058,
+        "foreground": "rgb(255, 255, 255)",
+        "locale": "zh-CN",
+        "opacity": "1",
+        "scheme": "light",
+        "width": 1280
+      },
+      {
+        "background": "rgb(106, 134, 210)",
+        "contrast": 5.147499321854971,
+        "foreground": "rgb(16, 22, 31)",
+        "locale": "en",
+        "opacity": "1",
+        "scheme": "dark",
+        "width": 1280
+      },
+      {
+        "background": "rgb(106, 134, 210)",
+        "contrast": 5.147499321854971,
+        "foreground": "rgb(16, 22, 31)",
+        "locale": "zh-CN",
+        "opacity": "1",
+        "scheme": "dark",
+        "width": 1280
+      },
+      {
+        "background": "rgb(41, 88, 214)",
+        "contrast": 6.067293758693058,
+        "foreground": "rgb(255, 255, 255)",
+        "locale": "en",
+        "opacity": "1",
+        "scheme": "light",
+        "width": 1280
+      }
+    ],
+    "minimum": 5.147499321854971,
+    "threshold": 4.5
+  },
+  "counts_by_file": {
+    "appearance.spec.ts": 6,
+    "canvas-connections.spec.ts": 13,
+    "canvas-visual-acceptance.spec.ts": 4,
+    "connection.spec.ts": 15,
+    "icons.spec.ts": 7,
+    "monitoring.spec.ts": 10,
+    "provider-management.spec.ts": 43,
+    "responsive.spec.ts": 10,
+    "routing-editor.spec.ts": 4,
+    "settings.spec.ts": 6
+  },
+  "evidence_boundaries": {
+    "backend": "Real installed Python routing/API/layout code; mocked upstreams and isolated temporary runtime.",
+    "browser_apis": "Synthetic API fixtures; installed wheel supplies static assets.",
+    "operator": "No operator files, installs or services changed by this worker.",
+    "source_gates": "Referenced independently; no Vite, frontend build, lint or source tests run by this worker."
+  },
+  "executed_cases": [
+    {
+      "duration_ms": 621,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B001",
+      "line": 9,
+      "retry": 0,
+      "status": "passed",
+      "title": "preset selection auto-saves the chosen seed exactly once"
+    },
+    {
+      "duration_ms": 663,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B002",
+      "line": 19,
+      "retry": 0,
+      "status": "passed",
+      "title": "native color picker input previews are committed through the change event"
+    },
+    {
+      "duration_ms": 2449,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B003",
+      "line": 44,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no settings document-level horizontal overflow at 1280x900 in English and Chinese"
+    },
+    {
+      "duration_ms": 2484,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B004",
+      "line": 44,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no settings document-level horizontal overflow at 1430x2511 in English and Chinese"
+    },
+    {
+      "duration_ms": 1791,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B005",
+      "line": 44,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no settings document-level horizontal overflow at 390x820 in English and Chinese"
+    },
+    {
+      "duration_ms": 2070,
+      "file": "frontend/tests/browser/appearance.spec.ts",
+      "id": "B006",
+      "line": 44,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no settings document-level horizontal overflow at 320x820 in English and Chinese"
+    },
+    {
+      "duration_ms": 975,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B007",
+      "line": 59,
+      "retry": 0,
+      "status": "passed",
+      "title": "selects the exact question result wire and names its output in en"
+    },
+    {
+      "duration_ms": 1270,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B008",
+      "line": 59,
+      "retry": 0,
+      "status": "passed",
+      "title": "selects the exact question result wire and names its output in zh-CN"
+    },
+    {
+      "duration_ms": 965,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B009",
+      "line": 105,
+      "retry": 0,
+      "status": "passed",
+      "title": "selects native wires, disconnects and repairs match outputs before review"
+    },
+    {
+      "duration_ms": 1299,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B010",
+      "line": 131,
+      "retry": 0,
+      "status": "passed",
+      "title": "adds and disconnects pool members with native drag and preserves foreign tags through apply"
+    },
+    {
+      "duration_ms": 1170,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B011",
+      "line": 157,
+      "retry": 0,
+      "status": "passed",
+      "title": "reconnects an empty failure fallback by pointer drag and cancels keyboard connection controls"
+    },
+    {
+      "duration_ms": 1090,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B012",
+      "line": 184,
+      "retry": 0,
+      "status": "passed",
+      "title": "question options grow and shrink ports and dense handles keep full size and exact wire centers"
+    },
+    {
+      "duration_ms": 973,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B013",
+      "line": 220,
+      "retry": 0,
+      "status": "passed",
+      "title": "aligns a selected group and restores its layout without policy writes"
+    },
+    {
+      "duration_ms": 1102,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B014",
+      "line": 235,
+      "retry": 0,
+      "status": "passed",
+      "title": "guards fixed paths, explicit pools, last members and read-only connection actions"
+    },
+    {
+      "duration_ms": 624,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B015",
+      "line": 260,
+      "retry": 0,
+      "status": "passed",
+      "title": "blocks unsupported question drafts with a specific error"
+    },
+    {
+      "duration_ms": 484,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B016",
+      "line": 271,
+      "retry": 0,
+      "status": "passed",
+      "title": "blocks blank instructions and restores result ports after repair"
+    },
+    {
+      "duration_ms": 644,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B017",
+      "line": 271,
+      "retry": 0,
+      "status": "passed",
+      "title": "blocks blank criterion description and restores result ports after repair"
+    },
+    {
+      "duration_ms": 706,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B018",
+      "line": 287,
+      "retry": 0,
+      "status": "passed",
+      "title": "a stale native connection gesture cannot overwrite a newer inspector edit"
+    },
+    {
+      "duration_ms": 773,
+      "file": "frontend/tests/browser/canvas-connections.spec.ts",
+      "id": "B019",
+      "line": 302,
+      "retry": 0,
+      "status": "passed",
+      "title": "rejects an oversized arrange-all operation visibly without a layout or policy PUT"
+    },
+    {
+      "duration_ms": 2221,
+      "file": "frontend/tests/browser/canvas-visual-acceptance.spec.ts",
+      "id": "B020",
+      "line": 13,
+      "retry": 0,
+      "status": "passed",
+      "title": "dense strategy nodes remain readable and reachable at 320x900"
+    },
+    {
+      "duration_ms": 2099,
+      "file": "frontend/tests/browser/canvas-visual-acceptance.spec.ts",
+      "id": "B021",
+      "line": 13,
+      "retry": 0,
+      "status": "passed",
+      "title": "dense strategy nodes remain readable and reachable at 390x900"
+    },
+    {
+      "duration_ms": 2583,
+      "file": "frontend/tests/browser/canvas-visual-acceptance.spec.ts",
+      "id": "B022",
+      "line": 13,
+      "retry": 0,
+      "status": "passed",
+      "title": "dense strategy nodes remain readable and reachable at 1280x900"
+    },
+    {
+      "duration_ms": 2553,
+      "file": "frontend/tests/browser/canvas-visual-acceptance.spec.ts",
+      "id": "B023",
+      "line": 13,
+      "retry": 0,
+      "status": "passed",
+      "title": "dense strategy nodes remain readable and reachable at 1430x2511"
+    },
+    {
+      "duration_ms": 612,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B024",
+      "line": 59,
+      "retry": 0,
+      "status": "passed",
+      "title": "401 hides the console; blank input sends nothing and Enter waits for validation with one trimmed Bearer attempt"
+    },
+    {
+      "duration_ms": 409,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B025",
+      "line": 90,
+      "retry": 0,
+      "status": "passed",
+      "title": "initial validation holds the page and excludes overlapping manual and locale-triggered probes"
+    },
+    {
+      "duration_ms": 341,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B026",
+      "line": 106,
+      "retry": 0,
+      "status": "passed",
+      "title": "blank-key errors follow locale changes without new validation requests"
+    },
+    {
+      "duration_ms": 507,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B027",
+      "line": 122,
+      "retry": 0,
+      "status": "passed",
+      "title": "wrong keys and a true network abort stay on the page with a retained draft and allow retry"
+    },
+    {
+      "duration_ms": 7010,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B028",
+      "line": 144,
+      "retry": 0,
+      "status": "passed",
+      "title": "activity 401 clears the credential, stops polling, hides remembered data and reload cannot restore the key"
+    },
+    {
+      "duration_ms": 349,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B029",
+      "line": 178,
+      "retry": 0,
+      "status": "passed",
+      "title": "a successful connection keeps credentials out of browser storage and reload needs a fresh key"
+    },
+    {
+      "duration_ms": 441,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B030",
+      "line": 196,
+      "retry": 0,
+      "status": "passed",
+      "title": "anonymous gateways retain normal navigation"
+    },
+    {
+      "duration_ms": 479,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B031",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: en, 1280px, light"
+    },
+    {
+      "duration_ms": 469,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B032",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: en, 1280px, dark"
+    },
+    {
+      "duration_ms": 401,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B033",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: en, 320px, light"
+    },
+    {
+      "duration_ms": 382,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B034",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: en, 320px, dark"
+    },
+    {
+      "duration_ms": 453,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B035",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: zh-CN, 1280px, light"
+    },
+    {
+      "duration_ms": 477,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B036",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: zh-CN, 1280px, dark"
+    },
+    {
+      "duration_ms": 425,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B037",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: zh-CN, 320px, light"
+    },
+    {
+      "duration_ms": 519,
+      "file": "frontend/tests/browser/connection.spec.ts",
+      "id": "B038",
+      "line": 210,
+      "retry": 0,
+      "status": "passed",
+      "title": "connection geometry and keyboard focus: zh-CN, 320px, dark"
+    },
+    {
+      "duration_ms": 3172,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B039",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in en at 1280px with system font"
+    },
+    {
+      "duration_ms": 3808,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B040",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in zh-CN at 1280px with system font"
+    },
+    {
+      "duration_ms": 3757,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B041",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in en at 390px with system font"
+    },
+    {
+      "duration_ms": 4700,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B042",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in zh-CN at 390px with system font"
+    },
+    {
+      "duration_ms": 4560,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B043",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in en at 320px with system font"
+    },
+    {
+      "duration_ms": 4591,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B044",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in zh-CN at 320px with system font"
+    },
+    {
+      "duration_ms": 4832,
+      "file": "frontend/tests/browser/icons.spec.ts",
+      "id": "B045",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "icon controls preserve names, geometry and interactions in en at 1280px with serif font"
+    },
+    {
+      "duration_ms": 605,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B046",
+      "line": 8,
+      "retry": 0,
+      "status": "passed",
+      "title": "restores the first cursor page when a later page fails, then loads the next page on retry"
+    },
+    {
+      "duration_ms": 496,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B047",
+      "line": 26,
+      "retry": 0,
+      "status": "passed",
+      "title": "supports keyboard session selection and selected detail"
+    },
+    {
+      "duration_ms": 759,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B048",
+      "line": 39,
+      "retry": 0,
+      "status": "passed",
+      "title": "request-detail list loads a cursor page on scroll and retains its focused row"
+    },
+    {
+      "duration_ms": 3539,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B049",
+      "line": 58,
+      "retry": 0,
+      "status": "passed",
+      "title": "utility geometry keeps virtual windows, recorded trace and mobile table readable"
+    },
+    {
+      "duration_ms": 821,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B050",
+      "line": 137,
+      "retry": 0,
+      "status": "passed",
+      "title": "keeps request-detail loading, failure, unavailable evidence, and empty states distinct"
+    },
+    {
+      "duration_ms": 410,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B051",
+      "line": 157,
+      "retry": 0,
+      "status": "passed",
+      "title": "keeps request-detail loading copy visible while its synthetic response is delayed"
+    },
+    {
+      "duration_ms": 495,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B052",
+      "line": 170,
+      "retry": 0,
+      "status": "passed",
+      "title": "keeps mobile provider cells' data-label records readable"
+    },
+    {
+      "duration_ms": 1196,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B053",
+      "line": 189,
+      "retry": 0,
+      "status": "passed",
+      "title": "activity honors reduced motion and keeps refresh outside the route map"
+    },
+    {
+      "duration_ms": 384,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B054",
+      "line": 223,
+      "retry": 0,
+      "status": "passed",
+      "title": "activity sample failure is shown as unavailable and can be retried without policy writes"
+    },
+    {
+      "duration_ms": 329,
+      "file": "frontend/tests/browser/monitoring.spec.ts",
+      "id": "B055",
+      "line": 234,
+      "retry": 0,
+      "status": "passed",
+      "title": "keeps the latest-session preview unselected until an operator chooses a session"
+    },
+    {
+      "duration_ms": 1303,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B056",
+      "line": 28,
+      "retry": 0,
+      "status": "passed",
+      "title": "refresh invalidates delayed query and automatic evidence after endpoint changes"
+    },
+    {
+      "duration_ms": 1196,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B057",
+      "line": 28,
+      "retry": 0,
+      "status": "passed",
+      "title": "refresh invalidates delayed query and automatic evidence after transport changes"
+    },
+    {
+      "duration_ms": 1220,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B058",
+      "line": 28,
+      "retry": 0,
+      "status": "passed",
+      "title": "refresh invalidates delayed query and automatic evidence after credential revision changes"
+    },
+    {
+      "duration_ms": 1156,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B059",
+      "line": 74,
+      "retry": 0,
+      "status": "passed",
+      "title": "latest evidence remains consistent for lookup to discovery, unknowns and manual overrides"
+    },
+    {
+      "duration_ms": 1253,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B060",
+      "line": 74,
+      "retry": 0,
+      "status": "passed",
+      "title": "latest evidence remains consistent for discovery to lookup, unknowns and manual overrides"
+    },
+    {
+      "duration_ms": 1084,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B061",
+      "line": 104,
+      "retry": 0,
+      "status": "passed",
+      "title": "null beside known evidence prefills, reference-only stays unknown and real conflicts block import"
+    },
+    {
+      "duration_ms": 711,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B062",
+      "line": 124,
+      "retry": 0,
+      "status": "passed",
+      "title": "candidate credential action edits respect rejected and accepted discard"
+    },
+    {
+      "duration_ms": 1041,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B063",
+      "line": 124,
+      "retry": 0,
+      "status": "passed",
+      "title": "candidate credential password edits respect rejected and accepted discard"
+    },
+    {
+      "duration_ms": 670,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B064",
+      "line": 152,
+      "retry": 0,
+      "status": "passed",
+      "title": "credential clear sends a value-free local clear and reports inherited effective presence"
+    },
+    {
+      "duration_ms": 1295,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B065",
+      "line": 167,
+      "retry": 0,
+      "status": "passed",
+      "title": "import remains applied after catalog GET failure and read retry never duplicates PUT"
+    },
+    {
+      "duration_ms": 693,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B066",
+      "line": 167,
+      "retry": 0,
+      "status": "passed",
+      "title": "save remains applied after catalog GET failure and read retry never duplicates PUT"
+    },
+    {
+      "duration_ms": 672,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B067",
+      "line": 204,
+      "retry": 0,
+      "status": "passed",
+      "title": "broken local supplier image uses the neutral fallback without changing identity geometry"
+    },
+    {
+      "duration_ms": 744,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B068",
+      "line": 213,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider editing preserves ID, clears secrets, and sends the shared contract"
+    },
+    {
+      "duration_ms": 1281,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B069",
+      "line": 235,
+      "retry": 0,
+      "status": "passed",
+      "title": "supplier aliases, custom entry, icon picker and System One are usable"
+    },
+    {
+      "duration_ms": 1101,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B070",
+      "line": 260,
+      "retry": 0,
+      "status": "passed",
+      "title": "selection scope, metadata edits and explicit import refresh the catalog"
+    },
+    {
+      "duration_ms": 755,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B071",
+      "line": 289,
+      "retry": 0,
+      "status": "passed",
+      "title": "unknown metadata blocks import and failed operations remain retryable"
+    },
+    {
+      "duration_ms": 699,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B072",
+      "line": 307,
+      "retry": 0,
+      "status": "passed",
+      "title": "revision conflicts preserve the draft, clear the secret and use the refreshed revision"
+    },
+    {
+      "duration_ms": 736,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B073",
+      "line": 328,
+      "retry": 0,
+      "status": "passed",
+      "title": "candidate private-network discovery is explicit and canceled results stay out of other tabs"
+    },
+    {
+      "duration_ms": 471,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B074",
+      "line": 349,
+      "retry": 0,
+      "status": "passed",
+      "title": "read-only and unauthorized configuration reads expose the appropriate recovery"
+    },
+    {
+      "duration_ms": 794,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B075",
+      "line": 361,
+      "retry": 0,
+      "status": "passed",
+      "title": "verified DeepSeek artwork loads locally, preserves proportions and retains attribution"
+    },
+    {
+      "duration_ms": 1375,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B076",
+      "line": 375,
+      "retry": 0,
+      "status": "passed",
+      "title": "metadata retry remains a metadata operation and batch values need an explicit null decision"
+    },
+    {
+      "duration_ms": 741,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B077",
+      "line": 406,
+      "retry": 0,
+      "status": "passed",
+      "title": "native endpoint presets preserve null and fill their declared credential reference"
+    },
+    {
+      "duration_ms": 803,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B078",
+      "line": 421,
+      "retry": 0,
+      "status": "passed",
+      "title": "saving a previewed provider keeps model selection and reviewed metadata for explicit import"
+    },
+    {
+      "duration_ms": 576,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B079",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 320px en light"
+    },
+    {
+      "duration_ms": 631,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B080",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 320px en dark"
+    },
+    {
+      "duration_ms": 705,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B081",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 320px zh-CN light"
+    },
+    {
+      "duration_ms": 709,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B082",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 320px zh-CN dark"
+    },
+    {
+      "duration_ms": 657,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B083",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 390px en light"
+    },
+    {
+      "duration_ms": 578,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B084",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 390px en dark"
+    },
+    {
+      "duration_ms": 639,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B085",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 390px zh-CN light"
+    },
+    {
+      "duration_ms": 634,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B086",
+      "line": 446,
+      "retry": 0,
+      "status": "passed",
+      "title": "model confirmation fits 390px zh-CN dark"
+    },
+    {
+      "duration_ms": 586,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B087",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 320px en light"
+    },
+    {
+      "duration_ms": 410,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B088",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 320px en dark"
+    },
+    {
+      "duration_ms": 577,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B089",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 320px zh-CN light"
+    },
+    {
+      "duration_ms": 382,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B090",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 320px zh-CN dark"
+    },
+    {
+      "duration_ms": 532,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B091",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 390px en light"
+    },
+    {
+      "duration_ms": 593,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B092",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 390px en dark"
+    },
+    {
+      "duration_ms": 414,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B093",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 390px zh-CN light"
+    },
+    {
+      "duration_ms": 575,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B094",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 390px zh-CN dark"
+    },
+    {
+      "duration_ms": 617,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B095",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 1280px en light"
+    },
+    {
+      "duration_ms": 442,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B096",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 1280px en dark"
+    },
+    {
+      "duration_ms": 441,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B097",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 1280px zh-CN light"
+    },
+    {
+      "duration_ms": 497,
+      "file": "frontend/tests/browser/provider-management.spec.ts",
+      "id": "B098",
+      "line": 467,
+      "retry": 0,
+      "status": "passed",
+      "title": "provider form fits 1280px zh-CN dark"
+    },
+    {
+      "duration_ms": 3849,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B099",
+      "line": 10,
+      "retry": 0,
+      "status": "passed",
+      "title": "top-level view buttons stay compact on desktop and usable on mobile"
+    },
+    {
+      "duration_ms": 1737,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B100",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "view containers remain centered and bounded at 320px"
+    },
+    {
+      "duration_ms": 1711,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B101",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "view containers remain centered and bounded at 390px"
+    },
+    {
+      "duration_ms": 2592,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B102",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "view containers remain centered and bounded at 1280px"
+    },
+    {
+      "duration_ms": 3226,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B103",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "view containers remain centered and bounded at 1920px"
+    },
+    {
+      "duration_ms": 3256,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B104",
+      "line": 43,
+      "retry": 0,
+      "status": "passed",
+      "title": "view containers remain centered and bounded at 2560px"
+    },
+    {
+      "duration_ms": 1975,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B105",
+      "line": 103,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no document-level horizontal overflow at 1280x900 in English and Chinese"
+    },
+    {
+      "duration_ms": 1709,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B106",
+      "line": 103,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no document-level horizontal overflow at 1430x2511 in English and Chinese"
+    },
+    {
+      "duration_ms": 1930,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B107",
+      "line": 103,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no document-level horizontal overflow at 390x820 in English and Chinese"
+    },
+    {
+      "duration_ms": 1958,
+      "file": "frontend/tests/browser/responsive.spec.ts",
+      "id": "B108",
+      "line": 103,
+      "retry": 0,
+      "status": "passed",
+      "title": "has no document-level horizontal overflow at 320x820 in English and Chinese"
+    },
+    {
+      "duration_ms": 1017,
+      "file": "frontend/tests/browser/routing-editor.spec.ts",
+      "id": "B109",
+      "line": 8,
+      "retry": 0,
+      "status": "passed",
+      "title": "shows configured route explanation with and without reduced motion"
+    },
+    {
+      "duration_ms": 2382,
+      "file": "frontend/tests/browser/routing-editor.spec.ts",
+      "id": "B110",
+      "line": 51,
+      "retry": 0,
+      "status": "passed",
+      "title": "routing draft validates before review, requires warning acknowledgement, then explicitly applies and confirms reset"
+    },
+    {
+      "duration_ms": 1233,
+      "file": "frontend/tests/browser/routing-editor.spec.ts",
+      "id": "B111",
+      "line": 98,
+      "retry": 0,
+      "status": "passed",
+      "title": "canvas supports keyboard node focus and real pointer drag without policy writes"
+    },
+    {
+      "duration_ms": 3355,
+      "file": "frontend/tests/browser/routing-editor.spec.ts",
+      "id": "B112",
+      "line": 123,
+      "retry": 0,
+      "status": "passed",
+      "title": "canvas utilities preserve measured geometry, toolbar controls and real hit targets at supported widths"
+    },
+    {
+      "duration_ms": 1416,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B113",
+      "line": 4,
+      "retry": 0,
+      "status": "passed",
+      "title": "settings permits theme writes while provider and routing writes remain unavailable"
+    },
+    {
+      "duration_ms": 877,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B114",
+      "line": 29,
+      "retry": 0,
+      "status": "passed",
+      "title": "a late settings read cannot overwrite a newer theme read"
+    },
+    {
+      "duration_ms": 631,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B115",
+      "line": 51,
+      "retry": 0,
+      "status": "passed",
+      "title": "settings re-entry during a theme write keeps the write pending and skips reads"
+    },
+    {
+      "duration_ms": 421,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B116",
+      "line": 78,
+      "retry": 0,
+      "status": "passed",
+      "title": "a failed settings theme read is visible and can be retried"
+    },
+    {
+      "duration_ms": 583,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B117",
+      "line": 88,
+      "retry": 0,
+      "status": "passed",
+      "title": "a settings write rejected with 401 requires reconnection without persisting credentials"
+    },
+    {
+      "duration_ms": 743,
+      "file": "frontend/tests/browser/settings.spec.ts",
+      "id": "B118",
+      "line": 105,
+      "retry": 0,
+      "status": "passed",
+      "title": "a failed theme write preserves the saved seed and permits one successful retry"
+    }
+  ],
+  "first_publication_preserved": {
+    ".trellis/tasks/10-03-release-011-acceptance/check-public-browser.md": {
+      "matches_previous_preservation_snapshot": true,
+      "sha256": "e475dbdc4e651a3c0711f21938bd7f3233c6a691b72273fb2329b55d436ac9ee"
+    },
+    ".trellis/tasks/10-03-release-011-acceptance/verification/backend-harness-qualification.json": {
+      "retained": true,
+      "sha256": "1dbdd320a7b8a3e7acbbf7bda240454f05e5bae809c1dedac5e5c17cd57e5be1"
+    },
+    ".trellis/tasks/10-03-release-011-acceptance/verification/public-browser-results.json": {
+      "matches_previous_preservation_snapshot": true,
+      "sha256": "ef1c80aef870938285bdb9a8f910e068377deab1e2cdbca36f3b71c2607b0dfd"
+    }
+  },
+  "installer": {
+    "checks": [
+      "public installer supplied one verified wheel to uv",
+      "installer uv input matches exact public wheel SHA256",
+      "installed version and managed Python 3.12",
+      "installer installed the verified public wheel SHA256",
+      "recorded installation home",
+      "all installed package files match downloaded public wheel",
+      "browser install leaves managed gateway stopped",
+      "initial running or stopped service state restored"
+    ],
+    "cleanup_success": true,
+    "installed_package": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/lib/python3.12/site-packages/jev_gateway",
+    "installed_python": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/bin/python3",
+    "installer_sha256": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "installer_wheel_inputs": [
+      {
+        "filename": "jev_gateway-0.1.1-py3-none-any.whl",
+        "sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+        "size_bytes": 355988
+      }
+    ],
+    "package_files_compared": 52,
+    "scope": "browser",
+    "success": true,
+    "uv_archive_sha256_recorded": false,
+    "version": "0.1.1",
+    "wheel_identity_method": "observed installer input joined to installed file URL",
+    "wheel_sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038"
+  },
+  "limitations": [
+    "Source lint/type/unit/build/freshness evidence is separate from installed acceptance.",
+    "Canvas AC9 overflow-column, encoded Unicode payload and saved-position-after-growth subcases retain their separate source unit basis.",
+    "Operator preservation and final release approval remain with the parent."
+  ],
+  "native_invocations": {
+    "public-browser-install": {
+      "argv": [
+        "/Users/texas/Workspace/jev-llmroute-test/.venv/bin/python3",
+        "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/10-03-release-011-acceptance/verification/tools/public-installed-acceptance.py",
+        "--scope",
+        "browser",
+        "--version",
+        "0.1.1",
+        "--assets-manifest",
+        "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-download/public-assets-result.json",
+        "--work-dir",
+        "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install"
+      ],
+      "elapsed_seconds": 53.124,
+      "exit_code": 0,
+      "native_exit_record": {
+        "path": ".git/jev-release-011-acceptance/replacement/public-browser-install-native-exit.json",
+        "sha256": "7b6d49831e46097b74b7d61963525a01714e5fcbbd6871046103bedf250ab718"
+      },
+      "native_log": {
+        "path": ".git/jev-release-011-acceptance/replacement/public-browser-install-native.log",
+        "sha256": "12632b010efda72c05355d527706ab01a54fecffacbc16af5cbcf41b23ecfc15"
+      }
+    },
+    "public-wheel-browser": {
+      "argv": [
+        "/Users/texas/Workspace/jev-llmroute-test/.venv/bin/python3",
+        "/Users/texas/Workspace/jev-llmroute-test/.trellis/tasks/10-03-release-011-acceptance/verification/tools/public-wheel-browser.py",
+        "--mode",
+        "run",
+        "--source-repo",
+        "/Users/texas/Workspace/jev-llmroute-test",
+        "--assets-manifest",
+        "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-download/public-assets-result.json",
+        "--installed-python",
+        "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-browser-install/tools/jev-gateway/bin/python3",
+        "--expected-tests",
+        "118",
+        "--workers",
+        "2",
+        "--version",
+        "0.1.1",
+        "--work-dir",
+        "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/replacement/public-wheel-browser"
+      ],
+      "elapsed_seconds": 80.74,
+      "exit_code": 0,
+      "native_exit_record": {
+        "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser-native-exit.json",
+        "sha256": "a60762892b345218f5f85e143a37025624d64ae22ef2b1769d755f7482cf2abc"
+      },
+      "native_log": {
+        "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser-native.log",
+        "sha256": "c8bad3b7e2876a68d4396589b357c317b0cb72562d3e1596fc719c1db8ade801"
+      }
+    }
+  },
+  "private_evidence": {
+    "asgi.log": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/asgi.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "browser-result.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-result.json",
+      "sha256": "b673eb9d0d40a290d078f759c0d5eaf19a69599ec6c51fa31e7df2c2b32143c5"
+    },
+    "browser-results/results.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/browser-results/results.json",
+      "sha256": "a05e3ea77d23db030b3eba7c0c4426da1397db4c4d567dab2a760e152938584e"
+    },
+    "derived-config.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/derived-config.json",
+      "sha256": "e93119f5f63306ba8e25053aa640dcdc09c8997b9effe545c0e7c254dd8d76ee"
+    },
+    "discovery.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/discovery.json",
+      "sha256": "37feb407bb9e5f0d08331b95fd64d3af22027b1e71c1a5d98d0a9f347402feb0"
+    },
+    "escaped-api-requests.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/escaped-api-requests.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "playwright.log": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/playwright.log",
+      "sha256": "812cd23afcb567ee90234c2c4e7715b744f157a88a633c4eda593f5c65cfabb8"
+    },
+    "served-wheel.json": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-browser/served-wheel.json",
+      "sha256": "f3fe7faa5b24ea665122082a69de4485f02a3559edc0e5a8052299e2b91a4482"
+    }
+  },
+  "public_asset_identity": {
+    "ci_run_id": 37132156378,
+    "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+    "release_id": 402565482,
+    "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37132156378",
+    "sha256": {
+      "install.sh": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+      "jev_gateway-0.1.1-py3-none-any.whl": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038"
+    },
+    "tag": "v0.1.1",
+    "version": "0.1.1"
+  },
+  "retries": 0,
+  "scope": "Replacement public v0.1.1 installer browser scope and complete installed Dashboard browser regression.",
+  "scope_controls": {
+    "commits_or_publication": false,
+    "frontend_build_run": false,
+    "helpers_modified": false,
+    "product_source_modified": false,
+    "real_generation_or_provider_discovery": false,
+    "recursive_agents": false,
+    "retained_installation_for_parent": true,
+    "tests_modified": false
+  },
+  "source_integrity": {
+    "all_52_installed_package_files_match_after_backend_tooling": true,
+    "backend_non_dashboard_conftest_ast_unchanged": true,
+    "backend_test_hashes": {
+      "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "helpers.py": "c02a0c018676993381fa383dc0b7bad1048695d528a8b5447581b1c974434b7f",
+      "test_canvas_layout.py": "8e4e062185944a9861e798b828357009e9ce74f25be0ef1380bc55c882d5d2f3",
+      "test_decision_matrix.py": "db02ec411a494595b7f38be06235ecbe6d0b106c26f8a56a58ff9c796fb19d40",
+      "test_gateway.py": "4d42a78c692c25287196d7fd591223dbb08d049114b036caf62a71dadf628c34",
+      "test_routing_overlay.py": "e305fa7ca526c9bffa9b42ff3616a7d9f7b4598be1ec1ae147f8f328453973ad"
+    },
+    "browser_derived_tests": {
+      "appearance.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "6be6cda4aa635f9532345d75009fbea6849d600220adc20b7b32c9cf32df4d47",
+        "sha256": "6be6cda4aa635f9532345d75009fbea6849d600220adc20b7b32c9cf32df4d47"
+      },
+      "canvas-connections.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "f47c8c9ca065098aedafa6f986e1aca0aad307d1197e6f4342cc939d526d077a",
+        "sha256": "f9ed6f21829777ae2fd49e883d514afd5ab4432ad54ea5dea0af7eaf0795c81a"
+      },
+      "canvas-visual-acceptance.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "d4e5d52096b602bd5cbd4c83f3a1ab7dd8e75571e2df47d50bd7ccce30ed743d",
+        "sha256": "d4e5d52096b602bd5cbd4c83f3a1ab7dd8e75571e2df47d50bd7ccce30ed743d"
+      },
+      "connection.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "83b6658e9a2a160dddf0517f0b031cd6c2d24358081875bd4f486c1d19ac688f",
+        "sha256": "83b6658e9a2a160dddf0517f0b031cd6c2d24358081875bd4f486c1d19ac688f"
+      },
+      "icons.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "38c5c9c8357f76783e2340270be10b1ba971460d6984671bf33bbf11a17e1409",
+        "sha256": "38c5c9c8357f76783e2340270be10b1ba971460d6984671bf33bbf11a17e1409"
+      },
+      "monitoring.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "9ff92125bce26e818d1fd5a332dd4727dbfa30270eecac11c61d01a16243e43c",
+        "sha256": "9ff92125bce26e818d1fd5a332dd4727dbfa30270eecac11c61d01a16243e43c"
+      },
+      "provider-management.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "0fe4efa5b6b42f60e7ab9b34d075bb622473d28f790b701ec2b178e54c2147ea",
+        "sha256": "0fe4efa5b6b42f60e7ab9b34d075bb622473d28f790b701ec2b178e54c2147ea"
+      },
+      "responsive.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "a343b8b64641b47fe657efe6cc96dd14df6a10cdae04ea73b8c0aa1dcdb6f8d9",
+        "sha256": "a343b8b64641b47fe657efe6cc96dd14df6a10cdae04ea73b8c0aa1dcdb6f8d9"
+      },
+      "routing-editor.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "f006c816afb515b571bdfe4c4ecd190f3b647780aaa8471f101d6b6b80bb1ed7",
+        "sha256": "f006c816afb515b571bdfe4c4ecd190f3b647780aaa8471f101d6b6b80bb1ed7"
+      },
+      "settings.spec.ts": {
+        "assertions_unchanged": true,
+        "derived_sha256": "b4f5b6cf8e3261d20d4c3ac9b9b66048cc93e264713b651a822b5b323ac74188",
+        "sha256": "b4f5b6cf8e3261d20d4c3ac9b9b66048cc93e264713b651a822b5b323ac74188"
+      }
+    },
+    "cleanup": {
+      "installation_retained": true,
+      "installed_status_error": "not_running",
+      "installed_status_exit": 4,
+      "matching_asgi_children": [],
+      "port_4178_bindable": true
+    },
+    "dashboard_fixture_decorators_unchanged": true,
+    "escaped_api_requests": 0,
+    "fixture_symlinks_match_source": true,
+    "native_driver_exits": [
+      0,
+      0,
+      0
+    ],
+    "package_file_sha256": {
+      "jev_gateway/__init__.py": "329de6298cbd1212b43edcd7b0c9aa708962513224b26451d3dea56156957bd9",
+      "jev_gateway/activity.py": "86f8b9a886be9d99fbcc1f79a6c9a14a1141cc1d8cce6aac47e3bd6c23a5d0da",
+      "jev_gateway/canvas_layout.py": "348ab0091197f921e9114d7f924379f687dc7446465954063fc4b98fe3a2027d",
+      "jev_gateway/catalog.py": "5d5e08333ca9cd767c985d31aafb728c610b1053939641961e8ab91e3cdbebc2",
+      "jev_gateway/cli/__init__.py": "463d4be63abf0742eba7184f6d0c3820d737dbbd965cc206f013a339c96c1a1f",
+      "jev_gateway/cli/config_ops.py": "72a6cfb9fdfb7d58d7197f62c03f316ec625685af174bd279478bb6a4676ec96",
+      "jev_gateway/cli/health.py": "35fc51c7f06d220e77abbb82bfc7288b58f89152d694b0032d2664750bd46087",
+      "jev_gateway/cli/install_state.py": "275489f88969c19b69f33e15910cc6097861ac80f5d0b198a6fe845f4c80534d",
+      "jev_gateway/cli/main.py": "66d2c1ecbfac292adc851f333467e9d7817d00cd74dd4e94ddbf3c9f6db9db5f",
+      "jev_gateway/cli/output.py": "5a7597d914ea6317268c7d37536a38db22ed60ecffd01c226321d8f533b600cd",
+      "jev_gateway/cli/paths.py": "5a86c9d22a2941a57cf02d2acd10517538ba7d838594b2b865641200c5e97e8f",
+      "jev_gateway/cli/process.py": "22269d146c4a4b9ec970fd85d2f31d0c35da71ba506ac661375384913ace083e",
+      "jev_gateway/cli/providers.py": "90c9c7d12f15e26f54cbbd6a0a2283869b7ef3dc964ffd767d66e7b7bd02d71b",
+      "jev_gateway/cli/secrets.py": "00ae1d85b7814e994ec0511ef18647a3c71c81fa895f8f7b5f49129c8cf72bb3",
+      "jev_gateway/cli/server.py": "89f2349b421fd89a52e52b8ffaf001cc0be12e3f283831bd8334864ebf1edc24",
+      "jev_gateway/cli/uninstall.py": "49c714276dd589ea58db740b2ef6c0162fc8b5b1639463f2acf08d5e1a2e77f3",
+      "jev_gateway/config.py": "9f841f0be59a4e89a6ac286efd57b9c0cf65368391f44894f617d3b2eb42eb14",
+      "jev_gateway/config_transaction.py": "ddeff4dbb345028311d1a0e5cfbd05552dd9f8cafc50847b1bc15f9cb0fa5a84",
+      "jev_gateway/dashboard.py": "b41049ef7228175df1949a4203c44086afd8a5c5e47e32afc20717bda7c3b14b",
+      "jev_gateway/decision.py": "d751d0af81e76f932d931bf3ffda1deb41f0fe0056e4b743373f1a72e82ac014",
+      "jev_gateway/discovery_network.py": "efd44674340c2568d1d271d2ea53b4ec3b20addd18d1b384a90ea8f1616f20e4",
+      "jev_gateway/gateway.py": "639e0cd514a27ecb99fa873a0a6835550c7ae93143191176aa7e6b676138d193",
+      "jev_gateway/logging/__init__.py": "0309940836d04046ea13e7adbbe2aa041f87d52d4fa39a64406576f769258b70",
+      "jev_gateway/logging/catalog.py": "4b39e0b080b710c79f43027e64fe69bb739491b2a358aa19e42754a77e8a07b5",
+      "jev_gateway/logging/config.py": "116607216913f9961b2a03eb9171a8b759ba4719d664fd05c7ccd8e70d71c8fe",
+      "jev_gateway/model_discovery.py": "aedd8461cd8d0f589243511e36465c32db11faaa0d4da18728d5a4625ce0e690",
+      "jev_gateway/model_metadata.py": "d8b2ca8ae935c85d4a70543fefeba744db9b6f4e1a94b29934a757404afcb432",
+      "jev_gateway/provider/__init__.py": "50ffe4e203deaa46f6032abbd84cfe113f439444228c61c4dd21f38c084e3702",
+      "jev_gateway/provider/base.py": "c9dca2ce4a0728c2908b7527dbb405dea810a6df2df1d495e26dcaad53751e87",
+      "jev_gateway/provider/deepseek.py": "51aa76183e8db40791e2df91f8bb8ccb0efebd239f0edfb3b24d6ee0a7502a39",
+      "jev_gateway/provider_config.py": "942e296cba9bb1feebc92e15140cc55fd6f5a212ff978aec291e132f3ae22696",
+      "jev_gateway/provider_presets.py": "4eeb356cfcd556abe1a42c43e09de4d2c711d330d6cc14cdee68aa0b25a7591a",
+      "jev_gateway/reasoning.py": "77bdbccf3475ddbe297647242a530030c8a6957ba88f6a12737c786de1cc15e3",
+      "jev_gateway/records.py": "5b0575e69f31436c37ae9d2281a99eb88da9a068c88473bd28e96cce53a3f121",
+      "jev_gateway/request_facts.py": "85a9a84868f682f16e809a1b7769841fcda06fe240178e7915b699ff091810a4",
+      "jev_gateway/routing_overlay.py": "50f680ef4b341c211c1ff7271afb99e252e6c499b4869cd8dc8236732cfa74d8",
+      "jev_gateway/sessions.py": "8093226dc017b4635c455ec07aa11f5b24753f42917a8190f18619a7403fc52b",
+      "jev_gateway/static/assets/deepseek-Bl9-59Mi.svg": "ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b",
+      "jev_gateway/static/assets/index-DUdxukOW.css": "621fde520d581c4471158660585b6bd06acd602bf9a8429ab9d0fc5dd15bd0a9",
+      "jev_gateway/static/assets/index-DiAhKErC.js": "54a214554b162ced0207a2d64fdc8d84483e8f409a377b69bdcf914df45660be",
+      "jev_gateway/static/index.html": "b2c66a9f61d2d73c946c229b907c90128d892d5bc545ec868d7ec8b0660f17a7",
+      "jev_gateway/strategy/__init__.py": "f8921c5ece6a47a18d08dfcab3017570b2c1760415ce33710024eb53fa99b92b",
+      "jev_gateway/strategy/classifier.py": "72edcbbfc57014855447451de2d6eb593ec19e55666e65b2c2e8f8435d1e2a9f",
+      "jev_gateway/strategy/contracts.py": "9790dd4cac1b0fcaa720649c414621e30d966beade3085127184685c64aa2d1b",
+      "jev_gateway/strategy/decision_provider/__init__.py": "16c490f7dcb18fc3591e73f002344d89d66e41827b0036600ebd77bb6dfe7677",
+      "jev_gateway/strategy/decision_provider/base.py": "4961e0ca38279fd1e813b5920196089e09d98ae827886fbf99abf49a0c0c984a",
+      "jev_gateway/strategy/decision_provider/system_one.py": "537d62334391629fd9d9407569eb9b70cf73ef174ce4fc8c59a6789eb3651ef2",
+      "jev_gateway/strategy/matrix.py": "f98e56d756837c8b769d047c692db6d8d538d236793c73d9150b832b0cefcb82",
+      "jev_gateway/strategy/policy.py": "7a4babae23fee078b535520db448783a5a4569eeab9251b5f58d78b6f977a9f1",
+      "jev_gateway/strategy/registry.py": "3695c238679eec90d5767283c14b9d9dd3802d2680bf403b0d2e171761a54e4b",
+      "jev_gateway/templates/env.example": "ede5fde73be271b5032f680efe4409d1016016ae0f0ca3a736335dd0b6ed21eb",
+      "jev_gateway/templates/models.example.json": "a83f3eb8aabff6f27fad0fdf7f1de727c7d0b475d0d0b9b68f7f4f19fddefa07"
+    },
+    "source": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+    "source_files_checked": 39,
+    "source_hashes_unchanged": {
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/acceptance_common.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/authenticated-dashboard.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/installed-backend-regression.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/native-owner.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/public-installed-acceptance.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/public-wheel-browser.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/verified-installer-uv.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/verify-public-assets.py": true,
+      ".trellis/tasks/10-03-release-011-acceptance/verification/tools/wheel-dashboard-server.py": true,
+      "frontend/playwright.config.ts": true,
+      "frontend/tests/browser/appearance.spec.ts": true,
+      "frontend/tests/browser/canvas-connections.spec.ts": true,
+      "frontend/tests/browser/canvas-visual-acceptance.spec.ts": true,
+      "frontend/tests/browser/connection.spec.ts": true,
+      "frontend/tests/browser/fixtures.ts": true,
+      "frontend/tests/browser/icons.spec.ts": true,
+      "frontend/tests/browser/monitoring.spec.ts": true,
+      "frontend/tests/browser/provider-management.spec.ts": true,
+      "frontend/tests/browser/provider.config.ts": true,
+      "frontend/tests/browser/responsive.spec.ts": true,
+      "frontend/tests/browser/routing-editor.spec.ts": true,
+      "frontend/tests/browser/settings.spec.ts": true,
+      "frontend/tests/fixtures/activity.ts": true,
+      "frontend/tests/fixtures/configuration.ts": true,
+      "frontend/tests/fixtures/provider-browser.ts": true,
+      "frontend/tests/fixtures/provider-management.ts": true,
+      "frontend/tests/fixtures/sessions.ts": true,
+      "frontend/tests/fixtures/strategies.ts": true,
+      "frontend/tests/setup/mock-api.ts": true,
+      "frontend/tests/tsconfig.json": true,
+      "frontend/tsconfig.json": true,
+      "tests/__init__.py": true,
+      "tests/conftest.py": true,
+      "tests/fixtures/task_aware_matrix.json": true,
+      "tests/helpers.py": true,
+      "tests/test_canvas_layout.py": true,
+      "tests/test_decision_matrix.py": true,
+      "tests/test_gateway.py": true,
+      "tests/test_routing_overlay.py": true
+    },
+    "success": true,
+    "tagged_source_matches": {
+      "frontend/playwright.config.ts": true,
+      "frontend/tests/browser/appearance.spec.ts": true,
+      "frontend/tests/browser/canvas-connections.spec.ts": true,
+      "frontend/tests/browser/canvas-visual-acceptance.spec.ts": true,
+      "frontend/tests/browser/connection.spec.ts": true,
+      "frontend/tests/browser/fixtures.ts": true,
+      "frontend/tests/browser/icons.spec.ts": true,
+      "frontend/tests/browser/monitoring.spec.ts": true,
+      "frontend/tests/browser/provider-management.spec.ts": true,
+      "frontend/tests/browser/provider.config.ts": true,
+      "frontend/tests/browser/responsive.spec.ts": true,
+      "frontend/tests/browser/routing-editor.spec.ts": true,
+      "frontend/tests/browser/settings.spec.ts": true,
+      "frontend/tests/fixtures/activity.ts": true,
+      "frontend/tests/fixtures/configuration.ts": true,
+      "frontend/tests/fixtures/provider-browser.ts": true,
+      "frontend/tests/fixtures/provider-management.ts": true,
+      "frontend/tests/fixtures/sessions.ts": true,
+      "frontend/tests/fixtures/strategies.ts": true,
+      "frontend/tests/setup/mock-api.ts": true,
+      "frontend/tests/tsconfig.json": true,
+      "frontend/tsconfig.json": true,
+      "tests/__init__.py": true,
+      "tests/conftest.py": true,
+      "tests/fixtures/task_aware_matrix.json": true,
+      "tests/helpers.py": true,
+      "tests/test_canvas_layout.py": true,
+      "tests/test_decision_matrix.py": true,
+      "tests/test_gateway.py": true,
+      "tests/test_routing_overlay.py": true
+    }
+  },
+  "success": true,
+  "test_counts": {
+    "discovered": 118,
+    "executed": 118,
+    "failed": 0,
+    "flaky": 0,
+    "passed": 118,
+    "retried": 0,
+    "skipped": 0
+  },
+  "test_filters": [],
+  "workers": 2
+}

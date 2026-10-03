@@ -1,0 +1,157 @@
+{
+  "task": ".trellis/tasks/10-03-release-011-acceptance",
+  "scope": "Qualification of installed-backend-regression.py against the first public 0.1.1 wheel while repaired source verification and review continue.",
+  "final_release_acceptance": false,
+  "success": false,
+  "status": "harness_setup_defect_before_test_collection",
+  "required_follow_up": "The parent must apply the harness-only offline setup fix and rerun against corrected public assets after republishing. This evidence cannot satisfy final release acceptance.",
+  "public_asset_identity": {
+    "publication": "first",
+    "version": "0.1.1",
+    "tag": "v0.1.1",
+    "commit": "e5cdf2b9418624ccd95a302a65beda6f41b0d443",
+    "release_id": 402521532,
+    "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37125487119",
+    "wheel": "jev_gateway-0.1.1-py3-none-any.whl",
+    "wheel_sha256": "7fd6f8a5130325df80505d7a85f2dd01c53b7b0a76bbe4b17a961bf0534b061f",
+    "assets_manifest": ".git/jev-release-011-acceptance/public-download/public-assets-result.json",
+    "installer_context": "The caller reported that the first browser installer exited 0 and its observer assertion failed. This qualification does not resolve or repeat that installer acceptance. Installed package parity was checked again independently."
+  },
+  "invocation": {
+    "source_repo": "/Users/texas/Workspace/jev-llmroute-test",
+    "installed_python": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/public-browser-install/tools/jev-gateway/bin/python3",
+    "assets_manifest": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/public-download/public-assets-result.json",
+    "work_dir": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/backend-harness-first-publication",
+    "work_dir_was_fresh": true,
+    "work_dir_mode": "0700",
+    "started_at": "2026-10-03T15:05:08.928182+00:00",
+    "finished_at": "2026-10-03T15:05:12.478476+00:00",
+    "harness_sha256_before": "3e07cb8775ab7138087392ae001b56e19758334d6a6d18a77a060f980c889d6c",
+    "harness_sha256_after": "3e07cb8775ab7138087392ae001b56e19758334d6a6d18a77a060f980c889d6c",
+    "native_driver_exit": 1,
+    "native_pytest_exit": 4
+  },
+  "test_counts": {
+    "requested_test_modules": 4,
+    "source_test_function_definitions": 105,
+    "expected_parameterized_case_count": null,
+    "collected": 0,
+    "executed": 0,
+    "passed": 0,
+    "failed_test_cases": 0,
+    "skipped_test_cases": 0,
+    "conftest_load_errors": 1,
+    "count_basis": "pytest aborted while importing conftest.py, before collecting test modules. Function definitions are a static count and do not represent parameterized pytest cases."
+  },
+  "installed_package_identity": {
+    "package": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/public-browser-install/tools/jev-gateway/lib/python3.12/site-packages/jev_gateway",
+    "version": "0.1.1",
+    "imports_from_site_packages": true,
+    "package_files_compared_by_harness": 52,
+    "independent_installed_file_count": 52,
+    "independent_wheel_file_count": 52,
+    "independent_file_set_equal": true,
+    "independent_package_bytes_equal": true,
+    "comparison_excludes_generated_pycache": true,
+    "diagnostic_catalog_import": "/Users/texas/Workspace/jev-llmroute-test/.git/jev-release-011-acceptance/public-browser-install/tools/jev-gateway/lib/python3.12/site-packages/jev_gateway/catalog.py"
+  },
+  "test_integrity": {
+    "copied_files_byte_identical": {
+      "__init__.py": true,
+      "helpers.py": true,
+      "test_decision_matrix.py": true,
+      "test_routing_overlay.py": true,
+      "test_canvas_layout.py": true,
+      "test_gateway.py": true
+    },
+    "source_hashes_still_match": true,
+    "source_test_hashes": {
+      "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "helpers.py": "c02a0c018676993381fa383dc0b7bad1048695d528a8b5447581b1c974434b7f",
+      "test_canvas_layout.py": "8e4e062185944a9861e798b828357009e9ce74f25be0ef1380bc55c882d5d2f3",
+      "test_decision_matrix.py": "db02ec411a494595b7f38be06235ecbe6d0b106c26f8a56a58ff9c796fb19d40",
+      "test_gateway.py": "4d42a78c692c25287196d7fd591223dbb08d049114b036caf62a71dadf628c34",
+      "test_routing_overlay.py": "e305fa7ca526c9bffa9b42ff3616a7d9f7b4598be1ec1ae147f8f328453973ad"
+    },
+    "conftest_non_dashboard_fixture_ast_equal": true,
+    "dashboard_fixture_decorators_equal": true,
+    "dashboard_fixture_adaptation": "dashboard_bundle returns the installed static directory and asserts site-packages membership. All other conftest definitions are unchanged. The fixture was not reached in the failed pytest run.",
+    "fixture_symlink": "tests/fixtures links to the original source fixture directory.",
+    "template_symlink": "The derived test runtime links to the installed package templates.",
+    "assertions_weakened": false
+  },
+  "acceptance_tooling": {
+    "pytest_install_completed": true,
+    "setup_exit_basis": "The unmodified driver requires setup.returncode == 0 before creating and executing runner.py. The setup log also reports successful installation.",
+    "added_packages": {
+      "iniconfig": "2.3.0",
+      "pluggy": "1.6.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1"
+    },
+    "product_package_reinstalled": false,
+    "litellm_installed_version": "1.103.2"
+  },
+  "networking": {
+    "block_scope": "The installed pytest runner, before conftest and test imports. Acceptance tooling installation occurs before this audit hook.",
+    "audit_events_denied": ["socket.connect", "socket.getaddrinfo"],
+    "guard_error": "outbound networking disabled for installed regression",
+    "dns_block_observed_in_original_run": true,
+    "original_trigger": "LiteLLM attempted its import-time remote model-cost-map fetch while conftest.py imported jev_gateway.catalog. The audit hook raised at socket.getaddrinfo before DNS resolution.",
+    "separate_guard_diagnostic": {
+      "native_exit": 0,
+      "guard_source": "The diagnostic executed the unmodified no_outbound function extracted from the generated runner.py.",
+      "socket_getaddrinfo_denied": true,
+      "socket_connect_denied": true,
+      "deliberate_probe_events": {"socket.getaddrinfo": 1, "socket.connect": 1},
+      "offline_dependency_import_network_events": {},
+      "offline_model_cost_map_source": "local",
+      "offline_model_cost_map_env_forced": true,
+      "scope": "This diagnostic proves the guard and offline catalog import only. It did not run pytest or qualify the original failed harness."
+    },
+    "real_upstream_generation_requests_executed": 0
+  },
+  "harness_defect": {
+    "classification": "Missing offline dependency initialization in the private harness environment.",
+    "missing_dependency": null,
+    "missing_test_fixture": null,
+    "asgi_adaptation_assessment": "ASGI execution was not reached; no ASGI failure was observed.",
+    "failure_chain": "Derived conftest.py:14 imports jev_gateway.catalog; installed catalog.py:16 imports LiteLLM; litellm/__init__.py:556 loads its model-cost map; get_model_cost_map.py:638 attempts an HTTP fetch; runner.py:20 blocks DNS with RuntimeError.",
+    "smallest_fix_for_parent": "Add LITELLM_LOCAL_MODEL_COST_MAP=\"True\" to the harness env.update(...) before launching installed Python. Keep the socket/DNS audit hook and all copied assertions unchanged.",
+    "suggested_exact_environment_update": "env.update(PYTEST_DISABLE_PLUGIN_AUTOLOAD=\"1\", PYTHONDONTWRITEBYTECODE=\"1\", LITELLM_LOCAL_MODEL_COST_MAP=\"True\")",
+    "installed_dependency_contract": "LiteLLM 1.103.2 get_model_cost_map.py:626-631 selects its packaged local map when LITELLM_LOCAL_MODEL_COST_MAP lowercases to true.",
+    "recommendation_validation": "A separate installed-Python diagnostic with that environment value imported LiteLLM and jev_gateway.catalog successfully under the same guard, with no socket.connect or socket.getaddrinfo import events.",
+    "fix_applied_to_harness": false,
+    "full_regression_after_fix": "not_run",
+    "owner": "parent"
+  },
+  "evidence": {
+    "private_root": ".git/jev-release-011-acceptance/backend-harness-first-publication",
+    "native_invocation": "native-harness-invocation.json",
+    "native_driver_stdout": "native-harness.stdout.log",
+    "native_driver_stderr": "native-harness.stderr.log",
+    "pytest_setup_log": "pytest-setup.log",
+    "native_pytest_log": "pytest.log",
+    "harness_result": "result.json",
+    "package_provenance": "provenance.json",
+    "independent_integrity_check": "integrity-check.json",
+    "offline_guard_import_diagnostic": "offline-import-selfcheck.json",
+    "offline_diagnostic_stdout": "offline-import-selfcheck.stdout.log",
+    "offline_diagnostic_stderr": "offline-import-selfcheck.stderr.log"
+  },
+  "scope_controls": {
+    "frontend_build_run": false,
+    "product_or_source_tests_modified": false,
+    "harness_or_other_helpers_modified": false,
+    "operator_install_or_services_touched": false,
+    "release_published": false,
+    "commit_created": false,
+    "writes": "Fresh private qualification evidence, pytest acceptance tooling in the supplied isolated installation, and this task-scoped report."
+  },
+  "coverage_gaps": [
+    "Decision matrix, routing overlay, canvas layout, and gateway assertions did not execute.",
+    "Installed dashboard fixture and ASGI request behavior remain unqualified by this run.",
+    "The proposed offline setup fix has only an import diagnostic; the full harness still needs a fresh run.",
+    "Corrected public package, installer, browser behavior, and operator preservation require the parent's final acceptance after republishing."
+  ]
+}

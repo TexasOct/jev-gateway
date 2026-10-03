@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "restored_service_state": "running",
+  "version": "0.1.0",
+  "scope": "Recovery after unsuccessful default-path v0.1.1 startup; not v0.1.1 operator acceptance",
+  "public_release_id": 402022958,
+  "public_v010_wheel_sha256": "8fa9585c86a12f873ee2fc894c10243a25bca3673222a1c00a7d8cf35200cb9f",
+  "recovery_wheel_digest_equals_current_public_asset": true,
+  "recovery_wheel_record_verified_files": 54,
+  "installed_product_files_match_recovery_wheel": 54,
+  "dependency_requirements_unchanged": true,
+  "configuration_validation_exit": 0,
+  "start_exit": 0,
+  "status_exit": 0,
+  "doctor_exit": 0,
+  "native_owner_probe_exit": 0,
+  "native_owner_state": "running",
+  "authenticated_health": "ok",
+  "authenticated_dashboard_asset_count": 2,
+  "protected_files_preserved": 7,
+  "original_typed_row_multisets_preserved": true,
+  "sqlite_integrity": "ok",
+  "operator_configuration_rewritten": false,
+  "generation_or_upstream_requests_performed": false,
+  "initial_recovery_metadata_attempt_retained": {
+    "exit_code": 2,
+    "error_code": "invalid_install_source",
+    "reason": "Install metadata requires a matching published release URL; the local recovery path was rejected.",
+    "resolved_by": "Verify current v0.1.0 public asset digest and use its published URL for install metadata."
+  },
+  "single_field_private_preview": {
+    "applied": false,
+    "native_validation_exit": 1,
+    "removed_field": "defaults",
+    "error_type": "ValueError",
+    "reason": "A policy label resolves a tag not declared by any model.",
+    "original_global_default_model_nonempty": true
+  },
+  "native_evidence_root": ".git/jev-release-011-acceptance/replacement/operator-recovery"
+}

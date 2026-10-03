@@ -1,0 +1,215 @@
+{
+  "version": "0.1.1",
+  "tag": "v0.1.1",
+  "commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+  "run_id": 37132156378,
+  "release_id": 402565482,
+  "run_url": "https://github.com/TexasOct/jev-gateway/actions/runs/37132156378",
+  "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.1",
+  "scope": "replacement public wheel smoke and isolated public installer acceptance",
+  "success": true,
+  "cleanup_success": true,
+  "overall_release_acceptance_complete": false,
+  "wheel_sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+  "wheel_size_bytes": 355988,
+  "installer_sha256": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+  "private_root": ".git/jev-release-011-acceptance/replacement",
+  "public_wheel_smoke": {
+    "exit_code": 0,
+    "success": true,
+    "cleanup_success": true,
+    "check_count": 59,
+    "started_at": "2026-10-03T15:28:33.663976+00:00",
+    "finished_at": "2026-10-03T15:30:55.889142+00:00",
+    "duration_seconds": 142.225,
+    "work_dir": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke",
+    "wheel_sha256_matches_expected": true,
+    "installed_package_parity": {
+      "success": true,
+      "package_files_compared": 52,
+      "file_set_matches": true,
+      "byte_mismatches": 0,
+      "captured_at": "2026-10-03T15:29:45.974590+00:00",
+      "method": "independent read-only full-package comparison while smoke installation was present"
+    },
+    "coverage": [
+      "managed Python 3.12, installed version and recorded runtime home containing spaces",
+      "file operations in isolated tool, executable, state and runtime directories",
+      "background and foreground lifecycle outside the checkout, including readiness with invalid exported proxies",
+      "SQLite integrity and schema, authenticated dashboard shell and bundled JavaScript and CSS",
+      "provider validation, apply, revision conflict and deletion through local APIs",
+      "routing validation, apply and overlay deletion through local APIs",
+      "running update restarts, stopped update remains stopped",
+      "uninstall preview, executable removal and configuration, credential and database preservation"
+    ]
+  },
+  "public_installer_isolated": {
+    "exit_code": 0,
+    "success": true,
+    "cleanup_success": true,
+    "check_count": 23,
+    "started_at": "2026-10-03T15:30:55.934112+00:00",
+    "finished_at": "2026-10-03T15:32:44.136486+00:00",
+    "duration_seconds": 108.203,
+    "work_dir": ".git/jev-release-011-acceptance/replacement/public-installer-isolated",
+    "package_files_compared": 52,
+    "installed_package_file_set_and_bytes_match": true,
+    "uv_archive_sha256_recorded": false,
+    "wheel_identity_method": "observed installer input joined to installed file URL",
+    "public_installer_invocations": 3,
+    "public_installer_command_exit_codes": [0, 0, 0],
+    "installer_wheel_inputs": [
+      {
+        "filename": "jev_gateway-0.1.1-py3-none-any.whl",
+        "sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+        "size_bytes": 355988
+      },
+      {
+        "filename": "jev_gateway-0.1.1-py3-none-any.whl",
+        "sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+        "size_bytes": 355988
+      },
+      {
+        "filename": "jev_gateway-0.1.1-py3-none-any.whl",
+        "sha256": "2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038",
+        "size_bytes": 355988
+      }
+    ],
+    "command_count": 21,
+    "expected_stopped_status_exit_4_count": 1,
+    "unexpected_command_exits": [],
+    "coverage": [
+      "execution of the verified downloaded public installer, including its own pinned wheel download and checksum verification",
+      "installed Python 3.12, recorded home and full installed-package parity",
+      "authenticated local health and bundled dashboard assets",
+      "explicit restart, running reinstall restart and stopped reinstall preservation",
+      "foreground entry point outside the checkout",
+      "uninstall preview, executable removal and runtime preservation"
+    ],
+    "preservation": {
+      "integrity": "ok",
+      "protected_files": 7,
+      "credential_modes": {".env": "0600", ".env.backup": "0600"},
+      "tables": {
+        "assistant_continuations": {"original_rows": 0, "current_rows": 0},
+        "config_versions": {"original_rows": 1, "current_rows": 1},
+        "decisions": {"original_rows": 0, "current_rows": 0},
+        "outcomes": {"original_rows": 0, "current_rows": 0},
+        "requests": {"original_rows": 0, "current_rows": 0},
+        "upstream_requests": {"original_rows": 0, "current_rows": 0}
+      }
+    }
+  },
+  "postflight": {
+    "success": true,
+    "cleanup_success": true,
+    "captured_at": "2026-10-03T15:37:00.569510+00:00",
+    "same_user_processes_checked": 676,
+    "same_user_metadata_denied_pids": [],
+    "remaining_acceptance_processes": [],
+    "native_command_pids_gone": true,
+    "runner_process_gone": true,
+    "owned_pid_records_present": false,
+    "both_native_owner_probe_exit_codes": [0, 0],
+    "both_native_owner_states": ["stopped", "stopped"],
+    "both_listener_ports_available": true,
+    "both_isolated_executables_removed": true,
+    "both_runtime_sqlite_integrity": "ok",
+    "runtime_row_counts": {
+      "public_wheel_smoke": {
+        "requests": 0, "decisions": 0, "upstream_requests": 0,
+        "outcomes": 0, "assistant_continuations": 0, "config_versions": 2
+      },
+      "public_installer_isolated": {
+        "requests": 0, "decisions": 0, "upstream_requests": 0,
+        "outcomes": 0, "assistant_continuations": 0, "config_versions": 1
+      }
+    },
+    "generation_request_rows": 0,
+    "upstream_request_rows": 0,
+    "outcome_rows": 0,
+    "protected_files_compared": 123,
+    "changed_protected_files": [],
+    "historical_evidence_files_compared": 11,
+    "historical_reports_and_failed_attempt_evidence_unchanged": true,
+    "original_failed_attempt_directory_preserved": true,
+    "original_successful_retry_directory_preserved": true,
+    "private_root_mode": "0700",
+    "native_log_mode": "0600",
+    "initial_inspection_failure": {
+      "exit_code": 1,
+      "classification": "inspection_scope_error",
+      "other_user_metadata_denials": 8,
+      "native_acceptance_results_affected": false,
+      "corrected_by": "enumerate current user PID ownership before reading native argv",
+      "private_record": ".git/jev-release-011-acceptance/replacement/final-installed-postflight-attempt-1.json"
+    }
+  },
+  "scope_discipline": {
+    "product_tests_or_helpers_modified_by_tester": false,
+    "operator_or_default_install_or_services_changed_by_tester": false,
+    "main_frontend_backend_or_browser_suites_repeated": false,
+    "real_upstream_calls_made": false,
+    "commits_or_publication_performed": false
+  },
+  "evidence": {
+    "assets_manifest": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-download/public-assets-result.json",
+      "sha256": "962585034adbd678e1cdbf8c5e9748cc31b87e83c757d364daa0a7788395ef84"
+    },
+    "smoke_native_log": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke-native.log",
+      "sha256": "9a934ad67efdd783630b7a9196b1d03fc036a432cca5dad6557c39f0942f6e63"
+    },
+    "smoke_native_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke-native-result.json",
+      "sha256": "49f4fa7aaa3bb63fee69a112a3f619468f0eb3bb96fd2d2670b56f7a85295540"
+    },
+    "smoke_checks": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke/evidence/checks.json",
+      "sha256": "b1e4bb577f633a6aea091bb62bf723c7c12972ccff821e6f14b74b07a0f09764"
+    },
+    "smoke_installed_parity": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke-installed-parity.json",
+      "sha256": "0e9bc3746ea080925a49c90796e39f5cf28cc10e1c2d803c140d12ff79e66a9f"
+    },
+    "smoke_cleanup": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke-cleanup.json",
+      "sha256": "3b558b102f2079d028ac20f6a0708d7ce08ce80e6541b159b2ca00dd1c2f350c"
+    },
+    "installer_native_log": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-isolated-native.log",
+      "sha256": "7bea377bac1c54ce33ca9b6f4bef3ad0dd1209d02ee9bb03c5341aed8dc5941d"
+    },
+    "installer_native_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-isolated-native-result.json",
+      "sha256": "393a3ed6e1ecf5e7a0ae7bc6e106dc9cc05c4c42aae4b829d56b891d84dc944d"
+    },
+    "installer_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-isolated/public-installed-result.json",
+      "sha256": "492a5324b36a7d4705b1e7ffda61225216e3eef06211be3bb67defdafd34acd5"
+    },
+    "installer_cleanup": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-isolated-cleanup.json",
+      "sha256": "f66540fc1f79c8e39cc71c099dd56dc01571bae943f2c9c2f372ca39ae11959d"
+    },
+    "postflight": {
+      "path": ".git/jev-release-011-acceptance/replacement/final-installed-postflight.json",
+      "sha256": "bd0741ba0f75092ef921b5e578d92a1b01d8d8cca6a06404171f9ee56c750364"
+    },
+    "smoke_final_native_owner": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-wheel-smoke-final-native-owner.json",
+      "sha256": "e633c1aa1950d12fe7e03493e62e61e84b78c23d0872821c47ece71bc0ac6678"
+    },
+    "installer_final_native_owner": {
+      "path": ".git/jev-release-011-acceptance/replacement/public-installer-isolated-final-native-owner.json",
+      "sha256": "5765c9ecf2360b0c0ff6d3c4e1d479340bfc63a674393945d00c5331d9723368"
+    }
+  },
+  "coverage_limits": [
+    "Acceptance applies to the replacement publication identified by the commit, run, Release ID and exact public asset hashes above.",
+    "Preservation covers synthetic isolated runtimes. The installer baseline contained one configuration-version row and empty generation tables.",
+    "The observer is enabled for every helper scope; this assignment exercised isolated scope only.",
+    "Default-path operator upgrade and operator history preservation remain with the parent. Browser and main source suites were not repeated."
+  ]
+}
