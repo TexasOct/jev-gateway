@@ -401,6 +401,61 @@ The layout is shared by browsers connected to the same installation. The API cur
 
 Wrong: validate compact JSON size, then pretty-print a file larger than the read bound. Correct: validate and write a consistent encoding within the same byte limit.
 
+## Scenario: strategy canvas outputs and connection editing
+
+### 1. Scope / Trigger
+
+Use when changing node appearance, output counts, wire editing or automatic arrangement in the strategy workspace. Preserve ordered rule execution and the independent layout API.
+
+### 2. Signatures
+
+```typescript
+canvasOutputs(draft: RoutingDraft, config: ConfigurationPayload): Record<string, CanvasOutput[]>
+canvasDimensions(outputs: Record<string, CanvasOutput[]>): NodeDimensions
+nodeCardMetrics(outputs = 0): CardMetrics
+classifyConnection(draft: RoutingDraft, config: ConfigurationPayload, intent: ConnectionIntent, target: string): ConnectionResult
+```
+
+`model/outputs.ts` owns the visual projection. `model/node-card.ts` owns card and port metrics. `model/canvas.ts` owns connection classification, geometry and layout planning; draft mutation helpers revalidate the operation.
+
+### 3. Contracts
+
+Cards are 190px wide with a 56px identity header. Each semantic output adds a 28px row and an 18px handle. Inputs sit on the left at the card center; outputs sit on the right at their row centers. Model sinks have no outputs. Tag pools include a separate add-member output; explicit model lists have fixed membership.
+
+Derive rows from output options, including disconnected match slots. Valid choice criteria each have a result row leading to the same ordered rule entry. A separate decision-failure row enters the configured fallback. A valid answer set with no matching rule, including zero rules, uses the first ordered policy label and the policy's default selection. Configuration does not expose that selection, so the configured preview describes it as inherited. Never substitute the failure fallback's selection.
+
+Wire and port actions use the same connection classifier and draft mutation helpers. Keep visual output identity alongside the canonical mutation intent: question criteria share one rule-entry edge but each wire has its own selected state and exact output name in the action panel. Rules and fallback may be disconnected by storing an explicit `label: ""` in the pending draft; retain a reconnectable match row and block review until repaired. Never omit the label to represent disconnection: the backend treats an omitted label as a default choice. Pool edits preserve foreign tags and at least one resolved member. Generated question, failure and final-default links remain fixed; intermediate unmatched edits reorder a later rule immediately after the source.
+
+Fit, reveal, marquee, dragging, board bounds and arrangement consume the same `NodeDimensions`. Arrange-all accounts for cumulative heights and reserves nonoverlapping stage columns within schema-v1 bounds. Alignment and arrangement write only the serialized canvas-layout queue. Restoring saved positions must remain possible after output counts grow. Capacity errors remain visible and preserve the last confirmed layout.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Missing, empty or unknown match/fallback label | Keep repairable draft; block review and application |
+| Unsupported question type, fewer than two criteria or incomplete instructions/criteria | Explain the invalid question; block review |
+| Fixed path, explicit pool or last resolved member | Explain restriction; no draft mutation |
+| Draft/configuration changed during a connection gesture | Reject stale gesture; preserve newer draft |
+| Read-only or review state | Expose restriction; no connection mutation |
+| Coordinate, 256-node or 65536-byte layout limit exceeded | Visible layout error; no policy write or false save confirmation |
+
+### 5. Good/Base/Bad Cases
+
+- Good: disconnect a rule, reconnect its retained match port, validate the repaired draft, then review and explicitly apply it.
+- Base: outputs resize cards without changing node IDs, saved coordinates or the layout schema.
+- Bad: infer outputs only from existing edges, clamp overflow nodes onto one coordinate, or display decision failure as the final unmatched rule result.
+
+### 6. Tests Required
+
+- `outputs.test.ts`, `node-card.test.ts` and `canvas.test.ts`: semantic rows, empty slots, shared dimensions, boundaries, stale connections and overflow stage separation.
+- `canvas-connections.spec.ts`: native pointer and keyboard wire selection, connect/reconnect/disconnect, empty-port repair, cancellation, read-only restrictions, output growth/shrink and layout-only alignment persistence.
+- `canvas-visual-acceptance.spec.ts`: dense outputs with long Unicode names at desktop, tall, 390px and 320px viewports, in both locales and schemes; inspect screenshots, focus and actual geometry.
+- `tests/test_decision_matrix.py` and `tests/test_gateway.py`: distinguish default/failure routing and prove an incomplete canvas draft cannot change files, live policy, config hash or version count.
+
+### 7. Wrong vs Correct
+
+Wrong: remove a match edge and omit its label before saving. Correct: retain an explicit empty-label draft and its port, prevent review, then require a valid reconnection before validation and application.
+
 ## Scenario: monitoring lists with cursors and virtual windows
 
 ### 1. Scope / Trigger
@@ -580,7 +635,7 @@ Component-specific static appearance belongs in JSX Tailwind utilities, includin
 
 The session list viewport is 480px on desktop and 280px at widths of 720px or less; the request timeline is 480px on desktop and 62vh at those narrow widths. Session and request rows stay 132px and 360px respectively. Emit the 280px utilities only for session lists and the 62vh utilities only for timelines: Tailwind's generated ordering does not guarantee that two competing `max-[720px]` height utilities on one element resolve by class-string order. Keep all three viewport properties (`height`, `min-height`, `max-height`) equal. Preserve focused-row retention and cursor pagination while moving the static row positioning to utilities.
 
-Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on the 190 × 56px canvas nodes, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
+Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on 190px-wide canvas nodes with output-driven heights, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
 
 ## Common mistakes
 

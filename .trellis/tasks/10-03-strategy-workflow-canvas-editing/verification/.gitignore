@@ -1,0 +1,3 @@
+# Keep full browser runs locally; commit the curated screenshots and geometry.
+/browser-*/
+/shared-scope.diff

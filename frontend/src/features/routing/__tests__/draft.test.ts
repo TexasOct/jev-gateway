@@ -283,11 +283,11 @@ describe("diff summary", () => {
 
   it("builds first-match chains for zero, one, and many rules", () => {
     const base = configuration({ rules: [], questions: {} });
-    expect(workflowEdges(draftFromConfiguration(base), base)[0]).toEqual({ from: "questions", to: "fallback", kind: "context" });
+    expect(workflowEdges(draftFromConfiguration(base), base)[0]).toEqual({ from: "questions", to: "zone::task_aware/craft", kind: "context" });
     const one = draftFromConfiguration(configuration({ rules: configuration().rules.slice(0, 1) }));
-    expect(workflowEdges(one, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["fallback"]);
+    expect(workflowEdges(one, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["zone::task_aware/craft"]);
     const many = draftFromConfiguration(configuration());
-    expect(workflowEdges(many, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["rule-1", "fallback"]);
+    expect(workflowEdges(many, configuration()).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["rule-1", "zone::task_aware/craft"]);
   });
 
   it("projects match, unmatched, fallback, label pool, and model edges", () => {
@@ -295,7 +295,8 @@ describe("diff summary", () => {
     const edges = workflowEdges(draftFromConfiguration(config), config);
     expect(edges).toContainEqual({ from: "rule-0", to: "zone::task_aware/craft", kind: "match" });
     expect(edges).toContainEqual({ from: "rule-0", to: "rule-1", kind: "unmatched" });
-    expect(edges).toContainEqual({ from: "rule-1", to: "fallback", kind: "unmatched" });
+    expect(edges).toContainEqual({ from: "rule-1", to: "zone::task_aware/craft", kind: "unmatched" });
+    expect(edges).toContainEqual({ from: "questions", to: "fallback", kind: "failure" });
     expect(edges).toContainEqual({ from: "rule-1", to: "zone::task_aware/ultra", kind: "match" });
     expect(edges).toContainEqual({ from: "fallback", to: "zone::task_aware/craft", kind: "match" });
     expect(edges).toContainEqual({ from: "zone::task_aware/craft", to: "model::openai/gpt-6-luna", kind: "pool" });

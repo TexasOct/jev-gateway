@@ -1,0 +1,19 @@
+
+> jev-gateway-dashboard@0.1.0 test
+> vitest run src
+
+
+ RUN  v5.0.1 /private/var/folders/z1/x_q902n155vc8_nypm6nw_sc0000gn/T/jev-canvas-scope-fpoe4u07/checkout/frontend
+
+
+ Test Files  32 passed (32)
+      Tests  232 passed (232)
+   Start at  16:41:35
+   Duration  879ms (transform 62%, import 23%, tests 13%, worker 2%)
+
+  Transform  transforming modules took 4.25s · 62% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+EXIT=0

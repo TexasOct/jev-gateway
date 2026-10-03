@@ -1,0 +1,19 @@
+
+> jev-gateway-dashboard@0.1.0 test
+> vitest run src
+
+
+ RUN  v5.0.1 /Users/texas/Workspace/jev-llmroute-test/frontend
+
+
+ Test Files  33 passed (33)
+      Tests  233 passed (233)
+   Start at  15:49:21
+   Duration  1.06s (transform 62%, import 24%, tests 12%, worker 1%)
+
+  Transform  transforming modules took 5.22s · 62% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+EXIT=0

@@ -31,14 +31,15 @@ describe("configured policy projection", () => {
   it("keeps first-match order, unmatched chain, fallback and OR conditions", () => {
     const config = configuration();
     const view = projectConfiguredRouteFlow(draftFromConfiguration(config), config);
-    expect(view.branches.map(({ id }) => id)).toEqual(["rule-0", "rule-1", "fallback"]);
+    expect(view.branches.map(({ id }) => id)).toEqual(["rule-0", "rule-1", "default", "fallback"]);
     expect(view.branches[1]?.conditions).toEqual([{ question: "intent", values: ["code", "write"] }]);
     expect(view.branches[1]?.path.map(({ kind, to }) => [kind, to])).toEqual([
       ["context", "rule-0"], ["unmatched", "rule-1"], ["match", "zone::route/coding"],
     ]);
     expect(view.branches[2]?.path.map(({ kind, to }) => [kind, to])).toEqual([
-      ["context", "rule-0"], ["unmatched", "rule-1"], ["unmatched", "fallback"], ["match", "zone::route/writing"],
+      ["context", "rule-0"], ["unmatched", "rule-1"], ["unmatched", "zone::route/writing"],
     ]);
+    expect(view.branches[3]?.path.map(({ kind, to }) => [kind, to])).toEqual([["failure", "fallback"], ["match", "zone::route/writing"]]);
     expect(view.branches[1]?.models).toEqual(["p/static"]);
     expect(view.branches[0]?.models).toEqual(["p/writer"]);
     expect(view.questions[0]?.criteria).toEqual([{ name: "write", description: "Writing" }, { name: "code", description: "Coding" }]);
@@ -55,20 +56,34 @@ describe("configured policy projection", () => {
     expect(JSON.stringify(view)).not.toMatch(/probability|traffic|health|count|status|attempt|dispatch/);
   });
 
-  it("takes the direct fallback path with no rules", () => {
+  it("keeps unmatched default selection independent of the configured failure fallback", () => {
+    const config = { ...configuration(), fallback: { label: "coding", selection: "quality_first" } };
+    const view = projectConfiguredRouteFlow(draftFromConfiguration(config), config);
+    const inherited = view.branches.find((branch) => branch.kind === "default")!;
+    const failure = view.branches.find((branch) => branch.kind === "failure")!;
+    expect(inherited.label).toBe("writing");
+    expect(inherited.selection).toBeNull();
+    expect(inherited.path.at(-1)).toEqual({ from: "rule-1", to: "zone::route/writing", kind: "unmatched" });
+    expect(failure.label).toBe("coding");
+    expect(failure.selection).toBe("quality_first");
+    expect(failure.path).toEqual([{ from: "questions", to: "fallback", kind: "failure" }, { from: "fallback", to: "zone::route/coding", kind: "match" }]);
+  });
+
+  it("separates the direct default and failure fallback paths with no rules", () => {
     const config = { ...configuration(), rules: [] };
     const view = projectConfiguredRouteFlow(draftFromConfiguration(config), config);
-    expect(view.branches.map((branch) => branch.id)).toEqual(["fallback"]);
-    expect(view.branches[0]?.path.map((edge) => edge.kind)).toEqual(["context", "match"]);
-    expect(view.edges[0]?.to).toBe("fallback");
+    expect(view.branches.map((branch) => branch.id)).toEqual(["default", "fallback"]);
+    expect(view.branches[0]?.path.map((edge) => edge.kind)).toEqual(["context"]);
+    expect(view.branches[1]?.path.map((edge) => edge.kind)).toEqual(["failure", "match"]);
+    expect(view.edges[0]?.to).toBe("zone::route/writing");
   });
 });
 
 describe("configured route explanation markup", () => {
   it("renders the whole selected path and text without animation for reduced motion", () => {
     const config = configuration();
-    const html = renderToStaticMarkup(<ConfiguredRouteFlow draft={draftFromConfiguration(config)} config={config} locale="en" reducedMotion initialSelectedBranchId="fallback" />);
-    expect(html).toContain("No rule matches, so fallback selects the label pool");
+    const html = renderToStaticMarkup(<ConfiguredRouteFlow draft={draftFromConfiguration(config)} config={config} locale="en" reducedMotion initialSelectedBranchId="default" />);
+    expect(html).toContain("No rule matches, so the first policy label is selected");
     expect(html).toContain("Earlier rules do not match");
     expect(html).toContain("aria-pressed=\"true\"");
     expect(html).toMatch(/stroke-primary stroke-\[2\.5\]/);
@@ -86,5 +101,12 @@ describe("configured route explanation markup", () => {
     expect(html).toContain("animate-[configured-route-trace_900ms_ease-out_1_both]");
     expect(html).toContain("motion-reduce:animate-none");
     expect(html).toContain("不表示同时请求");
+  });
+  it("shows one direct context path and no unmatched path when there are no rules", () => {
+    const config = { ...configuration(), rules: [] };
+    const html = renderToStaticMarkup(<ConfiguredRouteFlow draft={draftFromConfiguration(config)} config={config} locale="en" reducedMotion initialSelectedBranchId="default" />);
+    expect(html.match(/data-flow-kind="context"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-flow-kind="unmatched"');
+    expect(html).toContain("Valid answers use the first policy label when no rules are configured.");
   });
 });

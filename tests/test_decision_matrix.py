@@ -260,10 +260,62 @@ def test_matrix_falls_back_when_source_or_answers_fail(monkeypatch) -> None:
     assert outcome.reason.startswith("decision_matrix:local:fallback:")
 
 
+@pytest.mark.parametrize("has_rules", [True, False])
+@pytest.mark.parametrize("valid_answers", [True, False])
+def test_matrix_no_match_default_is_distinct_from_decision_failure_fallback(
+    has_rules: bool, valid_answers: bool,
+) -> None:
+    class FixedDecisionMaker:
+        enabled = True
+
+        def describe(self) -> dict[str, Any]:
+            return {"enabled": True, "providers": []}
+
+        def evaluate(
+            self,
+            state: str | dict[str, Any],
+            questions: dict[str, Any],
+            *,
+            valid: Callable[[dict[str, Any]], bool] | None = None,
+        ) -> DecisionResult:
+            return DecisionResult("fixed", {
+                "risk": {"choice": "low" if valid_answers else "unknown"},
+                "objective": {"choice": "quality"},
+            })
+
+    config = document()
+    definition = config["strategies"]["definitions"]["matrix"]
+    definition["policy"]["selection"] = "cheapest_adequate"
+    definition["policy"]["tier_models"]["simple"] = [SMALL_MODEL_ID, LARGE_MODEL_ID]
+    definition["options"]["fallback"] = {"label": "complex", "selection": "quality_first"}
+    if not has_rules:
+        definition["options"]["rules"] = []
+    catalog = catalog_from_document(config, "matrix terminal paths")
+    stored = catalog.strategies[0]
+    strategy = DecisionMatrixStrategy(stored.name, stored.policy, FixedDecisionMaker(), stored.options)
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    outcome = strategy.decide(RoutingRequest(facts, None, None, 1, 0.0), catalog)
+
+    if valid_answers:
+        assert outcome.tier == "simple"
+        assert outcome.model == SMALL_MODEL_ID
+        assert outcome.reason.startswith("decision_matrix:fixed:default:")
+    else:
+        assert outcome.tier == "complex"
+        assert outcome.model == LARGE_MODEL_ID
+        assert outcome.reason.startswith("decision_matrix:fixed:fallback:")
+
+
 @pytest.mark.parametrize(
     "change",
     [
         lambda opts: opts["questions"].update({"bad": {"type": "boolean"}}),
+        lambda opts: opts["questions"]["risk"].update({"type": "score"}),
+        lambda opts: opts["questions"]["risk"].update({"type": "noul"}),
+        lambda opts: opts["questions"]["risk"].update({"criteria": {"low": "Routine."}}),
+        lambda opts: opts["questions"]["risk"].update({"instructions": ""}),
+        lambda opts: opts["questions"]["risk"].update({"instructions": "   "}),
+        lambda opts: opts["questions"]["risk"]["criteria"].update({"low": ""}),
         lambda opts: opts["rules"][0]["when"].update({"unknown": "high"}),
         lambda opts: opts["rules"][0]["select"].update({"tier": "invalid"}),
     ],

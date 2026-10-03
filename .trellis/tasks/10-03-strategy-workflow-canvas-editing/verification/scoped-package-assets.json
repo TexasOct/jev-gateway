@@ -1,0 +1,11 @@
+{
+  "wheel": "jev_gateway-0.1.0-py3-none-any.whl",
+  "asset_count": 4,
+  "asset_parity": true,
+  "assets": {
+    "jev_gateway/static/index.html": "4c2ffbcf0a76a850b36c7460cfeea5518d759daea92a2b4d0cf4352886d0687a",
+    "jev_gateway/static/assets/index-CrVqAEyE.js": "893ad832ff0b6240d6248edc942dec3aae838677bb325041ef668662be8a3d9d",
+    "jev_gateway/static/assets/index-Dbp4ciod.css": "38f0341b7b2742213696fefb52eb5f6fcbfbd94ec8a82d052ce1ca1a29c75113",
+    "jev_gateway/static/assets/deepseek-Bl9-59Mi.svg": "ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b"
+  }
+}

@@ -95,7 +95,7 @@ describe("full canvas editor structure", () => {
     const html = renderEditor();
     expect(html.startsWith('<section class="workflow-workspace relative flex-1 isolate min-w-0 min-h-0 overflow-hidden"')).toBe(true);
     expect(html).not.toContain('class="panel"');
-    const title = html.indexOf('class="workspace-chrome" data-canvas-occlusion="top"');
+    const title = html.indexOf('class="workspace-chrome absolute left-3 right-3 top-3 z-[9]');
     const surface = html.indexOf('class="routing-canvas-scroll');
     const drawer = html.indexOf('class="workflow-drawer absolute bottom-0');
     const information = html.indexOf('id="routing-information"');
@@ -124,7 +124,7 @@ describe("full canvas editor structure", () => {
     expect(html).toContain('Layout only: routing stays unchanged');
     expect(html).toContain('Routing workflow nodes');
     expect(html.indexOf('Routing workflow nodes')).toBeLessThan(html.indexOf('class="rule-add grid'));
-    for (const name of ['Questions', 'Rule 1', 'Fallback', 'craft']) expect(html).toContain(name);
+    for (const name of ['Questions', 'Rule 1', 'Decision failure fallback', 'craft']) expect(html).toContain(name);
     expect(html).toContain('Question name');
     expect(html).toContain('Label membership');
     expect(html).toContain('Connections (first match order)');

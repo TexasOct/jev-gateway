@@ -67,7 +67,7 @@ describe("connection compatibility and layout interactions", () => {
     expect(classifyConnection(draft, config, { kind: "new-pool", from: pool.from }, "model::p/a").reason).toBe("duplicate");
     const single = disconnectPoolEdge(draft, config, { ...pool, to: "model::p/b" })!;
     expect(classifyConnection(single, config, { kind: "remove", edge: pool }, pool.to).reason).toBe("lastMember");
-    expect(classifyConnection(draft, config, { kind: "reconnect", edge: { from: "rule-2", to: "fallback", kind: "unmatched" } }, "rule-0").reason).toBe("fixed");
+    expect(classifyConnection(draft, config, { kind: "reconnect", edge: { from: "rule-2", to: "zone::task_aware/craft", kind: "unmatched" } }, "rule-0").reason).toBe("fixed");
     expect(classifyConnection(draft, config, { kind: "reconnect", edge: { from: "rule-0", to: "rule-1", kind: "unmatched" } }, "rule-2").operation).toBe("order");
     const explicit = { ...config, labels: [{ ...config.labels[0]!, resolution: "models" as const }, config.labels[1]!] };
     expect(classifyConnection(draft, explicit, { kind: "new-pool", from: "zone::task_aware/craft" }, "model::p/b").reason).toBe("explicit");
@@ -308,11 +308,11 @@ describe("first-match edge conversion", () => {
     const draft = draftFromConfiguration(config);
     const changed = reconnectEdge(draft, config, { from: "rule-0", to: "rule-1", kind: "unmatched" }, "rule-2");
     expect(changed?.rules.map((rule) => rule.when.scale)).toEqual(["small", "huge", "large"]);
-    expect(workflowEdges(changed!, config).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["rule-1", "rule-2", "fallback"]);
+    expect(workflowEdges(changed!, config).filter((edge) => edge.kind === "unmatched").map((edge) => edge.to)).toEqual(["rule-1", "rule-2", "zone::task_aware/craft"]);
     expect(reconnectEdge(draft, config, { from: "rule-1", to: "rule-2", kind: "unmatched" }, "rule-0")).toBeNull();
     expect(reconnectEdge(draft, config, { from: "rule-0", to: "rule-1", kind: "unmatched" }, "fallback")).toBeNull();
     expect(compatibleTargets(draft, config, { from: "rule-0", to: "rule-1", kind: "unmatched" })).not.toContain("fallback");
-    expect(compatibleTargets(draft, config, { from: "rule-2", to: "fallback", kind: "unmatched" })).toEqual([]);
+    expect(compatibleTargets(draft, config, { from: "rule-2", to: "zone::task_aware/craft", kind: "unmatched" })).toEqual([]);
   });
   it("moves model membership between tag labels without dropping foreign tags", () => {
     const draft = draftFromConfiguration(config);

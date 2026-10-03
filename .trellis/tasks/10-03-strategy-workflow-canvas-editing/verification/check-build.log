@@ -1,0 +1,10 @@
+
+> jev-gateway-dashboard@0.1.0 build
+> tsc --noEmit && vite build
+
+src/features/routing/__tests__/outputs.test.ts(78,100): error TS2352: Conversion of type '{ one: string; two: string; ""?: undefined; " "?: undefined; } | { one: string; two?: undefined; ""?: undefined; " "?: undefined; } | { "": string; two: string; one?: undefined; " "?: undefined; } | { " ": string; two: string; one?: undefined; ""?: undefined; }' to type 'Record<string, string>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ " ": string; two: string; one?: undefined; ""?: undefined; }' is not comparable to type 'Record<string, string>'.
+    Property 'one' is incompatible with index signature.
+      Type 'undefined' is not comparable to type 'string'.
+
+EXIT=2
