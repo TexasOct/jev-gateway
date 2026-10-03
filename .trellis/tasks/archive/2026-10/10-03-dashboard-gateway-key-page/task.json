@@ -31,6 +31,6 @@
     ".trellis/spec/backend/dashboard-routing-config.md",
     "docs/http-api.md"
   ],
-  "notes": "All six acceptance criteria passed in the isolated worktree. Final source gates: 211 unit, 101 browser, 755 backend; lint/type/build/freshness/Pyright passed. Parent source, screenshot and runtime fingerprint review passed. Local source change only; runtime deployment and public release are outside scope. Concurrent strategy-canvas work is preserved.",
+  "notes": "All six acceptance criteria passed in the isolated worktree. Final source gates: 211 unit, 101 browser, 755 backend; lint/type/build/freshness/Pyright passed. Parent source, final isolated screenshot and operator configuration fingerprint review passed. Two overwritten early screenshot originals were recovered; two could not be recovered. The original failed browser log remains unchanged, and the acceptance report discloses the preservation gap. Local source change only; runtime deployment and public release are outside scope. Concurrent strategy-canvas work is preserved.",
   "meta": {}
 }
