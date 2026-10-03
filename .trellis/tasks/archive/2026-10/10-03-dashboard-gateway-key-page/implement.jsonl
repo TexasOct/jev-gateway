@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Frontend ownership, memory-only Bearer, one-page navigation, Tailwind/theme/CSP and bundle verification."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Mock-only tests, frontend gates and ignored generated asset freshness."}
+{"file":".trellis/tasks/archive/2026-10/10-03-dashboard-gateway-key-page/research/auth-flow.md","reason":"Observed connection ordering, existing auth/anonymous fixtures and bounded implementation/acceptance."}
