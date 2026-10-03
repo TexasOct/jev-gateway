@@ -15,7 +15,7 @@ Set the two release identity values to the final published commit and tag workfl
 ```bash
 umask 077
 jev_acceptance_repo=/Users/texas/Workspace/jev-llmroute-test
-jev_acceptance_tools="$jev_acceptance_repo/.trellis/tasks/10-03-release-011-acceptance/verification/tools"
+jev_acceptance_tools="$jev_acceptance_repo/.trellis/tasks/archive/2026-10/10-03-release-011-acceptance/verification/tools"
 jev_acceptance_evidence="$jev_acceptance_repo/.git/jev-release-011-acceptance/new-verification"
 jev_release_commit='6fc0f0e19e31f52d8e831593e8c530aed7e73141'
 jev_release_run='37132156378'
