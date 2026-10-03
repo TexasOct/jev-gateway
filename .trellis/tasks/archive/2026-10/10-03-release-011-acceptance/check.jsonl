@@ -1,3 +1,3 @@
 {"file":".trellis/spec/backend/quality-guidelines.md","reason":"Full-scope release verification and evidence standards"}
 {"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Installed commands, state preservation and failure contracts"}
-{"file":".trellis/tasks/10-03-release-011-acceptance/research/release-contracts.md","reason":"Authoritative source requirements and publication evidence boundaries"}
+{"file":".trellis/tasks/archive/2026-10/10-03-release-011-acceptance/research/release-contracts.md","reason":"Authoritative source requirements and publication evidence boundaries"}
