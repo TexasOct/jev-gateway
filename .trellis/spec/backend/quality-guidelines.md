@@ -198,7 +198,10 @@ python3 scripts/validate-release.py v0.1.0 dist
 ```
 
 Substitute the intended version and use an output directory with exactly one
-wheel. Validation must confirm wheel metadata, entry points, templates, license,
+wheel. Keep `pyproject.toml` project metadata, `jev_gateway/__init__.py` package
+metadata and the root `jev-gateway` entry in `uv.lock` on the same version. A
+version bump must preserve the resolved dependency versions and pass
+`uv lock --check`. Validation must confirm wheel metadata, entry points, templates, license,
 dashboard shell and referenced assets, and exact file parity with the built
 source tree. It also stamps the source installer's release-tag placeholder into
 `dist/install.sh`, checks shell syntax, and generates installer and wheel SHA256
