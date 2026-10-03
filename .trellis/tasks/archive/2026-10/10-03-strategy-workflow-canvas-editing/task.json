@@ -1,0 +1,61 @@
+{
+  "id": "strategy-workflow-canvas-editing",
+  "name": "strategy-workflow-canvas-editing",
+  "title": "策略工作流中文文案与画布连线编辑",
+  "description": "完善策略工作流中文文案、节点对齐和左右端口，支持画布选择连线与断开并按输出选项动态扩展端口",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-03",
+  "completedAt": "2026-10-03",
+  "branch": "feat/strategy-workflow-canvas-editing",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "d51f359427ef15331b3c37ebac025a5660db021c",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "frontend/src/features/routing/RoutingCanvas.tsx",
+    "frontend/src/features/routing/RoutingEditor.tsx",
+    "frontend/src/features/routing/ConfiguredRouteFlow.tsx",
+    "frontend/src/features/routing/model/outputs.ts",
+    "frontend/src/features/routing/model/node-card.ts",
+    "frontend/src/features/routing/model/canvas.ts",
+    "frontend/src/features/routing/model/draft.ts",
+    "frontend/src/features/routing/model/configured-route-flow.ts",
+    "frontend/src/features/routing/model/selection.ts",
+    "frontend/src/shared/i18n/en.ts",
+    "frontend/src/shared/i18n/zh-CN.ts",
+    "frontend/tests/browser/canvas-connections.spec.ts",
+    "frontend/tests/browser/canvas-visual-acceptance.spec.ts",
+    "tests/test_decision_matrix.py",
+    "tests/test_gateway.py",
+    "docs/http-api.md",
+    ".trellis/spec/backend/dashboard-routing-config.md"
+  ],
+  "notes": "All nine acceptance criteria passed. Shared workspace and isolated task-only verification are recorded in verification.md; concurrent Key-page code and journal changes remain preserved.",
+  "meta": {
+    "closure": {
+      "disposition": "implemented",
+      "acceptance_complete": true,
+      "verified_criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8",
+        "AC9"
+      ],
+      "implementation_commit": "d51f359427ef15331b3c37ebac025a5660db021c"
+    }
+  }
+}
