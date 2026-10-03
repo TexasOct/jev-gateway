@@ -68,7 +68,8 @@ Implemented and accepted a separate gateway connection page. Six acceptance crit
 
 - [OK] 211 frontend unit, 101 browser and 755 backend tests passed; types/build/freshness/Pyright passed.
 - [OK] Four screenshots inspected; settled button contrast 6.07:1 light and 5.15:1 dark; four existing lint warnings.
-- [OK] Operator .env and models.json fingerprints unchanged; original failed evidence retained.
+- [OK] Operator .env and models.json fingerprints unchanged; original failed browser log retained.
+- Early screenshots were overwritten after fingerprinting. Two originals were recovered from session attachments; two could not be recovered. All four final isolated screenshots are retained; the acceptance report records the gap.
 
 ### Status
 

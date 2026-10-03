@@ -43,7 +43,9 @@ The parent inspected English desktop and Chinese 320px screenshots in both schem
 
 ## Retained attempts and runtime scope
 
-The first shared four-worker browser run had a routing-drawer visibility failure; the original log remains. Isolated review attempts also retained failed transition-frame measurements before the final measurement correction. Original evidence was not overwritten or relabeled as passing. Final acceptance uses isolated-gates/results.json and review.json.
+The first shared four-worker browser run had a routing-drawer visibility failure; its original log still matches the retained fingerprint. Isolated review attempts also retained failed transition-frame measurements before the final measurement correction. Final acceptance uses isolated-gates/results.json and review.json.
+
+The final closeout check found that all four early screenshots had been overwritten at 15:40:32 after their fingerprints were recorded. The English light and Chinese dark originals were recovered from the parent session's image attachments and verified against their original SHA256 hashes. No exact copy of the English dark or Chinese light original was found. The overwritten files, original fingerprint manifest and recovery receipt remain retained. This is a gap in early screenshot preservation; all four final isolated screenshots remain available and were inspected. The original runtime-final.json claim that all original evidence was preserved is superseded by runtime-final-corrected.json.
 
 Private evidence resides under `/Users/texas/.cache/jev-dashboard-key-page/`: implementation/, isolated-gates/, isolated-screenshots/, isolation/ and runtime-final.json. Screenshot and contrast evidence files are mode 0600; their private directories are 0700. Logs contain synthetic test data, and no operator credentials were disclosed.
 
