@@ -1,0 +1,18 @@
+{
+  "version": "0.1.1",
+  "requires_python": ">=3.12",
+  "license": "AGPL-3.0-or-later",
+  "package_files": 52,
+  "static_files": 4,
+  "wheel_exact_source_parity": true,
+  "sdist_package_parity": true,
+  "sdist_version": "0.1.1",
+  "assets": {
+    ".gitignore": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+    "install.sh": "bbd06b07d7e8f5ead47540bc4d52c2dc24a524eb850911f12682d1ba28e56cd5",
+    "install.sh.sha256": "b402cff962889260f41065ca4e861868a09b727a63f311f2d5afc2d232268855",
+    "jev_gateway-0.1.1-py3-none-any.whl": "a27530dddc54bbd4b18b55f8a1adf44654837d9d752b87c10b548aa4dfd0e4cb",
+    "jev_gateway-0.1.1-py3-none-any.whl.sha256": "38f6960bb25cae97d4e0ee9e36c9bdd4d3aced98d290945732e7f304538c2222",
+    "jev_gateway-0.1.1.tar.gz": "bc0ab3622aaff47f503c0a9a37355b9426a92af4ceb6e5475b04fa2e762bb4c7"
+  }
+}

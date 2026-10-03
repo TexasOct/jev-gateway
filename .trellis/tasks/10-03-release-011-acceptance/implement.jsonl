@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"Package ownership and pre-development checklist"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required release, frontend, backend and packaging verification"}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Installed lifecycle and operator preservation contracts"}
+{"file":".trellis/tasks/10-03-release-011-acceptance/research/release-contracts.md","reason":"Version owners, publication boundary and prior acceptance tools"}

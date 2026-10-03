@@ -1,0 +1,197 @@
+[
+  {
+    "label": "frontend-lint",
+    "argv": [
+      "npm",
+      "--prefix",
+      "frontend",
+      "run",
+      "lint"
+    ],
+    "exit": 0,
+    "seconds": 4.528,
+    "reused": true
+  },
+  {
+    "label": "frontend-unit",
+    "argv": [
+      "npm",
+      "--prefix",
+      "frontend",
+      "run",
+      "test"
+    ],
+    "exit": 0,
+    "seconds": 1.282,
+    "counts": [
+      "233 passed"
+    ],
+    "reused": true
+  },
+  {
+    "label": "frontend-browser",
+    "argv": [
+      "npm",
+      "--prefix",
+      "frontend",
+      "run",
+      "test:browser",
+      "--",
+      "--retries=0",
+      "--output=.git/jev-release-011-acceptance/local/browser-results"
+    ],
+    "exit": 0,
+    "seconds": 22.976,
+    "counts": [
+      "118 passed"
+    ]
+  },
+  {
+    "label": "frontend-freshness",
+    "argv": [
+      "sh",
+      "scripts/build-frontend.sh",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.02,
+    "counts": []
+  },
+  {
+    "label": "pytest",
+    "argv": [
+      "uv",
+      "run",
+      "pytest",
+      "-q"
+    ],
+    "exit": 0,
+    "seconds": 45.743,
+    "counts": [
+      "767 passed"
+    ]
+  },
+  {
+    "label": "pyright",
+    "argv": [
+      "uvx",
+      "pyright"
+    ],
+    "exit": 0,
+    "seconds": 4.849,
+    "counts": [
+      "0 warnings"
+    ]
+  },
+  {
+    "label": "lock",
+    "argv": [
+      "uv",
+      "lock",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.015,
+    "counts": []
+  },
+  {
+    "label": "syntax-install",
+    "argv": [
+      "sh",
+      "-n",
+      "scripts/install.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.005,
+    "counts": []
+  },
+  {
+    "label": "syntax-install-local",
+    "argv": [
+      "sh",
+      "-n",
+      "scripts/install-local.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.011,
+    "counts": []
+  },
+  {
+    "label": "syntax-build-frontend",
+    "argv": [
+      "sh",
+      "-n",
+      "scripts/build-frontend.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.005,
+    "counts": []
+  },
+  {
+    "label": "build",
+    "argv": [
+      "uv",
+      "build",
+      "--out-dir",
+      ".git/jev-release-011-acceptance/candidate-dist"
+    ],
+    "exit": 0,
+    "seconds": 1.291,
+    "counts": []
+  },
+  {
+    "label": "validate",
+    "argv": [
+      "python3",
+      "scripts/validate-release.py",
+      "v0.1.1",
+      ".git/jev-release-011-acceptance/candidate-dist"
+    ],
+    "exit": 0,
+    "seconds": 0.071,
+    "counts": []
+  },
+  {
+    "label": "smoke",
+    "argv": [
+      "python3",
+      "scripts/smoke-installed-release.py",
+      "--wheel",
+      ".git/jev-release-011-acceptance/candidate-dist/jev_gateway-0.1.1-py3-none-any.whl",
+      "--version",
+      "0.1.1",
+      "--work-dir",
+      ".git/jev-release-011-acceptance/candidate-smoke"
+    ],
+    "exit": 0,
+    "seconds": 69.976,
+    "counts": []
+  },
+  {
+    "label": "syntax-install-with-brew",
+    "argv": [
+      "sh",
+      "-n",
+      "scripts/install-with-brew.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.01
+  },
+  {
+    "label": "syntax-uninstall-local",
+    "argv": [
+      "sh",
+      "-n",
+      "scripts/uninstall-local.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.008
+  },
+  {
+    "label": "candidate-smoke-evidence",
+    "success": true,
+    "checks": 59,
+    "checks_sha256": "9e32d05c2847cb130ce706be14f763f52fcc1449ea0d16ff8a1ddcce52512540",
+    "wheel_sha256": "a27530dddc54bbd4b18b55f8a1adf44654837d9d752b87c10b548aa4dfd0e4cb"
+  }
+]
