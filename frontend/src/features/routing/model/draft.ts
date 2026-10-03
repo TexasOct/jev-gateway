@@ -337,16 +337,38 @@ export function toOverlayPayload(
 export interface WorkflowEdge {
   from: string;
   to: string;
-  kind: "context" | "match" | "unmatched" | "pool";
+  kind: "context" | "failure" | "match" | "unmatched" | "pool";
+}
+
+/** Empty labels remain repairable in the draft but must never reach validation/apply. */
+export function incompleteLabels(draft: RoutingDraft, config: ConfigurationPayload): string[] {
+  const known = new Set(config.labels.map((label) => label.name));
+  return [...draft.rules.flatMap((rule, index) => !rule.select.label || !known.has(rule.select.label) ? [`rule-${index}`] : []),
+    ...(!draft.fallback.label || !known.has(draft.fallback.label) ? ["fallback"] : [])];
+}
+
+type QuestionError = { name: string; reason: "type" | "criteria" | "instructions" | "criterionName" | "criterionDescription" };
+
+export function invalidQuestions(draft: RoutingDraft): QuestionError[] {
+  return Object.entries(draft.questions).flatMap<QuestionError>(([name, question]) => {
+    if (question.type !== "choice") return [{ name, reason: "type" }];
+    if (Object.keys(question.criteria).length < 2) return [{ name, reason: "criteria" }];
+    if (!question.instructions.trim()) return [{ name, reason: "instructions" }];
+    if (Object.keys(question.criteria).some((criterion) => !criterion.trim())) return [{ name, reason: "criterionName" }];
+    if (Object.values(question.criteria).some((description) => !description.trim())) return [{ name, reason: "criterionDescription" }];
+    return [];
+  });
 }
 
 /** Ordered first-match graph; links to pools follow the effective draft membership. */
 export function workflowEdges(draft: RoutingDraft, config: ConfigurationPayload): WorkflowEdge[] {
-  const edges: WorkflowEdge[] = [{ from: "questions", to: draft.rules.length ? "rule-0" : "fallback", kind: "context" }];
+  const defaultPool = config.labels[0] ? `zone::${config.labels[0].tag}` : "";
+  const edges: WorkflowEdge[] = [{ from: "questions", to: draft.rules.length ? "rule-0" : defaultPool, kind: "context" },
+    { from: "questions", to: "fallback", kind: "failure" }];
   draft.rules.forEach((rule, index) => {
     const tag = config.labels.find((label) => label.name === rule.select.label)?.tag;
     if (tag !== undefined) edges.push({ from: `rule-${index}`, to: `zone::${tag}`, kind: "match" });
-    edges.push({ from: `rule-${index}`, to: index + 1 < draft.rules.length ? `rule-${index + 1}` : "fallback", kind: "unmatched" });
+    edges.push({ from: `rule-${index}`, to: index + 1 < draft.rules.length ? `rule-${index + 1}` : defaultPool, kind: "unmatched" });
   });
   const fallbackTag = config.labels.find((label) => label.name === draft.fallback.label)?.tag;
   if (fallbackTag !== undefined) edges.push({ from: "fallback", to: `zone::${fallbackTag}`, kind: "match" });

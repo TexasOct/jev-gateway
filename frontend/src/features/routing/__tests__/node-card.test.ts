@@ -27,34 +27,36 @@ describe("node card geometry", () => {
     expect(moved.y + card.height).toBeLessThanOrEqual(10000);
   });
 
-  it("centers single edges and separates match/order ports symmetrically", () => {
+  it("keeps the identity header and one spaced row per semantic output", () => {
     expect(nodeCardCenter("left")).toEqual({ x: 0, y: 28 });
     expect(nodeCardCenter("right")).toEqual({ x: 190, y: 28 });
     expect(nodeCardPorts(0)).toEqual([]);
-    expect(nodeCardPorts(1)).toEqual([{ x: 190, y: 28, radius: 9 }]);
-    expect(nodeCardPorts(2).map((port) => port.y)).toEqual([18, 38]);
-    expect(nodeCardPorts(3).map((port) => port.y)).toEqual([10, 28, 46]);
+    expect(nodeCardPorts(1)).toEqual([{ x: 190, y: 70, radius: 9 }]);
+    expect(nodeCardPorts(2).map((port) => port.y)).toEqual([70, 98]);
+    expect(nodeCardPorts(3).map((port) => port.y)).toEqual([70, 98, 126]);
+    expect(nodeCardMetrics(3)).toEqual({ width: 190, height: 140 });
+    expect(nodeCardCenter("left", 3)).toEqual({ x: 0, y: 70 });
   });
 
-  it.each([1, 2, 3, 6, 256])("bounds %i sibling handles without overlapping the center add port", (count) => {
+  it.each([1, 2, 3, 6, 256])("bounds %i full-size handles with a separate add row", (count) => {
     for (const withCenterPort of [false, true]) {
       const ports = withCenterPort ? nodeCardPortsWithCenter(count) : nodeCardPorts(count);
       expect(ports).toEqual(withCenterPort ? nodeCardPortsWithCenter(count) : nodeCardPorts(count));
       expect(new Set(ports.map((port) => port.y)).size).toBe(count);
       const ordered = [...ports].sort((a, b) => a.y - b.y);
-      if (withCenterPort || count > 2) expect(ports).toEqual(ordered);
+      expect(ports).toEqual(ordered);
       for (const [index, port] of ordered.entries()) {
         expect(port.x).toBe(nodeCardMetrics().width);
-        expect(port.radius).toBeGreaterThan(0);
+        expect(port.radius).toBe(NODE_CARD_PORT_RADIUS);
         expect(port.y - port.radius).toBeGreaterThanOrEqual(0);
-        expect(port.y + port.radius).toBeLessThanOrEqual(nodeCardMetrics().height);
-        if (withCenterPort) expect(Math.abs(port.y - nodeCardCenter("right").y)).toBeGreaterThanOrEqual(port.radius + NODE_CARD_PORT_RADIUS);
+        expect(port.y + port.radius).toBeLessThanOrEqual(nodeCardMetrics(count + (withCenterPort ? 1 : 0)).height);
+        if (withCenterPort) expect(nodeCardPorts(count + 1)[count]!.y - port.y).toBeGreaterThanOrEqual(port.radius + NODE_CARD_PORT_RADIUS);
         if (index) expect(port.y - ordered[index - 1]!.y).toBeGreaterThanOrEqual(port.radius + ordered[index - 1]!.radius);
       }
     }
   });
 
-  it.each(["en", "zh-CN"])("keeps all five roles at the same cap with long Unicode contents in %s", (locale) => {
+  it.each(["en", "zh-CN"])("keeps identity headers readable while semantic output rows grow in %s", (locale) => {
     vi.stubGlobal("window", { localStorage: { getItem: () => locale } });
     const name = "模型👩🏽‍💻e\u0301".repeat(15);
     const id = `供应商/${name}`;
@@ -78,15 +80,17 @@ describe("node card geometry", () => {
     const cards = [...html.matchAll(/<button[^>]*data-canvas-node="[^"]+"[^>]*>/g)].map(([tag]) => tag);
     expect(cards).toHaveLength(5);
     for (const card of cards) {
-      expect(card).toContain('class="routing-canvas-node absolute block h-14 min-h-14 max-h-14 w-[190px] overflow-hidden');
+      expect(card).toContain('class="routing-canvas-node absolute block w-[190px] overflow-hidden');
       expect(card).toContain('[touch-action:none]');
       expect(card).toContain('style="left:');
-      expect(card).toContain('width:190px;height:56px;min-height:56px;max-height:56px');
+      expect(card).toMatch(/width:190px;height:(56|84|112)px/);
     }
     for (const kind of ["questions", "rule", "fallback", "label", "model"]) expect(html).toContain(`data-node-kind="${kind}"`);
     expect(html).toContain(name);
     expect(html).toContain(name.repeat(20));
     expect(html).not.toContain("height:380px");
-    expect(html).toContain('cx="1040" cy="108" r="9" class="canvas-edge-handle canvas-add-handle cursor-grab fill-panel stroke-primary [pointer-events:all] [stroke-width:3px]"');
+    expect(html).toContain('data-canvas-output="add" data-output-node=');
+    expect(html).toContain('data-canvas-input=');
+    expect(html).toContain('data-canvas-edge=');
   });
 });

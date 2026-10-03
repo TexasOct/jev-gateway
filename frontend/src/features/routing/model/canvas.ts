@@ -1,6 +1,8 @@
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { labelMembers, moveRule, setFallback, setLabelMembership, setRuleChoice, workflowEdges } from "./draft";
 import type { RoutingDraft, WorkflowEdge } from "./draft";
+import { nodeCardMetrics } from "./node-card";
+import type { NodeDimensions } from "./node-card";
 
 export const BOARD_WIDTH = 3200;
 export const BOARD_HEIGHT = 2200;
@@ -23,7 +25,7 @@ export function validLayout(value: unknown): value is CanvasLayout {
     layout.version !== 1 || !validPosition(layout.viewport) || typeof layout.nodes !== "object" ||
     layout.nodes === null || Array.isArray(layout.nodes)) return false;
   const nodes = layout.nodes as Record<string, unknown>;
-  return Object.keys(nodes).length <= 256 && Object.entries(nodes).every(([id, position]) => NODE_ID.test(id) &&
+  return Object.keys(nodes).length <= 256 && new TextEncoder().encode(JSON.stringify({ version: 1, nodes, viewport: layout.viewport })).length <= 65536 && Object.entries(nodes).every(([id, position]) => NODE_ID.test(id) &&
     [...id].every((character) => character.codePointAt(0)! > 31 && character.codePointAt(0)! !== 127) && validPosition(position));
 }
 
@@ -124,7 +126,7 @@ export function defaultPosition(id: string): Position {
   return { x: 2200, y: 80 };
 }
 
-export type ConnectionIntent = { kind: "reconnect"; edge: WorkflowEdge } | { kind: "new-pool"; from: string } | { kind: "remove"; edge: WorkflowEdge };
+export type ConnectionIntent = { kind: "reconnect"; edge: WorkflowEdge } | { kind: "new-pool"; from: string } | { kind: "new-match"; from: string } | { kind: "remove"; edge: WorkflowEdge };
 export type ConnectionReason = "context" | "stale" | "unknownLabel" | "unknownModel" | "explicit" | "duplicate" | "lastMember" | "order" | "fixed" | "invalid";
 export type ConnectionResult = { operation: "match" | "order" | "add" | "move" | "remove" | "noop" | null; reason: ConnectionReason | null };
 const allow = (operation: Exclude<ConnectionResult["operation"], null>): ConnectionResult => ({ operation, reason: null });
@@ -134,8 +136,16 @@ const block = (reason: ConnectionReason): ConnectionResult => ({ operation: null
 export function classifyConnection(draft: RoutingDraft, config: ConfigurationPayload, intent: ConnectionIntent, target: string): ConnectionResult {
   if (intent.kind === "remove" || intent.kind === "reconnect") {
     if (!workflowEdgeExists(draft, config, intent.edge)) return block("stale");
-    if (intent.edge.kind === "context") return block("context");
+    if (intent.edge.kind === "context" || intent.edge.kind === "failure") return block("context");
   }
+  if (intent.kind === "new-match") {
+    const rule = /^rule-(0|[1-9][0-9]*)$/.test(intent.from) ? draft.rules[Number(intent.from.slice(5))] : undefined;
+    const choice = intent.from === "fallback" ? draft.fallback : rule?.select;
+    if (!choice || workflowEdges(draft, config).some((edge) => edge.from === intent.from && edge.kind === "match")) return block("stale");
+    return config.labels.some((label) => `zone::${label.tag}` === target) ? allow("match") : block("unknownLabel");
+  }
+  if (intent.kind === "remove" && intent.edge.kind === "match") return allow("remove");
+  if (intent.kind === "remove" && intent.edge.kind === "unmatched") return block(intent.edge.to.startsWith("zone::") ? "fixed" : "order");
   if (intent.kind === "new-pool" || (intent.kind === "reconnect" && intent.edge.kind === "pool") || intent.kind === "remove") {
     const source = intent.kind === "new-pool" ? intent.from : intent.edge.from;
     const label = config.labels.find((item) => `zone::${item.tag}` === source);
@@ -160,7 +170,7 @@ export function classifyConnection(draft: RoutingDraft, config: ConfigurationPay
     const from = Number(intent.edge.from.slice(5));
     const to = Number(target.slice(5));
     if (target === intent.edge.to) return allow("noop");
-    if (intent.edge.to === "fallback" || target === "fallback") return block("fixed");
+    if (intent.edge.to.startsWith("zone::") || target === "fallback" || target.startsWith("zone::")) return block("fixed");
     return Number.isInteger(to) && to > from + 1 && to < draft.rules.length ? allow("order") : block("order");
   }
   return block("invalid");
@@ -304,21 +314,21 @@ export function reconcileRuleSelection(id: string, mutation: RuleLayoutMutation)
   return Object.keys(mapped)[0] ?? "";
 }
 
-function nodeBounds(ids: string[], positions: Record<string, Position>) {
-  const points = ids.map((id) => positions[id]).filter((at): at is Position => at !== undefined);
+function nodeBounds(ids: string[], positions: Record<string, Position>, dimensions: NodeDimensions = {}) {
+  const points = ids.filter((id) => positions[id]).map((id) => ({ ...positions[id]!, size: dimensions[id] ?? nodeCardMetrics() }));
   if (!points.length) return null;
   return {
     left: Math.min(...points.map((at) => at.x)), top: Math.min(...points.map((at) => at.y)),
-    right: Math.max(...points.map((at) => at.x + 190)), bottom: Math.max(...points.map((at) => at.y + 56)),
+    right: Math.max(...points.map((at) => at.x + at.size.width)), bottom: Math.max(...points.map((at) => at.y + at.size.height)),
   };
 }
 
 /** Choose a readable view when a whole-board fit would shrink modules beyond use. */
 export function planFitViewport(
   positions: Record<string, Position>, selected: string, selection: string[],
-  viewport: ViewportSize, board: ViewportSize,
+  viewport: ViewportSize, board: ViewportSize, dimensions: NodeDimensions = {},
 ): ViewportPlan {
-  const all = nodeBounds(Object.keys(positions), positions);
+  const all = nodeBounds(Object.keys(positions), positions, dimensions);
   const fallback = { zoom: 1, scroll: { x: 0, y: 0 }, mode: "node" as const };
   if (!all || viewport.width <= 0 || viewport.height <= 0) return fallback;
   const fit = (bounds: NonNullable<typeof all>) => Math.min(1.75,
@@ -328,10 +338,10 @@ export function planFitViewport(
   let mode: ViewportPlan["mode"] = "board";
   let zoom = fit(bounds);
   if (viewport.width < 600 || zoom < MIN_ZOOM) {
-    const group = nodeBounds(selection, positions);
+    const group = nodeBounds(selection, positions, dimensions);
     const focusId = selection.find((id) => positions[id]) ?? (positions[selected] ? selected : Object.keys(positions)[0]!);
     const useGroup = selection.length > 1 && group !== null && fit(group) >= 0.75;
-    bounds = useGroup ? group! : nodeBounds([focusId], positions)!;
+    bounds = useGroup ? group! : nodeBounds([focusId], positions, dimensions)!;
     mode = useGroup ? "group" : "node";
     zoom = Math.min(1, Math.max(MIN_ZOOM, fit(bounds)));
   }
@@ -367,24 +377,24 @@ export function nodeDragScrollLock(drag: { moved: boolean; scroll: Position } | 
 }
 
 /** Preview a group from the gesture snapshot, never from an earlier preview frame. */
-export function draggedLayout(layout: CanvasLayout, starts: Record<string, Position>, delta: Position, width: number, height: number): { layout: CanvasLayout; changed: boolean } {
+export function draggedLayout(layout: CanvasLayout, starts: Record<string, Position>, delta: Position, width: number, height: number, dimensions: NodeDimensions = {}): { layout: CanvasLayout; changed: boolean } {
   const ids = Object.keys(starts);
-  const moved = translateNodes(starts, ids, delta, width, height);
+  const moved = translateNodes(starts, ids, delta, width, height, dimensions);
   const changed = ids.some((id) => moved[id]!.x !== starts[id]!.x || moved[id]!.y !== starts[id]!.y);
   return { layout: changed ? { ...layout, nodes: { ...layout.nodes, ...moved } } : layout, changed };
 }
-export function marqueeNodes(start: Position, end: Position, positions: Record<string, Position>): string[] {
+export function marqueeNodes(start: Position, end: Position, positions: Record<string, Position>, dimensions: NodeDimensions = {}): string[] {
   const left = Math.min(start.x, end.x), right = Math.max(start.x, end.x);
   const top = Math.min(start.y, end.y), bottom = Math.max(start.y, end.y);
-  return Object.entries(positions).filter(([, at]) => at.x < right && at.x + 190 > left && at.y < bottom && at.y + 56 > top).map(([id]) => id);
+  return Object.entries(positions).filter(([id, at]) => { const size = dimensions[id] ?? nodeCardMetrics(); return at.x < right && at.x + size.width > left && at.y < bottom && at.y + size.height > top; }).map(([id]) => id);
 }
-export function translateNodes(positions: Record<string, Position>, ids: string[], delta: Position, width: number, height: number): Record<string, Position> {
+export function translateNodes(positions: Record<string, Position>, ids: string[], delta: Position, width: number, height: number, dimensions: NodeDimensions = {}): Record<string, Position> {
   if (!ids.length) return {};
-  const points = ids.map((id) => positions[id]!);
+  const points = ids.map((id) => ({ ...positions[id]!, size: dimensions[id] ?? nodeCardMetrics() }));
   const dx = Math.max(-Math.min(...points.map((point) => point.x)),
-    Math.min(Math.min(9790, width - 210) - Math.max(...points.map((point) => point.x)), Math.round(delta.x)));
+    Math.min(Math.min(...points.map((point) => Math.min(MAX_COORD - point.size.width - 20, width - point.size.width - 20) - point.x)), Math.round(delta.x)));
   const dy = Math.max(-Math.min(...points.map((point) => point.y)),
-    Math.min(Math.min(9915, height - 85) - Math.max(...points.map((point) => point.y)), Math.round(delta.y)));
+    Math.min(Math.min(...points.map((point) => Math.min(MAX_COORD - point.size.height - 29, height - point.size.height - 29) - point.y)), Math.round(delta.y)));
   return Object.fromEntries(ids.map((id) => [id, { x: positions[id]!.x + dx, y: positions[id]!.y + dy }]));
 }
 
@@ -427,7 +437,7 @@ export function reconnectEdge(
       return moveRule(draft, to, from + 1);
     }
   }
-  // Last unmatched edge is necessarily fallback. Removing an edge or arbitrary topology is invalid.
+  // The terminal unmatched edge uses the first policy label; arbitrary topology is invalid.
   return null;
 }
 
@@ -437,6 +447,54 @@ export function disconnectPoolEdge(draft: RoutingDraft, config: ConfigurationPay
   const model = edge.to.slice(7);
   return label?.resolution === "tag" && labelMembers(draft, config, label).length > 1 && Object.hasOwn(draft.models, model) &&
     draft.models[model]!.tags.includes(label.tag) ? setLabelMembership(draft, model, label.tag, false) : null;
+}
+
+export function disconnectEdge(draft: RoutingDraft, config: ConfigurationPayload, edge: WorkflowEdge): RoutingDraft | null {
+  if (classifyConnection(draft, config, { kind: "remove", edge }, edge.to).reason) return null;
+  if (edge.kind === "pool") return disconnectPoolEdge(draft, config, edge);
+  return edge.kind === "match" ? setMatchLabel(draft, edge.from, "") : null;
+}
+
+function setMatchLabel(draft: RoutingDraft, from: string, label: string): RoutingDraft {
+  return from === "fallback" ? setFallback(draft, { label }) : setRuleChoice(draft, Number(from.slice(5)), { label });
+}
+
+export function connectMatchEdge(draft: RoutingDraft, config: ConfigurationPayload, from: string, target: string): RoutingDraft | null {
+  if (classifyConnection(draft, config, { kind: "new-match", from }, target).reason) return null;
+  return setMatchLabel(draft, from, config.labels.find((label) => `zone::${label.tag}` === target)!.name);
+}
+
+export function intentTargets(draft: RoutingDraft, config: ConfigurationPayload, intent: ConnectionIntent): string[] {
+  const candidates = [...draft.rules.map((_, index) => `rule-${index}`), "fallback",
+    ...config.labels.map((label) => `zone::${label.tag}`), ...config.models.map((model) => `model::${model.id}`)];
+  return candidates.filter((target) => !classifyConnection(draft, config, intent, target).reason);
+}
+
+/** Stage columns use cumulative content heights, with overflow columns within layout bounds. */
+export function arrangeNodes(ids: string[], dimensions: NodeDimensions): Record<string, Position> {
+  const stages = [ids.filter((id) => id === "questions"), ids.filter((id) => id.startsWith("rule-") || id === "fallback"),
+    ids.filter((id) => id.startsWith("zone::")), ids.filter((id) => id.startsWith("model::"))];
+  const result: Record<string, Position> = {};
+  let previousRight = 0;
+  for (const [stage, nodes] of stages.entries()) {
+    let x = Math.max([50, 400, 850, 2200][stage]!, previousRight + (stage ? 160 : 0)), y = 80;
+    let columnWidth = 0;
+    for (const id of nodes) {
+      const size = dimensions[id] ?? nodeCardMetrics();
+      if (y + size.height > MAX_COORD && y > 80) { x += columnWidth + 40; y = 80; columnWidth = 0; }
+      result[id] = { x, y };
+      columnWidth = Math.max(columnWidth, size.width);
+      previousRight = Math.max(previousRight, x + size.width);
+      y += size.height + 48;
+    }
+  }
+  return result;
+}
+
+export function alignNodes(positions: Record<string, Position>, ids: string[], axis: "x" | "y"): Record<string, Position> {
+  const current = ids.filter((id) => positions[id]);
+  const value = Math.min(...current.map((id) => positions[id]![axis]));
+  return Object.fromEntries(current.map((id) => [id, { ...positions[id]!, [axis]: value }]));
 }
 
 /** A new label-to-model link adds membership without removing other links. */
@@ -466,7 +524,7 @@ function workflowEdgeExists(draft: RoutingDraft, config: ConfigurationPayload, e
 }
 
 export function compatibleTargets(draft: RoutingDraft, config: ConfigurationPayload, edge: WorkflowEdge): string[] {
-  if (edge.kind === "unmatched" && edge.to === "fallback") return [];
+  if (edge.kind === "unmatched" && edge.to.startsWith("zone::")) return [];
   const candidates = ["questions", "fallback", ...draft.rules.map((_, index) => `rule-${index}`),
     ...config.labels.map((label) => `zone::${label.tag}`), ...config.models.map((model) => `model::${model.id}`)];
   return candidates.filter((target) => classifyConnection(draft, config, { kind: "reconnect", edge }, target).reason === null);

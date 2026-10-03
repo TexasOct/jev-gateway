@@ -34,9 +34,10 @@ it("keeps exactly nine purpose-owned stylesheets behind the sole application CSS
   expect(geometry).toMatch(/routing-canvas-scroll[^\n]*absolute inset-0[^\n]*overflow-auto[^\n]*overscroll-contain[^\n]*\[touch-action:none\]/);
   expect(geometry).toMatch(/routing-canvas-board relative min-h-full overflow-clip/);
   expect(geometry).toMatch(/routing-canvas-content absolute left-0 top-\[var\(--canvas-origin-y,0px\)\]/);
-  expect(geometry).toMatch(/routing-canvas-node absolute block h-14 min-h-14 max-h-14 w-\[190px\] overflow-hidden[^\n]*\[touch-action:none\]/);
+  expect(geometry).toMatch(/routing-canvas-node absolute block w-\[190px\] overflow-hidden[^\n]*\[touch-action:none\]/);
+  expect(geometry).toContain("height: dimensions[id]!.height");
   expect(geometry).toMatch(/routing-canvas-lines pointer-events-none absolute inset-0/);
-  expect(geometry).toMatch(/canvas-edge-handle[^\n]*\[pointer-events:all\]/);
+  expect(geometry).toMatch(/canvas-edge-handle[^\n]*\[pointer-events:auto\]/);
   expect(geometry).toMatch(/canvas-edge-preview pointer-events-none/);
   expect(geometry).toMatch(/canvas-marquee absolute pointer-events-none/);
   expect(geometry).toMatch(/canvas-tools absolute[^\n]*z-\[7\][^\n]*overflow-auto/);
