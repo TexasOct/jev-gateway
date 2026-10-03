@@ -21,9 +21,13 @@ gateway serves without inbound authentication. A declared but empty or missing k
 is a configuration error. The comparison is constant-time.
 
 The `GET /dashboard` HTML shell is always served; the data endpoints it calls are
-protected by the same rule. The page asks for the key only after a data request
-returns `401`, keeps it in JavaScript memory, and sends it through the
-`Authorization` header.
+protected by the same rule. When a key is required, the dashboard shows a
+standalone connection page with password input and connection status. Navigation
+and business panels become available after validation succeeds. Failed attempts
+remain on the connection page for retry; a later `401` returns there and stops
+activity polling. The key stays in JavaScript memory and is sent through the
+`Authorization` header. Gateways without inbound authentication still open the
+console after their initial data access succeeds.
 
 ## Endpoints
 

@@ -133,6 +133,8 @@ export const zhCN = {
   light: "浅色",
   dark: "深色",
   connect: "连接",
+  connectionIntro: "输入网关 API 密钥以打开控制台。",
+  connectionPending: "正在验证连接…",
   credentialNote: "网关凭证仅保存在此页面的内存中，不会写入存储或网址。",
   apiKey: "网关 API 密钥",
   authRequired: "需要身份验证。请输入网关 API 密钥以继续。",

@@ -505,8 +505,9 @@ The projection carries an opaque process instance ID, completeness flag and aggr
 
 ## Frontend conventions
 
-- One page, no client-side router. View state switches between monitoring and
-  configuration. At wide widths, center and bound the Monitoring view to 1280px,
+- One app entry, no client-side router. Authentication has a standalone connection
+  page; connected view state switches between Monitoring, Strategy, Provider and
+  Settings. At wide widths, center and bound the Monitoring view to 1280px,
   Provider and Settings content to 768px, and the Strategy workspace to 1440px.
   Keep the strategy shell full viewport height and preserve canvas pan, fit,
   node-size and hit-target behavior within the centered workspace.
@@ -571,6 +572,56 @@ The projection carries an opaque process instance ID, completeness flag and aggr
 - Status colors used for small text must meet the normal-text contrast target
   (4.5:1) on every surface where rendered. Do not mark 3:1 large-text contrast
   as passing for small status labels.
+
+## Standalone connection and authentication admission
+
+`App.tsx` owns connection attempts, draft input, errors and unauthorized callbacks.
+`AppShell` renders the connection page exclusively while access is unresolved or
+a key is required. The dashboard header, navigation and business panels do not
+mount alongside the connection form. Presentational connection controls reuse
+the existing palette and UI primitives; they do not own API or storage logic.
+
+`setCredential(string | null)` remains the single module-memory write path.
+Connection submission trims input and rejects empty values without a request.
+There is no new key-length rule, authentication endpoint, router or persisted
+session. Initial access probing and submitted validation share a pending guard;
+duplicate forms and late initial responses cannot supersede an active attempt.
+The pending page remains visible until the attempt succeeds. Clear the draft
+after successful connection. Locale preference remains the only stored value.
+
+Initialize access as unresolved even when the client module already has a key.
+Keep built-in connection errors as message keys resolved with the current locale;
+changing language must update existing feedback without another access probe.
+Preserve arbitrary API/network error text separately from those message keys.
+
+| Condition | UI and request behavior |
+| --- | --- |
+| Blank key | Local error, no validation request |
+| Validation pending | Connection page stays visible, controls prevent duplicate submissions |
+| Validation succeeds | Enter the connected shell after awaited success |
+| Wrong key or failed network read | Stay on connection page with an accessible error and retry |
+| Later 401 | Clear credential, stop route activity and return to connection page |
+| No gateway key configured | Initial successful anonymous data access admits the console |
+
+`App.run(work)` catches errors and resolves `Promise<void>`. Its completion is not
+proof that `work` succeeded. Authentication admission belongs inside the successful
+awaited work, or a separately owned explicit success result. Do not clear
+`needsKey` unconditionally after `run` resolves or before the validation requests
+finish. Preserve the error and credential cleanup owned by unauthorized handling.
+
+Browser regressions must assert absent dashboard navigation/business panels
+during pending/failed validation, delayed and duplicate submit behavior, initial
+probe/manual attempt ordering, password and Enter semantics, trimmed Bearer,
+network retry, 401 activity cessation, memory loss on refresh and anonymous
+compatibility. Inspect URL, cookies and both storage objects for synthetic-key
+absence. Cover both locales, desktop/320px and system light/dark schemes with
+computed overflow and visible keyboard focus. Static structure tests complement
+these interactions; they do not establish authentication success.
+
+Use portable per-test output paths for screenshots and private evidence. For
+computed button contrast, wait for active color transitions to finish and assert
+the enabled control's settled foreground/background at opacity 1. An intermediate
+transition frame does not establish the final palette's contrast ratio.
 
 ## Frontend Tailwind and geometry boundaries
 

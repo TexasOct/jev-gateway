@@ -14,6 +14,7 @@ import type { RoutingActivityPayload } from "@/shared/api/types";
 import type { useMonitoringData } from "./hooks/useMonitoringData";
 import { ProviderView } from "@/features/providers/ProviderView";
 import type { ProviderManagement } from "@/features/providers/useProviderManagement";
+import { ConnectionPage } from "./ConnectionPage";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 type FormatDateTime = ReturnType<typeof useLocale>["formatDateTime"];
@@ -44,6 +45,7 @@ type Props = {
   providerManagement?: ProviderManagement;
   view: View;
   needsKey: boolean;
+  connectionPending?: boolean;
   keyDraft: string;
   error: string | null;
   locale: "en" | "zh-CN";
@@ -69,6 +71,7 @@ export function AppShell({
   providerManagement,
   view,
   needsKey,
+  connectionPending = false,
   keyDraft,
   error,
   locale,
@@ -89,6 +92,9 @@ export function AppShell({
   onError,
   onRetryMonitoring,
 }: Props) {
+  if (needsKey) {
+    return <ConnectionPage keyDraft={keyDraft} error={error} pending={connectionPending} locale={locale} setLocale={setLocale} t={t} onConnect={onConnect} onKeyDraftChange={onKeyDraftChange} />;
+  }
   return (
     <div
       data-view={view}
@@ -166,31 +172,6 @@ export function AppShell({
             : "mx-auto grid w-full min-w-0 max-w-[1440px] content-start gap-4 px-4 py-5 max-[720px]:gap-3 max-[720px]:p-3 lg:px-6"
         }
       >
-        {needsKey && (
-          <Card className="min-w-0 p-4">
-            <h2 className="mb-2 text-sm font-semibold">{t("connect")}</h2>
-            <p className="text-ink-muted [overflow-wrap:anywhere]">
-              {t("credentialNote")}
-            </p>
-            <form
-              className="flex flex-wrap items-center gap-2"
-              onSubmit={onConnect}
-            >
-              <input
-                className="min-h-9 min-w-0 rounded-lg border border-outline bg-panel px-3 text-ink"
-                type="password"
-                value={keyDraft}
-                autoComplete="off"
-                aria-label={t("apiKey")}
-                placeholder={t("apiKey")}
-                onChange={(event) => onKeyDraftChange(event.target.value)}
-              />
-              <Button type="submit" size="lg">
-                {t("connect")}
-              </Button>
-            </form>
-          </Card>
-        )}
         {error !== null && !(view === "strategy" && configuration !== null) && (
           <Card className="min-w-0 p-3">
             <div className="my-2 rounded border-l-[3px] border-caution bg-panel-muted px-2 py-2 text-ink-muted [overflow-wrap:anywhere]">

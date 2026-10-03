@@ -133,6 +133,8 @@ export const en = {
   light: "Light",
   dark: "Dark",
   connect: "Connect",
+  connectionIntro: "Enter your gateway API key to open the dashboard.",
+  connectionPending: "Checking connection…",
   credentialNote: "The gateway keeps credentials in this page's memory only. Nothing is written to storage or the URL.",
   apiKey: "Gateway API key",
   authRequired: "Authentication required. Enter the gateway API key to continue.",
