@@ -2,7 +2,7 @@ import type { BrowserContext, Route } from "@playwright/test";
 import { activity, providers } from "../fixtures/activity";
 import { configuration } from "../fixtures/configuration";
 import { emptyDetail, sessionDetail, sessionsPageOne, sessionsPageTwo, sessionRequestsPageOne, sessionRequestsPageTwo } from "../fixtures/sessions";
-import type { ProviderConfiguration, RoutingActivityPayload, SessionRequestsPayload } from "@/shared/api/types";
+import type { CanvasLayout, ProviderConfiguration, RoutingActivityPayload, SessionRequestsPayload } from "@/shared/api/types";
 import { policy, strategies } from "../fixtures/strategies";
 
 export interface MockApiState {
@@ -17,6 +17,8 @@ export interface MockApiState {
   configurationWarnings: boolean;
   configurationApplied: boolean;
   appliedConfiguration?: typeof configuration;
+  canvasLayout?: CanvasLayout;
+  canvasWrites?: CanvasLayout[];
   themeSeed: string;
   delayThemeRead?: () => Promise<void>;
   rejectThemeRead?: boolean;
@@ -74,7 +76,9 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
     const method = request.method();
     state.requests.push({ method, path: `${url.pathname}${url.search}` });
     if (method === "PUT" && url.pathname === "/v1/dashboard/canvas-layout") {
-      return fulfill(route, request.postDataJSON());
+      state.canvasLayout = request.postDataJSON() as CanvasLayout;
+      (state.canvasWrites ??= []).push(structuredClone(state.canvasLayout));
+      return fulfill(route, state.canvasLayout);
     }
     const allowedWrite = state.allowedWrites.find((write) => write.method === method && write.path === url.pathname);
     if (allowedWrite) {
@@ -84,12 +88,14 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       }
       if (url.pathname === "/v1/routing/configuration" && method === "PUT") {
         state.configurationApplied = true;
-        const payload = allowedWrite.body as { questions?: typeof configuration.questions; rules?: typeof configuration.rules; fallback?: typeof configuration.fallback };
+        const payload = allowedWrite.body as { questions?: typeof configuration.questions; rules?: typeof configuration.rules; fallback?: typeof configuration.fallback; models?: Record<string, { tags: string[]; priority: number }> };
+        const current = state.appliedConfiguration ?? configuration;
         state.appliedConfiguration = {
-          ...configuration,
+          ...current,
           questions: payload.questions ?? configuration.questions,
           rules: (payload.rules ?? configuration.rules).map((rule, index) => ({ ...rule, index })),
           fallback: payload.fallback ?? configuration.fallback,
+          models: current.models.map((model) => ({ ...model, ...payload.models?.[model.id] })),
           config_hash: "fixture-hash-applied",
           overlay: { ...configuration.overlay, applied: true },
         };
@@ -124,7 +130,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       if (state.rejectThemeRead) { state.rejectThemeRead = false; return fulfill(route, { error: { message: "Synthetic theme read failure" } }, 503); }
       return fulfill(route, { version: 1, seed: state.themeSeed });
     }
-    if (url.pathname === "/v1/dashboard/canvas-layout") return fulfill(route, { version: 1, nodes: {}, viewport: { x: 0, y: 0 } });
+    if (url.pathname === "/v1/dashboard/canvas-layout") return fulfill(route, state.canvasLayout ?? { version: 1, nodes: {}, viewport: { x: 0, y: 0 } });
     if (url.pathname === "/v1/routing/sessions") {
       const cursor = url.searchParams.get("cursor");
       if (cursor === "fixture-page-2") {

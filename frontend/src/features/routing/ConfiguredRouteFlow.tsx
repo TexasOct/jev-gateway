@@ -3,6 +3,9 @@ import type { ConfigurationPayload } from "@/shared/api/types";
 import type { RoutingDraft } from "./model/draft";
 import { projectConfiguredRouteFlow } from "./model/configured-route-flow";
 import type { ConfiguredBranch } from "./model/configured-route-flow";
+import type { WorkflowEdge } from "./model/draft";
+import { messages } from "@/shared/i18n";
+import { selectionCaption } from "./model/selection";
 
 export interface ConfiguredRouteFlowProps {
   draft: RoutingDraft;
@@ -23,46 +26,52 @@ const copy = {
     questions: "Questions considered",
     noQuestions: "No questions configured",
     rule: "Rule",
-    fallback: "Fallback",
+    fallback: "Decision failure fallback",
+    default: "No rule matches",
+    failure: "Missing or invalid answers",
     match: "If matched",
     unmatched: "Otherwise, check the next rule",
-    fallbackNext: "Otherwise, use fallback",
+    fallbackNext: "Otherwise, use the first policy label",
     pool: "Eligible model pool",
     member: "Pool member",
     noMembers: "No configured pool members",
     unbound: "No label selected",
-    choose: "Choose a rule or fallback to trace its configured path.",
+    choose: "Choose a rule, default or decision failure fallback to trace its path.",
     first: "Questions enter the first rule.",
-    direct: "Questions lead directly to fallback.",
+    direct: "Valid answers use the first policy label when no rules are configured.",
     skip: "Earlier rules do not match in this example path.",
     chosen: "The selected rule matches and selects the label pool",
-    final: "No rule matches, so fallback selects the label pool",
+    final: "No rule matches, so the first policy label is selected",
+    failed: "Missing or invalid answers use the configured failure fallback",
     selection: "Selection mode",
     membership: "Listed models belong to the pool. This does not imply simultaneous requests or a chosen model.",
     missingPool: "This branch has no resolved label pool in the draft.",
   },
   "zh-CN": {
-    title: "配置路由",
+    title: "策略路径预览",
     draft: "策略草稿预览",
     applied: "策略草稿预览 · 与当前已应用策略一致",
     note: "这里展示草稿中的可能路径，不展示已记录请求或服务商状态。",
     questions: "参与判断的问题",
     noQuestions: "未配置问题",
     rule: "规则",
-    fallback: "兜底",
-    match: "匹配时",
+    fallback: "判定失败兜底",
+    default: "所有规则未命中",
+    failure: "答案缺失或无效",
+    match: "命中时",
     unmatched: "否则检查下一条规则",
-    fallbackNext: "否则进入兜底",
+    fallbackNext: "否则使用策略的首个标签",
     pool: "可选模型池",
     member: "模型池成员",
     noMembers: "模型池没有已配置成员",
     unbound: "未选择标签",
-    choose: "选择规则或兜底，查看配置中的路径。",
+    choose: "选择规则、默认路径或判定失败兜底，查看策略中的路径。",
     first: "问题进入第一条规则。",
-    direct: "问题直接进入兜底。",
-    skip: "此示例路径中，前面的规则均未匹配。",
-    chosen: "选中的规则匹配后进入标签模型池",
-    final: "所有规则均未匹配，兜底进入标签模型池",
+    direct: "未配置规则时，有效答案直接使用策略的首个标签。",
+    skip: "此示例路径中，前面的规则均未命中。",
+    chosen: "选中的规则命中后进入标签模型池",
+    final: "所有规则均未命中，使用策略的首个标签",
+    failed: "答案缺失或无效时，使用配置的判定失败兜底",
     selection: "选择模式",
     membership: "所列模型是模型池成员，不表示同时请求或已选定某个模型。",
     missingPool: "草稿中此分支没有可解析的标签模型池。",
@@ -99,7 +108,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
   const isSelected = (from: string, to: string, kind: string) => selectedEdges.has(`${from}|${to}|${kind}`);
   const motionKey = `${selection?.revision ?? 0}-${reducedMotion ? "static" : "motion"}`;
 
-  function wire(from: string, to: string, kind: "context" | "unmatched" | "match", label: string) {
+  function wire(from: string, to: string, kind: WorkflowEdge["kind"], label: string) {
     const highlighted = isSelected(from, to, kind);
     return <div className="flex min-h-7 items-center gap-2" aria-label={label} key={`${from}-${to}-${kind}`}>
       <svg viewBox="0 0 48 22" width="48" height="22" className="shrink-0" aria-hidden="true">
@@ -113,7 +122,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
     return <div className="min-w-0 rounded-xl border border-outline bg-panel-muted p-3">
       <span className="text-xs text-ink-muted">{text.pool}</span>
       <p className="mt-1 break-words text-sm font-semibold text-ink">{branch.label ?? text.unbound}</p>
-      {branch.selection && <p className="mt-1 text-xs text-ink-muted">{text.selection}: {branch.selection}</p>}
+      <p className="mt-1 text-xs text-ink-muted">{text.selection}: {selectionCaption(branch.selection, (key) => messages[locale][key])}</p>
       {branch.models.length ? <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={text.member}>{branch.models.map((model) => <li key={model} className="max-w-full break-all rounded-md border border-outline bg-panel px-2 py-1 text-xs text-ink">{model}</li>)}</ul> : <p className="mt-2 text-xs text-ink-muted">{text.noMembers}</p>}
     </div>;
   }
@@ -128,23 +137,24 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
       <h4 className="text-xs font-semibold text-ink">{text.questions}</h4>
       {projection.questions.length ? <ul className="mt-2 flex flex-wrap gap-2">{projection.questions.map((question) => <li key={question.name} className="min-w-0 max-w-full rounded-md border border-outline bg-panel px-2 py-1 text-xs text-ink"><strong className="break-words">{question.name}</strong>{question.instructions && <span className="ml-2 break-words text-ink-muted">{question.instructions}</span>}<span className="block break-words text-ink-muted">{question.criteria.map((criterion) => `${criterion.name}: ${criterion.description}`).join(" · ")}</span></li>)}</ul> : <p className="mt-2 text-xs text-ink-muted">{text.noQuestions}</p>}
     </div>
-    <div className="mt-2">{wire("questions", projection.branches[0]?.id ?? "fallback", "context", projection.branches[0]?.order ? text.first : text.direct)}</div>
+    {draft.rules.length > 0 && <div className="mt-2">{wire("questions", projection.edges[0]!.to, "context", text.first)}</div>}
     <ol className="min-w-0">
       {projection.branches.map((branch, index) => <li key={branch.id} className="min-w-0">
+        {branch.kind === "failure" && wire("questions", "fallback", "failure", text.failure)}
         <div className={`my-2 grid min-w-0 gap-2 rounded-xl border p-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center ${active?.id === branch.id ? "border-primary bg-panel-muted" : "border-outline"}`}>
           <button type="button" onClick={() => select(branch.id)} aria-pressed={active?.id === branch.id} className="min-h-10 min-w-0 rounded-md border border-outline bg-panel px-3 py-2 text-left text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            <span className="font-semibold">{branch.order === null ? text.fallback : `${text.rule} ${branch.order}`}</span>
+            <span className="font-semibold">{branch.kind === "failure" ? text.fallback : branch.kind === "default" ? text.default : `${text.rule} ${branch.order}`}</span>
             {branch.conditions.map(({ question, values }) => <span key={question} className="block break-words text-xs text-ink-muted">{question} = {values.join(" | ")}</span>)}
           </button>
-          {branch.poolId ? wire(branch.id, branch.poolId, "match", text.match) : <span className="text-xs text-ink-muted">{text.missingPool}</span>}
+          {branch.poolId ? (() => { const edge = branch.path.at(-1)!; return wire(edge.from, edge.to, edge.kind, branch.kind === "default" ? edge.kind === "unmatched" ? text.fallbackNext : text.direct : text.match); })() : <span className="text-xs text-ink-muted">{text.missingPool}</span>}
           {pool(branch)}
         </div>
-        {index < projection.branches.length - 1 && wire(branch.id, projection.branches[index + 1]!.id, "unmatched", index === projection.branches.length - 2 ? text.fallbackNext : text.unmatched)}
+        {branch.kind === "rule" && projection.branches[index + 1]?.kind === "rule" && wire(branch.id, projection.branches[index + 1]!.id, "unmatched", text.unmatched)}
       </li>)}
     </ol>
     <div className="mt-3 rounded-xl border border-outline bg-panel-muted p-3 text-xs leading-5 text-ink" role="status" aria-live="polite">
       {active ? <>
-        <p>{active.order === null ? text.final : text.chosen}{active.label ? `: ${active.label}.` : "."}</p>
+        <p>{active.kind === "failure" ? text.failed : active.kind === "default" ? text.final : text.chosen}{active.label ? `: ${active.label}.` : "."}</p>
         {active.path.some((edge) => edge.kind === "unmatched") && <p>{text.skip}</p>}
         {active.poolId === null && <p>{text.missingPool}</p>}
         <p>{text.membership}</p>

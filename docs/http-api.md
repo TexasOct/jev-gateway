@@ -134,16 +134,34 @@ and a bounded bottom drawer for help, node and edge lists, advanced editors and
 review actions. The drawer starts collapsed and scrolls internally when expanded.
 Selected-node details open in a size-capped, scrollable panel beside the node;
 changing tools affects canvas interaction only, not the routing strategy.
-The whiteboard renders question context, the ordered match/unmatched rule chain,
-fallback, labels, and model pools at the saved coordinates. Reconnecting a match
-edge changes its rule or fallback label; reconnecting an unmatched edge moves a
-later rule immediately after its source. Tag-resolved label edges can add, move,
-or remove model membership, subject to whole-catalog validation; explicit-model
-labels cannot be rewired. The edge list offers keyboard controls, and node
-positions can also be moved with Alt + arrow keys. Layout edits save separately
-from policy edits. Policy edits remain pending until review, validation, and
-confirmation. A failed layout write reports an error and restores the last
-confirmed layout instead of silently claiming that the new coordinates persisted.
+The canvas renders question results, the ordered match/unmatched rule chain,
+fallback, labels, and model pools at the saved coordinates. Inputs appear on the
+left and named outputs on the right. Nodes grow with the number of question
+options or pool members so handles remain separated. Question-option outputs
+feed the same ordered rule entry; the strategy still evaluates the complete
+answer set and uses the first matching rule. Valid answers with no matching rule
+use the first policy label and the strategy's default selection mode. Failed or
+invalid decision answers use the separately configured fallback. These paths
+remain distinct when no conditional rules are configured.
+
+Select a wire or output port to choose a destination in the canvas connection
+panel, or drag an output onto a compatible input. Reconnecting a match edge
+changes its rule or fallback label; reconnecting an unmatched edge moves a later
+rule immediately after its source. Disconnecting a match leaves an empty output
+in the pending draft. Reconnect it to a label before reviewing or applying that
+draft. Tag-resolved label edges can add, move, or remove model membership while
+retaining at least one model; explicit-model labels and the generated rule-entry,
+decision-failure and final default links show their editing restrictions. The
+connection panel and edge list provide keyboard controls, and Escape cancels a
+connection edit. The strategy requires choice questions with instructions and at
+least two described criteria; incomplete questions must be repaired before review.
+
+Node positions can also be moved with Alt + arrow keys. Arrange the canvas or
+align selected nodes to keep the flow readable. These actions save layout
+separately from policy edits. Policy edits remain pending until validation,
+review, and explicit confirmation. A failed layout write reports an error and
+restores the last confirmed layout instead of silently claiming that the new
+coordinates persisted.
 Routing, canvas-layout, and theme writes leave `models.json` unchanged.
 
 Routing overlays are validated before they touch disk. The overlay is merged into the

@@ -5,14 +5,18 @@ import { api } from "@/shared/api/client";
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
 import CanvasNodeContent, { getCanvasNodeKind } from "./components/CanvasNodeContent";
-import { BOARD_HEIGHT, BOARD_WIDTH, MIN_ZOOM, boardPoint, canonicalViewport, canvasAvailableRect, canvasToolShortcut, classifyConnection, compatibleTargets, connectPoolEdge, createLayoutWriteQueue, crossedDragThreshold, defaultPosition, disconnectPoolEdge, dragDisplacement, draggedLayout, marqueeNodes, nodeDragScrollLock, planFitViewport, planNodeReveal, reconcileRuleLayout, reconnectEdge, restoreCanvasViewport, translateNodes, validLayout } from "./model/canvas";
+import { BOARD_HEIGHT, BOARD_WIDTH, MIN_ZOOM, alignNodes, arrangeNodes, boardPoint, canonicalViewport, canvasAvailableRect, canvasToolShortcut, classifyConnection, compatibleTargets, connectMatchEdge, connectPoolEdge, createLayoutWriteQueue, crossedDragThreshold, disconnectEdge, dragDisplacement, draggedLayout, intentTargets, marqueeNodes, nodeDragScrollLock, planFitViewport, planNodeReveal, reconcileRuleLayout, reconnectEdge, restoreCanvasViewport, translateNodes, validLayout } from "./model/canvas";
 import type { ConnectionIntent, ConnectionReason, RuleLayoutMutation } from "./model/canvas";
 import type { Position } from "./model/canvas";
 import { Button } from "@/shared/ui/button";
 import { ToolButton } from "@/shared/ui/ToolButton";
-import { NODE_CARD_BASE_HEIGHT, NODE_CARD_PORT_RADIUS, NODE_CARD_WIDTH, nodeCardCenter, nodeCardPorts, nodeCardPortsWithCenter } from "./model/node-card";
+import { NODE_CARD_BASE_HEIGHT, NODE_CARD_OUTPUT_HEIGHT, NODE_CARD_WIDTH, nodeCardCenter, nodeCardPorts } from "./model/node-card";
+import { canvasDimensions, canvasOutputs } from "./model/outputs";
+import type { CanvasOutput } from "./model/outputs";
 import { workflowEdges } from "./model/draft";
 import type { RoutingDraft, WorkflowEdge } from "./model/draft";
+
+type VisualOutput = { from: string; output: CanvasOutput };
 
 interface Props {
   heading: ReactNode;
@@ -61,17 +65,21 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const marqueeRef = useRef<{ pointerId: number; start: Position; end: Position; additive: boolean } | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hoverTarget, setHoverTarget] = useState("");
-  const [activeIntent, setActiveIntent] = useState<ConnectionIntent | null>(null);
+  const [activeConnection, setActiveConnection] = useState<{ intent: ConnectionIntent; visual?: VisualOutput } | null>(null);
+  const activeIntent = activeConnection?.intent ?? null;
+  const [intentDraft, setIntentDraft] = useState<RoutingDraft | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const dragEdge = useRef<WorkflowEdge | { from: string; kind: "new-pool" } | null>(null);
+  const dragEdge = useRef<{ intent: ConnectionIntent; visual: VisualOutput; draft: RoutingDraft; start: Position; moved: boolean; pointerId: number } | null>(null);
+  const connectionDraft = useRef<RoutingDraft | null>(null);
+  const connectionOrigin = useRef<HTMLElement | SVGElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [edgePointer, setEdgePointer] = useState<Position | null>(null);
   const [pointerCandidate, setPointerCandidate] = useState("");
   const [keyboardTarget, setKeyboardTarget] = useState("");
   const [keyboardPool, setKeyboardPool] = useState("");
   const [keyboardModel, setKeyboardModel] = useState("");
   const [keyboardCandidate, setKeyboardCandidate] = useState("");
-  const [edgeChoice, setEdgeChoice] = useState<{ edge: WorkflowEdge; draft: RoutingDraft } | null>(null);
   const surface = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const originY = useRef(0);
@@ -209,34 +217,14 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     ...config.models.map((model) => ({ id: `model::${model.id}`, text: model.id })),
   ], [draft.rules, config.labels, config.models, t]);
   const edges = workflowEdges(draft, config);
-  const addPortNodes = new Set(config.labels.filter((label) => label.resolution === "tag").map((label) => `zone::${label.tag}`));
-  const outgoingEdges = new Map<string, WorkflowEdge[]>();
-  for (const edge of edges) {
-    const outgoing = outgoingEdges.get(edge.from) ?? [];
-    outgoing.push(edge);
-    outgoingEdges.set(edge.from, outgoing);
-  }
-  const edgePorts = new Map([...outgoingEdges].flatMap(([id, outgoing]) => {
-    const ports = addPortNodes.has(id) ? nodeCardPortsWithCenter(outgoing.length) : nodeCardPorts(outgoing.length);
-    return outgoing.map((edge, index) => [edge, ports[index]!] as const);
-  }));
-  const validNodeIds = new Set(nodes.map((node) => node.id));
-  const activeEdgeChoice = edgeChoice?.draft === draft && validNodeIds.has(edgeChoice.edge.from) && validNodeIds.has(edgeChoice.edge.to) &&
-    edges.some((edge) => edge.from === edgeChoice.edge.from && edge.to === edgeChoice.edge.to && edge.kind === edgeChoice.edge.kind)
-    ? edgeChoice.edge : null;
-  const positions = useMemo(() => Object.fromEntries(nodes.map((node, index) => {
-    const defaultAt = defaultPosition(node.id);
-    const at = layout.nodes[node.id] ?? (node.id.startsWith("zone::") ? (() => {
-      const position = config.labels.findIndex((label) => `zone::${label.tag}` === node.id);
-      return { x: defaultAt.x + Math.floor(position / 50) * 210, y: 80 + (position % 50) * 160 };
-    })() : node.id.startsWith("model::") ? (() => {
-      const position = index - nodes.length + config.models.length;
-      return { x: defaultAt.x + Math.floor(position / 50) * 210, y: 80 + (position % 50) * 110 };
-    })() : defaultAt);
-    return [node.id, at];
-  })) as Record<string, Position>, [nodes, layout.nodes, config.labels, config.models.length]);
-  const boardWidth = Math.max(BOARD_WIDTH, ...Object.values(positions).map((at) => at.x + 210));
-  const boardHeight = Math.max(BOARD_HEIGHT, ...Object.values(positions).map((at) => at.y + 85));
+  const outputs = useMemo(() => canvasOutputs(draft, config), [draft, config]);
+  const dimensions = useMemo(() => canvasDimensions(outputs), [outputs]);
+  const defaults = useMemo(() => arrangeNodes(nodes.map((node) => node.id), dimensions), [nodes, dimensions]);
+  const displayEdges = Object.entries(outputs).flatMap(([from, rows]) => rows.flatMap((output, index) =>
+    output.edge ? [{ from, output, port: nodeCardPorts(rows.length)[index]! }] : []));
+  const positions = useMemo(() => Object.fromEntries(nodes.map((node) => [node.id, layout.nodes[node.id] ?? defaults[node.id]!])) as Record<string, Position>, [nodes, layout.nodes, defaults]);
+  const boardWidth = Math.max(BOARD_WIDTH, ...Object.entries(positions).map(([id, at]) => at.x + dimensions[id]!.width + 20));
+  const boardHeight = Math.max(BOARD_HEIGHT, ...Object.entries(positions).map(([id, at]) => at.y + dimensions[id]!.height + 29));
   const canEdit = loaded && !disabled;
   const canConnect = canEdit && tool === "select";
 
@@ -294,10 +282,16 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const moveGroup = (ids: string[], starts: Record<string, Position>, delta: Position, save: boolean) => {
     const additions = ids.filter((id) => !Object.hasOwn(layoutRef.current.nodes, id)).length;
     if (Object.keys(layoutRef.current.nodes).length + additions > 256) { setLayoutError(t("canvasLayoutFull")); return; }
-    const next = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, ...translateNodes(starts, ids, delta, boardWidth, boardHeight) } };
+    const next = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, ...translateNodes(starts, ids, delta, boardWidth, boardHeight, dimensions) } };
     layoutRef.current = next;
     setLayout(next);
     if (save) persist(next);
+  };
+  const saveArrangement = (positions: Record<string, Position>) => {
+    if (!canEdit) return;
+    const next = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, ...positions } };
+    if (!validLayout(next) || Object.entries(positions).some(([id, at]) => at.x + dimensions[id]!.width > 10000 || at.y + dimensions[id]!.height > 10000)) { setLayoutError(t("canvasLayoutLimits")); return; }
+    layoutRef.current = next; setLayout(next); persist(next);
   };
   const discardLayout = () => {
     if (layoutWrites.current.pending) return;
@@ -305,7 +299,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     rollbackLayout();
   };
   const startNode = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
-    if (event.button !== 0 || !canEdit || activeEdgeChoice || dragNode.current) return;
+    if (event.button !== 0 || !canEdit || activeIntent || dragNode.current) return;
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
     suppressClick.current = false;
     const ids = selection.includes(id) ? selection.filter((item) => Object.hasOwn(positions, item)) : [id];
@@ -339,7 +333,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     }
     event.preventDefault();
     if (surface.current) holdNodeScroll(surface.current);
-    const preview = draggedLayout(drag.layout, drag.start, dragDisplacement(start, current, drag.zoom), drag.width, drag.height);
+    const preview = draggedLayout(drag.layout, drag.start, dragDisplacement(start, current, drag.zoom), drag.width, drag.height, dimensions);
     drag.changed = preview.changed;
     if (!preview.changed) {
       layoutRef.current = drag.layout;
@@ -365,10 +359,10 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const removeEdge = (edge: WorkflowEdge) => {
     if (!canConnect) return;
     const result = classifyConnection(draft, config, { kind: "remove", edge }, edge.to);
-    const next = result.reason ? null : disconnectPoolEdge(draft, config, edge);
+    const next = result.reason ? null : disconnectEdge(draft, config, edge);
     if (next === null) announce(result.reason ?? "stale");
     else onDraft(next);
-    setEdgeChoice(null);
+    setActiveConnection(null);
   };
   const applyEdge = (edge: WorkflowEdge, target: string) => {
     if (!canConnect) return;
@@ -388,10 +382,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       }
     }
     dragEdge.current = null;
-    setActiveIntent(null);
+    setActiveConnection(null);
     setKeyboardTarget("");
     setEdgePointer(null);
-    setEdgeChoice(null);
   };
   const applyPool = (source: string, target: string) => {
     if (!canConnect) return;
@@ -400,7 +393,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (next === null) announce(result.reason ?? "stale");
     else { announce(null); onDraft(next); }
     dragEdge.current = null;
-    setActiveIntent(null);
+    setActiveConnection(null);
     setEdgePointer(null);
     setKeyboardModel("");
   };
@@ -410,20 +403,57 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     return boardPoint({ x: event.clientX, y: event.clientY }, { x: rect.left, y: rect.top + originY.current },
       { x: surface.current.scrollLeft, y: surface.current.scrollTop }, zoom);
   };
-  const finishEdge = (event: ReactPointerEvent<SVGCircleElement>) => {
+  const applyIntent = (intent: ConnectionIntent, target: string) => {
+    if (!canConnect) return;
+    if (connectionDraft.current !== draft) { announce("stale"); cancelConnection(); return; }
+    if (intent.kind === "reconnect") { applyEdge(intent.edge, target); cancelConnection(); return; }
+    if (intent.kind === "new-pool") { applyPool(intent.from, target); cancelConnection(); return; }
+    if (intent.kind === "new-match") {
+      const result = classifyConnection(draft, config, intent, target);
+      const next = result.reason ? null : connectMatchEdge(draft, config, intent.from, target);
+      if (next) { onDraft(next); announce(null); cancelConnection(); }
+      else announce(result.reason ?? "stale");
+    }
+  };
+  const cancelConnection = () => {
+    setActiveConnection(null); setEdgePointer(null); setKeyboardTarget("");
+    const gesture = dragEdge.current;
+    dragEdge.current = null; setHoverTarget(""); setPointerCandidate("");
+    const origin = connectionOrigin.current;
+    if (gesture && origin?.hasPointerCapture(gesture.pointerId)) origin.releasePointerCapture(gesture.pointerId);
+    const box = origin?.getBoundingClientRect();
+    const free = surface.current && canvasAvailableRect(surface.current);
+    if (origin?.isConnected && box && free && box.left >= free.left && box.right <= free.right && box.top >= free.top && box.bottom <= free.bottom) origin.focus({ preventScroll: true });
+    else surface.current?.focus({ preventScroll: true });
+  };
+  const openConnection = (intent: ConnectionIntent, origin: HTMLElement | SVGElement, visual?: VisualOutput) => {
+    onSelection([]);
+    connectionDraft.current = draft; connectionOrigin.current = origin;
+    setIntentDraft(draft);
+    const from = intent.kind === "reconnect" || intent.kind === "remove" ? intent.edge.from : intent.from;
+    const output = outputs[from]?.find((row) => intent.kind === "reconnect" || intent.kind === "remove"
+      ? row.edge?.to === intent.edge.to && row.edge.kind === intent.edge.kind
+      : row.id === (intent.kind === "new-match" ? "match" : "add"));
+    setActiveConnection({ intent, visual: visual ?? (output ? { from, output } : undefined) }); setKeyboardTarget(""); announce(null);
+    requestAnimationFrame(() => panelRef.current?.querySelector<HTMLElement>("select, button")?.focus({ preventScroll: true }));
+  };
+  const finishEdge = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const active = dragEdge.current;
-    if (!active || !canConnect) {
-      dragEdge.current = null; setActiveIntent(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate("");
+    if (!active) return;
+    if (!canConnect) {
+      cancelConnection();
       return;
     }
-    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node]");
-    const target = element?.getAttribute("data-canvas-node") ?? "";
-    if (target) {
-      if (active.kind === "new-pool") applyPool(active.from, target);
-      else applyEdge(active, target);
-    } else announce("invalid");
     dragEdge.current = null;
-    setActiveIntent(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!active.moved) { dragEdge.current = null; setEdgePointer(null); openConnection(active.intent, event.currentTarget, active.visual); return; }
+    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node], [data-canvas-input]");
+    const target = element?.getAttribute("data-canvas-node") ?? element?.getAttribute("data-canvas-input") ?? "";
+    if (active.draft !== draft) announce("stale");
+    else if (target) applyIntent(active.intent, target);
+    else announce("invalid");
+    dragEdge.current = null;
+    setActiveConnection(null);
     setEdgePointer(null);
     setHoverTarget("");
     setPointerCandidate("");
@@ -431,7 +461,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const selectNode = (id: string, focusInspector = false) => {
     if (suppressClick.current) { suppressClick.current = false; return; }
     if (tool === "pan") return;
-    if (activeEdgeChoice && canEdit) { applyEdge(activeEdgeChoice, id); return; }
+    if (activeIntent && canEdit) { applyIntent(activeIntent, id); return; }
     if (selection.length) onSelection([]);
     onSelect(id, focusInspector);
   };
@@ -441,16 +471,18 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   };
   const chooseTool = (next: "select" | "pan") => {
     if (dragNode.current) stopNode(dragNode.current.pointerId, true);
+    if (dragEdge.current || activeIntent) cancelConnection();
     setTool(next);
-    setEdgeChoice(null);
     dragEdge.current = null;
-    setActiveIntent(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate("");
+    setActiveConnection(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate("");
     if (next === "pan") onSelection([]);
     panDrag.current = null;
     marqueeRef.current = null;
     setMarquee(null);
   };
-  const intent = canConnect ? activeIntent ?? (activeEdgeChoice ? { kind: "reconnect" as const, edge: activeEdgeChoice } : null) : null;
+  const intent = activeIntent;
+  const intentStale = !!activeIntent && intentDraft !== draft;
+  const outputName = (output: CanvasOutput) => output.name ?? t(output.kind === "add" ? "canvasAddPoolEdge" : output.kind === "failure" ? "canvasQuestionFailure" : output.kind === "match" ? "match" : "unmatched");
   const selectedCount = selection.length > 1 ? selection.length : 0;
   const pointerReason = intent && pointerCandidate ? classifyConnection(draft, config, intent, pointerCandidate).reason : null;
   const selectedEdge = selectedCount ? undefined : edges.find((edge) => edge.from === selected && compatibleTargets(draft, config, edge).length > 0);
@@ -477,20 +509,20 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       if (!viewport || dragNode.current) return;
       revealedSerial.current = revealNode.serial;
       setTool("select");
-      setEdgeChoice(null);
+      setActiveConnection(null);
       reportAnchor();
       const rect = viewport.getBoundingClientRect();
       const visible = canvasAvailableRect(viewport);
       if (!visible) return;
       const at = positions[revealNode.id]!;
       const node = [...viewport.querySelectorAll<HTMLButtonElement>("[data-canvas-node]")].find((item) => item.dataset.canvasNode === revealNode.id);
-      const plan = planNodeReveal(at, { width: node?.offsetWidth ?? NODE_CARD_WIDTH, height: node?.offsetHeight ?? NODE_CARD_BASE_HEIGHT }, zoom, rect, visible, viewportReference(viewport, originY.current), inspectorOpen);
+      const plan = planNodeReveal(at, dimensions[revealNode.id]!, zoom, rect, visible, viewportReference(viewport, originY.current), inspectorOpen);
       viewport.scrollTo({ left: plan.scroll.x, top: plan.scroll.y, behavior: "instant" });
       node?.focus({ preventScroll: true });
       reportAnchor();
     });
     return () => cancelAnimationFrame(frame);
-  }, [loaded, revealNode, positions, zoom, reportAnchor, inspectorOpen, draggingNodes.length]);
+  }, [loaded, revealNode, positions, dimensions, zoom, reportAnchor, inspectorOpen, draggingNodes.length]);
   const fitBoard = () => {
     if (dragNode.current) stopNode(dragNode.current.pointerId, true);
     const viewport = surface.current;
@@ -503,7 +535,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     const width = visibleBounds.right - visibleBounds.left;
     const height = visibleBounds.bottom - visibleBounds.top;
     const plan = planFitViewport(positions, selected, selection,
-      { width: Math.min(viewport.clientWidth, width), height: Math.min(viewport.clientHeight, height) }, { width: boardWidth, height: boardHeight });
+      { width: Math.min(viewport.clientWidth, width), height: Math.min(viewport.clientHeight, height) }, { width: boardWidth, height: boardHeight }, dimensions);
     setFitMode(plan.mode);
     zoomRef.current = plan.zoom;
     setZoom(plan.zoom);
@@ -514,8 +546,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       viewport.scrollLeft = Math.max(0, plan.scroll.x - (visible ? visible.left - bounds.left : 0));
       viewport.scrollTop = Math.max(0, originY.current + plan.scroll.y - (visible ? visible.top - bounds.top : 0));
       if (plan.mode === "node" && inspectorOpen && positions[selected] && visible) {
-        const node = [...viewport.querySelectorAll<HTMLButtonElement>("[data-canvas-node]")].find((item) => item.dataset.canvasNode === selected);
-        const reveal = planNodeReveal(positions[selected]!, { width: node?.offsetWidth ?? NODE_CARD_WIDTH, height: node?.offsetHeight ?? NODE_CARD_BASE_HEIGHT }, plan.zoom, bounds, visible, viewportReference(viewport, originY.current), true);
+        const reveal = planNodeReveal(positions[selected]!, dimensions[selected]!, plan.zoom, bounds, visible, viewportReference(viewport, originY.current), true);
         viewport.scrollLeft = reveal.scroll.x;
         viewport.scrollTop = reveal.scroll.y;
       }
@@ -529,11 +560,27 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     };
     requestAnimationFrame(() => requestAnimationFrame(fitPageScroll));
   };
-  const edgeDescription = (edge: WorkflowEdge) => `${edge.from} ${edge.kind === "context" ? t("firstMatch") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} ${edge.to}`;
+  const edgeDescription = (edge: WorkflowEdge) => `${nodes.find((node) => node.id === edge.from)?.text ?? edge.from} · ${edge.kind === "context" ? t("questions") : edge.kind === "failure" ? t("canvasQuestionFailure") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} → ${nodes.find((node) => node.id === edge.to)?.text ?? edge.to}`;
+  const outputDescription = ({ from, output }: VisualOutput) => {
+    const source = nodes.find((node) => node.id === from)?.text ?? from;
+    const destination = output.edge?.to;
+    return `${source} · ${outputName(output)}${destination ? ` → ${nodes.find((node) => node.id === destination)?.text ?? destination}` : ""}`;
+  };
   return <section className="canvas-section absolute inset-0 min-w-0" aria-label={t("routingCanvas")}>
-    <div className="workspace-chrome" data-canvas-occlusion="top">
+    <div className="workspace-chrome absolute left-3 right-3 top-3 z-[9] pointer-events-none [&>*]:pointer-events-auto" data-canvas-occlusion="top">
     {heading}
-    {activeEdgeChoice && <p className="notice" role="status">{t("canvasTarget")} <button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={() => setEdgeChoice(null)}>{t("cancel")}</button></p>}
+    {intent && <div ref={panelRef} className="canvas-connection-panel flex max-h-52 flex-wrap items-end gap-2 overflow-auto rounded-lg border border-primary bg-panel p-3 text-sm text-ink shadow-lg" role="region" aria-label={t("canvasConnectionActions")} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConnection(); } }}>
+      <p className="w-full break-words text-xs text-ink-muted">{activeConnection?.visual ? outputDescription(activeConnection.visual) : intent.kind === "reconnect" || intent.kind === "remove" ? edgeDescription(intent.edge) : `${nodes.find((node) => node.id === intent.from)?.text ?? intent.from} · ${t(intent.kind === "new-match" ? "match" : "canvasAddPoolEdge")}`}</p>
+      {intentStale ? <p role="status">{t("canvasReason_stale")}</p> : !canConnect ? <p role="status">{t("canvasReadOnly")}</p> : <>
+        <label className="grid min-w-0 flex-1 gap-1">{t("canvasTarget")}<select className="min-h-9 max-w-full rounded-md border border-outline bg-panel px-2" value={keyboardTarget} onChange={(event) => setKeyboardTarget(event.target.value)}>
+          <option value="">{t("canvasTarget")}</option>{intentTargets(draft, config, intent).map((id) => <option key={id} value={id}>{nodes.find((node) => node.id === id)?.text ?? id}</option>)}
+        </select></label>
+        <Button type="button" disabled={!keyboardTarget} onClick={() => applyIntent(intent, keyboardTarget)}>{t("canvasConnect")}</Button>
+        {intent.kind === "reconnect" && <Button variant="outline" type="button" disabled={!!classifyConnection(draft, config, { kind: "remove", edge: intent.edge }, intent.edge.to).reason} onClick={() => { removeEdge(intent.edge); cancelConnection(); }}>{t("canvasDisconnect")}</Button>}
+        {intent.kind === "reconnect" && (() => { const reason = classifyConnection(draft, config, { kind: "remove", edge: intent.edge }, intent.edge.to).reason; return reason ? <p className="w-full text-xs text-ink-muted" role="status">{connectionReasonText(t, reason)}</p> : null; })()}
+      </>}
+      <Button variant="outline" type="button" onClick={cancelConnection}>{t("cancel")}</Button>
+    </div>}
     {layoutError && <p className="notice warn" role="status">{layoutError === "unreadable" ? t("canvasLayoutUnreadable") : layoutError}{canEdit && <button type="button" onClick={() => { setLayoutError(null); persist(layoutRef.current); }}>{t("canvasRetryLayout")}</button>}{loaded && <button type="button" onClick={discardLayout}>{t("canvasDiscardLayout")}</button>}</p>}
     {feedback && <p className="notice warn" role="status">{feedback}</p>}
     {pointerReason && <p className="notice" role="status">{connectionReasonText(t, pointerReason)}</p>}
@@ -551,18 +598,22 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       <Button variant={tool === "select" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasSelectTool")} aria-label={t("canvasSelectTool")} aria-pressed={tool === "select"} onClick={() => chooseTool("select")}><MousePointer2 aria-hidden="true" focusable="false" /></Button>
       <Button variant={tool === "pan" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasPanTool")} aria-label={t("canvasPanTool")} aria-pressed={tool === "pan"} onClick={() => chooseTool("pan")}><Hand aria-hidden="true" focusable="false" /></Button>
       <Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" title={t("addRule")} aria-label={t("addRule")} disabled={disabled || !canAddRule} onClick={onAddRule}><Plus aria-hidden="true" focusable="false" /></Button>
+      <ToolButton type="button" disabled={!canEdit} onClick={() => saveArrangement(defaults)}>{t("canvasArrangeAll")}</ToolButton>
+      <ToolButton type="button" disabled={!canEdit || selectedCount < 2} onClick={() => saveArrangement(alignNodes(positions, selection, "x"))}>{t("canvasAlignLeft")}</ToolButton>
+      <ToolButton type="button" disabled={!canEdit || selectedCount < 2} onClick={() => saveArrangement(alignNodes(positions, selection, "y"))}>{t("canvasAlignTop")}</ToolButton>
       <div className="canvas-zoom flex flex-wrap items-center justify-center gap-[0.3rem] max-[600px]:flex-nowrap max-[600px]:gap-[0.2rem]" role="group" aria-label={t("canvasZoom")}><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" aria-label={t("canvasZoomOut")} onClick={() => zoomTo(zoom - 0.25)}><Minus aria-hidden="true" focusable="false" /></Button><output className="min-w-12 text-center tabular-nums max-[600px]:min-w-10" role="status" aria-live="polite" aria-atomic="true" title={dragPosition ? t("canvasLayoutOnly") : t("canvasZoom")} aria-label={dragPosition ? `${t("canvasLayoutOnly")} · x: ${dragPosition.x}, y: ${dragPosition.y}` : t("canvasZoom")}>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : `${Math.round(zoom * 100)}%`}</output><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" aria-label={t("canvasZoomIn")} onClick={() => zoomTo(zoom + 0.25)}><Plus aria-hidden="true" focusable="false" /></Button><ToolButton type="button" onClick={() => zoomTo(1)} title={t("canvasZoomReset")} aria-label={t("canvasZoomReset")}>1:1</ToolButton><ToolButton type="button" onClick={fitBoard}>{t("canvasZoomFit")}</ToolButton></div>
       <div className="canvas-pan flex gap-[0.3rem] max-[600px]:flex-nowrap max-[600px]:gap-[0.2rem]" role="group" aria-label={t("canvasPan")}><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(-1, 0)} aria-label={t("canvasPanLeft")}><ArrowLeft aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(1, 0)} aria-label={t("canvasPanRight")}><ArrowRight aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(0, -1)} aria-label={t("canvasPanUp")}><ArrowUp aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(0, 1)} aria-label={t("canvasPanDown")}><ArrowDown aria-hidden="true" focusable="false" /></Button></div>
     </div>
     <div className={`routing-canvas-scroll absolute inset-0 max-w-full min-h-0 overflow-auto overscroll-contain [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${tool === "pan" ? "tool-pan" : "tool-select"}`} ref={surface} tabIndex={0} aria-label={t("routingCanvas")}
-      onPointerDown={(event) => { if (event.button !== 0 || marqueeRef.current) return; if (tool === "pan") { panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }; event.currentTarget.setPointerCapture(event.pointerId); return; } if (event.target instanceof Element && event.target.closest("[data-canvas-node], .canvas-edge-handle") || activeEdgeChoice) return; const point = pointerOnBoard(event); marqueeRef.current = { pointerId: event.pointerId, start: point, end: point, additive: event.shiftKey }; event.currentTarget.setPointerCapture(event.pointerId); setMarquee({ start: point, end: point }); }}
+      onPointerDown={(event) => { if (event.button !== 0 || marqueeRef.current) return; if (event.target instanceof Element && event.target.closest("[data-canvas-node], [data-canvas-input], [data-canvas-output], [data-canvas-edge]")) return; if (tool === "pan") { panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }; event.currentTarget.setPointerCapture(event.pointerId); return; } if (intent) return; const point = pointerOnBoard(event); marqueeRef.current = { pointerId: event.pointerId, start: point, end: point, additive: event.shiftKey }; event.currentTarget.setPointerCapture(event.pointerId); setMarquee({ start: point, end: point }); }}
       onPointerMove={(event) => { const drag = panDrag.current; if (drag?.pointerId === event.pointerId) { event.currentTarget.scrollLeft = drag.left + drag.x - event.clientX; event.currentTarget.scrollTop = drag.top + drag.y - event.clientY; return; } if (!marqueeRef.current || marqueeRef.current.pointerId !== event.pointerId || !event.currentTarget.hasPointerCapture(event.pointerId)) return; const point = pointerOnBoard(event); marqueeRef.current.end = point; setMarquee({ start: marqueeRef.current.start, end: point }); }}
-      onPointerUp={(event) => { if (panDrag.current?.pointerId === event.pointerId) { panDrag.current = null; return; } const current = marqueeRef.current; if (!current || current.pointerId !== event.pointerId) return; const found = marqueeNodes(current.start, current.end, positions); const next = current.additive ? [...new Set([...selection.filter((id) => Object.hasOwn(positions, id)), ...found])] : found; onSelection(next); marqueeRef.current = null; setMarquee(null); }}
+      onPointerUp={(event) => { if (panDrag.current?.pointerId === event.pointerId) { panDrag.current = null; return; } const current = marqueeRef.current; if (!current || current.pointerId !== event.pointerId) return; const found = marqueeNodes(current.start, current.end, positions, dimensions); const next = current.additive ? [...new Set([...selection.filter((id) => Object.hasOwn(positions, id)), ...found])] : found; onSelection(next); marqueeRef.current = null; setMarquee(null); }}
       onPointerCancel={(event) => { if (panDrag.current?.pointerId === event.pointerId) panDrag.current = null; if (marqueeRef.current?.pointerId === event.pointerId) { marqueeRef.current = null; setMarquee(null); } }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           if (dragNode.current) { event.preventDefault(); event.stopPropagation(); stopNode(dragNode.current.pointerId, true); return; }
-          setEdgeChoice(null); onSelection([]); return;
+          if (intent || dragEdge.current) { event.preventDefault(); event.stopPropagation(); cancelConnection(); return; }
+          onSelection([]); return;
         }
         const editing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
         const next = canvasToolShortcut(event.key, editing, event.altKey || event.ctrlKey || event.metaKey || event.shiftKey);
@@ -579,46 +630,36 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
         scrollTimer.current = setTimeout(() => persist(layoutRef.current), 450);
       }}>
       <div className="routing-canvas-board relative min-h-full overflow-clip bg-panel bg-[radial-gradient(var(--border)_0.9px,transparent_0.9px)] bg-[length:20px_20px]" style={{ width: boardWidth * zoom, height: `calc(${boardHeight * zoom}px + var(--canvas-origin-y, 0px) + var(--canvas-end-space, 0px))` }}><div className="routing-canvas-content absolute left-0 top-[var(--canvas-origin-y,0px)]" style={{ width: boardWidth, height: boardHeight, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
-        <svg className="routing-canvas-lines pointer-events-none absolute inset-0 text-ink-muted" width={boardWidth} height={boardHeight} aria-hidden="true" pointerEvents="none">
-          {edges.map((edge, index) => {
+        <svg className="routing-canvas-lines pointer-events-none absolute inset-0 text-ink-muted" width={boardWidth} height={boardHeight} pointerEvents="none">
+          <defs><marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" /></marker></defs>
+          {displayEdges.map(({ output, port }) => {
+            const edge = output.edge!;
             const from = positions[edge.from]; const to = positions[edge.to];
             if (!from || !to) return null;
-            const port = edgePorts.get(edge)!;
-            const target = nodeCardCenter("left");
+            const target = nodeCardCenter("left", outputs[edge.to]?.length ?? 0);
             const sx = from.x + port.x; const sy = from.y + port.y;
             const tx = to.x + target.x; const ty = to.y + target.y;
-            return <g key={`${edge.from}:${edge.kind}:${edge.to}`}>
-              <path d={`M ${sx} ${sy} C ${sx + 70} ${sy}, ${tx - 70} ${ty}, ${tx} ${ty}`} pointerEvents="none" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={edge.kind === "unmatched" ? "6 5" : undefined} />
-              {edge.kind !== "context" && <circle cx={sx} cy={sy} r={port.radius} className="canvas-edge-handle cursor-grab fill-primary stroke-panel [pointer-events:all] [stroke-width:2px] tool-pan:cursor-grab" style={{ strokeWidth: Math.min(2, port.radius / 5) }}
-                onPointerDown={(event) => { if (!canEdit || tool === "pan") return; event.currentTarget.setPointerCapture(event.pointerId); dragEdge.current = edge; setActiveIntent({ kind: "reconnect", edge }); setEdgePointer({ x: sx, y: sy }); }}
-                onPointerMove={(event) => { if (dragEdge.current) { setEdgePointer(pointerOnBoard(event)); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node]")?.getAttribute("data-canvas-node") ?? ""; setHoverTarget(target); setPointerCandidate(target); } }}
-                onPointerUp={finishEdge} onPointerCancel={() => { dragEdge.current = null; setActiveIntent(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate(""); }} />}
-              <title>{`${edgeDescription(edge)} #${index + 1}`}</title>
+            const path = `M ${sx} ${sy} C ${sx + 70} ${sy}, ${tx - 70} ${ty}, ${tx} ${ty}`;
+            const chosen = activeConnection?.visual?.from === edge.from && activeConnection.visual.output.id === output.id;
+            return <g key={`${edge.from}:${output.id}`}>
+              <path d={path} fill="none" stroke={chosen ? "var(--accent)" : "currentColor"} strokeWidth={chosen ? 3 : 2} strokeDasharray={edge.kind === "unmatched" ? "6 5" : undefined} markerEnd="url(#canvas-arrow)" />
+              <path data-canvas-edge={JSON.stringify([edge.from, output.id, edge.to])} data-edge-kind={edge.kind} data-edge-from={edge.from} data-edge-to={edge.to}
+                d={path} fill="none" stroke="transparent" strokeWidth="16" className="cursor-pointer [pointer-events:stroke] focus-visible:stroke-primary/30" role="button" tabIndex={0}
+                aria-label={`${t("canvasSelectConnection")}: ${outputName(output)} · ${edgeDescription(edge)}`} aria-pressed={chosen}
+                onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (tool === "select") openConnection(output.intent, event.currentTarget, { from: edge.from, output }); }}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openConnection(output.intent, event.currentTarget, { from: edge.from, output }); } }} />
             </g>;
-          })}
-          {config.labels.filter((label) => label.resolution === "tag").map((label) => {
-            const from = positions[`zone::${label.tag}`];
-            if (!from) return null;
-            const port = nodeCardCenter("right");
-            const center = { x: from.x + port.x, y: from.y + port.y };
-            return <circle key={`add-${label.tag}`} cx={center.x} cy={center.y} r={NODE_CARD_PORT_RADIUS}
-              className="canvas-edge-handle canvas-add-handle cursor-grab fill-panel stroke-primary [pointer-events:all] [stroke-width:3px]"
-              onPointerDown={(event) => { if (!canEdit || tool === "pan") return; event.currentTarget.setPointerCapture(event.pointerId); dragEdge.current = { from: `zone::${label.tag}`, kind: "new-pool" }; setActiveIntent({ kind: "new-pool", from: `zone::${label.tag}` }); setEdgePointer(center); }}
-              onPointerMove={(event) => { if (dragEdge.current) { setEdgePointer(pointerOnBoard(event)); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node]")?.getAttribute("data-canvas-node") ?? ""; setHoverTarget(target); setPointerCandidate(target); } }}
-              onPointerUp={finishEdge} onPointerCancel={() => { dragEdge.current = null; setActiveIntent(null); setEdgePointer(null); setHoverTarget(""); setPointerCandidate(""); }}>
-              <title>{`${t("canvasAddPoolEdge")} ${label.name}`}</title>
-            </circle>;
           })}
           {edgePointer && <circle cx={edgePointer.x} cy={edgePointer.y} r="7" className="canvas-edge-preview pointer-events-none fill-primary opacity-75" />}
         </svg>
         {nodes.map(({ id, text }) => <button key={id} type="button" data-canvas-node={id} data-node-kind={getCanvasNodeKind(id)}
-          className={`routing-canvas-node absolute block h-14 min-h-14 max-h-14 w-[190px] overflow-hidden p-1.5 text-left [touch-action:none] cursor-grab text-ink [--canvas-node-accent:var(--text-muted)] [background:color-mix(in_srgb,var(--canvas-node-accent)_5%,var(--surface))] [border:1px_solid_color-mix(in_srgb,var(--canvas-node-accent)_45%,var(--border))] [border-inline-start:3px_solid_var(--canvas-node-accent)] [box-shadow:0_3px_14px_color-mix(in_srgb,var(--text)_10%,transparent)] rounded-lg data-[node-kind=questions]:[--canvas-node-accent:var(--accent)] data-[node-kind=questions]:rounded-xl data-[node-kind=rule]:[--canvas-node-accent:var(--good)] data-[node-kind=rule]:rounded data-[node-kind=fallback]:[--canvas-node-accent:var(--warn)] data-[node-kind=fallback]:[border-style:dashed] data-[node-kind=fallback]:[border-inline-start-style:solid] data-[node-kind=label]:[--canvas-node-accent:var(--accent)] data-[node-kind=label]:[border-inline-start-style:double] data-[node-kind=label]:[border-radius:0.75rem_0.25rem_0.25rem_0.75rem] data-[node-kind=model]:[border-inline-start-width:1px] data-[node-kind=model]:[border-inline-end:3px_solid_var(--canvas-node-accent)] data-[node-kind=model]:rounded hover:not-disabled:[background:color-mix(in_srgb,var(--canvas-node-accent)_9%,var(--surface))] hover:not-disabled:[border-color:var(--canvas-node-accent)] focus-visible:outline-[3px] focus-visible:outline-text focus-visible:outline-offset-1 ${tool === "pan" ? "cursor-grab" : ""}${selection.length > 1 ? selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : "" : selected === id || selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : ""}${intent && classifyConnection(draft, config, intent, id).reason === null ? " compatible [outline:3px_dashed_var(--accent)] outline-offset-0" : intent && hoverTarget === id ? " incompatible opacity-[0.68]" : ""}${draggingNodes.includes(id) ? " dragging z-[4] cursor-grabbing [box-shadow:0_6px_18px_color-mix(in_srgb,var(--text)_22%,transparent)] animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate] motion-reduce:animate-none" : ""}${!canEdit ? " read-only cursor-default shadow-none" : ""}`}
+          className={`routing-canvas-node absolute block w-[190px] overflow-hidden p-0 text-left [touch-action:none] cursor-grab text-ink [--canvas-node-accent:var(--text-muted)] [background:color-mix(in_srgb,var(--canvas-node-accent)_5%,var(--surface))] [border:1px_solid_color-mix(in_srgb,var(--canvas-node-accent)_45%,var(--border))] [border-inline-start:3px_solid_var(--canvas-node-accent)] [box-shadow:0_3px_14px_color-mix(in_srgb,var(--text)_10%,transparent)] rounded-lg data-[node-kind=questions]:[--canvas-node-accent:var(--accent)] data-[node-kind=questions]:rounded-xl data-[node-kind=rule]:[--canvas-node-accent:var(--good)] data-[node-kind=rule]:rounded data-[node-kind=fallback]:[--canvas-node-accent:var(--warn)] data-[node-kind=fallback]:[border-style:dashed] data-[node-kind=fallback]:[border-inline-start-style:solid] data-[node-kind=label]:[--canvas-node-accent:var(--accent)] data-[node-kind=label]:[border-inline-start-style:double] data-[node-kind=label]:[border-radius:0.75rem_0.25rem_0.25rem_0.75rem] data-[node-kind=model]:[border-inline-start-width:1px] data-[node-kind=model]:[border-inline-end:3px_solid_var(--canvas-node-accent)] data-[node-kind=model]:rounded hover:not-disabled:[background:color-mix(in_srgb,var(--canvas-node-accent)_9%,var(--surface))] hover:not-disabled:[border-color:var(--canvas-node-accent)] focus-visible:outline-[3px] focus-visible:outline-text focus-visible:outline-offset-1 ${tool === "pan" ? "cursor-grab" : ""}${selection.length > 1 ? selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : "" : selected === id || selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : ""}${intent && classifyConnection(draft, config, intent, id).reason === null ? " compatible [outline:3px_dashed_var(--accent)] outline-offset-0" : intent && hoverTarget === id ? " incompatible opacity-[0.68]" : ""}${draggingNodes.includes(id) ? " dragging z-[4] cursor-grabbing [box-shadow:0_6px_18px_color-mix(in_srgb,var(--text)_22%,transparent)] animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate] motion-reduce:animate-none" : ""}${!canEdit ? " read-only cursor-default shadow-none" : ""}`}
           data-dragging={draggingNodes.includes(id) || undefined}
-          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: NODE_CARD_BASE_HEIGHT, minHeight: NODE_CARD_BASE_HEIGHT, maxHeight: NODE_CARD_BASE_HEIGHT }}
+          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: dimensions[id]!.height }}
           onDoubleClick={() => onReveal(id)}
           title={`${text} · ${id}`}
           aria-label={text}
-          onClick={(event) => { if (event.detail === 0 && event.shiftKey) return; selectNode(id, event.detail === 0); }} onPointerDown={(event) => { if (tool === "select" && !activeEdgeChoice) startNode(event, id); }}
+          onClick={(event) => { if (event.detail === 0 && event.shiftKey) return; selectNode(id, event.detail === 0); }} onPointerDown={(event) => { if (tool === "select" && !activeIntent) startNode(event, id); }}
           onPointerMove={dragNodeMove} onPointerUp={(event) => stopNode(event.pointerId)} onPointerCancel={(event) => stopNode(event.pointerId, true)}
           onLostPointerCapture={(event) => stopNode(event.pointerId, true)}
           onKeyDown={(event) => {
@@ -633,19 +674,38 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
             moveGroup(ids, Object.fromEntries(ids.map((item) => [item, positions[item]!])), delta, true);
           }}>
           <CanvasNodeContent id={id} text={text} draft={draft} config={config} />
+          {(outputs[id] ?? []).map((output, index) => <span key={output.id} className="absolute left-0 right-0 flex items-center justify-between gap-1 border-t border-outline px-3 text-[11px] leading-3" style={{ top: NODE_CARD_BASE_HEIGHT + index * NODE_CARD_OUTPUT_HEIGHT, height: NODE_CARD_OUTPUT_HEIGHT }} title={outputName(output)}>
+            <span className="shrink-0 text-[9px] text-ink-muted">{t("canvasOutput")}</span><span className="truncate">{outputName(output)}{!output.edge && output.kind !== "add" ? ` · ${t("canvasDisconnected")}` : ""}</span>
+          </span>)}
         </button>)}
+        {nodes.map(({ id, text }) => {
+          const rows = outputs[id] ?? [], at = positions[id]!;
+          const input = nodeCardCenter("left", rows.length);
+          return <div key={`ports-${id}`} className={`pointer-events-none absolute ${draggingNodes.includes(id) ? "z-[5]" : "z-[2]"}`} style={{ left: at.x, top: at.y }}>
+            {id !== "questions" && <span className="absolute w-7 whitespace-nowrap text-right text-[9px] leading-3 text-ink-muted" style={{ left: -42, top: input.y - 6 }}>{t("canvasInput")}</span>}
+            {id !== "questions" && <button type="button" data-canvas-input={id} className="absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary bg-panel p-0 [pointer-events:auto] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" style={{ left: -9, top: input.y - 9 }} aria-label={`${t("canvasInput")}: ${text}`} title={`${t("canvasInput")}: ${text}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => { if (intent) applyIntent(intent, id); else selectNode(id); }}>‹</button>}
+            {rows.map((output, index) => { const port = nodeCardPorts(rows.length)[index]!; return <button key={output.id} type="button" data-canvas-output={output.id} data-output-node={id} data-output-kind={output.kind} data-output-connected={!!output.edge}
+              className={`canvas-edge-handle absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary p-0 text-[11px] [pointer-events:auto] [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${output.edge ? "bg-primary text-primary-foreground" : "bg-panel text-primary"}`}
+              style={{ left: port.x - 9, top: port.y - 9 }} aria-label={`${t("canvasOutput")}: ${text} · ${outputName(output)}`} title={`${t("canvasOutput")}: ${outputName(output)}`}
+              onClick={(event) => { if (event.detail === 0) openConnection(output.intent, event.currentTarget, { from: id, output }); }}
+              onPointerDown={(event) => { event.stopPropagation(); if (tool !== "select") return; if (!canConnect) { openConnection(output.intent, event.currentTarget, { from: id, output }); return; } event.preventDefault(); event.currentTarget.focus({ preventScroll: true }); event.currentTarget.setPointerCapture(event.pointerId); connectionDraft.current = draft; connectionOrigin.current = event.currentTarget; dragEdge.current = { intent: output.intent, visual: { from: id, output }, draft, start: { x: event.clientX, y: event.clientY }, moved: false, pointerId: event.pointerId }; setActiveConnection(null); }}
+              onPointerMove={(event) => { const active = dragEdge.current; if (!active || !event.currentTarget.hasPointerCapture(event.pointerId)) return; active.moved ||= crossedDragThreshold(active.start, { x: event.clientX, y: event.clientY }); if (!active.moved) return; setEdgePointer(pointerOnBoard(event)); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node], [data-canvas-input]"); const targetId = target?.getAttribute("data-canvas-node") ?? target?.getAttribute("data-canvas-input") ?? ""; setHoverTarget(targetId); setPointerCandidate(targetId); }}
+              onPointerUp={finishEdge} onPointerCancel={cancelConnection} onLostPointerCapture={() => { if (dragEdge.current) cancelConnection(); }}>
+              {output.kind === "add" ? "+" : "›"}
+            </button>; })}
+          </div>;
+        })}
         {marquee && <div className="canvas-marquee absolute pointer-events-none border-2 border-primary bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]" style={{ left: Math.min(marquee.start.x, marquee.end.x), top: Math.min(marquee.start.y, marquee.end.y), width: Math.abs(marquee.end.x - marquee.start.x), height: Math.abs(marquee.end.y - marquee.start.y) }} />}
         </div>
       </div>
     </div>
     </div>
     {children(<>
-    <div className="canvas-context-actions flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-ink shadow-[0_5px_16px_color-mix(in_srgb,var(--text)_10%,transparent)]" role="status">{selectedEdge ? <span>{t("canvasPolicyEdit")}</span> : dragPosition || selectedCount || selected ? <span className="canvas-layout-state" data-layout-only="true">{t("canvasLayoutOnly")}</span> : null}<span>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : selectedCount ? t("canvasSelectedCount").replace("{count}", String(selectedCount)) : nodes.find((node) => node.id === selected)?.text ?? t("canvasLayoutOnly")}</span>{selected && !inspectorOpen && tool === "select" && <button type="button" onClick={() => onReveal(selected)}>{t("canvasOpenDetails")}</button>}{selectedEdge && <button type="button" disabled={!canConnect} onClick={() => { setEdgeChoice({ edge: selectedEdge, draft }); setKeyboardTarget(""); }}>{t("canvasReconnect")}</button>}{fitMode && <span>{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</span>}</div>
+    <div className="canvas-context-actions flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-ink shadow-[0_5px_16px_color-mix(in_srgb,var(--text)_10%,transparent)]" role="status">{selectedEdge ? <span>{t("canvasPolicyEdit")}</span> : dragPosition || selectedCount || selected ? <span className="canvas-layout-state" data-layout-only="true">{t("canvasLayoutOnly")}</span> : null}<span>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : selectedCount ? t("canvasSelectedCount").replace("{count}", String(selectedCount)) : nodes.find((node) => node.id === selected)?.text ?? t("canvasLayoutOnly")}</span>{selected && !inspectorOpen && tool === "select" && <button type="button" onClick={() => onReveal(selected)}>{t("canvasOpenDetails")}</button>}{selectedEdge && <button type="button" disabled={!canConnect} onClick={(event) => openConnection({ kind: "reconnect", edge: selectedEdge }, event.currentTarget)}>{t("canvasReconnect")}</button>}{fitMode && <span>{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</span>}</div>
     <details className="my-2 rounded-lg border border-outline bg-panel p-3 text-ink border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] text-sm font-medium text-ink-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">{t("canvasHelpTitle")}</summary><p className="mt-2 text-xs text-ink-muted">{t("canvasHelp")}</p></details>
     <div className="grid gap-2 text-sm text-ink"><details className="rounded-lg border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] font-medium focus-visible:outline-2 focus-visible:outline-primary">{t("canvasNodeList")}</summary><ul className="mt-2 space-y-1">{nodes.map((node) => <li key={node.id}><button className="min-h-9 rounded-md px-2 text-left text-ink hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={() => onReveal(node.id)}>{node.text}</button></li>)}</ul></details>
     <details className="rounded-lg border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] font-medium focus-visible:outline-2 focus-visible:outline-primary">{t("canvasEdgeList")}</summary><ol className="mt-2 space-y-2">{edges.map((edge) => <li key={`${edge.from}-${edge.kind}-${edge.to}`}>
-      <span>{edgeDescription(edge)}</span>{" "}<button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" disabled={!canConnect || compatibleTargets(draft, config, edge).length === 0} onClick={() => { setKeyboardTarget(""); setEdgeChoice({ edge, draft }); }}>{t("canvasReconnect")}</button>{edge.kind === "pool" && <button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" disabled={!canConnect || !disconnectPoolEdge(draft, config, edge)} onClick={() => removeEdge(edge)}>{t("remove")}</button>}
-      {activeEdgeChoice?.from === edge.from && activeEdgeChoice.to === edge.to && activeEdgeChoice.kind === edge.kind && <div className="my-2 grid justify-items-start gap-2 rounded-lg border border-primary bg-panel-muted p-3 text-ink"><p className="m-0 text-xs text-ink-muted">{t("canvasReconnect")}</p><label className="grid gap-1 text-xs text-ink-muted"><span>{t("canvasTarget")}</span><select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink focus-visible:outline-2 focus-visible:outline-primary" disabled={!canConnect} aria-label={t("canvasTarget")} value={keyboardTarget} onChange={(event) => setKeyboardTarget(event.target.value)}><option value="">{t("canvasTarget")}</option>{compatibleTargets(draft, config, edge).map((id) => <option key={id} value={id}>{nodes.find((node) => node.id === id)?.text ?? id}</option>)}</select></label><button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" disabled={!canConnect || !keyboardTarget} onClick={() => applyEdge(edge, keyboardTarget)}>{t("canvasConnect")}</button><button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={() => setEdgeChoice(null)}>{t("cancel")}</button>{keyboardTarget && <p role="status">{t("canvasTargetAllowed")}</p>}<ul className="mt-2 max-h-36 list-inside list-disc overflow-y-auto text-xs text-ink-muted">{nodes.filter((node) => classifyConnection(draft, config, { kind: "reconnect", edge }, node.id).reason).map((node) => <li key={node.id}>{node.text}: {connectionReasonText(t, classifyConnection(draft, config, { kind: "reconnect", edge }, node.id).reason!)}</li>)}</ul></div>}
+      <span>{edgeDescription(edge)}</span>{" "}<button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={(event) => openConnection({ kind: "reconnect", edge }, event.currentTarget)}>{t("canvasSelectConnection")}</button>
     </li>)}</ol>
       <label className="grid gap-1 text-xs text-ink-muted">{t("canvasAddPoolEdge")} <select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink" value={keyboardPool} disabled={!canConnect} onChange={(event) => { setKeyboardPool(event.target.value); setKeyboardModel(""); }}><option value="">{t("chooseLabel")}</option>{config.labels.filter((label) => label.resolution === "tag").map((label) => <option key={label.tag} value={`zone::${label.tag}`}>{label.name}</option>)}</select></label>
       <select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink" aria-label={t("model")} value={keyboardModel} disabled={!canConnect || !keyboardPool} onChange={(event) => setKeyboardModel(event.target.value)}><option value="">{t("model")}</option>{config.models.filter((model) => !draft.models[model.id]?.tags.includes(keyboardPool.slice(6))).map((model) => <option key={model.id} value={`model::${model.id}`}>{model.id}</option>)}</select>

@@ -7,7 +7,7 @@ export const configuration: ConfigurationPayload = {
   baseline_source: "fixture",
   overlay: { applied: true, path: "fixture", error: null },
   config_hash: "fixture-hash",
-  questions: { intent: { type: "choice", instructions: "Choose a route", criteria: { default: "Default" } } },
+  questions: { intent: { type: "choice", instructions: "Choose a route", criteria: { default: "Default", other: "Other" } } },
   fallback: { label: "default" },
   rules: [{ index: 0, when: { intent: "default" }, select: { label: "default" } }],
   labels: [
