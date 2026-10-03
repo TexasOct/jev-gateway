@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
   api,
-  hasCredential,
   setCredential,
 } from "@/shared/api/client";
 import type { ConfigurationPayload } from "@/shared/api/types";
@@ -17,14 +16,20 @@ import { useProviderManagement } from "@/features/providers/useProviderManagemen
 export default function App() {
   const { locale, setLocale, t, formatDateTime } = useLocale();
   const [view, setView] = useState<View>("monitoring");
-  const [needsKey, setNeedsKey] = useState(!hasCredential());
+  const [needsKey, setNeedsKey] = useState(true);
   const [keyDraft, setKeyDraft] = useState("");
+  const [connectionPending, setConnectionPending] = useState(true);
+  const connectionBusy = useRef(false);
+  const initialValidationStarted = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionErrorKey, setConnectionErrorKey] =
+    useState<"authRequired" | "enterApiKey" | null>(null);
   const [configuration, setConfiguration] =
     useState<ConfigurationPayload | null>(null);
   const onActivityUnauthorized = useCallback(() => {
     setCredential(null);
     setNeedsKey(true);
+    setConnectionErrorKey("authRequired");
   }, []);
   const routeActivity = useRouteActivity(
     view === "monitoring",
@@ -36,6 +41,7 @@ export default function App() {
   const onUnauthorized = useCallback(() => {
     setCredential(null);
     setNeedsKey(true);
+    setConnectionErrorKey("authRequired");
     stopRoutingActivity(true);
   }, [stopRoutingActivity]);
   const run = useCallback(
@@ -43,12 +49,14 @@ export default function App() {
       try {
         await work();
         setError(null);
+        setConnectionErrorKey(null);
       } catch (caught) {
         if (caught instanceof ApiError && caught.status === 401) {
           onUnauthorized();
           setError(t("authRequired"));
           return;
         }
+        setConnectionErrorKey(null);
         setError(caught instanceof Error ? caught.message : String(caught));
       }
     },
@@ -64,18 +72,35 @@ export default function App() {
     setConfiguration(await api.configuration());
   }, []);
 
-  useEffect(() => {
-    // Deferred one microtask on purpose: the react-hooks compiler rule rejects an
-    // effect body that can reach a state setter synchronously, and this is the
-    // mount-time load that decides whether the connect form is needed.
-    void Promise.resolve().then(() =>
-      run(async () => {
+  const validateConnection = useCallback(async (credential?: string) => {
+    if (connectionBusy.current) return;
+    connectionBusy.current = true;
+    setConnectionPending(true);
+    setError(null);
+    setConnectionErrorKey(null);
+    if (credential !== undefined) setCredential(credential);
+    clearNotice();
+    try {
+      await run(async () => {
         await loadMonitoring();
         await loadTheme();
+        setKeyDraft("");
         setNeedsKey(false);
-      }),
-    );
-  }, [loadMonitoring, loadTheme, run]);
+      });
+    } finally {
+      connectionBusy.current = false;
+      setConnectionPending(false);
+    }
+  }, [clearNotice, loadMonitoring, loadTheme, run]);
+
+  useEffect(() => {
+    // Defer state updates and share the submission guard with the initial probe.
+    void Promise.resolve().then(() => {
+      if (initialValidationStarted.current) return;
+      initialValidationStarted.current = true;
+      return validateConnection();
+    });
+  }, [validateConnection]);
 
   const refresh = useCallback(async () => {
     restartRoutingActivity();
@@ -114,20 +139,15 @@ export default function App() {
   const connect = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (connectionBusy.current || !initialValidationStarted.current) return;
       if (keyDraft.trim() === "") {
         setError(t("enterApiKey"));
+        setConnectionErrorKey("enterApiKey");
         return;
       }
-      setCredential(keyDraft.trim());
-      setKeyDraft("");
-      setNeedsKey(false);
-      clearNotice();
-      void run(async () => {
-        await loadMonitoring();
-        await loadTheme();
-      });
+      void validateConnection(keyDraft.trim());
     },
-    [clearNotice, keyDraft, loadMonitoring, loadTheme, run, t],
+    [keyDraft, validateConnection, t],
   );
 
   const openView = useCallback(
@@ -150,8 +170,9 @@ export default function App() {
       view={view}
       providerManagement={providerManagement}
       needsKey={needsKey}
+      connectionPending={connectionPending}
       keyDraft={keyDraft}
-      error={error}
+      error={needsKey && connectionErrorKey !== null ? t(connectionErrorKey) : error}
       locale={locale}
       setLocale={setLocale}
       t={t}
