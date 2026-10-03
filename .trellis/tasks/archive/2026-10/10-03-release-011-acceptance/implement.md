@@ -16,7 +16,7 @@
 - [x] Recheck original/preview hashes and ownership, take fresh consistent backups, apply only the approved pair, and restore the valid old owned running baseline.
 - [x] Back up current default runtime and original rows, run ordinary public-installer upgrade, verify preservation and restore original service state.
 - [x] Produce the requirement audit, retain failures, obtain independent release acceptance review and update release notes.
-- [ ] Review spec lessons, commit/push sanitized evidence, archive the task and add only owned journal content through scoped commits.
-- [ ] Recheck remote main/tag/Release, public digests, installed state and unrelated file preservation; then complete the active Goal.
+- [x] Review spec lessons, commit/push sanitized evidence, archive the task and add only owned journal content through scoped commits.
+- [x] Recheck remote main/tag/Release, public digests, installed state and unrelated file preservation; then complete the active Goal.
 
 Rollback uses the retained v0.1.0 public installer and the protected runtime backups. Repeated v0.1.1 tag publication is authorized; replacements still require state inspection and private backup. No acceptance command may send real provider generation requests.

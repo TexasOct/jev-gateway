@@ -1,6 +1,6 @@
 # 公开 0.1.1 发布验收
 
-最终公开版本的产品与安装验收及独立最终评审已通过。发布源码为 `6fc0f0e19e31f52d8e831593e8c530aed7e73141`，对应 [CI run 37132156378](https://github.com/TexasOct/jev-gateway/actions/runs/37132156378) 和稳定/latest [Release 402565482](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.1)。公开 wheel SHA256 为 `2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038`。[独立评审](check-final-acceptance.md) 对 R1 至 R7 及收尾准备给出 PASS，无阻塞问题。报告推送、归档、日志和发布说明交付仍须完成，整个任务尚未关闭。
+最终公开版本的产品与安装验收及独立最终评审已通过。发布源码为 `6fc0f0e19e31f52d8e831593e8c530aed7e73141`，对应 [CI run 37132156378](https://github.com/TexasOct/jev-gateway/actions/runs/37132156378) 和稳定/latest [Release 402565482](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.1)。公开 wheel SHA256 为 `2598f5ab58d1c90c1cb4b788bbf2d2193a28f247fc6d6b6ae01ec7e8fd6a2038`。[独立评审](check-final-acceptance.md) 对 R1 至 R7 及收尾准备给出 PASS，无阻塞问题。报告已签名推送，任务已归档且上下文有效，公开发布说明与已审阅文本一致。本次收尾追加 Session 6，最后推送后的原生核验通过后才关闭 Goal。
 
 | 需求 | 实际证据与范围 | 结论 |
 | --- | --- | --- |
@@ -11,7 +11,7 @@
 | R5 / AC5 | 最终实际下载的公开 wheel smoke 59 项、隔离公开安装器 23 项均原生退出 0，success/cleanup true。涵盖带空格运行目录、独立 uv、真实本地鉴权 API、生命周期、重装和卸载保存。 | 通过 |
 | R6 / AC6 | 已安装公开 wheel 提供静态资源，未重建。118 项 browser 零失败、跳过、重试或 flaky，零逸出 API；133 项安装后后端测试通过。Key 页六项、画布九项验收逐项映射，其他已连接页面回归通过。 | 通过 |
 | R7 / AC7 | 用户批准的两文件变化与预览 SHA256 完全一致。普通默认路径安装器通过 14 项检查、16 条子命令全部退出 0，success/cleanup true。安装 0.1.1 全部 52 个文件一致，原生服务保持运行，鉴权 health/静态资源与入口/元数据通过。批准后完整基线及原始记录保留。 | 通过 |
-| R8 / AC8 | 脱敏证据、失败历史、发布说明、spec 与原有工作保存检查已准备，独立最终评审 PASS。Git 推送/归档、日志和公开说明交付完成后关闭此项。 | 收尾中 |
+| R8 / AC8 | 脱敏证据、失败历史、spec 和独立最终评审已推送；公开说明已发布并核对，归档上下文有效，本次日志采用独立投影。新一次原生核验确认运行服务、52 个包文件、公开身份和 33 个无关任务文件及其他 worktree 完整。最终提交推送后，核对远端与运行状态。 | 通过，最后推送受后置核验约束 |
 
 源码与打包证据见 [check-repaired-source.md](check-repaired-source.md)、[preview-fix-gates.json](verification/preview-fix-gates.json)、[repaired-source-gates.json](verification/repaired-source-gates.json)；公开身份链见 [final-artifact-audit.json](verification/final-artifact-audit.json)。两个平台接受同一构建产物，公开下载又与 CI 产物核对。候选包或第一次发布的成功结果不替代这条最终身份链。
 
@@ -33,3 +33,5 @@
 - 安装后清理扫描的宽泛目录匹配曾误包含原有源码开发服务。后续按验收路径检查并保留该服务；父会话另作完整当前用户命令行复核。所有失败的原生日志和退出记录仍在私有证据目录。
 
 原配置、凭据、SQLite 备份、进程 PID/argv、原生日志与安装环境均留在 `.git/jev-release-011-acceptance/`。私有边界和最终证据根目录为 `0700`，原始日志及备份为 `0600`；安装工具自身保留运行所需权限。提交内容仅含已审阅摘要、退出码、计数、SHA256、合成 UI 图像和几何。最终收尾采用临时 index、签名提交和新 HEAD 的正常 index 重建；保留原有 journal 差异、四个其他任务与独立 Key-page worktree。发布说明见 [release-notes.md](release-notes.md)。
+
+验收报告提交为 `3edb7e67f794182a21b050145c3ede06e0a06c3b`，已核对远端；归档提交为 `bff4b346037f8ddce15dea45421974803bb5a189`，均签名验证通过。最终交付原生核验再次确认 0.1.1 运行服务、完整公开包、两份文件保存基线、原始类型元组、稳定/latest Release、全部四个 digests、公开说明、33 个无关任务文件及其他 worktree。一个汇总字段名错误发生在这些检查通过之后，已直接读取 SQLite 完整性并修正摘要；原失败记录保留。Session 6 投影以原 HEAD 日志加本次追加内容构造，工作区原有内容逐字节保留；原有 Key-page Session 4 差异保持未提交。上述收尾记录见 [closeout-delivery.json](verification/closeout-delivery.json)。最后推送后的完整远端/运行核验存入私有 `closeout/final-postflight.json`，其成功是 Goal 完成的前提。
