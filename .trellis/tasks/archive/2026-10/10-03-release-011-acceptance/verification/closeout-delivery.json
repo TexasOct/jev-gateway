@@ -1,0 +1,35 @@
+{
+  "scope": "Native delivery gates and owned journal projection before final signed commit/push",
+  "success": true,
+  "independent_review": "PASS",
+  "accepted_tag_commit": "6fc0f0e19e31f52d8e831593e8c530aed7e73141",
+  "report_commit": "3edb7e67f794182a21b050145c3ede06e0a06c3b",
+  "report_commit_signed_and_pushed": true,
+  "archive_commit": "bff4b346037f8ddce15dea45421974803bb5a189",
+  "archive_commit_signature_verified": true,
+  "archived_task_status": "completed",
+  "archive_context_manifests_valid": true,
+  "current_task_pointer_cleared": true,
+  "release_id": 402565482,
+  "release_notes_published_and_exactly_verified": true,
+  "stable_latest_and_four_digests_verified": true,
+  "installed_version": "0.1.1",
+  "installed_package_files_compared": 52,
+  "native_owned_service": "running",
+  "authenticated_health_and_assets": "PASS",
+  "approved_files_and_original_typed_rows_preserved": true,
+  "sqlite_integrity": "ok",
+  "unrelated_task_files_preserved": 33,
+  "other_worktree_head_and_status_unchanged": true,
+  "journal_session": 6,
+  "original_journal_bytes_and_history_rows_retained": true,
+  "original_dirty_session_numbering_excluded_from_projection": true,
+  "evidence": {
+    "native_delivery_result": {
+      "path": ".git/jev-release-011-acceptance/replacement/closeout/delivery-native/result.json",
+      "sha256": "2e0b6b0a3b75e1d5c87a5a1503f8d1485f5731aa8c3b42a5d9e736fe388bbeea"
+    }
+  },
+  "summary_field_failure_retained": true,
+  "final_postpush_gate": "Verify exact remote main/tag/Release, installed runtime, preserved data and shared work after pushing the closing signed commit. Goal completion requires the private final-postflight.json to pass."
+}

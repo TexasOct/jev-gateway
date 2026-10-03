@@ -106,3 +106,41 @@ Completed Chinese workflow copy, node roles and alignment, visible side ports an
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: v0.1.1 release acceptance
+<!-- trellis-session: v=2 fp=2b88e592de3603c5 -->
+
+**Date**: 2026-10-04
+**Task**: v0.1.1 release acceptance
+**Branch**: `main`
+
+### Summary
+
+Final public release, installed feature and approved default-path upgrade acceptance passed.
+
+### Main Changes
+
+- Published signed v0.1.1 from the repaired source through one-wheel Ubuntu and macOS gates; verified the four actual public assets and their digests.
+- Fixed configured-preview disclosure after reset while retaining config-hash draft resets and original browser assertions.
+- Accepted the installed public Dashboard and backend, then completed the ordinary default-path upgrade after the explicitly approved two-file configuration adjustment. Retained original backups, credentials, typed history and the running service.
+
+### Testing
+
+- [OK] Final source: 233 frontend unit, 118 browser and 767 backend cases; lint, types, Pyright, build/freshness, lock, shell and packaging checks passed.
+- [OK] The same final public wheel passed 59 checks on Ubuntu and macOS; local public wheel smoke passed 59 and isolated installer acceptance passed 23.
+- [OK] Installed public assets: 118 browser cases, zero retries/skips/flaky/API escapes; 133 installed backend cases passed with mocked upstreams and network protection.
+- [OK] Default-path installer: 14 checks, 16 child exits zero; 52 installed files match the public wheel. Operator 0.1.1 remains owned and running with authenticated health and Dashboard assets.
+- [OK] Approved configuration baseline and all original typed row multiplicities preserved; credentials 0600, SQLite integrity ok, no generation calls or residual acceptance processes.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6fc0f0e19e31f52d8e831593e8c530aed7e73141` | fix(dashboard): retain configured preview after reset |
+| `3edb7e67f794182a21b050145c3ede06e0a06c3b` | docs(release): record final public v0.1.1 acceptance |
+
+### Status
+
+[OK] **Completed**
