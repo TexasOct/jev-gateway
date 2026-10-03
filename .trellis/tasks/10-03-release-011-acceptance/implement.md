@@ -9,11 +9,13 @@
 - [x] Create/push v0.1.1; inspect the exact workflow head and all jobs. Arrange a completion notification for external CI waits.
 - [x] Download all four pinned public assets and latest installer; verify SHA256 sidecars, GitHub digests, embedded tag, wheel metadata and exact package/source parity.
 - [x] Repair reproduced reset disclosure while preserving config-hash draft remounts; retain and synchronize the existing browser assertions.
-- [ ] Recheck repaired source, back up the first public Release/tag/assets, commit/push the repair, replace only v0.1.1 with a tag-specific lease and repeat final public acceptance.
-- [ ] Run installed smoke on the downloaded public wheel and fresh public-installer acceptance with isolated directories.
-- [ ] Run the full existing browser suite against the installed public wheel's loopback assets with no source build; retain locale/theme/responsive screenshots and native results.
-- [ ] Back up current default runtime and original rows, run ordinary public-installer upgrade, verify preservation and restore original service state.
-- [ ] Produce the requirement audit, retain failures, obtain independent release acceptance review and update release notes.
+- [x] Recheck repaired source, back up the first public Release/tag/assets, commit/push the repair, replace only v0.1.1 with a tag-specific lease and repeat final public acceptance.
+- [x] Run installed smoke on the downloaded public wheel and fresh public-installer acceptance with isolated directories.
+- [x] Run the full existing browser suite against the installed public wheel's loopback assets with no source build; retain locale/theme/responsive screenshots and native results.
+- [x] Recover the old owned service without data/configuration changes, prepare the scoped two-file adjustment, validate it with installed public code, obtain independent preview review and user approval.
+- [x] Recheck original/preview hashes and ownership, take fresh consistent backups, apply only the approved pair, and restore the valid old owned running baseline.
+- [x] Back up current default runtime and original rows, run ordinary public-installer upgrade, verify preservation and restore original service state.
+- [x] Produce the requirement audit, retain failures, obtain independent release acceptance review and update release notes.
 - [ ] Review spec lessons, commit/push sanitized evidence, archive the task and add only owned journal content through scoped commits.
 - [ ] Recheck remote main/tag/Release, public digests, installed state and unrelated file preservation; then complete the active Goal.
 
