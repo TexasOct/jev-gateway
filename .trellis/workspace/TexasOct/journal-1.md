@@ -39,3 +39,37 @@ Repaired foreground runtime lookup, process ownership, and local proxy handling;
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: Complete standalone dashboard gateway connection page
+<!-- trellis-session: v=2 fp=8b61e90e6a70805a -->
+
+**Date**: 2026-10-03
+**Task**: Complete standalone dashboard gateway connection page
+**Branch**: `feat/dashboard-key-page`
+
+### Summary
+
+Implemented and accepted a separate gateway connection page. Six acceptance criteria passed on isolated source; concurrent strategy-canvas changes and operator configuration were preserved.
+
+### Main Changes
+
+- Hide dashboard navigation and panels until successful validation; retain retryable drafts and serialize connection attempts.
+- Translate existing connection errors with locale changes, keep keys in memory and return on 401 with activity stopped.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `12fb1c80e8bb46523472f0dc4cd077433aa5eb7e` | feat: add standalone dashboard gateway connection page |
+| `4e60e26eb7c4ad71b3d119c587ba1013a16a227f` | chore(task): archive dashboard key connection page |
+
+### Testing
+
+- [OK] 211 frontend unit, 101 browser and 755 backend tests passed; types/build/freshness/Pyright passed.
+- [OK] Four screenshots inspected; settled button contrast 6.07:1 light and 5.15:1 dark; four existing lint warnings.
+- [OK] Operator .env and models.json fingerprints unchanged; original failed evidence retained.
+
+### Status
+
+[OK] **Completed**
