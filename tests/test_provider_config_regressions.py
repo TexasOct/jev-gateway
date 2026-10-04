@@ -60,7 +60,8 @@ def test_http_cli_and_reload_preserve_expansions_and_managed_literals(tmp_path: 
         result = request(app, method, route, headers=headers(config), json=body)
         assert result.status_code == 200
         assert secret not in result.text
-    assert "# jev-managed-literal-v1" in env_file.read_text()
+    assert "TEST_PROVIDER_KEY=${BASE_KEY}" in env_file.read_text()
+    assert json.loads((tmp_path / "credentials.json").read_text())["values"]["TEST_PROVIDER_KEY"] == secret
     assert credential_snapshot(config.models_file)["TEST_PROVIDER_KEY"] == secret
     assert request(app, "POST", "/v1/routing/reload", headers=headers(config)).status_code == 200
     assert config.engine.catalog.providers[0].api_key == secret
@@ -140,7 +141,7 @@ def test_partial_recovery_blocks_reads_adapters_and_activation_until_manual_repa
     original = config_transaction.atomic_bytes
 
     def fault(path: Path, data: bytes | None, *, protected: bool = False) -> None:
-        if path.name == ".env" or (path == config.models_file and data == old_document):
+        if path.name == "credentials.json" or (path == config.models_file and data == old_document):
             raise OSError("fake-key-in-write-error")
         original(path, data, protected=protected)
 
@@ -262,11 +263,10 @@ def test_activation_callback_can_reenter_coherent_reads(tmp_path: Path) -> None:
     assert seen == ["Reentrant", "fake-reentrant"]
 
 
-def test_clear_required_llm_without_external_fallback_rejects_without_write(tmp_path: Path) -> None:
+def test_clear_required_llm_without_external_fallback_becomes_pending(tmp_path: Path) -> None:
     app, config = fixture_app(tmp_path)
     current = ProviderConfiguration(config.models_file, external={"MANAGEMENT_FIXTURE_KEY": "fake-management"})
     body = edit(app, config, {"action": "clear"})
-    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
-    with pytest.raises(ValueError, match="not set|requires"):
-        current.command(body, apply=True)
-    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+    result = current.command(body, apply=True)
+    assert result["providers"][0]["has_api_key"] is False
+    assert current.read()["providers"][0]["has_api_key"] is False

@@ -18,8 +18,10 @@ import type {
   SessionsPayload,
   StrategiesPayload,
   ThemePayload,
+  SetupStatus,
 } from "./types";
-import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, DiscoveryResult, MetadataResult } from "./types";
+import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, DiscoveryResult, MetadataResult, GatewayCredentialMutation, GatewayCredentialResult } from "./types";
+import { isValidSetupKey } from "./setup-key";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -34,6 +36,7 @@ export class ApiError extends Error {
 }
 
 let credential: string | null = null;
+const pendingGatewayWrites = new Set<Promise<void>>();
 
 export function setCredential(value: string | null): void {
   credential = value;
@@ -43,11 +46,17 @@ export function hasCredential(): boolean {
   return credential !== null;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, retryAuthentication = true): Promise<T> {
+  const sentCredential = credential;
   const headers = new Headers(init.headers);
-  if (credential !== null) headers.set("Authorization", `Bearer ${credential}`);
+  if (sentCredential !== null) headers.set("Authorization", `Bearer ${sentCredential}`);
   if (init.body !== undefined) headers.set("Content-Type", "application/json");
   const response = await fetch(path, { ...init, headers, cache: "no-store" });
+  // Activation may precede the rotation response and its new in-memory key.
+  if (response.status === 401 && retryAuthentication && (init.method ?? "GET") === "GET") {
+    while (pendingGatewayWrites.size > 0) await Promise.all([...pendingGatewayWrites]);
+    if (credential !== null && sentCredential !== credential) return request<T>(path, init, false);
+  }
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
       error?: { message?: string; code?: string | null };
@@ -62,8 +71,34 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function updateCredential<T>(value: string, write: () => Promise<T>): Promise<T> {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  pendingGatewayWrites.add(pending);
+  try {
+    const result = await write();
+    setCredential(value);
+    return result;
+  } finally {
+    pendingGatewayWrites.delete(pending);
+    release();
+  }
+}
+
+function saveGatewayCredential(payload: GatewayCredentialMutation): Promise<GatewayCredentialResult> {
+  return updateCredential(payload.credential.value, () => request<GatewayCredentialResult>("/v1/gateway-credential", { method: "PUT", body: JSON.stringify(payload) }));
+}
+
 export const api = {
+  setup: () => request<SetupStatus>("/v1/setup"),
+  initialize: async (expected_revision: string, api_key: string) => {
+    if (!isValidSetupKey(api_key)) throw new ApiError("Invalid management key format.", 400, "invalid_setup_key");
+    return updateCredential(api_key, () => request<SetupStatus>("/v1/setup", {
+      method: "POST", body: JSON.stringify({ expected_revision, api_key }),
+    }));
+  },
   providerConfiguration: (signal?: AbortSignal) => request<ProviderConfiguration>("/v1/provider-configuration", { signal }),
+  saveGatewayCredential,
   validateProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration/validate", { method: "POST", body: JSON.stringify(payload) }),
   saveProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration", { method: "PUT", body: JSON.stringify(payload) }),
   discoverModels: (payload: ProviderSelector, signal?: AbortSignal) => request<DiscoveryResult>("/v1/provider-discovery", { method: "POST", body: JSON.stringify(payload), signal }),

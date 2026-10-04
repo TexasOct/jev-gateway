@@ -21,6 +21,7 @@ jev_gateway/
 ├── __init__.py              # Package metadata only
 ├── catalog.py               # Catalog types and models.json parsing/validation
 ├── config.py                # Shared scalar and URL coercion helpers
+├── credentials.py           # Immutable JSON/dotenv/process resolution and literal storage
 ├── decision.py              # Session-aware routing orchestration
 ├── gateway.py               # FastAPI schemas, routes, auth, streaming, reload
 ├── reasoning.py             # reasoning_effort derivation and clamping
@@ -64,6 +65,7 @@ docs/
 | Module | Responsibility | Main entry points |
 | --- | --- | --- |
 | `catalog.py` | Immutable catalog-domain objects and strict configuration parsing | `Catalog`, `RoutingPolicy`, `StrategyDefinition`, `catalog_from_document()`, `load_catalog()` |
+| `credentials.py` | Bounded versioned credential storage, reference/value validation and lock-protected immutable resolution | `credential_path()`, `credential_snapshot()`, `credential_update()` |
 | `decision.py` | Turn-level routing, session interaction, strategy invocation, and best-effort evidence submission | `Decision`, `RoutingEngine` |
 | `strategy/decision_provider/` | Decision-protocol transport, normalized answers, and ordered failover | `DecisionClient`, `DecisionAdapter`, `DecisionResult`, `registered_protocols()` |
 | `gateway.py` | HTTP boundary, request models, route handlers, authentication, LiteLLM transport, streaming, and reload | `ChatCompletionRequest`, `GatewayConfig`, `create_app()`, `run_gateway()` |

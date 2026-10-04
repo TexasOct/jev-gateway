@@ -1,0 +1,9 @@
+# Select appearance and form alignment
+
+Retain the native select element and its event/label semantics. Put the small shared single-select defaults in an existing allowed stylesheet, scoped to non-multiple controls without a list size (or size 1). Use CSS geometry for a crisp chevron with at least 12px of right inset and enough text reservation, inheriting the runtime foreground and preserving the palette. This avoids external image requests, data-URI CSP failures and a new custom-popup lifecycle. Restore native appearance in forced-colors mode. Listboxes and multi-selects stay native.
+
+The Provider main form grid must align children to the start. A single `items-start` utility prevents the transport label/select from stretching to the height of the neighboring endpoint input plus its auxiliary checkbox. Keep the existing input min-height and helper rows.
+
+Implementation is isolated at `/Users/texas/Workspace/jev-select-spacing-alignment`, branch `fix/select-spacing-alignment`, based on accepted main `dbcc14faac40503fe26703f032483e338e90b1d2`. The shared checkout is owned by other Provider tasks. After isolated verification, transfer the shared stylesheet only if its fingerprint still matches, and apply only the Provider grid alignment hunk to the latest shared file. Do not copy the whole mixed ProviderView or switch the shared branch. Retain the source diff and private handoff receipts.
+
+Use the existing synthetic Provider fixture to measure real DOM geometry and exercise native selection, keyboard/focus/disabled states, light/dark palettes and locale/viewport combinations. Generated static assets are built only in the isolated worktree. The reference screenshot is private, and tools currently omit image attachments; retain screenshots and machine-readable geometry, inspect them with an available visual surface or local pixel analysis, and state any remaining visual limits precisely.

@@ -1,6 +1,7 @@
 import { test, expect } from "./fixtures";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
+import { canvasNodeCenterHit } from "./canvas-hit";
 
 async function openDashboard(page: import("@playwright/test").Page) {
   await page.goto("/dashboard/");
@@ -74,11 +75,9 @@ for (const width of [320, 390, 1280, 1920, 2560]) {
             if (width >= 1920) {
               const node = canvas.locator('[data-canvas-node="questions"]');
               await node.focus();
-              const nodeBox = await node.boundingBox();
+              const { box: nodeBox, hit } = await canvasNodeCenterHit(node);
               if (!nodeBox) throw new Error("Questions node has no measurable bounds");
-              expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("[data-canvas-node]")?.getAttribute("data-canvas-node"), {
-                x: nodeBox.x + nodeBox.width / 2, y: nodeBox.y + nodeBox.height / 2,
-              })).toBe("questions");
+              expect(hit).toBe("questions");
               if (locale === "en" && scheme === "light") {
                 const beforeLeft = await node.evaluate((element) => element.style.left);
                 await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height / 2);

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { RetainedRequest } from "@/shared/api/types";
+import type { PolicyCatalog, RetainedRequest } from "@/shared/api/types";
 import { LocaleProvider, messages } from "@/shared/i18n";
 import type { Locale } from "@/shared/i18n";
 import { RouteTrace } from "../components/RouteTrace";
@@ -30,17 +30,41 @@ const successRequest: RetainedRequest = {
   outcome: { ok: true, latency_ms: 27, prompt_tokens: 2 },
 };
 
-function renderTrace(item: RetainedRequest | null, locale: Locale = "en"): string {
+function renderTrace(item: RetainedRequest | null, locale: Locale = "en", policyCatalog?: PolicyCatalog): string {
   vi.stubGlobal("window", {
     matchMedia: () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
     localStorage: { getItem: () => locale, setItem: vi.fn() },
   });
-  return renderToStaticMarkup(<LocaleProvider><RouteTrace item={item} /></LocaleProvider>);
+  return renderToStaticMarkup(<LocaleProvider><RouteTrace item={item} policyCatalog={policyCatalog} /></LocaleProvider>);
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("monitoring route trace", () => {
+  it.each<Locale>(["en", "zh-CN"])("renders ordinary default and inherited default distinctly with the same catalog in %s", (locale) => {
+    const catalog: PolicyCatalog = { models: [], strategies: [{ name: "task_aware", description: null, policy: { labels: { default: {}, missing: {} } } }] };
+    for (const reason of ["first_turn_default", "session_pinned"]) for (const defaulted of [false, true]) {
+      const html = renderTrace({ ...successRequest, decision: { ...successRequest.decision, label: "default", defaulted, reason } }, locale, catalog);
+      expect(html).toContain(`task_aware · ${defaulted ? messages[locale].defaultRouteLabel : "default"} · openai/gpt-4.1`);
+      expect(html).toContain(`&quot;defaulted&quot;: ${defaulted}`);
+      expect(html).toContain("&quot;label&quot;: &quot;default&quot;");
+    }
+    const legacy = renderTrace({ ...successRequest, decision: { ...successRequest.decision, label: "default", reason: "rule_0:empty_tag_default" } }, locale, catalog);
+    expect(legacy).toContain(`task_aware · ${messages[locale].defaultRouteLabel} · openai/gpt-4.1`);
+    const literalLegacy = renderTrace({ ...successRequest, decision: { ...successRequest.decision, label: "default", reason: "first_turn_default" } }, locale, catalog);
+    expect(literalLegacy).toContain("task_aware · default · openai/gpt-4.1");
+  });
+  it.each<Locale>(["en", "zh-CN"])("localizes only the reserved final default label in %s", (locale) => {
+    const defaultHtml = renderTrace({ ...successRequest, decision: { ...successRequest.decision, label: "default" } }, locale);
+    expect(defaultHtml).toContain(`task_aware · ${locale === "en" ? "Default" : "默认"} · openai/gpt-4.1`);
+    // Recorded evidence keeps the API value for inspection.
+    expect(defaultHtml).toContain("&quot;label&quot;: &quot;default&quot;");
+    for (const label of ["My custom label", "Default", "default-custom"]) {
+      const html = renderTrace({ ...successRequest, decision: { ...successRequest.decision, label } }, locale);
+      expect(html).toContain(`task_aware · ${label} · openai/gpt-4.1`);
+    }
+  });
+
   it.each<Locale>(["en", "zh-CN"])("labels all four evidence stages in %s", (locale) => {
     const html = renderTrace(successRequest, locale);
     const copy = messages[locale];

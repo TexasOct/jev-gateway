@@ -48,7 +48,8 @@ def test_get_validate_apply_and_revision_conflict(tmp_path: Path) -> None:
     app, config = setup_app(tmp_path)
     auth = headers(config)
     initial = request(app, "GET", "/v1/provider-configuration", headers=auth).json()
-    assert set(initial) == {"revision", "write_available", "providers", "decision", "models", "presets", "provider_types", "decision_protocols"}
+    assert set(initial) == {"revision", "write_available", "defaults", "gateway", "gateway_bootstrap_available", "providers", "decision", "models", "presets", "provider_types", "decision_protocols"}
+    assert initial["defaults"] == {"default_model": None}
     assert "system_one" in initial["decision_protocols"]
     assert all({"kind", "id", "display_name", "brand_id", "icon_id", "api_base", "api_key_env"} <= set(preset) for preset in initial["presets"])
     before = config.models_file.read_bytes()
@@ -62,6 +63,34 @@ def test_get_validate_apply_and_revision_conflict(tmp_path: Path) -> None:
     assert applied.json()["applied"] is True
     assert config.engine.catalog.providers[0].display_name == "Edited"
     assert request(app, "PUT", "/v1/provider-configuration", headers=auth, json=body).status_code == 409
+
+
+@pytest.mark.parametrize("kind", ["llm", "decision"])
+def test_selected_icon_survives_api_reload_without_changing_provider_identity(tmp_path: Path, kind: str) -> None:
+    app, config = setup_app(tmp_path)
+    auth = headers(config)
+    initial = request(app, "GET", "/v1/provider-configuration", headers=auth).json()
+    if kind == "llm":
+        provider = {"id": "test-provider", "type": "openai", "api_base": "https://test.example/v1", "api_key_env": "TEST_PROVIDER_KEY"}
+    else:
+        provider = {"id": "judge", "protocol": "system_one", "api_base": "https://fixture.example/evaluate", "api_key_env": "TEST_PROVIDER_KEY"}
+    provider.update(brand_id="anthropic", icon_id="qwen")
+    body = {"expected_revision": initial["revision"], "operations": [{"action": "upsert", "kind": kind, "provider": provider, "credential": {"action": "keep"}}]}
+    baseline = config.models_file.read_bytes()
+    validation = request(app, "POST", "/v1/provider-configuration/validate", headers=auth, json=body)
+    assert validation.status_code == 200
+    assert config.models_file.read_bytes() == baseline
+    applied = request(app, "PUT", "/v1/provider-configuration", headers=auth, json=body)
+    assert applied.status_code == 200
+    assert request(app, "POST", "/v1/routing/reload", headers=auth).status_code == 200
+    refreshed = request(app, "GET", "/v1/provider-configuration", headers=auth).json()
+    entry = (refreshed["providers"] if kind == "llm" else refreshed["decision"]["providers"])[0]
+    assert entry["id"] == provider["id"]
+    assert entry.get("type" if kind == "llm" else "protocol") == provider.get("type" if kind == "llm" else "protocol")
+    assert entry["brand_id"] == "anthropic"
+    assert entry["icon_id"] == "qwen"
+    assert refreshed["models"] == initial["models"]
+    assert not (tmp_path / ".env").exists()
 
 
 @pytest.mark.parametrize("method,path", [("POST", "/v1/provider-configuration/validate"), ("PUT", "/v1/provider-configuration"), ("POST", "/v1/provider-discovery"), ("POST", "/v1/provider-metadata")])

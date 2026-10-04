@@ -7,8 +7,9 @@ routing behavior behind each decision is in [`routing-design.md`](./routing-desi
 
 ## Authentication
 
-Set `gateway.api_key_env` in `models.json` to the name of an environment variable
-holding an inbound API key. When that variable resolves to a value, every `/v1`
+Set `gateway.api_key_env` in `models.json` to a credential reference resolved from
+neighboring `credentials.json`, legacy `.env`, or the captured process environment,
+in that order. When the reference resolves to a value, every `/v1`
 route and `GET /healthz` require it as a Bearer token:
 
 ```http
@@ -17,7 +18,7 @@ Authorization: Bearer <key>
 
 A missing or wrong token returns `401` with `error.code: "invalid_api_key"` and a
 `WWW-Authenticate: Bearer` header. When `gateway.api_key_env` is unset, the
-gateway serves without inbound authentication. A declared but empty or missing key variable
+gateway serves without inbound authentication. A declared but empty or missing key reference
 is a configuration error. The comparison is constant-time.
 
 The `GET /dashboard` HTML shell is always served; the data endpoints it calls are
@@ -27,7 +28,9 @@ and business panels become available after validation succeeds. Failed attempts
 remain on the connection page for retry; a later `401` returns there and stops
 activity polling. The key stays in JavaScript memory and is sent through the
 `Authorization` header. Gateways without inbound authentication still open the
-console after their initial data access succeeds.
+console after their initial data access succeeds when setup is already complete.
+A fresh default installation shows the initialization form first; providers and
+models can be configured after entering the console.
 
 ## Endpoints
 
@@ -35,6 +38,8 @@ console after their initial data access succeeds.
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness and configuration snapshot: status, catalog names, policy mode, default strategy, registered strategies, session strategy, storage state, live session count. |
 | `GET` | `/dashboard` | Bundled operator UI (a Vite build shipped inside the package) served by the gateway process itself. |
+| `GET` | `/v1/setup` | Initialization status and optional configuration progress. |
+| `POST` | `/v1/setup` | Set the first management key through local bootstrap. |
 | `GET` | `/v1/models` | OpenAI model list: registered strategy names first, then concrete catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot plus `session_strategy`. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and their policies. |
@@ -47,6 +52,7 @@ console after their initial data access succeeds.
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | Live snapshot plus retained request evidence, newest first. |
 | `GET` | `/v1/routing/providers/summary` | Configured providers and retained attempts in a fixed rolling 15-minute window. |
 | `GET` | `/v1/provider-configuration` | Safe provider/model configuration, presets, supported types, write availability, and an opaque revision. |
+| `PUT` | `/v1/gateway-credential` | Initialize or replace the gateway key through the managed credential owner. |
 | `POST` | `/v1/provider-configuration/validate` | Validate provider changes or confirmed model imports without writing or activating them. |
 | `PUT` | `/v1/provider-configuration` | Apply validated provider changes and confirmed model imports to the baseline and credential file. |
 | `POST` | `/v1/provider-discovery` | Fetch candidate upstream models for a saved or in-memory LLM provider. |
@@ -86,6 +92,15 @@ session list still shows live state, and session detail returns an empty request
 list when evidence is unavailable. The requests route accepts slashes in session
 IDs (`{session_id:path}` internally); the single-session snapshot route does not.
 
+New previews and decisions expose `defaulted: true|false` beside the final label.
+Session list rows, live snapshots and retained request decisions expose this
+optional boolean when their selection source is known. True identifies the
+global fallback; false preserves an ordinary configured label, including a
+literal label named `default`. Legacy evidence with unknown source omits it.
+Retained decisions read this flag from the existing `signals_json` column;
+there is no database-column migration. Pins retain the source after event-history
+eviction, and the list flag describes the selection whose label it displays.
+
 Both monitoring lists accept `limit` (default 30, maximum 100) and an opaque
 `cursor`. Without a cursor, each returns the first page. Responses retain their
 existing `data` or `requests` array and add `page_size`, `has_more`, and
@@ -113,6 +128,67 @@ store. When the assets are missing from the install, `/dashboard` returns `404`
 with `dashboard_not_built` and startup logs a warning.
 
 ## Configuration writes
+
+### Initialization
+
+The packaged default contains strategy plans with no provider instances or
+models. The gateway and dashboard can start in that state. Adding suppliers
+and models is optional during initialization and can be done later.
+
+`GET /v1/setup` returns `{required, local_setup_available, revision,
+has_providers, has_models, routing_ready, next_step}`. `next_step` is
+`gateway_key`, `provider`, `model`, `routing`, or `ready`; progress describes
+configuration and does not block console access. `routing_ready` means a global
+default model is configured or all default-strategy label pools have models. With a configured gateway key,
+this read follows the normal Bearer rule.
+Setup reads and CLI setup can inspect an empty declared gateway reference for
+repair. Runtime startup and reload still require its effective value; losing a
+configured key cannot silently enable anonymous serving.
+
+`POST /v1/setup` accepts exactly `{expected_revision, api_key}`. The key contains
+16 to 8192 visible ASCII characters without whitespace. Both HTTP setup endpoints
+require the original listener and request peer to be loopback, one valid loopback
+Host, an optional matching Origin and no forwarding headers. Reloading the file
+host does not change bootstrap eligibility.
+These checks also apply to malformed anonymous setup requests.
+Remote deployments can run `jev setup` locally before connecting to the
+dashboard. Setup delegates to the same managed credential owner as
+`PUT /v1/gateway-credential`. It stores only the key reference in `models.json`
+and the value in protected `credentials.json`, preserves a declared reference name,
+and uses `JEV_GATEWAY_API_KEY` only when none is declared. It prepares and
+activates the catalog, and restores files and runtime state on failure. Stale
+revisions conflict. Setup cannot replace an effective management key. An empty
+declared reference can be repaired without changing its name. Responses
+never include the key. Successful setup returns the setup projection above.
+An ineligible local request returns `403 setup_local_only`; an existing key returns
+`409 setup_already_configured`. Validation uses `400 invalid_configuration`,
+revision conflicts use `409 revision_conflict`, and persistence or activation
+failures use `500 provider_configuration_failed`. These remain separate from
+the credential endpoint's errors.
+
+With no configured models, chat and preview return `503 setup_incomplete`
+without calling an upstream service. Provider saves, model imports and routing
+assignments can proceed separately. Dashboard saves activate changes; reload
+rereads the same files after manual edits.
+
+Settings saves the single global default model through the existing guarded
+provider-configuration transaction. The operation is
+`{action: "set_default_model", model: "provider/upstream_model"}`; use `model: null`
+to clear it. The safe snapshot includes `defaults: {default_model: string|null}`.
+The model ID must be an exact configured canonical ID. Validation, stale-revision
+and rollback rules are the same as other baseline operations, and the routing
+overlay does not store this value.
+
+When a matched tag has no models, every strategy inherits this global default;
+preview, response route headers, records and sessions report final `label`/`tier`
+as `default`, with `defaulted: true`. Views display Default/默认 for this reserved
+result and preserve a configured literal `default` label when `defaulted: false`.
+Per-strategy defaults are deferred.
+If no global default is configured when this fallback is needed, chat/preview
+return `503 setup_incomplete` before generation. A populated tag pool continues
+to use normal selection rules without requiring a global fallback.
+
+### Routing and preferences
 
 `POST /v1/routing/reload` rereads the catalog and any existing overlay; it keeps
 its existing authentication behavior and does not write either file. The routing
@@ -162,12 +238,19 @@ separately from policy edits. Policy edits remain pending until validation,
 review, and explicit confirmation. A failed layout write reports an error and
 restores the last confirmed layout instead of silently claiming that the new
 coordinates persisted.
+
+Configured path and monitoring views show inherited global destinations for empty
+selectable pools. These dashed edges have no membership handle and cannot be
+reconnected or removed. They do not add tags or write inherited membership into
+an overlay. `GET /v1/routing/configuration` includes the safe root `defaults`;
+edit its global model in Settings.
 Routing, canvas-layout, and theme writes leave `models.json` unchanged.
 
 Routing overlays are validated before they touch disk. The overlay is merged into the
 `models.json` document and passed through the normal parser and strategy
-registry, so an edit that would leave a label without a model, name an unknown
-label or selection mode, or change storage settings is rejected with the parser's
+registry. Unassigned tag-based label pools remain valid editable states. An edit
+that names an unknown model, label or selection mode, or changes storage settings
+is rejected with the parser's
 own message and the active catalog is left alone. A write that fails after the
 file was replaced restores the previous content and reloads the previous catalog,
 then returns `500 overlay_apply_failed`. Each applied change registers a
@@ -197,18 +280,32 @@ before a management change is activated. Storage and gateway settings cannot be
 changed through provider operations.
 
 `GET /v1/provider-configuration` returns
-`{revision, write_available, providers, decision, models, presets, provider_types, decision_protocols}`.
+`{revision, write_available, defaults, gateway, gateway_bootstrap_available, providers, decision, models, presets, provider_types, decision_protocols}`.
 The revision is opaque and detects baseline, overlay, and credential-file changes.
 Restarting the gateway invalidates revisions issued by that process.
-Provider responses expose declared environment references and credential presence,
+`gateway` exposes only `{api_key_env, has_api_key}`. `gateway_bootstrap_available`
+describes whether this request can initialize an unconfigured local gateway.
+Provider responses expose declared credential references and effective presence,
 never credential values. Advanced provider parameters use a safe projection.
 Presence uses `has_api_key`; model views use `name` for their qualified ID.
 Presets and custom forms share the same operation format; `brand_id` identifies a
 supplier and `type` selects the LLM transport. Decision providers select their
 `protocol` independently; the supported protocol is `system_one`.
 
+LLM presets come from the same registry as the CLI. Each preset includes its
+display name, brand/icon IDs and transport configuration, with optional `aliases`,
+`docs_url`, bilingual `setup_instructions`/`setup_instructions_zh` and
+`setup_fields`. A setup field declares `key`, `target` (`params` or `param_env`),
+`label`, `label_zh`, `required` and optional `placeholder`. These fields describe
+the unsaved template; omit them from provider writes. Null `api_base` uses the
+native transport endpoint, while an empty template endpoint requires an
+account-specific URL. Null `api_key_env` declares no primary API-key reference.
+An explicit `icon_id` overrides automatic brand artwork without changing brand,
+transport, instance or model IDs; unknown icon IDs remain valid display metadata.
+
 Both validation and apply accept `{expected_revision, operations}`. An operation
-upserts a provider, deletes an unreferenced provider, or explicitly imports models.
+upserts a provider, deletes an unreferenced provider, explicitly imports models,
+or sets the global default model as described under Initialization.
 For example, a candidate LLM provider can be submitted as:
 
 ```json
@@ -234,14 +331,15 @@ For example, a candidate LLM provider can be submitted as:
 
 Credential actions are `keep`, `set`, and `clear`. `set` requires a non-empty
 value; an empty string is not an instruction to keep the existing value.
-Clear removes the local `.env` entry. An inherited environment value may still
+Set writes the protected neighboring `credentials.json` store. Clear removes the
+name from both that store and the local `.env` entry. An inherited environment value may still
 supply the declared reference, and `has_api_key` reports its effective presence.
 It does not remove a value supplied by the launching shell.
-Unmarked `.env` records retain ordered python-dotenv `override=True` interpolation,
-including `${NAME}` and `${NAME:-default}`. Managed set values containing `${` use
-a trailing ` # jev-managed-literal-v1` after their single-quoted assignment, so JEV
-preserves that record literally. Generic dotenv readers do not implement this
-JEV marker. Resolution uses a local mapping without changing `os.environ`.
+JSON values are literal, including `${NAME}`. Existing `.env` records retain
+their ordered interpolation and managed-literal marker rules. JSON values take
+precedence over local dotenv and inherited process values. Resolution uses a local
+mapping without changing `os.environ`; full file semantics are in
+[credential configuration](credentials.md).
 Omitted advanced `params` and `param_env` remain unchanged on an existing
 provider. Deletion uses `{action: "delete", kind: "llm"|"decision", id}` and
 rejects remaining references instead of removing models or strategies implicitly.
@@ -315,6 +413,44 @@ Every provider-management POST and PUT, including validation, discovery, and
 metadata lookup, requires a configured gateway key. With no configured key these
 commands return `403 config_writes_disabled`; a wrong configured Bearer token
 returns `401 invalid_api_key`. GET follows the existing read authentication rule.
+
+## Gateway credential initialization and replacement
+
+`PUT /v1/gateway-credential` accepts only a SET operation:
+
+```json
+{
+  "expected_revision": "<revision from GET /v1/provider-configuration>",
+  "credential": {"action": "set", "value": "<new gateway key>"}
+}
+```
+
+With a configured gateway key, the operation requires the current Bearer token.
+Without one, first setup requires a loopback listener and request peer, a valid
+loopback Host/Origin, and no forwarding headers. An anonymous public or proxy
+connection cannot initialize the key. Provider, routing and canvas writes keep
+their configured-key guard.
+
+This endpoint and `POST /v1/setup` share the managed credential owner, immutable
+snapshot, revision checks and local-bootstrap authorization. The setup endpoint
+accepts `{expected_revision, api_key}` and sets only the first key; this endpoint
+accepts the SET shape above and also supports authenticated replacement. Each
+keeps its own safe response projection and error codes.
+
+The operation uses the existing `gateway.api_key_env` reference, or adds
+`JEV_GATEWAY_API_KEY` for first setup. It checks shared references and the opaque
+revision, validates and prepares the effective catalog, then commits and activates
+the new key through the recoverable configuration transaction. The response is
+the safe Provider configuration plus `{valid: true, applied: true}`. It contains
+no credential value. There is no gateway CLEAR operation.
+
+The new key takes effect immediately; the old key then fails authentication.
+The Dashboard keeps its connection using the submitted value in module memory.
+HTTP callers retain their own copy. A stale revision returns `409 revision_conflict`.
+Invalid inputs return `400 invalid_gateway_credential`; an ineligible first setup
+returns `403 gateway_bootstrap_unavailable`. Write or activation failures return
+`500 gateway_credential_failed` after restoring the old state. Errors use fixed
+text and never quote submitted values or file content.
 
 ## Upstream discovery and metadata
 
@@ -445,9 +581,13 @@ Errors use the OpenAI envelope:
 | `400` | `invalid_limit` | Monitoring page size is outside 1..100. |
 | `400` | `invalid_cursor` | Monitoring cursor is malformed, altered, from another endpoint/session, or invalid after restart. |
 | `400` | `restart_required` | Reload changes storage settings. |
+| `400` | `invalid_gateway_credential` | Gateway credential SET has an invalid shape or key. |
 | `401` | `invalid_api_key` | Missing or wrong Bearer token. |
 | `403` | `config_writes_disabled` | A configuration write was attempted with no `gateway.api_key_env` configured. |
+| `403` | `setup_local_only` | First `/v1/setup` write fails local-bootstrap checks. |
+| `403` | `gateway_bootstrap_unavailable` | First gateway-credential write fails local-bootstrap checks. |
 | `409` | `revision_conflict` | Provider validation/apply used an outdated configuration revision. |
+| `409` | `setup_already_configured` | `/v1/setup` attempts to replace an existing management key. |
 | `404` | `dashboard_not_built` | The dashboard assets are absent from this install. |
 | `404` | `model_not_found` | `model` is neither a strategy nor a catalog model. |
 | `404` | `unknown_decision` | Decision ID is not in the in-memory log. |
@@ -455,9 +595,12 @@ Errors use the OpenAI envelope:
 | `500` | `catalog_mismatch` | A routed model disappeared from the catalog. |
 | `500` | `overlay_apply_failed` | The overlay could not be written or applied; the previous catalog was restored. |
 | `500` | `provider_configuration_failed` | Provider configuration persistence, activation, or recovery failed. |
+| `500` | `gateway_credential_failed` | Gateway credential persistence or activation failed. |
 | `500` | `canvas_layout_write_failed` | Layout persistence failed; routing policy remains untouched. |
 | `502` | `upstream_error` | Upstream call failed before a response began; `type` is a bounded exception type. |
 | `503` | `storage_unavailable` | Reload cannot reach the record store. |
+| `503` | `setup_incomplete` | No models are configured, or an empty matched tag needs an unset global default. |
+| `503` | `provider_credentials_missing` | The selected LLM provider lacks a declared key or transport credential. |
 
 The upstream error message is fixed: `Upstream provider request failed.` Once
 streaming headers have been sent, a stream failure cannot become an HTTP `502`;
@@ -469,7 +612,8 @@ the stream terminates and the gateway records a failed outcome on a best-effort 
 curl -X POST http://127.0.0.1:8000/v1/routing/reload
 ```
 
-Reload re-reads `models.json` and its adjacent `.env`, rebuilds providers, models,
+Reload reads one locked snapshot of `models.json`, adjacent `credentials.json`,
+legacy `.env` and the routing overlay, then rebuilds providers, models,
 and strategies, registers a configuration snapshot with the existing record store,
 and applies reloadable gateway settings. It preserves sessions subject to the new
 TTL and session-count limits. On the next turn, a session whose stored model no

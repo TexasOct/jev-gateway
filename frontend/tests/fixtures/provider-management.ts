@@ -1,5 +1,6 @@
 import type { BrowserContext } from "@playwright/test";
-import type { ImportModel, MetadataItem, ProviderConfiguration, ProviderModelView, ProviderMutation, ProviderSelector } from "../../src/shared/api/types";
+import type { GatewayCredentialMutation, ImportModel, MetadataItem, ProviderConfiguration, ProviderModelView, ProviderMutation, ProviderSelector, SetupStatus } from "../../src/shared/api/types";
+import { isValidSetupKey } from "../../src/shared/api/setup-key";
 import { configuration as routingConfiguration } from "./configuration";
 
 function modelView(provider: string, upstream_model: string, imported?: ImportModel): ProviderModelView {
@@ -13,7 +14,9 @@ function modelView(provider: string, upstream_model: string, imported?: ImportMo
 
 export function providerFixture(): ProviderConfiguration {
   return {
-    revision: "r1", write_available: true,
+    revision: "r1", write_available: true, defaults: { default_model: null },
+    gateway: { api_key_env: "FIXTURE_GATEWAY_KEY", has_api_key: true },
+    gateway_bootstrap_available: false,
     providers: [{ id: "fixture", display_name: "Fixture provider", type: "openai", api_base: "https://example.test/v1", api_key_env: "FIXTURE_KEY", has_api_key: true, allow_private_network: false, brand_id: null, icon_id: null, params: { timeout: "[configured]" }, param_env: { extra_header: "FIXTURE_HEADER" } }],
     decision: { enabled: false, default_provider: null, timeout_seconds: 1.5, providers: [{ id: "judge", display_name: "Fixture judge", protocol: "system_one", api_base: "https://example.test/evaluate", api_key_env: "JUDGE_KEY", has_api_key: true, brand_id: null, icon_id: null, model: null }] },
     models: [modelView("fixture", "existing")],
@@ -27,6 +30,8 @@ export type ProviderFixtureState = {
   validations: ProviderMutation[];
   selectors: ProviderSelector[];
   rejectWrite?: number;
+  delayWrite?: () => Promise<void>;
+  rejectValidation?: number;
   rejectDiscovery?: number;
   delayDiscovery?: () => Promise<void>;
   metadataUnknown?: boolean;
@@ -40,25 +45,85 @@ export type ProviderFixtureState = {
   rejectCatalogRead?: number;
   catalogReads?: number;
   inheritedCredential?: boolean;
+  gatewayWrites?: GatewayCredentialMutation[];
+  setupWrites?: Array<{ expected_revision: string; api_key: string }>;
+  gatewayKey?: string;
+  enforceGatewayAuth?: boolean;
+  gatewayHeaders?: Array<{ path: string; authorization: string | undefined }>;
+  rejectGatewayWrite?: number;
+  delayGatewayWrite?: () => Promise<void>;
+  delayValidation?: () => Promise<void>;
+  delayCatalogRead?: () => Promise<void>;
 };
 export async function installProviderFixture(context: BrowserContext, state: ProviderFixtureState) {
+  const setupStatus = (): SetupStatus => {
+    const required = !state.configuration.gateway.has_api_key;
+    const hasProviders = state.configuration.providers.length > 0;
+    const hasModels = state.configuration.models.length > 0;
+    const routingReady = hasModels && (state.configuration.defaults?.default_model != null || routingConfiguration.labels.every((label) => label.models.length > 0));
+    return { required, local_setup_available: required && state.configuration.gateway_bootstrap_available, revision: state.configuration.revision, has_providers: hasProviders, has_models: hasModels, routing_ready: routingReady, next_step: required ? "gateway_key" : !hasProviders ? "provider" : !hasModels ? "model" : !routingReady ? "routing" : "ready" };
+  };
+  await context.route("**/v1/setup", async (route) => {
+    const request = route.request();
+    const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    if (request.method() === "GET") return reply(setupStatus());
+    if (request.method() !== "POST") return route.abort("blockedbyclient");
+    if (state.configuration.gateway.has_api_key) return reply({ error: { code: "setup_already_configured", message: "Management key is already configured." } }, 409);
+    if (!state.configuration.gateway.has_api_key && !state.configuration.gateway_bootstrap_available) return reply({ error: { code: "setup_local_only", message: "Local setup required" } }, 403);
+    const body = request.postDataJSON() as { expected_revision: string; api_key: string };
+    (state.setupWrites ??= []).push(body);
+    if (body.expected_revision !== state.configuration.revision) return reply({ error: { message: "Synthetic revision conflict" } }, 409);
+    if (!isValidSetupKey(body.api_key)) return reply({ error: { code: "invalid_setup_key", message: "Invalid management key format." } }, 400);
+    state.gatewayKey = body.api_key;
+    state.configuration.gateway = { api_key_env: state.configuration.gateway.api_key_env ?? "JEV_GATEWAY_API_KEY", has_api_key: true };
+    state.configuration.gateway_bootstrap_available = false;
+    state.configuration.write_available = true;
+    state.configuration.revision = `setup-r${state.setupWrites.length}`;
+    return reply(setupStatus());
+  });
+  await context.route("**/v1/gateway-credential", async (route) => {
+    const request = route.request();
+    if (request.method() !== "PUT") return route.abort("blockedbyclient");
+    if (!state.configuration.gateway.has_api_key && !state.configuration.gateway_bootstrap_available) return route.fulfill({ status: 403, json: { error: { code: "gateway_bootstrap_unavailable", message: "Local setup required" } } });
+    const body = request.postDataJSON() as GatewayCredentialMutation;
+    (state.gatewayWrites ??= []).push(body);
+    if (state.delayGatewayWrite) { const delay = state.delayGatewayWrite; state.delayGatewayWrite = undefined; await delay(); }
+    const reply = (payload: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(payload) });
+    if (state.rejectGatewayWrite) { const status = state.rejectGatewayWrite; state.rejectGatewayWrite = undefined; return reply({ error: { message: "synthetic-gateway-error-must-not-render" } }, status); }
+    if (body.expected_revision !== state.configuration.revision) return reply({ error: { message: "Synthetic revision conflict" } }, 409);
+    state.gatewayKey = body.credential.value;
+    state.configuration.gateway = { api_key_env: state.configuration.gateway.api_key_env ?? "JEV_GATEWAY_API_KEY", has_api_key: true };
+    state.configuration.gateway_bootstrap_available = false;
+    state.configuration.write_available = true;
+    state.configuration.revision = `gateway-r${state.gatewayWrites!.length}`;
+    return reply({ ...state.configuration, valid: true, applied: true });
+  });
   await context.route("**/v1/dashboard/canvas-layout", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: 1, nodes: {}, viewport: { x: 0, y: 0 } }) }));
   await context.route("**/v1/routing/configuration", async (route) => {
     state.catalogReads = (state.catalogReads ?? 0) + 1;
+    if (state.delayCatalogRead) { const delay = state.delayCatalogRead; state.delayCatalogRead = undefined; await delay(); }
     if (state.rejectCatalogRead) return route.fulfill({ status: state.rejectCatalogRead, contentType: "application/json", body: JSON.stringify({ error: { message: "synthetic-catalog-read-error" } }) });
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...routingConfiguration, models: [...routingConfiguration.models, ...state.configuration.models.map((model) => ({ id: model.name, provider: model.provider, upstream_model: model.upstream_model, priority: model.priority, baseline_priority: model.priority, tags: model.tags, baseline_tags: model.tags }))] }) });
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...routingConfiguration, write_available: state.configuration.write_available, defaults: state.configuration.defaults, models: [...routingConfiguration.models, ...state.configuration.models.map((model) => ({ id: model.name, provider: model.provider, upstream_model: model.upstream_model, priority: model.priority, baseline_priority: model.priority, tags: model.tags, baseline_tags: model.tags }))] }) });
   });
   await context.route("**/v1/provider-**", async (route) => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/v1/provider-configuration" && request.method() === "GET") return state.rejectRead ? reply({ error: { message: "synthetic-read-error" } }, state.rejectRead) : reply(state.configuration);
-    if (path === "/v1/provider-configuration/validate") { state.validations.push(request.postDataJSON()); return reply({ ...state.configuration, valid: true, applied: false, imported: 0, skipped: 0 }); }
+    if (path === "/v1/provider-configuration/validate") {
+      state.validations.push(request.postDataJSON());
+      if (state.delayValidation) { const delay = state.delayValidation; state.delayValidation = undefined; await delay(); }
+      if (state.rejectValidation) return reply({ error: { message: "synthetic-validation-error" } }, state.rejectValidation);
+      return reply({ ...state.configuration, valid: true, applied: false, imported: 0, skipped: 0 });
+    }
     if (path === "/v1/provider-configuration" && request.method() === "PUT") {
       const body = request.postDataJSON() as ProviderMutation; state.writes.push(body);
+      if (state.delayWrite) { const delay = state.delayWrite; state.delayWrite = undefined; await delay(); }
       let imported = 0; let skipped = 0;
       if (state.rejectWrite) { const status = state.rejectWrite; state.rejectWrite = undefined; return reply({ error: { message: "synthetic-rejected-secret-must-not-render" } }, status); }
       for (const operation of body.operations) {
-        if (operation.action === "upsert") {
+        if (operation.action === "set_default_model") {
+          state.configuration.defaults = { default_model: operation.model };
+        } else if (operation.action === "upsert") {
           const list = operation.kind === "llm" ? state.configuration.providers : state.configuration.decision.providers;
           const existing = list.findIndex((provider) => provider.id === operation.provider.id);
           const view = { ...operation.provider, has_api_key: operation.credential.action === "set" || state.inheritedCredential === true || (operation.credential.action === "keep" && list[existing]?.has_api_key === true), ...(operation.kind === "llm" ? { params: list[existing]?.params ?? {}, param_env: list[existing]?.param_env ?? {} } : {}) };
@@ -101,5 +166,15 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
       }) });
     }
     await route.abort("blockedbyclient");
+  });
+  await context.route("**/v1/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const authorization = request.headers().authorization;
+    (state.gatewayHeaders ??= []).push({ path, authorization });
+    if (state.enforceGatewayAuth && state.gatewayKey && authorization !== `Bearer ${state.gatewayKey}`) {
+      return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: { message: "Synthetic unauthorized", code: "invalid_api_key" } }) });
+    }
+    return route.fallback();
   });
 }

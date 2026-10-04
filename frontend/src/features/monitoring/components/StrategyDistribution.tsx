@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { PolicyCatalog, RoutingActivityPayload, SessionsPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
-import { activePaths, configuredModels, connectorAnchors, connectorPath, pathForModel, routeDestinations, strategyChoices, validActivity } from "../model/route-activity";
+import { activePaths, configuredRouteModels, connectorAnchors, connectorPath, pathForModel, routeDestinations, strategyChoices, validActivity } from "../model/route-activity";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
 import { distributeSessions } from "../model/strategy-distribution";
 import type { StrategiesPayload, StrategyDistribution } from "../model/strategy-distribution";
 
@@ -82,7 +83,7 @@ export function StrategyDistribution({ strategies = null, policyCatalog = null, 
       viewport?.removeEventListener("change", measure);
       observer.disconnect();
     };
-  }, [strategies, activeStrategy, locale, activity, sessions]);
+  }, [strategies, policyCatalog, activeStrategy, locale, activity, sessions]);
 
   const sessionStorageUnavailable = sessions !== null && (sessions.storage.enabled === false || Boolean(sessions.storage.error));
   const distribution = distributeSessions(strategies?.data ?? [], sessions ? [sessions] : [], sessionsComplete && !sessionPageError && !monitoringError && !sessionStorageUnavailable);
@@ -97,7 +98,8 @@ export function StrategyDistribution({ strategies = null, policyCatalog = null, 
   const selectedStrategy = strategies?.data.find((strategy) => strategy.name === selectedChoice?.name);
   const selectedStrategyName = selectedChoice?.name;
   const selectedDistribution = distribution.strategies.find((strategy) => strategy.name === selectedStrategyName);
-  const destinations = routeDestinations(selectedDistribution?.destinations ?? [], observedPaths.filter((path) => path.strategy === selectedStrategyName), configuredModels(selectedStrategy, policyCatalog));
+  const configured = configuredRouteModels(selectedStrategy, policyCatalog);
+  const destinations = routeDestinations(selectedDistribution?.destinations ?? [], observedPaths.filter((path) => path.strategy === selectedStrategyName), configured.models);
   const activityForModel = (modelId: string | null) => activityFresh && pathForModel(visiblePaths, selectedStrategyName, modelId);
   const unknownTarget = destinations.some((item) => item.source !== "model");
   const copy = (en: string, zh: string) => locale === "zh-CN" ? zh : en;
@@ -152,10 +154,12 @@ export function StrategyDistribution({ strategies = null, policyCatalog = null, 
 
               </div>
               {destinations.map((target) => <div className="monitoring-destination group flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-outline bg-panel px-[0.7rem] py-[0.55rem] data-[active=true]:border-primary" data-route-target={target.id ?? "unknown"} data-route-unknown={target.source !== "model" || undefined} data-active={(target.source === "model" && activityForModel(target.id)) || undefined} key={`${target.source}:${target.id}`}>
+                {target.id === configured.defaultModel && <small className="basis-full text-xs text-ink-muted" data-global-default>{t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true }))}</small>}
                 <div className="grid min-w-0 gap-[0.2rem]"><strong className="[overflow-wrap:anywhere]">{target.id ?? copy("Unknown model / route", "模型 / 路由未知")}</strong><small className="text-xs text-ink-muted">{target.activityOnly ? copy("Activity", "活动") : target.configured ? target.count === 0 ? distribution.complete ? copy("Configured · no sessions", "已配置 · 无会话") : copy("Configured · partial", "已配置 · 部分") : copy("Configured · selected", "已配置 · 已选择") : target.source === "model" ? copy("Selected", "已选择") : target.source === "route" ? copy("Recorded · model unknown", "已记录 · 模型未知") : copy("Unknown", "未知")}</small></div>
                 <span className="shrink-0 text-lg font-bold tabular-nums text-primary">{target.activityOnly || (target.configured && target.count === 0) ? "—" : `${target.count}${distribution.complete ? "" : "+"}`}</span>
                 {target.source === "model" ? <small className="monitoring-path-status basis-full text-xs text-ink-muted group-data-[active=true]:text-primary">{!activityFresh ? copy("Activity unknown", "活动状态未知") : activityForModel(target.id) ? copy("Active", "活跃") : copy("No activity observed", "未观察到活动")}</small> : null}
               </div>)}
+              {configured.incomplete && <p className="m-0 border-l-2 border-outline p-[0.6rem] text-xs text-ink-muted">{t("emptyTagPath")}</p>}
               {selectedStrategy && !policyCatalog ? <p className="m-0 border-l-2 border-outline p-[0.6rem] text-xs text-ink-muted">{copy("Configured possibilities unavailable; catalog model data could not be read.", "无法读取目录模型数据，已配置的候选模型暂不可用。")}</p> : null}
               {selectedStrategy?.kind && !["auto", "policy", "decision", "decision_matrix"].includes(selectedStrategy.kind) ? <p className="m-0 border-l-2 border-outline p-[0.6rem] text-xs text-ink-muted">{copy("Configured model possibilities are unavailable for this strategy kind.", "此策略类型无法显示已配置的候选模型。")}</p> : null}
               {selectedDistribution?.count === 0 ? <p className="m-0 border-l-2 border-outline p-[0.6rem] text-xs text-ink-muted">{distribution.complete ? copy("No live sessions for this strategy.", "此策略没有活动会话。") : copy("No sessions observed yet; the page walk is incomplete.", "尚未观察到会话；分页读取尚未完成。")}</p> : null}

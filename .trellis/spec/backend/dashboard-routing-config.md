@@ -21,8 +21,21 @@ Three files next to the active `models.json` hold runtime edits:
 | `routing-canvas-layout.json` | node positions and scroll viewport | `PUT /v1/dashboard/canvas-layout` |
 
 `models.json` is the baseline. Routing-overlay, theme, and canvas-layout APIs
-leave its bytes unchanged. Provider-management writes have a separate contract
-and must not expand the routing-overlay schema.
+keep their own write surfaces. Provider-management writes have a separate
+contract and must not expand the routing-overlay schema.
+
+The overlay accepts the same matrix choices as the baseline: an omitted label
+uses the first configured label, `{}` is a legal choice, and `tier` is the
+existing alias for `label`. Reject both names in one choice and reject unknown
+keys. Validation, merge and reload preserve unedited choice fields in the JSON
+document. An explicit label edit removes its former alias; display resolution
+alone must not add a choice field to an overlay.
+
+Default installations contain strategies without supplier or model instances.
+The local setup form establishes management access, then allows console use
+while providers/models are configured later. Empty tag-based pools remain
+editable. See [Runtime initialization](./initialization.md) for its API, CLI,
+authorization and persistence contracts.
 
 Module ownership: `jev_gateway/routing_overlay.py` owns overlay shape, merge,
 atomic write, and `load_catalog_with_overlay()`. It must not import
@@ -85,10 +98,11 @@ Overlay request body:
   sections are unreachable, so a credential cannot be smuggled in.
 - Label membership is tag-based: adding a model to a label adds `{strategy}/{label}`
   to that model's `tags`. Tags owned by other strategies must survive an edit.
-- Environment key: `gateway.api_key_env` must be configured for routing-overlay
+- Gateway credential: `gateway.api_key_env` must be configured for routing-overlay
   and canvas-layout writes. Theme writes follow the ordinary gateway Bearer rule
   and remain available without a configured key. The key is resolved at catalog
-  load; no new variable is introduced.
+  load through JSON > local dotenv > captured process values, and activated after
+  a successful managed write. See [credential configuration](./credential-configuration.md).
 - The overlay file and theme file are created with the process umask.
 
 ### 4. Validation & Error Matrix
@@ -389,6 +403,7 @@ The layout is shared by browsers connected to the same installation. The API cur
 - `tests/test_gateway.py`: configured-key guard, Bearer checks, file failure, unchanged policy hash/version count and unchanged baseline/overlay bytes.
 - `frontend/src/features/routing/model/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
 - Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works. For zoomed/scrolled canvases, `elementFromPoint(clientX, clientY)` must identify the intended `data-canvas-node`; verify with real browser mouse input because synthetic `PointerEvent` dispatch does not exercise browser pointer capture faithfully.
+- Sample a node's current bounds and center hit within one synchronous browser evaluation. Chrome measurement and viewport restoration can move the node between two awaited reads, making cached coordinates hit empty space. Keep the exact hit, native drag and policy-write assertions; a covering overlay must still fail the hit check. `canvas-hit.ts` and its synthetic origin-shift/occlusion regressions exercise this sampling boundary.
 - Browser checks for responsive canvas fitting should scroll the canvas into the visible page before measuring node bounds. Assert that the selected node's bounding box is inside the visible canvas after Fit, at a usable CSS size, rather than relying on absence of page-level horizontal overflow. When the whole board cannot fit at minimum readable zoom, focus a selected node or compact group and provide explicit pan controls; viewport changes remain layout-only and must not submit policy changes.
 - `RoutingEditor` selection is the source passed into canvas fitting and the inspector. Canvas node selection callbacks must update the parent `selectedNode`; otherwise Fit may focus a stale default node even when the user selected another module. Verify selection synchronization in browser tests after switching from an advanced panel.
 - The strategy-only shell is a `100dvh` grid with `auto minmax(0, 1fr)` rows. The shared header owns the auto row; the actual canvas fills the remaining row. Do not restore a fixed board height or make monitoring/appearance use this shell.
@@ -689,6 +704,8 @@ Component-specific static appearance belongs in JSX Tailwind utilities, includin
 The session list viewport is 480px on desktop and 280px at widths of 720px or less; the request timeline is 480px on desktop and 62vh at those narrow widths. Session and request rows stay 132px and 360px respectively. Emit the 280px utilities only for session lists and the 62vh utilities only for timelines: Tailwind's generated ordering does not guarantee that two competing `max-[720px]` height utilities on one element resolve by class-string order. Keep all three viewport properties (`height`, `min-height`, `max-height`) equal. Preserve focused-row retention and cursor pagination while moving the static row positioning to utilities.
 
 Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on 190px-wide canvas nodes with output-driven heights, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
+
+Single-select defaults in `base.css` reserve 32px of right padding and draw a current-color CSS chevron at least 12px from the right edge. Keep these shared defaults unlayered so component `px-*` utilities cannot remove the arrow space. Preserve the native element, labels, change handlers, keyboard operation and focus; exclude multiple/listbox controls and restore native appearance under `forced-colors`. CSS geometry avoids a data-URI icon blocked by the Dashboard's `img-src 'self'` policy. Provider main field grids use `items-start`: a neighboring endpoint checkbox must not stretch the transport select. The browser contract is 44px control height and at most 1px top/height difference on wide screens, no overflow at 320/390px, and current-palette arrows in both locales/schemes. `frontend/tests/browser/select-controls.spec.ts` exercises these assertions with synthetic APIs; rendered PNG pixel measurements check the arrow inset and center.
 
 ## Common mistakes
 

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Full package quality gates."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Verify unchanged transaction, credential, transport and identity boundaries."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Verify frontend and packaged local assets."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Full test and type-check requirements."}
+{"file":".trellis/tasks/archive/2026-10/10-04-provider-icon-presets/research/icon-assets.md","reason":"Verify logo source, license and fallback decisions."}

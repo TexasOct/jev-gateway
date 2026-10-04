@@ -75,18 +75,33 @@ python3 scripts/smoke-installed-release.py \
   --work-dir '/absolute/path/jev installed smoke'
 ```
 
-The script installs managed Python 3.12 into isolated uv tool, binary, and state
+The script installs managed Python 3.12 with isolated HOME, uv cache, tool, binary, and state
 directories. It initializes packaged templates in a runtime home containing
-spaces, uses dummy credentials, and launches installed commands from an unrelated
+spaces, supplies dummy credentials only through `credentials.json`, and launches installed commands from an unrelated
 directory. Checks cover file create/read/update/rename/delete, CLI lifecycle,
 readiness with invalid proxy settings, dashboard assets, SQLite integrity and
-schema, authenticated provider and routing
-configuration writes, repeat installation, direct foreground startup, and
+schema, empty `0600` credential initialization, protected backups, gateway key
+rotation, authenticated provider and routing writes, secret-free responses/logs,
+repeat installation, direct foreground startup, and
 uninstall preservation. It makes no upstream requests. Services are stopped on
 exit; sanitized command logs and `checks.json` remain under `work-dir/evidence`.
 The evidence includes a `success` boolean, which is true only after all checks pass.
 Each invocation creates a unique installation directory and preserves its runtime
 files for inspection. The script never uses the operator's default installation.
+
+The smoke begins with the real strategy-only template. It starts the empty
+gateway, checks the controlled unconfigured response, sets the management key
+through the local setup API, saves a provider without models, imports a confirmed
+synthetic model and assigns its strategy pools. Reload and preview verify that
+the configuration is usable without upstream calls. Installed package files are
+compared with the wheel bytes.
+
+After publication, download the four pinned assets and verify both sidecars.
+To execute the public installer with the same isolated acceptance checks, add
+`--installer /absolute/path/install.sh` to the smoke command. Its adjacent
+`install.sh.sha256` must match, and the embedded tag must match `--version`.
+This mode installs from the public pinned URLs and checks running/stopped
+reinstall behavior, configuration preservation and uninstall preservation.
 
 1. Protect tags matching `v*` in repository rules so only authorized maintainers
    can publish. `.github/workflows/release.yml` uses `GITHUB_TOKEN` with

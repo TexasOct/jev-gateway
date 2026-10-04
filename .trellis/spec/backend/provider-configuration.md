@@ -7,6 +7,10 @@ model discovery, metadata lookup, and explicit model import. Read the dashboard
 routing guide for overlays, theme, canvas layout, shell privacy, and packaging.
 Provider management owns baseline changes; routing overlays keep their separate
 schema and leave baseline bytes unchanged.
+Read [Runtime initialization](./initialization.md) for strategy-only defaults and
+management-key setup. Empty catalogs and unassigned tag pools are valid editable
+states. Save a provider before importing its first model; never seed synthetic
+instances merely to satisfy validation.
 
 ## 2. Signatures
 
@@ -37,10 +41,11 @@ the same presets as the CLI.
 
 ## 3. Contracts
 
-GET returns `{revision, write_available, providers, decision, models, presets,
-provider_types, decision_protocols}`. Safe provider views include display metadata,
-Credential values never
-appear in a response. Advanced parameters use a safe projection; callers omit
+GET returns `{revision, write_available, defaults, gateway, gateway_bootstrap_available,
+providers, decision, models, presets, provider_types, decision_protocols}`. Safe
+provider views include display metadata. Gateway presence and initialization are
+defined in [credential configuration](./credential-configuration.md). Credential
+values never appear in a response. Advanced parameters use a safe projection; callers omit
 that projection from ordinary upserts so the original `params` and `param_env`
 survive.
 Presence uses `has_api_key`; model views use `name` for the qualified ID.
@@ -52,20 +57,34 @@ Validation and apply accept `{expected_revision, operations}`. Operations use:
 - `{action: "upsert", kind: "llm"|"decision", provider, credential}`;
 - `{action: "delete", kind: "llm"|"decision", id}`;
 - `{action: "import", provider_id, models, confirmed: true}`.
+- `{action: "set_default_model", model: string|null}`.
+
+The last operation edits baseline defaults.default_model and exposes only its
+canonical provider/upstream_model ID in the safe defaults projection. It shares
+normal authorization, revision, baseline/effective validation, registry preparation
+and recoverable activation. It never writes the strategy overlay or a secret file.
+Reject unknown keys, wrong types and missing model IDs. Null clears the default.
+All strategies inherit this global value; per-strategy default controls are deferred.
+The Settings selector reuses this configuration owner and model records. Referenced
+provider/model removal, including CLI force, cannot leave a dangling global default.
+CLI add supports omitted provider/model arrays in the packaged template and keeps
+explicit invalid shapes strict.
 
 Credential actions are `keep`, `set`, and `clear`; `set` includes a non-empty
-`value`. Empty text is not keep. Continue resolving only environment names declared
-in the configuration. Candidate parsing and registry preparation use an injected
-environment mapping, not a temporary mutation of process-wide `os.environ`.
+`value`. Empty text is not keep. Continue resolving only credential references
+declared in the configuration. Candidate parsing and registry preparation use an
+injected mapping, not a temporary mutation of process-wide `os.environ`.
 Non-injected decision-client behavior retains its existing call-time resolution.
-Retain legacy dotenv expansion and assignment order in the local mapping. Managed
-literal credentials must be distinguishable so `${...}` within a newly written
-secret is preserved without changing how older dotenv entries resolve. Managed
-SET uses a single-quoted assignment with trailing ` # jev-managed-literal-v1` when
-the value contains `${`; only the marked record skips expansion. Generic dotenv
-consumers do not interpret this marker. Preserve unaffected records and replace
-all assignments for the selected name on SET/CLEAR.
-Clear removes a local credential entry; inherited values can remain effective.
+The root credential owner resolves JSON > local dotenv > captured process values.
+SET writes literal JSON strings, including `${...}`. Retain legacy dotenv expansion,
+assignment order and existing ` # jev-managed-literal-v1` records; generic dotenv
+consumers do not interpret that marker. CLEAR removes the name from JSON and all
+local dotenv assignments, preserving unaffected records. Inherited values can
+remain effective.
+Shared-reference protection excludes only the edited primary-key occurrence.
+Retain the edited provider's transport references, and recheck the completed
+candidate after all operations so newly added consumers cannot bypass SET/CLEAR
+guards. CLI login/logout share this rule, including dry runs.
 Validation/apply/read/reload and candidate previews must report the same effective
 presence. CLI add uses the shared reference protection before replacing a key.
 CLI show/validate/doctor/status/start/reload use a coherent lock-protected
@@ -81,8 +100,10 @@ uses a full evaluation URL and optional model, with no model-list probe. LLM
 `allow_private_network` is a strict boolean that defaults to false and controls
 only discovery.
 
-Every management POST/PUT requires the configured gateway key, including
-validation, discovery, and metadata lookup. Read behavior follows the existing
+Provider validation, apply, discovery and metadata lookup require the configured
+gateway key. Initial `/v1/setup` and `/v1/gateway-credential` writes share the
+strict local-bootstrap checks and the managed credential owner described in
+[runtime initialization](./initialization.md). Read behavior follows the existing
 Bearer rule. The opaque revision detects changes in baseline, overlay, and
 credential files without exposing a raw secret digest. HTTP takes the reload lock
 before the shared file lock; CLI uses the file lock. Validate the merged catalog
@@ -90,7 +111,7 @@ and prepare its registry before writes. File replacement and activation must
 restore old bytes and active state on failure; recovery material containing
 credentials has restrictive permissions. An uncooperative editor does not honor
 the lock, so check disk revisions as part of the transaction.
-Startup and reload read a coherent baseline/env/overlay snapshot under the shared
+Startup and reload read a coherent baseline/JSON/env/overlay snapshot under the shared
 file lock. Reload holds the reload lock before any reads or preparation, then
 the file lock through activation, so an older preparation cannot replace a newer
 successful management write. Check unresolved recovery state only after acquiring
@@ -168,8 +189,9 @@ Ignore stale responses after switching provider or starting a newer request;
 query prefilling must preserve fields the operator has edited. Success refreshes
 the effective model catalog used by the existing strategy editor. Keys remain
 memory-only in the browser and are cleared from completed/cancelled forms.
-Supplier images are packaged local assets with official source/usage evidence;
-missing logos use neutral fallbacks. CSP, CSS entry points, palette and locale
+Supplier images are packaged local assets with traceable source, supplier reference
+and license evidence; the identity/preset contract is in `provider-identities.md`.
+Missing logos use neutral fallbacks. CSP, CSS entry points, palette and locale
 storage retain their existing boundaries.
 Bind queries to the effective provider configuration, including changes noticed
 by configuration refresh. Current values, state, source detail and confirmation
@@ -216,6 +238,8 @@ read without resubmitting an already committed import.
   Include legacy interpolation plus literal-secret round trips, CLI add reference
   guards, inherited clear presence, unresolved-journal read rejection, and reload
   races with CLI writes and successful management PUT.
+  Cover own-provider transport references, proposed upsert bindings and later
+  operations that introduce a consumer, with unchanged files/runtime on rejection.
 - Catalog/decision: strict optional-field parsing, old omission defaults, stable
   model IDs, optional System One model, and credential-injection compatibility.
 - Discovery/network: fixture adapters, paging and bounds, empty/partial/unsupported

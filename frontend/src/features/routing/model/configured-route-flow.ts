@@ -1,6 +1,7 @@
 import type { ConfigurationPayload, RuleCondition } from "@/shared/api/types";
 import { diffSummary, workflowEdges } from "./draft";
 import type { RoutingDraft, WorkflowEdge } from "./draft";
+import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 
 export interface ConfiguredBranch {
   id: string;
@@ -11,6 +12,8 @@ export interface ConfiguredBranch {
   selection: string | null;
   poolId: string | null;
   models: string[];
+  defaulted: boolean;
+  incomplete: boolean;
   /** Only the policy decision path is highlighted. Pool edges describe eligibility. */
   path: WorkflowEdge[];
 }
@@ -51,8 +54,9 @@ export function projectConfiguredRouteFlow(
     branches: branches.map(({ id, kind, order, conditions, choice }) => {
       const match = edges.find((edge) => edge.from === id && edge.kind === "match");
       const poolId = kind === "default" && config.labels[0] ? `zone::${config.labels[0].tag}` : match?.to ?? null;
+      const inherited = edges.find((edge) => edge.from === poolId && edge.kind === "default");
       const models = poolId === null ? [] : edges
-        .filter((edge) => edge.from === poolId && edge.kind === "pool")
+        .filter((edge) => edge.from === poolId && (edge.kind === "pool" || edge.kind === "default"))
         .map((edge) => edge.to.slice("model::".length));
       const failure = edges.find((edge) => edge.kind === "failure");
       const path: WorkflowEdge[] = kind === "failure" ? failure ? [failure] : [] : context ? [context] : [];
@@ -61,15 +65,18 @@ export function projectConfiguredRouteFlow(
         if (unmatched) path.push(unmatched);
       }
       if (match) path.push(match);
+      if (inherited) path.push(inherited);
       return {
         id,
         kind,
         order,
         conditions,
-        label: choice.label ?? null,
+        label: matrixChoiceLabel(choice, config.labels[0]?.name) ?? null,
         selection: choice.selection ?? null,
         poolId,
         models,
+        defaulted: inherited !== undefined,
+        incomplete: poolId !== null && models.length === 0,
         path,
       };
     }),

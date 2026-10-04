@@ -22,7 +22,7 @@ def test_release_state_records_wheel_and_preserves_runtime(tmp_path, monkeypatch
     (runtime / ".env").write_text("secret")
     (runtime / "jev-records.sqlite3").write_text("records")
     result = init_runtime(runtime, ref="main", method="isolated", version="0.1.0", source=url)
-    assert result["files"] == {"models.json": "preserved", ".env": "preserved"}
+    assert result["files"] == {"models.json": "preserved", ".env": "preserved", "credentials.json": "preserved"}
     assert [(runtime / name).read_text() for name in ("models.json", ".env", "jev-records.sqlite3")] == ["custom", "secret", "records"]
     state = read_state()
     assert state is not None

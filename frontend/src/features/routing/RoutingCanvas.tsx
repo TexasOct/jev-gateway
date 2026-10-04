@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Hand, Minus, MousePointer2, 
 import { api } from "@/shared/api/client";
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
 import CanvasNodeContent, { getCanvasNodeKind } from "./components/CanvasNodeContent";
 import { BOARD_HEIGHT, BOARD_WIDTH, MIN_ZOOM, alignNodes, arrangeNodes, boardPoint, canonicalViewport, canvasAvailableRect, canvasToolShortcut, classifyConnection, compatibleTargets, connectMatchEdge, connectPoolEdge, createLayoutWriteQueue, crossedDragThreshold, disconnectEdge, dragDisplacement, draggedLayout, intentTargets, marqueeNodes, nodeDragScrollLock, planFitViewport, planNodeReveal, reconcileRuleLayout, reconnectEdge, restoreCanvasViewport, translateNodes, validLayout } from "./model/canvas";
 import type { ConnectionIntent, ConnectionReason, RuleLayoutMutation } from "./model/canvas";
@@ -560,7 +561,8 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     };
     requestAnimationFrame(() => requestAnimationFrame(fitPageScroll));
   };
-  const edgeDescription = (edge: WorkflowEdge) => `${nodes.find((node) => node.id === edge.from)?.text ?? edge.from} · ${edge.kind === "context" ? t("questions") : edge.kind === "failure" ? t("canvasQuestionFailure") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} → ${nodes.find((node) => node.id === edge.to)?.text ?? edge.to}`;
+  const defaultPath = t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true }));
+  const edgeDescription = (edge: WorkflowEdge) => `${nodes.find((node) => node.id === edge.from)?.text ?? edge.from} · ${edge.kind === "default" ? defaultPath : edge.kind === "context" ? t("questions") : edge.kind === "failure" ? t("canvasQuestionFailure") : edge.kind === "match" ? t("match") : edge.kind === "unmatched" ? t("unmatched") : t("modelPool")} → ${nodes.find((node) => node.id === edge.to)?.text ?? edge.to}`;
   const outputDescription = ({ from, output }: VisualOutput) => {
     const source = nodes.find((node) => node.id === from)?.text ?? from;
     const destination = output.edge?.to;
@@ -642,12 +644,13 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
             const path = `M ${sx} ${sy} C ${sx + 70} ${sy}, ${tx - 70} ${ty}, ${tx} ${ty}`;
             const chosen = activeConnection?.visual?.from === edge.from && activeConnection.visual.output.id === output.id;
             return <g key={`${edge.from}:${output.id}`}>
-              <path d={path} fill="none" stroke={chosen ? "var(--accent)" : "currentColor"} strokeWidth={chosen ? 3 : 2} strokeDasharray={edge.kind === "unmatched" ? "6 5" : undefined} markerEnd="url(#canvas-arrow)" />
-              <path data-canvas-edge={JSON.stringify([edge.from, output.id, edge.to])} data-edge-kind={edge.kind} data-edge-from={edge.from} data-edge-to={edge.to}
+              <path data-workflow-edge={edge.kind} d={path} fill="none" stroke={chosen ? "var(--accent)" : "currentColor"} strokeWidth={chosen ? 3 : 2} strokeDasharray={edge.kind === "unmatched" || edge.kind === "default" ? "6 5" : undefined} markerEnd="url(#canvas-arrow)" />
+              {edge.kind === "default" && <text x={(sx + tx) / 2} y={(sy + ty) / 2 - 8} className="fill-ink-muted text-xs" pointerEvents="none">{defaultPath}</text>}
+              {edge.kind !== "default" && <path data-canvas-edge={JSON.stringify([edge.from, output.id, edge.to])} data-edge-kind={edge.kind} data-edge-from={edge.from} data-edge-to={edge.to}
                 d={path} fill="none" stroke="transparent" strokeWidth="16" className="cursor-pointer [pointer-events:stroke] focus-visible:stroke-primary/30" role="button" tabIndex={0}
                 aria-label={`${t("canvasSelectConnection")}: ${outputName(output)} · ${edgeDescription(edge)}`} aria-pressed={chosen}
                 onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (tool === "select") openConnection(output.intent, event.currentTarget, { from: edge.from, output }); }}
-                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openConnection(output.intent, event.currentTarget, { from: edge.from, output }); } }} />
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openConnection(output.intent, event.currentTarget, { from: edge.from, output }); } }} />}
             </g>;
           })}
           {edgePointer && <circle cx={edgePointer.x} cy={edgePointer.y} r="7" className="canvas-edge-preview pointer-events-none fill-primary opacity-75" />}
@@ -684,7 +687,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
           return <div key={`ports-${id}`} className={`pointer-events-none absolute ${draggingNodes.includes(id) ? "z-[5]" : "z-[2]"}`} style={{ left: at.x, top: at.y }}>
             {id !== "questions" && <span className="absolute w-7 whitespace-nowrap text-right text-[9px] leading-3 text-ink-muted" style={{ left: -42, top: input.y - 6 }}>{t("canvasInput")}</span>}
             {id !== "questions" && <button type="button" data-canvas-input={id} className="absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary bg-panel p-0 [pointer-events:auto] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" style={{ left: -9, top: input.y - 9 }} aria-label={`${t("canvasInput")}: ${text}`} title={`${t("canvasInput")}: ${text}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => { if (intent) applyIntent(intent, id); else selectNode(id); }}>‹</button>}
-            {rows.map((output, index) => { const port = nodeCardPorts(rows.length)[index]!; return <button key={output.id} type="button" data-canvas-output={output.id} data-output-node={id} data-output-kind={output.kind} data-output-connected={!!output.edge}
+            {rows.map((output, index) => { const port = nodeCardPorts(rows.length)[index]!; if (output.kind === "default") return null; return <button key={output.id} type="button" data-canvas-output={output.id} data-output-node={id} data-output-kind={output.kind} data-output-connected={!!output.edge}
               className={`canvas-edge-handle absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary p-0 text-[11px] [pointer-events:auto] [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${output.edge ? "bg-primary text-primary-foreground" : "bg-panel text-primary"}`}
               style={{ left: port.x - 9, top: port.y - 9 }} aria-label={`${t("canvasOutput")}: ${text} · ${outputName(output)}`} title={`${t("canvasOutput")}: ${outputName(output)}`}
               onClick={(event) => { if (event.detail === 0) openConnection(output.intent, event.currentTarget, { from: id, output }); }}

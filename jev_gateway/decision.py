@@ -35,6 +35,7 @@ from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.request_facts import RequestFacts, extract_request_facts
 from jev_gateway.strategy import (
     RoutingRequest,
+    SetupIncompleteError,
     StrategyContractError,
     StrategyRegistry,
     UnknownStrategyError,
@@ -44,6 +45,7 @@ __all__ = [
     "Decision",
     "RoutingEngine",
     "UnknownModelError",
+    "SetupIncompleteError",
     "UnknownStrategyError",
 ]
 
@@ -78,6 +80,7 @@ class Decision:
     reasoning_effort_source: str
     candidates: tuple[str, ...]
     created_at: float
+    defaulted: bool = False
 
     @property
     def label(self) -> str:
@@ -95,6 +98,7 @@ class Decision:
             "model": self.model,
             "label": self.label,
             "tier": self.tier,
+            "defaulted": self.defaulted,
             "reason": self.reason,
             "mode": self.mode,
             "turn_index": self.turn_index,
@@ -205,6 +209,8 @@ class RoutingEngine:
         reasoning_effort: str | None = None,
     ) -> Decision:
         """Route one request, using the stored session when one exists."""
+        if not self.catalog.profiles:
+            raise SetupIncompleteError("Configure a provider and model before sending requests.")
         strategy_impl = self.strategies.resolve(strategy)
         facts = extract_request_facts(
             messages,
@@ -238,7 +244,8 @@ class RoutingEngine:
                 f"{outcome.model!r}."
             )
         effort, effort_source = self._reasoning_choice(
-            strategy_impl, facts, profile, reasoning_effort, outcome.tier
+            strategy_impl, facts, profile, reasoning_effort, outcome.tier,
+            defaulted=outcome.defaulted,
         )
         decision = self._build(
             request_id=request_id,
@@ -246,6 +253,7 @@ class RoutingEngine:
             session_id=session_id,
             profile=profile,
             outcome_tier=outcome.tier,
+            defaulted=outcome.defaulted,
             reason=outcome.reason,
             mode=outcome.mode,
             turn_index=facts.turn_index,
@@ -273,6 +281,8 @@ class RoutingEngine:
         reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Return the routing answer for a request without mutating any state."""
+        if not self.catalog.profiles:
+            raise SetupIncompleteError("Configure a provider and model before sending requests.")
         strategy_impl = self.strategies.resolve(strategy)
         facts = extract_request_facts(
             messages,
@@ -305,7 +315,8 @@ class RoutingEngine:
                 f"{outcome.model!r}."
             )
         effort, effort_source = self._reasoning_choice(
-            strategy_impl, facts, profile, reasoning_effort, outcome.tier
+            strategy_impl, facts, profile, reasoning_effort, outcome.tier,
+            defaulted=outcome.defaulted,
         )
         return {
             "strategy": strategy_impl.name,
@@ -315,6 +326,7 @@ class RoutingEngine:
             "upstream_model": profile.model,
             "label": outcome.tier,
             "tier": outcome.tier,
+            "defaulted": outcome.defaulted,
             "reason": outcome.reason,
             "mode": outcome.mode,
             "switched_from": outcome.switched_from,
@@ -512,7 +524,7 @@ class RoutingEngine:
             reasoning_effort=decision.reasoning_effort,
             reasoning_effort_source=decision.reasoning_effort_source,
             candidates=decision.candidates,
-            signals={},
+            signals={"defaulted": decision.defaulted},
             created_at=decision.created_at,
         )
         self._store(lambda: self.record_store.record_decision(record), "decision")
@@ -524,6 +536,8 @@ class RoutingEngine:
         profile: ModelProfile,
         requested: str | None,
         tier: str,
+        *,
+        defaulted: bool = False,
     ) -> tuple[str | None, str]:
         """Pick the thinking level for the model that was just selected.
 
@@ -540,7 +554,10 @@ class RoutingEngine:
         policy = getattr(strategy_impl, "policy", None)
         reasoning = policy.reasoning if policy is not None else self.catalog.policy.reasoning
         active_policy = policy if policy is not None else self.catalog.policy
-        configured = active_policy.labels.get(tier)
+        configured = active_policy.labels.get(tier) if not defaulted else None
+        if defaulted:
+            from dataclasses import replace
+            reasoning = replace(reasoning, effort_by_label={}, effort_by_tier={})
         if configured is not None and configured.reasoning_effort is not None:
             from dataclasses import replace
             reasoning = replace(reasoning, effort_by_label={
@@ -564,6 +581,7 @@ class RoutingEngine:
         session_id: str | None,
         profile: ModelProfile,
         outcome_tier: str,
+        defaulted: bool,
         reason: str,
         mode: str,
         turn_index: int,
@@ -583,6 +601,7 @@ class RoutingEngine:
             model=profile.model,
             api_base=profile.api_base,
             tier=outcome_tier,
+            defaulted=defaulted,
             reason=reason,
             mode=mode,
             turn_index=turn_index,
@@ -605,6 +624,7 @@ class RoutingEngine:
                 session_id=decision.session_id or "",
                 route=decision.route_name,
                 tier=decision.tier,
+                defaulted=decision.defaulted,
                 created_at=now,
                 updated_at=now,
                 switched_at=now,
@@ -621,12 +641,14 @@ class RoutingEngine:
                         "from": decision.switched_from,
                         "to": decision.route_name,
                         "reason": decision.reason,
+                        "defaulted": decision.defaulted,
                         "turn": decision.turn_index,
                         "decision_id": decision.decision_id,
                     }
                 )
             state.route = decision.route_name
             state.tier = decision.tier
+            state.defaulted = decision.defaulted
             state.strategy = decision.strategy
             state.turn_count = max(state.turn_count, decision.turn_index, 1)
             state.updated_at = now
@@ -635,6 +657,7 @@ class RoutingEngine:
                     "type": "decision",
                     "route": decision.route_name,
                     "tier": decision.tier,
+                    "defaulted": decision.defaulted,
                     "strategy": decision.strategy,
                     "reason": decision.reason,
                     "mode": decision.mode,

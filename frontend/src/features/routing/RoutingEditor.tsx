@@ -29,6 +29,8 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, GripVertical, X } from "luc
 
 import { api } from "@/shared/api/client";
 import { useLocale } from "@/shared/i18n";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
+import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 import ConfiguredRouteFlow from "./ConfiguredRouteFlow";
 import RoutingCanvas from "./RoutingCanvas";
 import { canvasAvailableRect, changeLabelMembership, handoffInspectorFocus, inspectorFallbackPosition, inspectorPosition, pageViewport, reconcileRuleSelection, visibleCanvasRect } from "./model/canvas";
@@ -95,7 +97,7 @@ function WorkflowConnection({ edge, target, onSelect }: { edge: WorkflowEdge; ta
   const { t } = useTranslation();
   return <Button variant="outline" size="sm" className={`workflow-connection min-h-9 whitespace-normal text-left ${edge.kind === "unmatched" ? "[&>svg>path]:[stroke-dasharray:4_4]" : ""}`} onClick={() => onSelect(edge.to)}>
     <svg viewBox="0 0 36 24" width="36" height="24" aria-hidden="true"><path d="M2 12 H30 M25 7 L31 12 L25 17" className={edge.kind === "unmatched" ? "[stroke-dasharray:4_4]" : ""} fill="none" stroke="currentColor" strokeWidth="2" /></svg>
-    <span>{edge.kind === "pool" ? t("modelPool") : edge.kind === "match" ? t("match") : t("unmatched")}: {target}</span>
+    <span>{edge.kind === "default" ? t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true })) : edge.kind === "pool" ? t("modelPool") : edge.kind === "match" ? t("match") : t("unmatched")}: {target}</span>
   </Button>;
 }
 
@@ -105,7 +107,7 @@ function ChoiceFields({ choice, labels, selections, onChoice }: {
 }) {
   const { t } = useTranslation();
   return <>
-    <label>{t("label")}<select value={choice.label ?? ""} onChange={(event) => onChoice({ label: event.target.value })}>
+    <label>{t("label")}<select value={matrixChoiceLabel(choice, labels[0]?.name) ?? ""} onChange={(event) => onChoice({ label: event.target.value })}>
       <option value="">{t("unboundLabel")}</option>{labels.map((label) => <option key={label.name} value={label.name}>{label.name}</option>)}
     </select></label>
     <label>{t("selection")}<select value={choice.selection ?? ""} onChange={(event) => onChoice({ selection: event.target.value || undefined })}>
@@ -159,7 +161,7 @@ function RuleRow({
       <label>
         {t("label")}
         <select
-          value={rule.select.label ?? ""}
+          value={matrixChoiceLabel(rule.select, labels[0]?.name) ?? ""}
           disabled={disabled}
           onChange={(event) => onChoice({ label: event.target.value })}
         >
@@ -434,9 +436,8 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const editDisabled = writeDisabled || busy || review !== null || resetReview;
   const edges = workflowEdges(draft, config);
   const addableQuestions = Object.entries(draft.questions).filter(([, question]) => Object.keys(question.criteria).length > 0);
-  const addableLabels = config.labels.filter((label) => label.resolution === "models"
-    ? label.models.some((id) => Object.hasOwn(draft.models, id))
-    : config.models.some((model) => draft.models[model.id]?.tags.includes(label.tag)));
+  const addableLabels = config.labels.filter((label) => label.resolution === "tag" ||
+    label.models.some((id) => Object.hasOwn(draft.models, id)));
   // Future AI proposal composition belongs at this boundary: a proposal must enter
   // the ordinary draft, validation, review and explicit apply flow. No prompt UI or payload exists here.
   const selectedRuleIndex = selectedNode.startsWith("rule-") ? Number(selectedNode.slice(5)) : -1;
@@ -557,6 +558,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   }, [onError, onReloaded, t, writeDisabled, busy, resetReview]);
 
   const heading = <>
+      {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
       <header className="workspace-heading flex flex-wrap items-center justify-between gap-2"><div><span className="meta text-xs text-ink-muted">{t("routingWorkflow")}</span><h2 className="text-[17px] font-semibold text-ink">{t("configuration")}</h2></div><span className="workspace-status rounded-md border border-outline bg-panel-muted px-2 py-1 text-xs text-ink-muted" role="status" data-policy-draft={diff.changed ? "pending" : "unchanged"}>{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span></header>
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {incomplete && <div className="notice warn" role="status">{t("canvasIncompleteDraft")}</div>}
@@ -633,7 +635,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
           <Button variant="outline" className={actionButtonClass} type="button" ref={drawerToggleRef} aria-expanded={infoOpen} aria-controls="routing-information" onClick={() => setInfoOpen(!infoOpen)}><span><span className="inline-flex w-[7px] items-center justify-center align-middle">{infoOpen ? <ChevronDown aria-hidden="true" focusable="false" /> : <ChevronUp aria-hidden="true" focusable="false" />}</span> {t("canvasInformation")}</span></Button>
           <span className="meta text-xs text-ink-muted" role="status">{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span>
         </div>
-      <div id="routing-information" className="workflow-info space-y-3 p-3 text-ink" ref={drawerBodyRef} hidden={!infoOpen}>
+      <div id="routing-information" className="workflow-info col-start-1 row-start-2 min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain p-3 text-ink max-[600px]:col-span-2" ref={drawerBodyRef} hidden={!infoOpen}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-ink-muted" role="status"><span className={`rounded-md border border-outline bg-panel-muted px-2 py-1 ${diff.changed ? "font-semibold text-primary" : ""}`} data-policy-draft={diff.changed ? "pending" : "unchanged"}>{t("reviewChanges")}: {diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span><span className="rounded-md border border-outline bg-panel-muted px-2 py-1">{t("canvasLayoutOnly")}</span></div>
         {canvasInformation}
         <ConfiguredRouteFlow draft={draft} config={config} locale={locale} />
@@ -733,7 +735,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
             <DropZone
               key={label.tag}
               id={zoneId(label.tag)}
-              title={tr("labelScore", { label: label.name, score: String(label.score) })}
+              title={Number.isFinite(label.score) ? tr("labelScore", { label: label.name, score: String(label.score) }) : label.name}
               subtitle={
                 label.resolution === "models"
                   ? t("explicitModelsReadOnly")

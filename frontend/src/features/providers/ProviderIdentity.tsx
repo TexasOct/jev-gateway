@@ -2,13 +2,17 @@ import { CircuitBoard, Cloud, Globe, Server } from "lucide-react";
 import { useState } from "react";
 import type { ProviderProfile } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
-import deepseekLogo from "./assets/deepseek.svg";
+import { brandIcon, resolvedIconID } from "./icons";
 
-export function ProviderIdentity({ provider, t }: { provider: ProviderProfile; t: ReturnType<typeof useLocale>["t"] }) {
-  const [failedAsset, setFailedAsset] = useState(false);
-  const official = !failedAsset && (provider.icon_id === "deepseek" || (provider.brand_id === "deepseek" && !provider.icon_id));
-  const Icon = { server: Server, cloud: Cloud, circuit: CircuitBoard, globe: Globe }[provider.icon_id as "server" | "cloud" | "circuit" | "globe"];
-  return <span title={official ? "DeepSeek" : t("pmFallback")} className={`grid h-11 w-24 shrink-0 place-items-center rounded-md border border-outline text-sm text-ink ${official ? "bg-white" : "bg-panel-muted"}`} aria-hidden="true">
-    {official ? <img src={deepseekLogo} alt="" className="h-auto max-h-8 w-22 object-contain" onError={() => setFailedAsset(true)} /> : Icon ? <Icon size={20} aria-hidden="true" focusable="false" /> : (provider.display_name || provider.id).slice(0, 2).toUpperCase()}
+const genericIconComponents = { server: Server, cloud: Cloud, circuit: CircuitBoard, globe: Globe };
+
+export function ProviderIdentity({ provider, t, compact = false }: { provider: ProviderProfile; t: ReturnType<typeof useLocale>["t"]; compact?: boolean }) {
+  const [failedURL, setFailedURL] = useState<string | null>(null);
+  const id = resolvedIconID(provider);
+  const brand = brandIcon(id);
+  const image = brand && failedURL !== brand.url ? brand : undefined;
+  const Icon = id !== null && Object.hasOwn(genericIconComponents, id) ? genericIconComponents[id as keyof typeof genericIconComponents] : undefined;
+  return <span title={image ? image.label : t("pmFallback")} data-provider-icon={id ?? "automatic"} className={`grid h-11 shrink-0 place-items-center rounded-md border border-outline text-sm text-ink ${compact ? "w-14" : "w-24"} ${image ? "bg-white" : "bg-panel-muted"}`} aria-hidden="true">
+    {image ? <img key={image.url} src={image.url} alt="" className={`object-contain ${image.id === "deepseek" ? `h-auto max-h-8 ${compact ? "w-12" : "w-22"}` : "h-8 w-8"} ${image.id === "kimi" ? "drop-shadow-[0_0_1px_#111]" : ""}`} onError={() => setFailedURL(image.url)} /> : Icon ? <Icon size={20} aria-hidden="true" focusable="false" /> : (provider.display_name || provider.id).slice(0, 2).toUpperCase()}
   </span>;
 }

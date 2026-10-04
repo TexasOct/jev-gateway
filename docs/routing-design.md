@@ -65,8 +65,10 @@ them in the policy response. Every model requires `provider` and
 as complete strings. The default strategy label `deep` resolves `task_aware/deep`;
 strategy `quality` label `critical` resolves `quality/critical`. A label can set
 `tag` to override that convention. The loader rejects duplicate provider IDs,
-duplicate canonical model IDs, missing provider references, labels whose tag
-matches no model, malformed tags, and literal `api_key` fields.
+duplicate canonical model IDs, missing provider references, unknown explicit
+model references, malformed tags, and literal `api_key` fields. Empty catalogs
+and unassigned tag-based label pools are valid editable states. They let an
+operator start the console before adding suppliers and models.
 
 ## Selection
 
@@ -81,6 +83,15 @@ output capacity. The remaining models are ranked by `policy.selection`:
 If no model in the label can satisfy a hard constraint, JEV widens the search to
 the complete model catalog. The decision reports the actual selected model label
 when a widened fallback selects a model configured for another label.
+
+An empty matched tag uses exactly `defaults.default_model` when configured,
+independently of strategy ranking preferences. It reports final label `default`
+and `defaulted: true`, retaining matched-rule and escalation evidence in its
+reason. Ordinary selections, including a populated literal `default` label,
+report `defaulted: false`. A missing global model produces `setup_incomplete`
+only when the empty-pool fallback is needed. Configured-path views show this
+inherited destination separately from tag members; saving a path does not assign
+the global model to its empty tag.
 
 This permits both same-provider selection, such as choosing a faster and a
 stronger model from one proxy, and cross-provider fallback, such as switching
@@ -104,7 +115,13 @@ while it is still comparing candidates. The strategy contract therefore does not
 change: `StrategyOutcome` still returns a model, and a custom strategy gets a
 sensible level for whichever model it picked without doing anything.
 
-The engine derives effort from the committed routing label using the configured label mapping or fallback, then clamps it into the selected model's ladder. The committed label is also what the client sees in `X-JEV-Route-Label` (`X-JEV-Task-Type` remains an alias). A model with no declared ladder is left alone.
+The engine derives ordinary selection effort from the committed routing label
+using its configured mapping or fallback, then clamps it into the selected
+model's ladder. A global-default selection derives effort from
+`policy.reasoning.fallback`; it does not use an ordinary literal `default` label's
+effort mappings. The committed label is also what the client sees in
+`X-JEV-Route-Label` (`X-JEV-Task-Type` remains an alias). A model with no declared
+ladder is left alone.
 
 `policy.reasoning.mode` decides what happens to a level the client sent itself.
 `override` replaces it, `cap` lowers but never raises it, `fill` speaks only when
@@ -161,9 +178,10 @@ A strategy is the unit that owns the selection rules above. `PolicyStrategy` is
 the built-in implementation; it wraps one complete `RoutingPolicy` and answers
 one question per request: which catalog model serves this turn.
 
-The top-level `policy` block contains fields inherited by every strategy.
-`strategies.task_aware` is required and is the default virtual model. The same
-object may define any number of sibling model-routing strategies:
+An optional top-level `policy` block supplies inherited policy fields. The
+packaged template defines complete policies under `strategies.definitions` and
+sets `strategies.default` to `task_aware`. The direct strategy-map form below
+is also supported when a valid top-level policy supplies the inherited fields:
 
 ```json
 {
@@ -288,47 +306,23 @@ reload endpoint.
 
 ## The shipped `task_aware` table
 
-The repository's `task_aware` strategy asks a decision provider three questions: `workload`
-(research, docs, small_change, coding, reverse), `scale` (bounded, moderate,
-large, cross_domain), and `rigor` (draft, exacting). Nine ordered rules map those
-answers onto seven labels:
+The packaged `task_aware` plan defines three questions: `workload` (research,
+docs, small_change, coding, reverse), `scale` (bounded, moderate, large,
+cross_domain), and `rigor` (draft, exacting). Seven ordered rules map answers
+onto five labels. Provider instances and models are configured separately.
 
-| Label | Reached when | Pool | Effort |
+| Label | Reached when | Selection | Effort |
 | --- | --- | --- | --- |
-| `quick` | `small_change` at `bounded` scale with `draft` rigor | `deepseek-flash` | `minimal` |
-| `draft` | `research`, `docs`, or `small_change` at `draft` rigor, when no earlier rule claims it | `gpt-6-luna`, dropping to `deepseek-flash` only when the request needs more output than Luna's ceiling | `low` |
-| `review` | `docs` or `small_change` at `exacting` rigor | `gpt-6-luna`, dropping to `deepseek-flash` only when the request needs more output than Luna's ceiling | `medium` |
-| `investigate` | `research` at `exacting` rigor | `deepseek-flash` | `high` |
-| `craft` | `coding` the rules above did not claim: not `large` or `cross_domain` scale, and not moderate at `exacting` rigor | `gpt-6-luna` | `medium` |
-| `engineering` | `reverse`; or `coding` at `large` scale, or at moderate scale with `exacting` rigor | `gpt-6-sol`, with `gpt-6-luna` as the constraint fallback | `high` |
-| `ultra` | `cross_domain` scale with a `coding` or `reverse` workload | `gpt-6-astra` | `xhigh` |
+| `draft` | Coding below earlier rules, or research/docs/small_change with draft rigor | `cheapest_adequate` | `low` |
+| `review` | Research/docs/small_change with exacting rigor; also the configured fallback | `cheapest_adequate` | `medium` |
+| `craft` | Coding with exacting rigor below the large/cross-domain rules | `cheapest_adequate` | `medium` |
+| `engineering` | Reverse engineering, or coding at large scale | `quality_first` | `high` |
+| `ultra` | Cross-domain coding or reverse engineering | `quality_first` | `xhigh` |
 
-Pool membership decides the model, not a quality threshold: `cheapest_adequate`
-picks the cheapest member that fits the request's context and output limits. Luna
-costs less than `deepseek-flash` and scores higher, so wherever the two share a
-pool Luna wins outright. DeepSeek keeps the two pools Luna is not in — bounded
-draft-level edits (`quick`) and exacting investigation (`investigate`). Luna takes
-documentation, review, and the coding that ships without being large. Sol takes
-large coding and reverse engineering. `ultra` is reachable only from the
-cross-domain rule, so a hard single-domain task stays on Sol however large it is.
-
-Rule 1 also requires a `coding` or `reverse` workload, so researching or
-documenting a cross-domain subject stays in the everyday pools instead of being
-promoted by the topic alone.
-
-`gpt-5.6-terra` carries no `task_aware` tag. It remains in the `quality/analysis`
-pool only for compatibility. The GPT-6 family has no Terra tier, and returning
-this old route to a task-aware pool would let it compete with Luna on cost.
-
-### Reserving Astra
-
-The configured provider serves `gpt-6`, `gpt-6-astra`, `gpt-6-sol`, and
-`gpt-6-luna`, although its collection endpoint currently omits the GPT-6 aliases.
-The catalog therefore records the explicit aliases, not the incomplete list.
-
-Astra has only the `task_aware/ultra` tag. `ultra` selects with `quality_first`,
-but no everyday label includes that tag. Only rule 1, which requires a
-cross-domain coding or reverse-engineering workload, can select Astra.
+Assign imported models to pools using tags such as `task_aware/review` in the
+strategy editor. The shipped pools are empty. Decision providers are optional;
+until one is configured and enabled, the matrix uses its `review` fallback.
+The `quality` and `economy` plans are also retained with empty pools.
 
 ## Sessions and observability
 
@@ -404,6 +398,15 @@ it never changes the gateway response. A successful enqueue does **not**
 guarantee the record survived a crash. Later worker failures appear in
 `/healthz` under `storage.error`, and subsequent submissions are dropped.
 Stream outcomes are enqueued after the stream ends under the same rule.
+
+Successful streams retain the observed finish reason, reported token counts and
+provider-native returned model before applying the client-facing model echo.
+Success requires SDK iterator exhaustion, a finish reason and delivery of the
+terminal ASGI body frame. Only then does the provider adapter finalize assistant
+continuation capture. SDK errors, incomplete streams, client disconnects and
+failed delivery record unsuccessful outcomes and no completed continuation.
+Usage-only final chunks preserve an earlier finish reason. Stream resources and
+activity tracking close on success and failure.
 
 Upstream errors return a fixed `502` message (`Upstream provider request failed.`)
 with `error.code: upstream_error` and a bounded exception `error.type`. The

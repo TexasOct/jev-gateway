@@ -6,6 +6,7 @@ export interface RegisteredStrategy {
   description?: string | null;
   kind?: string;
   policy?: Record<string, unknown>;
+  options?: Record<string, unknown>;
 }
 
 export interface StrategiesPayload {

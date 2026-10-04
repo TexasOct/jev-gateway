@@ -88,6 +88,31 @@ The managed background server records its PID under `run/gateway.pid` and output
 
 ## Configuration
 
+Fresh defaults contain strategy plans without providers or models. Start the
+service and use the local dashboard initialization form, or set the initial
+management key through the CLI:
+
+```sh
+jev setup
+jev setup --secret-env GATEWAY_KEY_INPUT
+printf '%s\n' "$KEY" | jev setup --secret-stdin
+```
+
+The interactive command uses a no-echo prompt. Noninteractive use requires an
+explicit secret source; the key is never an argument or command result. Setup
+stores its reference in `gateway.api_key_env` and its value in the protected
+runtime `credentials.json`. An existing declared reference keeps its name;
+setup uses the managed credential owner's default when no reference is declared.
+It preserves existing configuration and cannot replace an effective management
+key. If a declared gateway reference has no effective value, CLI setup can repair
+that reference. Runtime startup and reload still reject a missing declared gateway
+key; they cannot silently disable authentication. Providers and models may be configured later.
+If the service is already running when CLI setup writes the files, run
+`jev config reload` to activate the key before connecting to the dashboard.
+New management keys must contain 16 to 8192 visible ASCII characters without
+whitespace. This keeps the saved value valid in browser Authorization
+headers. Existing credential files retain their original bytes and key parsing.
+
 ```sh
 jev config path
 jev config show
@@ -95,7 +120,15 @@ jev config validate
 jev config reload
 ```
 
-The CLI can write provider and model entries. Policy, strategies, gateway, storage, and decision are read-only. Secret variables are displayed by name and presence only.
+The CLI can write provider and model entries. Initial setup also establishes the
+gateway key reference. The dashboard edits routing strategies and the global
+default model, and supports gateway key replacement. Host, port, storage and
+other runtime settings are edited in the configuration file. Credential references
+are displayed by name and presence only. `jev config path` includes the neighboring
+credential file. [Credential configuration](credentials.md) covers local Dashboard
+setup and file configuration for servers. After file changes, `jev config reload` validates and
+activates configuration without reinstalling the service. Host/port and storage
+changes still require a process restart.
 
 ## Providers and credentials
 
@@ -105,9 +138,31 @@ Add official API-key providers by choosing model names explicitly:
 jev provider add openai --model gpt-model
 jev provider add anthropic --model claude-model
 jev provider add deepseek --model deepseek-model
+jev provider add gemini --model gemini-model
+jev provider add openrouter --model vendor/model
 jev provider add custom --id my-endpoint --type openai \
   --api-base https://example.invalid/v1 --api-key-env MY_API_KEY --model model-name
 ```
+
+The CLI and dashboard share supplier presets for Chinese and international model
+vendors, aggregators, cloud platforms and local services. `jev provider add --help`
+lists every supported preset. Templates fill provider display/brand/icon fields
+alongside transport settings; they never select models or routing tags for you.
+
+Azure requires its resource endpoint through `--api-base`. Cloud templates can
+require project or region parameters. Use `--param NAME=VALUE` for non-secret
+completion settings (plain text or JSON), and `--param-env NAME=ENV` for an extra
+credential supplied by an explicitly named environment variable:
+
+```sh
+jev provider add vertex_ai --model model-name \
+  --param vertex_project=my-project --param vertex_location=us-central1 \
+  --param-env vertex_credentials=PROJECT_CREDENTIALS
+```
+
+Populate declared environment references before validation. Optional references
+are omitted unless supplied. Native local services do not require a fabricated
+API key; a supplied credential still requires an explicit `--api-key-env`.
 
 Use `--tag` one or more times to add the models to routing pools. Without tags, models remain manually selectable. To add credentials, supply an environment-variable name with `--secret-env NAME`, or use `--secret-stdin`; an interactive no-echo prompt is available on a terminal. The name is not a key value. There is no secret-valued command-line option.
 
@@ -120,7 +175,7 @@ jev provider logout openai
 jev provider list
 ```
 
-Login stores only the provider's declared key variable in the runtime `.env`, mode `0600`, and keeps the previous `.env` in `.env.backup` when rotating. Logout removes the variable from `.env` but does not revoke the upstream key, unset a parent-shell variable, or delete provider/model entries. Neither login nor add reads another CLI's account state.
+Login stores the provider's declared credential reference in the runtime `credentials.json`, mode `0600`, and retains the previous store in `credentials.json.backup`. Logout removes that reference from both the JSON store and legacy local `.env` assignments. It does not revoke the upstream key, unset a parent-shell variable, or delete provider/model entries. Existing `.env` values remain readable, with the JSON store taking precedence. Neither login nor add reads another CLI's account state.
 
 `jev provider remove ID` refuses providers with models unless `--force` is passed. Mutating commands accept `--dry-run`.
 
@@ -132,4 +187,4 @@ jev uninstall
 jev uninstall --purge --yes
 ```
 
-Normal uninstall removes the CLI and install state but preserves `models.json`, `.env`, and records. `--purge` removes the runtime directory and requires `--yes` for noninteractive execution. Review the dry-run plan first.
+Normal uninstall removes the CLI and install state but preserves `models.json`, `credentials.json`, `.env`, and records. `--purge` removes the runtime directory and requires `--yes` for noninteractive execution. Review the dry-run plan first.

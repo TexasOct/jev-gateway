@@ -155,10 +155,6 @@ def test_label_can_override_its_default_scoped_tag() -> None:
             "more than once",
         ),
         (lambda d: d["models"][0].update(tags=["default//quick"]), "segments"),
-        (
-            lambda d: d["models"][1].update(tags=["economy/expensive"]),
-            "no model declares",
-        ),
     ],
 )
 def test_invalid_scoped_tags(mutation, error: str) -> None:
@@ -168,6 +164,22 @@ def test_invalid_scoped_tags(mutation, error: str) -> None:
     mutation(document)
     with pytest.raises(ValueError, match=error):
         catalog_from_document(document, "tags")
+
+
+def test_unassigned_scoped_tag_pool_is_valid_incomplete_configuration() -> None:
+    document = tag_document()
+    document["models"][1]["tags"] = ["economy/expensive"]
+
+    catalog = catalog_from_document(document, "tags")
+    registry = StrategyRegistry.from_catalog(catalog)
+
+    assert registry.has("task_aware")
+    assert list(catalog.policy.labels) == ["quick", "deep"]
+    assert catalog.for_tier("deep") == []
+    assert [profile.name for profile in catalog.for_tier("quick")] == [SMALL_MODEL_ID]
+    large = catalog.by_name(LARGE_MODEL_ID)
+    assert large is not None
+    assert large.tags == ("economy/expensive",)
 
 
 def test_legacy_tiers_still_load() -> None:
@@ -250,3 +262,41 @@ def test_old_session_label_recovers_and_reasoning_label_wins() -> None:
     direct = engine.decide(messages=turns("audit security architecture"))
     assert direct.label == "quick"
     assert direct.reasoning_effort is None
+
+
+@pytest.mark.parametrize("mode", ["sticky", "cached", "escalate"])
+def test_default_session_keeps_its_model_and_label(mode: str) -> None:
+    document = custom_document()
+    document["policy"]["mode"] = mode
+    catalog = catalog_from_document(document, "default session")
+    strategy = StrategyRegistry.from_catalog(catalog).get("task_aware")
+    session = SessionState(
+        "default-session", LARGE_MODEL_ID, "default",
+        created_at=0, updated_at=0, switched_at=0,
+    )
+    outcome = strategy.decide(
+        RoutingRequest(extract_facts(turns("hello")), session, None, 2, 1), catalog
+    )
+
+    assert outcome.model == LARGE_MODEL_ID
+    assert outcome.tier == "default"
+    assert outcome.reason == ("session_sticky" if mode == "escalate" else "session_pinned")
+    assert outcome.switched_from is None
+
+
+def test_fresh_default_session_can_return_to_a_populated_label() -> None:
+    document = custom_document()
+    document["policy"]["mode"] = "fresh"
+    catalog = catalog_from_document(document, "fresh default session")
+    strategy = StrategyRegistry.from_catalog(catalog).get("task_aware")
+    session = SessionState(
+        "default-session", SMALL_MODEL_ID, "default",
+        created_at=0, updated_at=0, switched_at=0,
+    )
+    facts = replace(extract_facts(turns("hello")), route_label="work")
+    outcome = strategy.decide(RoutingRequest(facts, session, None, 2, 1), catalog)
+
+    assert outcome.model == SMALL_MODEL_ID
+    assert outcome.tier == "work"
+    assert outcome.reason == "per_turn_policy"
+    assert outcome.switched_from is None

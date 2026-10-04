@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Package ownership and full quality gates."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Shared presets, display fields, transaction and credential contracts."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Frontend theme, component, assets, CSP and packaging contracts."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Types, test isolation and verification."}
+{"file":".trellis/tasks/archive/2026-10/10-04-provider-icon-presets/research/icon-assets.md","reason":"Source-backed local logo plan and explicit icon compatibility."}

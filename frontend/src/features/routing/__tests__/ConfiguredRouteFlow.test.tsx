@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ConfigurationPayload, LabelRow, ModelRow } from "@/shared/api/types";
-import { draftFromConfiguration, setLabelMembership } from "../model/draft";
+import { diffSummary, draftFromConfiguration, setLabelMembership, toOverlayPayload, workflowEdges } from "../model/draft";
+import { classifyConnection, compatibleTargets, disconnectPoolEdge, reconnectEdge } from "../model/canvas";
 import { projectConfiguredRouteFlow } from "../model/configured-route-flow";
 import ConfiguredRouteFlow from "../ConfiguredRouteFlow";
 
@@ -28,6 +29,75 @@ function configuration(): ConfigurationPayload {
 }
 
 describe("configured policy projection", () => {
+  it("traces selection-only rules and empty fallback through the implicit first label without materializing choices", () => {
+    const config = configuration();
+    config.defaults = { default_model: "p/other" };
+    config.labels = [label("missing", "route/missing")];
+    config.rules = [{ index: 0, when: { intent: "code" }, select: { selection: "quality_first" } }];
+    config.fallback = {};
+    const draft = draftFromConfiguration(config);
+    const original = JSON.stringify({ draft, config });
+    const view = projectConfiguredRouteFlow(draft, config);
+    for (const branch of view.branches) {
+      expect(branch).toMatchObject({ label: "missing", poolId: "zone::route/missing", models: ["p/other"], defaulted: true });
+      expect(branch.path.map((edge) => edge.kind)).toContain(branch.kind === "default" ? "unmatched" : "match");
+      expect(branch.path.map((edge) => edge.kind)).toContain("default");
+    }
+    expect(view.branches[0]?.selection).toBe("quality_first");
+    expect(view.changed).toBe(false);
+    const payload = toOverlayPayload(draft, config);
+    expect(payload.rules[0]?.select).toEqual({ selection: "quality_first" });
+    expect(payload.fallback).toEqual({});
+    expect(payload.models).toEqual({});
+    expect(payload).not.toHaveProperty("defaults");
+    expect(JSON.stringify({ draft, config })).toBe(original);
+    const cleared = projectConfiguredRouteFlow(draft, { ...config, defaults: { default_model: null } });
+    for (const branch of cleared.branches) expect(branch).toMatchObject({ label: "missing", models: [], defaulted: false, incomplete: true });
+  });
+
+  it("keeps the legacy tier alias in read-only match and branch resolution", () => {
+    const config = configuration();
+    const legacyChoice = { tier: "coding", selection: "balanced" as const };
+    config.rules = [{ index: 0, when: { intent: "code" }, select: legacyChoice }];
+    const draft = draftFromConfiguration(config);
+    expect(projectConfiguredRouteFlow(draft, config).branches[0]).toMatchObject({ label: "coding", models: ["p/static"], poolId: "zone::route/coding" });
+    expect(toOverlayPayload(draft, config).rules[0]?.select).toEqual(legacyChoice);
+    expect(diffSummary(draft, config).changed).toBe(false);
+  });
+
+  it("inherits an untagged global model only through a read-only default edge without dirtying or persisting membership", () => {
+    const config = configuration();
+    config.defaults = { default_model: "p/other" };
+    config.labels = [label("default", "route/default"), label("missing", "route/missing")];
+    config.models[0]!.tags = ["route/default"];
+    config.models[0]!.baseline_tags = ["route/default"];
+    config.rules = [{ index: 0, when: { intent: "code" }, select: { label: "missing" } }];
+    config.fallback = { label: "default" };
+    const draft = draftFromConfiguration(config);
+    const before = JSON.stringify({ draft, config });
+    const view = projectConfiguredRouteFlow(draft, config);
+    expect(view.branches[0]).toMatchObject({ label: "missing", models: ["p/other"], defaulted: true, incomplete: false });
+    expect(view.branches[1]).toMatchObject({ label: "default", models: ["p/writer"], defaulted: false });
+    const edge = workflowEdges(draft, config).find((entry) => entry.kind === "default")!;
+    expect(edge).toEqual({ from: "zone::route/missing", to: "model::p/other", kind: "default" });
+    expect(view.branches[0]?.path).toContainEqual(edge);
+    expect(classifyConnection(draft, config, { kind: "remove", edge }, edge.to)).toEqual({ operation: null, reason: "fixed" });
+    expect(reconnectEdge(draft, config, edge, "model::p/writer")).toBeNull();
+    expect(disconnectPoolEdge(draft, config, edge)).toBeNull();
+    expect(compatibleTargets(draft, config, edge)).toEqual([]);
+    expect(diffSummary(draft, config).changed).toBe(false);
+    const saved = toOverlayPayload(draft, config);
+    expect(saved.models).toEqual({});
+    expect(saved).not.toHaveProperty("defaults");
+    const reloaded = draftFromConfiguration({ ...config, rules: saved.rules.map((rule, index) => ({ ...rule, index })) });
+    expect(reloaded.models["p/other"]?.tags).toEqual([]);
+    expect(JSON.stringify({ draft, config })).toBe(before);
+    const cleared = { ...config, defaults: { default_model: null } };
+    expect(workflowEdges(draft, cleared).some((entry) => entry.kind === "default")).toBe(false);
+    expect(projectConfiguredRouteFlow(draft, cleared).branches[0]).toMatchObject({ models: [], defaulted: false, incomplete: true });
+    const assigned = setLabelMembership(draft, "p/static", "route/missing", true);
+    expect(projectConfiguredRouteFlow(assigned, config).branches[0]).toMatchObject({ models: ["p/static"], defaulted: false });
+  });
   it("keeps first-match order, unmatched chain, fallback and OR conditions", () => {
     const config = configuration();
     const view = projectConfiguredRouteFlow(draftFromConfiguration(config), config);
@@ -80,6 +150,40 @@ describe("configured policy projection", () => {
 });
 
 describe("configured route explanation markup", () => {
+  it.each(["rule-0", "default", "fallback"])("highlights only the selected branch's inherited wire when all share a pool (%s)", (selected) => {
+    const config = configuration();
+    config.defaults = { default_model: "p/other" };
+    config.labels = [label("missing", "route/missing")];
+    config.rules = [{ index: 0, when: { intent: "code" }, select: { selection: "quality_first" } }];
+    config.fallback = {};
+    const html = renderToStaticMarkup(<ConfiguredRouteFlow draft={draftFromConfiguration(config)} config={config} locale="en" reducedMotion initialSelectedBranchId={selected} />);
+    const inherited = [...html.matchAll(/<path[^>]*data-flow-kind="default"[^>]*>/g)].map(([path]) => path);
+    expect(inherited).toHaveLength(3);
+    expect(inherited.filter((path) => path.includes('data-flow-state="active"'))).toHaveLength(1);
+    expect(inherited.filter((path) => path.includes('data-flow-state="idle"'))).toHaveLength(2);
+  });
+
+  it.each(["en", "zh-CN"] as const)("shows final inherited default and matched rule evidence in %s", (locale) => {
+    const config = configuration();
+    config.defaults = { default_model: "p/other" };
+    config.labels = [label("default", "route/default"), label("missing", "route/missing")];
+    config.rules = [{ index: 0, when: { intent: "code" }, select: { label: "missing" } }];
+    config.fallback = { label: "default" };
+    config.models[0]!.tags = ["route/default"];
+    const draft = draftFromConfiguration(config);
+    const render = (payload: ConfigurationPayload) => renderToStaticMarkup(<ConfiguredRouteFlow draft={draft} config={payload} locale={locale} reducedMotion initialSelectedBranchId="rule-0" />);
+    const html = render(config);
+    expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 继承全局模型");
+    expect(html).toContain(locale === "en" ? "not a pool member" : "不是模型池成员");
+    expect(html).toContain("missing");
+    expect(html).toContain(">default</p>");
+    expect(html).toContain("p/other");
+    expect(html).toContain('data-flow-kind="default"');
+    const cleared = render({ ...config, defaults: { default_model: null } });
+    expect(cleared).not.toContain("p/other");
+    expect(cleared).not.toContain('data-flow-kind="default"');
+    expect(cleared).toContain(locale === "en" ? "Settings" : "通用设置");
+  });
   it("renders the whole selected path and text without animation for reduced motion", () => {
     const config = configuration();
     const html = renderToStaticMarkup(<ConfiguredRouteFlow draft={draftFromConfiguration(config)} config={config} locale="en" reducedMotion initialSelectedBranchId="default" />);

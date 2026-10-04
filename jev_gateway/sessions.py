@@ -48,6 +48,8 @@ class SessionState:
     # Provider adapters may retain bounded, opaque continuation metadata for the
     # life of this session. It is deliberately excluded from inspection output.
     adapter_state: dict[str, Any] = field(default_factory=dict, repr=False)
+    # None keeps legacy sessions distinguishable until their next decision.
+    defaulted: bool | None = None
 
     def record_event(self, event: dict[str, Any], *, limit: int = EVENT_LIMIT) -> None:
         """Append a decision or switch event, keeping only the newest entries."""
@@ -62,6 +64,7 @@ class SessionState:
             "route": self.route,
             "label": self.tier,
             "tier": self.tier,
+            **({"defaulted": self.defaulted} if self.defaulted is not None else {}),
             "strategy": self.strategy,
             "turn_count": self.turn_count,
             "switch_count": self.switch_count,

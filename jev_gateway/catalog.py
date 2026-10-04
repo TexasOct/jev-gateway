@@ -36,6 +36,7 @@ __all__ = [
     "SELECTION_MODES",
     "BudgetPolicy",
     "Catalog",
+    "CatalogDefaults",
     "DecisionProvider",
     "DecisionSettings",
     "EscalationPolicy",
@@ -53,6 +54,7 @@ __all__ = [
     "StrategyDefinition",
     "catalog_from_document",
     "decision_from_dict",
+    "defaults_from_dict",
     "load_catalog",
     "policy_from_dict",
     "profile_from_dict",
@@ -517,6 +519,17 @@ class StrategyDefinition:
 
 
 @dataclass(frozen=True)
+class CatalogDefaults:
+    """Shared model selection inherited by routing strategies."""
+
+    default_model: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        """Serialize the canonical model reference without connection secrets."""
+        return {"default_model": self.default_model}
+
+
+@dataclass(frozen=True)
 class Catalog:
     """The routable models plus the policy that picks between them."""
 
@@ -528,6 +541,7 @@ class Catalog:
     default_strategy: str = "task_aware"
     storage: StorageSettings = field(default_factory=StorageSettings)
     decision: DecisionSettings = field(default_factory=DecisionSettings)
+    defaults: CatalogDefaults = field(default_factory=CatalogDefaults)
 
     def by_name(self, name: str | None) -> ModelProfile | None:
         """Look up a model by its provider-qualified catalog id."""
@@ -566,9 +580,9 @@ class Catalog:
 
     def validate(self) -> None:
         """Reject configurations that cannot serve every configured tier."""
-        if not self.profiles:
-            raise ValueError("At least one model route is required.")
         names = {profile.name for profile in self.profiles}
+        if self.defaults.default_model is not None and self.defaults.default_model not in names:
+            raise ValueError("defaults.default_model must reference a configured canonical model id.")
         provider_names = {provider.name for provider in self.providers}
         if len(provider_names) != len(self.providers):
             raise ValueError("A provider is configured more than once.")
@@ -624,6 +638,7 @@ class Catalog:
             "strategies": [definition.as_dict() for definition in self.strategies],
             "storage": self.storage.as_dict(),
             "decision": self.decision.as_dict(),
+            "defaults": self.defaults.as_dict(),
             "providers": [provider.as_dict() for provider in self.providers],
             "models": [profile.as_dict() for profile in self.profiles],
         }
@@ -652,16 +667,9 @@ def _validate_policy(
                 f"{label} labels[{name!r}] references unknown model ids: "
                 f"{', '.join(unknown_models)}."
             )
-        tag = route.tag or f"{strategy_name}/{name}"
-        tagged = [profile for profile in profiles if tag in profile.tags]
         if route.models and route.tag is not None:
             raise ValueError(
                 f"{label} labels[{name!r}] cannot declare both models and tag."
-            )
-        if not route.models and not tagged:
-            raise ValueError(
-                f"{label} labels[{name!r}] resolves tag {tag!r}, but no model "
-                "declares that tag."
             )
     if not isinstance(policy.mode, RoutingMode):
         raise TypeError(
@@ -885,17 +893,24 @@ def model_metadata(value: Any) -> dict[str, Any]:
     return copy.deepcopy(value)
 
 
-def _resolve_api_key(api_key_env: str, subject: str, credentials: Mapping[str, str] | None = None) -> str:
-    """Resolve only the environment variable explicitly named in the catalog."""
+def _resolve_api_key(api_key_env: str, subject: str, credentials: Mapping[str, str] | None = None, *, allow_missing_credentials: bool = False, trim_legacy: bool = False) -> str:
+    """Resolve the declared reference, optionally normalizing a legacy gateway key."""
+    from jev_gateway.credentials import CredentialSnapshot, validate_reference
+
+    validate_reference(api_key_env)
     value = os.getenv(api_key_env) if credentials is None else credentials.get(api_key_env)
     if not value or not value.strip():
+        if allow_missing_credentials:
+            return ""
         raise ValueError(
             f"{subject} declares api_key_env {api_key_env!r}, but that variable is not set."
         )
-    return value.strip()
+    if trim_legacy and (credentials is None or isinstance(credentials, CredentialSnapshot) and api_key_env not in credentials.literal_references):
+        return value.strip()
+    return value
 
 
-def provider_from_dict(item: dict[str, Any], index: int, credentials: Mapping[str, str] | None = None) -> ProviderProfile:
+def provider_from_dict(item: dict[str, Any], index: int, credentials: Mapping[str, str] | None = None, *, allow_missing_credentials: bool = False) -> ProviderProfile:
     """Resolve a LiteLLM provider type and its configured completion arguments."""
     name = _required_text(item.get("id"), f"Provider entry {index} id")
     if "api_key" in item:
@@ -949,7 +964,7 @@ def provider_from_dict(item: dict[str, Any], index: int, credentials: Mapping[st
     for key, value in raw_param_env.items():
         param_env[key] = _required_text(value, f"Provider {name!r} param_env.{key}")
         resolved_params[key] = _resolve_api_key(
-            param_env[key], f"Provider {name!r} param_env.{key}", credentials
+            param_env[key], f"Provider {name!r} param_env.{key}", credentials, allow_missing_credentials=allow_missing_credentials
         )
 
     api_base_value = item.get("api_base")
@@ -964,8 +979,8 @@ def provider_from_dict(item: dict[str, Any], index: int, credentials: Mapping[st
     )
     if api_key_env and "api_key" in raw_param_env:
         raise ValueError(f"Provider {name!r} cannot declare api_key twice.")
-    api_key = _resolve_api_key(api_key_env, f"Provider {name!r}", credentials) if api_key_env else None
-    if provider_type == "openai" and (not api_base or not api_key):
+    api_key = _resolve_api_key(api_key_env, f"Provider {name!r}", credentials, allow_missing_credentials=allow_missing_credentials) if api_key_env else None
+    if provider_type == "openai" and (not api_base or not api_key_env):
         raise ValueError(
             f"Provider {name!r} type 'openai' requires api_base and api_key_env."
         )
@@ -1436,13 +1451,16 @@ def gateway_from_dict(value: Any, source: str, credentials: Mapping[str, str] | 
     if clean_key_env:
         settings = replace(
             settings,
-            api_key=_resolve_api_key(clean_key_env, f"{source} gateway", credentials),
+            api_key=_resolve_api_key(clean_key_env, f"{source} gateway", credentials, trim_legacy=True),
         )
+        if settings.api_key and (not settings.api_key.isascii() or any(not 33 <= ord(char) <= 126 for char in settings.api_key)):
+            raise ValueError("Gateway credential must contain visible ASCII characters without whitespace.")
     return settings
 
 
 def decision_from_dict(value: Any, source: str, credentials: Mapping[str, str] | None = None) -> DecisionSettings:
     """Validate canonical decision-provider settings."""
+    from jev_gateway.credentials import validate_reference
     label = "decision"
     if value is None:
         return DecisionSettings()
@@ -1481,7 +1499,7 @@ def decision_from_dict(value: Any, source: str, credentials: Mapping[str, str] |
             name=name,
             protocol=protocol,
             api_base=_required_text(item.get("api_base"), f"{subject} api_base"),
-            api_key_env=_required_text(item.get("api_key_env"), f"{subject} api_key_env"),
+            api_key_env=validate_reference(_required_text(item.get("api_key_env"), f"{subject} api_key_env")),
             model=model,
             **display_fields(item),
         ))
@@ -1501,6 +1519,19 @@ def decision_from_dict(value: Any, source: str, credentials: Mapping[str, str] |
     if enabled and not providers:
         raise ValueError(f"{source} {label} enabled requires at least one provider.")
     return DecisionSettings(enabled, default_provider, timeout_seconds, tuple(providers), MappingProxyType(dict(credentials)) if credentials is not None else None)
+
+
+def defaults_from_dict(value: Any, source: str) -> CatalogDefaults:
+    """Parse the optional defaults object; callers supply {} when omitted."""
+    if not isinstance(value, dict):
+        raise TypeError(f"{source} defaults must be an object.")
+    unknown = set(value) - {"default_model"}
+    if unknown:
+        raise ValueError(f"{source} defaults has unknown keys: {', '.join(sorted(unknown))}.")
+    model = value.get("default_model")
+    if model is not None and (not isinstance(model, str) or not model.strip()):
+        raise ValueError(f"{source} defaults.default_model must be a nonempty string or null.")
+    return CatalogDefaults(default_model=model)
 
 
 def storage_from_dict(value: Any, source: str) -> StorageSettings:
@@ -1696,6 +1727,7 @@ def _build_catalog(
     default_strategy: str,
     storage: StorageSettings,
     decision: DecisionSettings,
+    defaults: CatalogDefaults,
 ) -> Catalog:
     """Attach reusable provider connections to each concrete model."""
     provider_by_name = {provider.name: provider for provider in providers}
@@ -1723,30 +1755,29 @@ def _build_catalog(
         default_strategy=default_strategy,
         storage=storage,
         decision=decision,
+        defaults=defaults,
     )
     catalog.validate()
     return catalog
 
 
-def catalog_from_document(document: dict[str, Any], source: str, credentials: Mapping[str, str] | None = None) -> Catalog:
+def catalog_from_document(document: dict[str, Any], source: str, credentials: Mapping[str, str] | None = None, *, allow_missing_credentials: bool = False) -> Catalog:
     """Build a catalog from a parsed models.json document."""
     if not isinstance(document, dict):
         raise TypeError(f"{source} must contain a JSON object.")
-    allowed = {"providers", "models", "policy", "strategies", "default_strategy", "gateway", "storage", "decision"}
+    allowed = {"providers", "models", "policy", "strategies", "default_strategy", "gateway", "storage", "decision", "defaults"}
     unknown = set(document) - allowed
     if unknown:
         raise ValueError(f"{source} has unknown keys: {', '.join(sorted(unknown))}.")
-    raw_providers = document.get("providers")
+    raw_providers = document.get("providers", [])
     if not isinstance(raw_providers, list):
         raise TypeError(f"{source} providers must be a list.")
-    if not raw_providers:
-        raise ValueError(f"{source} must contain a non-empty providers list.")
     providers: list[ProviderProfile] = []
     provider_names: set[str] = set()
     for index, item in enumerate(raw_providers):
         if not isinstance(item, dict):
             raise TypeError(f"{source} providers[{index}] must be an object.")
-        provider = provider_from_dict(item, index, credentials)
+        provider = provider_from_dict(item, index, credentials, allow_missing_credentials=allow_missing_credentials)
         if provider.name in provider_names:
             raise ValueError(
                 f"{source} configures provider {provider.name!r} more than once."
@@ -1754,11 +1785,9 @@ def catalog_from_document(document: dict[str, Any], source: str, credentials: Ma
         provider_names.add(provider.name)
         providers.append(provider)
 
-    raw_models = document.get("models")
+    raw_models = document.get("models", [])
     if not isinstance(raw_models, list):
         raise TypeError(f"{source} models must be a list.")
-    if not raw_models:
-        raise ValueError(f"{source} must contain a non-empty models list.")
 
     profiles: list[ModelProfile] = []
     seen_names: set[str] = set()
@@ -1812,16 +1841,21 @@ def catalog_from_document(document: dict[str, Any], source: str, credentials: Ma
         default_strategy,
         storage_from_dict(document.get("storage"), source),
         decision_from_dict(document.get("decision"), source, credentials),
+        defaults_from_dict(document.get("defaults", {}), source),
     )
 
 
-def load_catalog(models_file: Path | None = None) -> Catalog:
+def load_catalog(models_file: Path | None = None, *, allow_missing_credentials: bool = False) -> Catalog:
     """Load the sole routing source, defaulting to the local models.json file."""
     path = models_file or Path("models.json")
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise ValueError(f"Could not read the models file {path}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON in the models file {path}: {exc.msg}") from exc
-    return catalog_from_document(document, str(path))
+    from jev_gateway.config_transaction import configuration_read_lock
+    from jev_gateway.credentials import credential_snapshot
+
+    with configuration_read_lock(path):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise ValueError(f"Could not read the models file {path}: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in the models file {path}: {exc.msg}") from exc
+        return catalog_from_document(document, str(path), credential_snapshot(path), allow_missing_credentials=allow_missing_credentials)

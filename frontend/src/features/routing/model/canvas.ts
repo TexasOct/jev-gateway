@@ -137,6 +137,7 @@ export function classifyConnection(draft: RoutingDraft, config: ConfigurationPay
   if (intent.kind === "remove" || intent.kind === "reconnect") {
     if (!workflowEdgeExists(draft, config, intent.edge)) return block("stale");
     if (intent.edge.kind === "context" || intent.edge.kind === "failure") return block("context");
+    if (intent.edge.kind === "default") return block("fixed");
   }
   if (intent.kind === "new-match") {
     const rule = /^rule-(0|[1-9][0-9]*)$/.test(intent.from) ? draft.rules[Number(intent.from.slice(5))] : undefined;

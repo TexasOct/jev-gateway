@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
-import type { RetainedRequest } from "@/shared/api/types";
+import type { PolicyCatalog, RetainedRequest } from "@/shared/api/types";
 import { adjacentEvidenceLinks, locateRouteProgress } from "../model/route-trace";
 import { playbackStages } from "../model/route-playback";
 import { useLocale } from "@/shared/i18n";
+import { formatRouteLabel, routeLabelContext } from "@/shared/i18n/route-label";
 
 type StageKey = "request" | "decision" | "upstream_request" | "outcome";
 type Stage = { key: StageKey; value: Record<string, unknown> | null };
@@ -14,6 +15,7 @@ type Link = { d: string; available: boolean; start: Point; end: Point };
 
 interface Props {
   item: RetainedRequest | null;
+  policyCatalog?: PolicyCatalog | null;
 }
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
@@ -30,7 +32,7 @@ function safeEvidence(stage: Stage): Record<string, unknown> | null {
   if (value === null) return null;
   const allowed: Record<StageKey, readonly string[]> = {
     request: ["request_id", "received_at", "strategy", "requested_model", "endpoint", "client", "stream", "max_tokens", "has_tools", "has_vision", "wants_json", "prompt_chars", "prompt_tokens", "conversation_tokens", "turn_index", "content_captured", "prompt_digest"],
-    decision: ["decision_id", "strategy", "config_hash", "route", "provider", "upstream_model", "label", "reason", "mode", "turn_index", "switched_from", "blocked_by", "reasoning_effort", "reasoning_effort_source", "created_at"],
+    decision: ["decision_id", "strategy", "config_hash", "route", "provider", "upstream_model", "label", "defaulted", "reason", "mode", "turn_index", "switched_from", "blocked_by", "reasoning_effort", "reasoning_effort_source", "created_at"],
     upstream_request: ["provider", "model", "stream", "content_captured", "created_at"],
     outcome: ["ok", "finish_reason", "prompt_tokens", "completion_tokens", "total_tokens", "cost_usd", "latency_ms", "returned_model", "error_type", "recorded_at"],
   };
@@ -43,7 +45,7 @@ function outcomeClass(value: Record<string, unknown> | null): "success" | "failu
   return "unknown";
 }
 
-function stageSummary(stage: Stage, t: ReturnType<typeof useLocale>["t"], formatDateTime: ReturnType<typeof useLocale>["formatDateTime"]): string {
+function stageSummary(stage: Stage, t: ReturnType<typeof useLocale>["t"], formatDateTime: ReturnType<typeof useLocale>["formatDateTime"], catalog?: PolicyCatalog | null): string {
   const value = stage.value;
   if (value === null) return t("traceUnavailable");
   if (stage.key === "request") {
@@ -53,7 +55,7 @@ function stageSummary(stage: Stage, t: ReturnType<typeof useLocale>["t"], format
   }
   if (stage.key === "decision") {
     const strategy = typeof value["strategy"] === "string" ? value["strategy"] : t("strategyUnavailable");
-    const label = typeof value["label"] === "string" ? value["label"] : t("labelUnavailable");
+    const label = typeof value["label"] === "string" ? formatRouteLabel(value["label"], t, routeLabelContext(value, catalog)) : t("labelUnavailable");
     const provider = typeof value["provider"] === "string" ? value["provider"] : t("providerUnavailable");
     const model = typeof value["upstream_model"] === "string" ? value["upstream_model"] : t("notRecorded");
     return `${strategy} · ${label} · ${provider}/${model}`;
@@ -71,7 +73,7 @@ function stageSummary(stage: Stage, t: ReturnType<typeof useLocale>["t"], format
   return t("traceUnknown");
 }
 
-export function RouteTrace({ item }: Props) {
+export function RouteTrace({ item, policyCatalog }: Props) {
   const { t, formatDateTime } = useLocale();
   const rootRef = useRef<HTMLElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -284,7 +286,7 @@ export function RouteTrace({ item }: Props) {
               <li className={`trace-stage grid min-w-0 min-h-[var(--trace-stage-min)] content-start gap-[0.28rem] rounded-md border p-[0.55rem] max-[720px]:[.request-card.selected_&]:p-[0.45rem] transition-colors motion-reduce:transition-none max-[720px]:min-h-0 ${active ? "border-primary bg-panel-muted" : present ? "border-outline bg-panel" : "border-dashed border-outline bg-panel"} ${visited ? "[box-shadow:inset_0_-2px_0_var(--accent)]" : ""}`} data-presence={present ? "present" : "missing"} data-active={active || undefined} data-visited={visited || undefined} data-trace-index={index} aria-current={active ? "step" : undefined} key={stage.key}>
                 <span className="font-mono text-[0.7rem] tabular-nums text-ink-muted">{visited ? "✓ " : ""}{String(index + 1).padStart(2, "0")}</span>
                 <strong className="text-[0.78rem] [overflow-wrap:anywhere]">{label}</strong>
-                <span className="min-w-0 text-[0.72rem] text-ink-muted [overflow-wrap:anywhere]">{stageSummary(stage, t, formatDateTime)}</span>
+                <span className="min-w-0 text-[0.72rem] text-ink-muted [overflow-wrap:anywhere]">{stageSummary(stage, t, formatDateTime, policyCatalog)}</span>
                 <details className="mt-auto min-w-0 border-t border-outline py-[0.4rem] pt-1">
                   <summary className="cursor-pointer text-[0.72rem] font-[620] [overflow-wrap:anywhere] max-[720px]:text-[0.68rem]">{t("traceInspectEvidence")}</summary>
                   <pre className="max-h-32 max-w-full overflow-auto mt-[0.4rem] rounded-[0.35rem] bg-code p-[0.6rem] text-[0.7rem] [white-space:pre-wrap] [overflow-wrap:anywhere]" tabIndex={0}>{evidenceStages[index] === null ? t("traceUnavailable") : JSON.stringify(evidenceStages[index], null, 2)}</pre>

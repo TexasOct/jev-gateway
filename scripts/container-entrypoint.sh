@@ -21,6 +21,12 @@ fi
 if [ ! -f "$runtime_dir/.env" ]; then
     cp /opt/jev-gateway/.env.example "$runtime_dir/.env"
 fi
+if [ ! -f "$runtime_dir/credentials.json" ]; then
+    (
+        umask 077
+        cp /opt/jev-gateway/credentials.example.json "$runtime_dir/credentials.json"
+    )
+fi
 
 export JEV_GATEWAY_HOME="$runtime_dir"
 exec jev-gateway "$@"

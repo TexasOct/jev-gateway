@@ -2,7 +2,8 @@ import { CircleQuestionMark, CornerDownRight, GitBranch, MessageCircleQuestionMa
 import type { LucideIcon } from "lucide-react";
 import type { ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
-import { labelMembers } from "../model/draft";
+import { labelMembers, workflowEdges } from "../model/draft";
+import { formatRouteLabel } from "@/shared/i18n/route-label";
 import type { RoutingDraft } from "../model/draft";
 
 type CanvasNodeKind = "questions" | "rule" | "fallback" | "label" | "model" | "unknown";
@@ -71,6 +72,11 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
       if (label) {
         const count = label.resolution === "models" ? label.models.length : labelMembers(draft, config, label).length;
         summary = t(count === 1 ? "canvasNodeModelCountOne" : "canvasNodeModelCount").replace("{count}", String(count));
+        if (workflowEdges(draft, config).some((edge) => edge.from === id && edge.kind === "default")) {
+          summary = t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true }));
+        } else if (label.resolution === "tag" && count === 0 && config.defaults !== undefined) {
+          summary = t("emptyTagPath");
+        }
       }
       break;
     }

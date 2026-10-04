@@ -10,7 +10,7 @@ from jev_gateway.catalog import Catalog, ModelProfile, RoutingMode, RoutingPolic
 from jev_gateway.request_facts import RequestFacts
 from jev_gateway.sessions import SessionState
 
-from .contracts import RoutingRequest, StrategyOutcome
+from .contracts import RoutingRequest, SetupIncompleteError, StrategyOutcome
 
 __all__ = ["DEFAULT_OUTPUT_TOKENS", "PolicyStrategy"]
 
@@ -24,6 +24,7 @@ class Selection:
     profile: ModelProfile
     tier: str
     relaxed: bool
+    defaulted: bool = False
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,10 @@ class PolicyStrategy:
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         """Route one request according to this strategy's policy."""
-        if request.session is None or request.session.tier not in self.policy.labels:
+        if request.session is None or (
+            request.session.tier != "default"
+            and request.session.tier not in self.policy.labels
+        ):
             return self._initial(request, catalog)
         return self._continuation(request, catalog, request.session)
 
@@ -86,12 +90,16 @@ class PolicyStrategy:
             )
         selection = self._select(label, request.facts, catalog)
         effective_tier = self._effective_tier(selection)
-        reason = (
-            f"first_turn_{effective_tier}"
-            if not selection.relaxed
-            else f"tier_fallback_{effective_tier}"
+        if selection.defaulted:
+            reason = "empty_tag_default"
+        elif selection.relaxed:
+            reason = f"tier_fallback_{effective_tier}"
+        else:
+            reason = f"first_turn_{effective_tier}"
+        return self._outcome(
+            selection.profile, effective_tier, reason, "auto",
+            defaulted=selection.defaulted,
         )
-        return self._outcome(selection.profile, effective_tier, reason, "auto")
 
     def _continuation(
         self, request: RoutingRequest, catalog: Catalog, session: SessionState
@@ -116,9 +124,15 @@ class PolicyStrategy:
         switched_from = current.name if selection.profile.name != current.name else None
         effective_tier = (
             self._effective_tier(selection)
-            if switched_from or self.policy.mode is RoutingMode.FRESH
+            if selection.defaulted
+            or switched_from
+            or self.policy.mode is RoutingMode.FRESH
             else session.tier
         )
+        if selection.defaulted and reason not in {
+            "session_pinned", "session_sticky",
+        }:
+            reason = f"{reason}:empty_tag_default"
         return self._outcome(
             selection.profile,
             effective_tier,
@@ -126,6 +140,7 @@ class PolicyStrategy:
             "auto",
             switched_from=switched_from,
             blocked_by=blocked_by,
+            defaulted=selection.defaulted,
         )
 
     def _continuation_selection(
@@ -167,10 +182,10 @@ class PolicyStrategy:
                 if candidate is not None:
                     return candidate, escalation.reason, None
             else:
-                keep = Selection(profile=current, tier=session.tier, relaxed=False)
+                keep = self._current_selection(current, session)
                 return keep, "session_sticky", "hysteresis"
 
-        keep = Selection(profile=current, tier=session.tier, relaxed=False)
+        keep = self._current_selection(current, session)
         return keep, "session_sticky", None
 
     def _pinned_selection(
@@ -216,8 +231,22 @@ class PolicyStrategy:
             if candidate is not None:
                 return candidate, escalation.reason, None
 
-        keep = Selection(profile=current, tier=session.tier, relaxed=False)
+        keep = self._current_selection(current, session)
         return keep, "session_pinned", None
+
+    def _current_selection(self, current: ModelProfile, session: SessionState) -> Selection:
+        """Retain source independently of the bounded session event history."""
+        defaulted = session.defaulted
+        if defaulted is None:
+            defaulted = session.tier == "default" and (
+                "default" not in self.policy.labels
+                or any(
+                    "empty_tag_default" in str(event.get("reason", ""))
+                    for event in session.events
+                    if event.get("type") == "decision"
+                )
+            )
+        return Selection(current, session.tier, relaxed=False, defaulted=defaulted)
 
     def _escalation_candidate(
         self,
@@ -241,6 +270,7 @@ class PolicyStrategy:
                     profile=candidate.profile,
                     tier=self._effective_tier(candidate),
                     relaxed=candidate.relaxed,
+                    defaulted=candidate.defaulted,
                 )
             next_tier = self._raise_tier(tier)
             if next_tier in visited:
@@ -318,6 +348,16 @@ class PolicyStrategy:
 
     # Selection
 
+    def _default_model(self, catalog: Catalog) -> Selection:
+        """Resolve the global model without applying a strategy's ordering rule."""
+        model_id = catalog.defaults.default_model
+        profile = catalog.by_name(model_id) if model_id is not None else None
+        if profile is None:
+            raise SetupIncompleteError(
+                "Configure the global default model for unassigned routing labels."
+            )
+        return Selection(profile=profile, tier="default", relaxed=False, defaulted=True)
+
     def _tier_pool(self, tier: str, catalog: Catalog) -> list[ModelProfile]:
         """Return this strategy's candidates for one routing label."""
         route = self.policy.labels[tier]
@@ -341,12 +381,15 @@ class PolicyStrategy:
         min_context: int | None = None,
     ) -> Selection:
         """Pick a model, relaxing constraints in a fixed order until one fits."""
+        if tier == "default" and tier not in self.policy.labels:
+            return self._default_model(catalog)
+        tier_pool = self._tier_pool(tier, catalog)
+        if not tier_pool:
+            return self._default_model(catalog)
         required_context = max(self._required_context(facts), min_context or 0)
         required_output = self._output_requirement(facts)
-        tier_pool = self._tier_pool(tier, catalog)
         pools: list[tuple[list[ModelProfile], bool]] = []
-        if tier_pool:
-            pools.append((tier_pool, False))
+        pools.append((tier_pool, False))
         pools.append((list(catalog.profiles), True))
 
         steps: list[tuple[bool, int, int | None]] = [
@@ -463,7 +506,7 @@ class PolicyStrategy:
 
     def _effective_tier(self, selection: Selection) -> str:
         """Report the selected model's configured tier after a relaxed fallback."""
-        if not selection.relaxed:
+        if selection.defaulted or not selection.relaxed:
             return selection.tier
         return self._tier_for_profile(selection.profile, selection.tier)
 
@@ -476,11 +519,14 @@ class PolicyStrategy:
 
     def _request_label(self, facts: RequestFacts) -> str:
         """Use a decision-provider label or the first configured label."""
-        if facts.route_label in self.policy.labels:
+        if facts.route_label == "default" or facts.route_label in self.policy.labels:
             return facts.route_label
         return next(iter(self.policy.labels))
 
     def _rank(self, tier: str) -> int:
+        if tier == "default" and tier not in self.policy.labels:
+            # Global defaults have no strategy label; escalation starts at its floor.
+            return 0
         return list(self.policy.labels).index(tier)
 
     def _raise_tier(self, tier: str) -> str:
@@ -502,6 +548,7 @@ class PolicyStrategy:
         *,
         switched_from: str | None = None,
         blocked_by: str | None = None,
+        defaulted: bool = False,
     ) -> StrategyOutcome:
         return StrategyOutcome(
             model=profile.name,
@@ -510,4 +557,5 @@ class PolicyStrategy:
             mode=mode,
             switched_from=switched_from,
             blocked_by=blocked_by,
+            defaulted=defaulted,
         )

@@ -1,6 +1,6 @@
 # JEV Gateway
 
-**English** | [简体中文](README.zh-CN.md)
+**[English](README.md)** | [简体中文](README.zh-CN.md)
 
 ![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 
@@ -71,31 +71,48 @@ configuration and records:
 ./scripts/install-local.sh --editable
 ```
 
-Edit the two files under `$HOME/.jev-gateway/`:
+The default configuration contains the `task_aware`, `quality`, and `economy`
+strategy plans. It has no provider instances, models, or upstream credentials.
+You can start the gateway and configure those later:
 
 ```bash
-${EDITOR:-vi} "$HOME/.jev-gateway/models.json"  # providers, models, strategies
-${EDITOR:-vi} "$HOME/.jev-gateway/.env"         # secrets named by models.json
+jev start
 ```
 
-Replace the example endpoints and model names with ones your providers support. The template declares two providers, so its `.env` needs:
-
-```dotenv
-DEEPSEEK_API_KEY=replace-with-deepseek-key
-OPENAI_API_KEY=replace-with-openai-key
-```
-
-After a curl install, start the gateway with `jev start`. For the source install,
-use its local launcher:
+For the source install, use its local launcher:
 
 ```bash
 ~/.local/bin/jev-gateway-local
 ```
 
-In another terminal, send a first request:
+Open `http://127.0.0.1:8000/dashboard` and set a gateway management key in the
+initialization form. You can enter the console immediately and add providers
+and models later. Saved keys go to the protected `credentials.json` file and are
+never returned to the dashboard. Keep your own copy for clients. The connection
+key stays in browser memory; reconnect with it after refreshing the page.
+First-time browser setup is local only. For a terminal or remote deployment, use `jev setup` to
+set the key with a no-echo prompt before opening the dashboard.
+If the service is already running, follow CLI setup with `jev config reload`.
+File setup and `.env` compatibility are covered in
+[credential configuration](docs/credentials.md).
+After importing a model, choose the global default model in Settings. All
+strategies inherit it when a matched tag has no models and report the result as
+Default. Populated tag pools still
+use their normal selection rules.
+
+Use Provider to save a supplier and its credential, discover or manually add
+models, review their metadata, and explicitly import them. Assign models to
+strategy pools in Strategy workflow. Dashboard saves activate the configuration;
+`jev config reload` also rereads files after manual changes. Until models are
+configured, chat requests return `503 setup_incomplete` while the console stays
+available.
+
+Once a model is configured, send a first request with your gateway key:
 
 ```bash
+read -r -s JEV_CLIENT_KEY
 curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Authorization: Bearer $JEV_CLIENT_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"model": "task_aware", "messages": [{"role": "user", "content": "Summarize this design."}]}'
 ```
@@ -104,11 +121,8 @@ The template disables external decisions, so `task_aware` uses its configured fa
 `GET /healthz` confirms the process is up. For persistent, container, and wheel installs, see
 [`docs/local-install.md`](docs/local-install.md).
 
-Once the gateway has a valid catalog, open `/dashboard` and use Provider to browse
-supplier presets or configure a custom LLM or decision provider. Configure
-`gateway.api_key_env` to enable management commands. Model discovery produces a
-searchable candidate list; review price and capability metadata, then explicitly
-import the selected models. Provider setup and private-network opt-in are covered
+Provider supports supplier presets and custom LLM or decision providers.
+Provider setup and private-network opt-in are covered
 in [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入).
 
 ## Model identity
@@ -157,6 +171,8 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness and configuration snapshot. |
 | `GET` | `/dashboard` | Bundled operator UI for monitoring, providers, and routing configuration. |
+| `GET` | `/v1/setup` | Initialization status and optional configuration progress. |
+| `POST` | `/v1/setup` | Set the initial management key from a local connection. |
 | `GET` | `/v1/models` | Strategy names and catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and policies. |
@@ -168,6 +184,7 @@ Only the request-body `model` field selects a strategy. `?strategy=` returns `40
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | Retained requests for a session. |
 | `GET` | `/v1/routing/providers/summary` | Retained provider activity. |
 | `GET` | `/v1/provider-configuration` | Safe provider configuration, presets, and revision. |
+| `PUT` | `/v1/gateway-credential` | Initialize locally or replace the gateway access key without readback. |
 | `POST` | `/v1/provider-configuration/validate` | Validate provider changes or confirmed model imports. |
 | `PUT` | `/v1/provider-configuration` | Apply provider changes or confirmed model imports. |
 | `POST` | `/v1/provider-discovery` | Fetch candidate upstream models without importing. |
@@ -192,6 +209,7 @@ authentication, error codes, and reload semantics: [`docs/http-api.md`](docs/htt
 | --- | --- |
 | [`docs/local-install.md`](docs/local-install.md) | Curl, local, container, and wheel installation. |
 | [`docs/cli.md`](docs/cli.md) | CLI commands, provider setup, and lifecycle management. |
+| [`docs/credentials.md`](docs/credentials.md) | Write-only dashboard setup and file-based server credentials. |
 | [`docs/models-config.md`](docs/models-config.md) | Every `models.json` field. |
 | [`docs/routing-design.md`](docs/routing-design.md) | Routing contracts, strategies, sessions, evidence. |
 | [`docs/http-api.md`](docs/http-api.md) | Endpoints, headers, errors, reload. |

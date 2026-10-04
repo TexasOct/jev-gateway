@@ -1,5 +1,5 @@
 import type { ImportModel, ModelEvidence, CandidateSource, ModelMetadata, ProviderKind, ProviderProfile } from "@/shared/api/types";
-import { brandAliases } from "./constants";
+import { profileIconAliases } from "./icons";
 
 export const capabilityFields = ["tools", "vision", "json_mode", "reasoning", "temperature"] as const;
 export const modelFields = [...capabilityFields, "reasoning_effort", "input_per_million", "output_per_million", "context_window", "max_output_tokens"] as const;
@@ -108,5 +108,13 @@ export function profileForWrite(profile: ProviderProfile, kind: ProviderKind): P
 
 export function searchProfiles<T extends ProviderProfile & { aliases?: string[] }>(profiles: T[], search: string): T[] {
   const query = search.trim().toLocaleLowerCase();
-  return profiles.filter((profile) => [profile.id, profile.display_name, profile.brand_id, profile.type, profile.protocol, ...(profile.aliases ?? []), ...(brandAliases[profile.brand_id ?? profile.id] ?? [])].some((value) => value?.toLocaleLowerCase().includes(query)));
+  return profiles.filter((profile) => [profile.id, profile.display_name, profile.brand_id, profile.type, profile.protocol, ...(profile.aliases ?? []), ...profileIconAliases(profile)].some((value) => value?.toLocaleLowerCase().includes(query)));
+}
+
+export function newPresetInstanceID(id: string, profiles: ProviderProfile[]): string {
+  const used = new Set(profiles.map((profile) => profile.id));
+  if (!used.has(id)) return id;
+  let suffix = 2;
+  while (used.has(`${id}-${suffix}`)) ++suffix;
+  return `${id}-${suffix}`;
 }

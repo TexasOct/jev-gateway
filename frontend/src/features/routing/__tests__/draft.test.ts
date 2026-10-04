@@ -182,6 +182,15 @@ describe("label membership", () => {
 });
 
 describe("rule ordering", () => {
+  it("allows planning rules for unassigned tag pools before models are imported", () => {
+    const config = configuration({ models: [], questions: { scale: { type: "choice", instructions: "Scale", criteria: { small: "Small", large: "Large" } } } });
+    const draft = draftFromConfiguration(config);
+    expect(unassignedModels(draft, config)).toEqual([]);
+    const added = addRule(draft, config, "scale", "large", "craft");
+    expect(added.rules).toHaveLength(draft.rules.length + 1);
+    expect(toOverlayPayload(added, config).models).toEqual({});
+    expect(addRule(draft, config, "scale", "large", "unknown")).toBe(draft);
+  });
   it("adds rules only from valid existing conditions and labels", () => {
     const config = configuration({ questions: { scale: { type: "choice", instructions: "Scale", criteria: { small: "Small", large: "Large" } } } });
     const draft = draftFromConfiguration(config);
@@ -222,6 +231,27 @@ describe("rule ordering", () => {
     const edited = setRuleChoice(draft, 0, { label: "ultra" });
     expect(edited.rules[0]?.select.label).toBe("ultra");
     expect(edited.rules[0]?.when).toEqual({ workload: "coding" });
+  });
+
+  it("preserves a legacy rule choice until its label is explicitly edited", () => {
+    const config = configuration();
+    config.rules[0]!.select = { tier: "craft", selection: "balanced" };
+    const draft = draftFromConfiguration(config);
+    const ranked = setRuleChoice(draft, 0, { selection: "quality_first" });
+    expect(ranked.rules[0]!.select).toEqual({ tier: "craft", selection: "quality_first" });
+    const changed = setRuleChoice(ranked, 0, { label: "ultra" });
+    expect(changed.rules[0]!.select).toEqual({ label: "ultra", selection: "quality_first" });
+    expect(draft.rules[0]!.select).toEqual({ tier: "craft", selection: "balanced" });
+  });
+
+  it("keeps fallback omission and aliases until an explicit label edit", () => {
+    const config = configuration({ fallback: {} });
+    const draft = draftFromConfiguration(config);
+    expect(setFallback(draft, { selection: "balanced" }).fallback).toEqual({ selection: "balanced" });
+    const legacy = setFallback(draft, { tier: "craft" });
+    expect(setFallback(legacy, { selection: "balanced" }).fallback).toEqual({ tier: "craft", selection: "balanced" });
+    expect(setFallback(legacy, { label: "ultra" }).fallback).toEqual({ label: "ultra" });
+    expect(draft.fallback).toEqual({});
   });
 });
 

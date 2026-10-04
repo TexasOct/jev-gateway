@@ -25,8 +25,8 @@ def read_snapshot(path: Path) -> tuple[dict[str, Any], Mapping[str, str]]:
         return read_models_document(path), credential_snapshot(path)
 
 
-def validate_document(document: dict[str, Any], source: str = "models.json", credentials: Mapping[str, str] | None = None) -> None:
-    catalog_from_document(document, source, credentials)
+def validate_document(document: dict[str, Any], source: str = "models.json", credentials: Mapping[str, str] | None = None, *, allow_missing_credentials: bool = False) -> None:
+    catalog_from_document(document, source, credentials, allow_missing_credentials=allow_missing_credentials)
 
 
 def backup(path: Path) -> Path | None:

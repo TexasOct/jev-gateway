@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend layer boundaries and required checks."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Network-free tests, type checks, frontend builds, and installed packaging gates."}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Preserve lifecycle, configuration, credentials, and isolated installed-tool contracts."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Combine provider configuration and credential boundaries."}
+{"file":".trellis/spec/backend/provider-identities.md","reason":"Integrate committed provider icons and shared preset registry without transport or identity regressions."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Preserve Dashboard, routing-overlay, preview, assets, and packaging behavior."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/branch-inventory.md","reason":"Approved four branch tips, squash delivery, worktree occupancy, and safety snapshot."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/setup-credential-integration.md","reason":"Release-only setup paths require semantic adaptation to the managed credential owner."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/select-icon-integration.md","reason":"Preserve select geometry when icons replace provider form sections; combine preset fields with managed credentials and global defaults."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/credential-stage-results.md","reason":"Verified shared-writer, authentication, setup, and frontend contracts after credential code conflict resolution."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/integration-review-results.md","reason":"Repair legacy gateway source normalization and browser locator contracts identified by complete acceptance and independent review."}

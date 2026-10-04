@@ -16,6 +16,7 @@ import pytest
 from jev_gateway import config_transaction
 from jev_gateway.cli import config_ops, health
 from jev_gateway.cli.main import main
+from jev_gateway.credentials import credential_update
 from jev_gateway.provider_config import env_update
 from tests.helpers import single_route_document
 
@@ -35,9 +36,12 @@ def runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-@pytest.mark.parametrize("kind,expected", [("literal", "${CLI_FIXTURE_MISSING}"), ("legacy", "fake-expanded"), ("inherited", "fake-inherited"), ("empty", "")])
+@pytest.mark.parametrize("kind,expected", [("json", "fake-json-${CLI_FIXTURE_MISSING}"), ("literal", "${CLI_FIXTURE_MISSING}"), ("legacy", "fake-expanded"), ("inherited", "fake-inherited"), ("empty", "")])
 def test_cli_presence_validation_and_environment(runtime: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any, kind: str, expected: str) -> None:
-    if kind == "literal":
+    if kind == "json":
+        (runtime / "credentials.json").write_bytes(credential_update(None, "CLI_FIXTURE_KEY", expected))
+        (runtime / ".env").write_text("CLI_FIXTURE_KEY=fake-shadowed\n")
+    elif kind == "literal":
         (runtime / ".env").write_bytes(env_update(None, "CLI_FIXTURE_KEY", expected))
     elif kind == "legacy":
         (runtime / ".env").write_text("BASE=fake-expanded\nCLI_FIXTURE_KEY='${BASE}'\n")
@@ -71,9 +75,11 @@ def test_cli_presence_validation_and_environment(runtime: Path, monkeypatch: pyt
     assert os.environ == before
 
 
-def test_reload_auth_uses_one_snapshot(runtime: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+@pytest.mark.parametrize("source", ["dotenv", "json"])
+def test_reload_auth_uses_one_snapshot(runtime: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any, source: str) -> None:
     key = "${CLI_FIXTURE_MISSING}"
-    (runtime / ".env").write_bytes(env_update(None, "CLI_FIXTURE_KEY", key))
+    target = runtime / (".env" if source == "dotenv" else "credentials.json")
+    target.write_bytes(env_update(None, "CLI_FIXTURE_KEY", key) if source == "dotenv" else credential_update(None, "CLI_FIXTURE_KEY", key))
     before = dict(os.environ)
     original = config_ops.read_snapshot
     reads: list[Any] = []
@@ -81,7 +87,7 @@ def test_reload_auth_uses_one_snapshot(runtime: Path, monkeypatch: pytest.Monkey
     def read(path: Path) -> Any:
         result = original(path)
         reads.append(result)
-        (runtime / ".env").write_text("CLI_FIXTURE_KEY=fake-later\n")
+        target.write_bytes(env_update(None, "CLI_FIXTURE_KEY", "fake-later") if source == "dotenv" else credential_update(None, "CLI_FIXTURE_KEY", "fake-later"))
         document = json.loads(path.read_text())
         document["gateway"]["port"] = 9999
         path.write_text(json.dumps(document))
@@ -112,9 +118,11 @@ def test_reload_auth_uses_one_snapshot(runtime: Path, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.parametrize("command", ["status", "start"])
-def test_health_consumers_keep_snapshot_during_wait(runtime: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any, command: str) -> None:
+@pytest.mark.parametrize("source", ["dotenv", "json"])
+def test_health_consumers_keep_snapshot_during_wait(runtime: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any, command: str, source: str) -> None:
     key = "${CLI_FIXTURE_MISSING}"
-    (runtime / ".env").write_bytes(env_update(None, "CLI_FIXTURE_KEY", key))
+    target = runtime / (".env" if source == "dotenv" else "credentials.json")
+    target.write_bytes(env_update(None, "CLI_FIXTURE_KEY", key) if source == "dotenv" else credential_update(None, "CLI_FIXTURE_KEY", key))
     before = dict(os.environ)
     calls: list[Any] = []
     monkeypatch.setattr(cli.process, "status", lambda *args: {"status": "running"})
@@ -126,7 +134,7 @@ def test_health_consumers_keep_snapshot_during_wait(runtime: Path, monkeypatch: 
         assert url == "http://127.0.0.1:8123/healthz"
         assert headers == {"Authorization": f"Bearer {key}"}
         calls.append(headers)
-        (runtime / ".env").write_text("CLI_FIXTURE_KEY=fake-later\n")
+        target.write_bytes(env_update(None, "CLI_FIXTURE_KEY", "fake-later") if source == "dotenv" else credential_update(None, "CLI_FIXTURE_KEY", "fake-later"))
         return httpx.Response(503 if command == "start" and len(calls) == 1 else 200, json={"status": "ok"}, request=httpx.Request("GET", url))
 
     monkeypatch.setattr(health.httpx, "get", get)

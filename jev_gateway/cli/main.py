@@ -20,6 +20,10 @@ from jev_gateway.cli.paths import RuntimePaths, runtime_paths
 from jev_gateway.cli.secrets import obtain_secret
 from jev_gateway.config_transaction import ConfigurationRecoveryRequired
 from jev_gateway.dashboard import browsable_host
+from jev_gateway.initialization import initialize_configuration
+from jev_gateway.setup import ManagementSetup, SetupAlreadyConfigured
+from jev_gateway.provider_config import RevisionConflict
+from jev_gateway.provider_presets import PRESETS
 
 
 def _package_version() -> str:
@@ -39,6 +43,10 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="group", required=True)
     sub.add_parser("doctor")
     sub.add_parser("status")
+    setup = sub.add_parser("setup")
+    secret_source = setup.add_mutually_exclusive_group()
+    secret_source.add_argument("--secret-env")
+    secret_source.add_argument("--secret-stdin", action="store_true")
     start = sub.add_parser("start")
     start.add_argument("--foreground", action="store_true")
     start.add_argument("--wait", type=float, default=10)
@@ -58,11 +66,13 @@ def _parser() -> argparse.ArgumentParser:
     provider = sub.add_parser("provider").add_subparsers(dest="action", required=True)
     provider.add_parser("list")
     add = provider.add_parser("add")
-    add.add_argument("preset", choices=["openai", "anthropic", "deepseek", "custom"])
+    add.add_argument("preset", choices=[*PRESETS, "custom"])
     add.add_argument("--id")
     add.add_argument("--type")
     add.add_argument("--api-base")
     add.add_argument("--api-key-env")
+    add.add_argument("--param", action="append", default=[], metavar="NAME=VALUE", help="Non-secret completion parameter; JSON values or plain text.")
+    add.add_argument("--param-env", action="append", default=[], metavar="NAME=ENV", help="Completion parameter supplied by a declared environment reference.")
     add.add_argument("--model", action="append", default=[])
     add.add_argument("--tag", action="append", default=[])
     add.add_argument("--priority", type=int)
@@ -98,6 +108,22 @@ def _parser() -> argparse.ArgumentParser:
     uninstall_parser.add_argument("--purge", action="store_true")
     uninstall_parser.add_argument("--yes", action="store_true")
     return parser
+
+
+def _provider_assignments(values: list[str], *, json_values: bool) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for assignment in values:
+        name, separator, value = assignment.partition("=")
+        if not separator or not name.isidentifier() or not value.strip() or name in result:
+            raise CliError("invalid_provider_option", "Provider parameters require unique NAME=VALUE assignments.", ExitCode.USAGE)
+        if json_values:
+            try:
+                result[name] = json.loads(value)
+            except json.JSONDecodeError:
+                result[name] = value
+        else:
+            result[name] = value.strip()
+    return result
 
 
 def _catalog_options(paths: RuntimePaths) -> tuple[dict[str, Any], Mapping[str, str], str, int]:
@@ -139,6 +165,23 @@ def _start_and_wait(paths: RuntimePaths, document: dict[str, Any], credentials: 
 
 def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
     group, action = args.group, getattr(args, "action", None)
+    if group == "setup":
+        try:
+            initialize_configuration(paths.models)
+            service = ManagementSetup(paths.models)
+            status = service.read()
+            if not status["required"]:
+                raise SetupAlreadyConfigured("Management key is already configured.")
+            secret = obtain_secret(env_name=args.secret_env, stdin_secret=args.secret_stdin, json_mode=args.json_mode, quiet=args.quiet)
+            return service.configure({"expected_revision": status["revision"], "api_key": secret}), 0
+        except ConfigurationRecoveryRequired:
+            raise
+        except SetupAlreadyConfigured as exc:
+            raise CliError("setup_already_configured", "Management key is already configured.", ExitCode.INVALID_CONFIG) from exc
+        except RevisionConflict as exc:
+            raise CliError("revision_conflict", "Configuration changed. Run setup again.", ExitCode.INVALID_CONFIG) from exc
+        except (ValueError, TypeError, OSError, RuntimeError) as exc:
+            raise CliError("setup_failed", "Could not configure the management key. Check configuration and secret input.", ExitCode.INVALID_CONFIG) from exc
     if group == "doctor":
         data: dict[str, Any] = {"install_state": install_state.read_state() or {"status": "unmanaged"}, "runtime_dir": str(paths.home), "models_exists": paths.models.exists(), "env_exists": paths.env.exists(), "credentials": []}
         if paths.models.exists():
@@ -202,7 +245,7 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
         return text, 0
     if group == "config":
         if action == "path":
-            return {"home": str(paths.home), "models": str(paths.models), "env": str(paths.env), "records": str(paths.records), "pid": str(paths.pid), "log": str(paths.log)}, 0
+            return {"home": str(paths.home), "models": str(paths.models), "env": str(paths.env), "credentials": str(paths.home / "credentials.json"), "records": str(paths.records), "pid": str(paths.pid), "log": str(paths.log)}, 0
         document, credentials = config_ops.read_snapshot(paths.models)
         if action == "show":
             writes = {"providers": "writable", "models": "writable", **{key: "read_only" for key in document if key not in {"providers", "models"}}}
@@ -237,11 +280,14 @@ def _dispatch(args: argparse.Namespace, paths: RuntimePaths) -> tuple[Any, int]:
         if action == "add":
             if args.secret_env and args.secret_stdin:
                 raise CliError("secret_source_conflict", "Choose either --secret-env or --secret-stdin.", ExitCode.USAGE)
-            secret = obtain_secret(env_name=args.secret_env, stdin_secret=args.secret_stdin, json_mode=args.json_mode, quiet=args.quiet) if not args.dry_run and (args.secret_env or args.secret_stdin or (sys.stdin.isatty() and not args.json_mode and not args.quiet)) else None
-            return providers.add_provider(paths, preset=args.preset, provider_id=args.id, provider_type=args.type, api_base=args.api_base, api_key_env=args.api_key_env, models=args.model, tags=args.tag, priority=args.priority, quality=args.quality, context_window=args.context_window, max_output_tokens=args.max_output_tokens, set_defaults=args.set_defaults, secret=secret, dry_run=args.dry_run), 0
+            key_reference = args.api_key_env or PRESETS.get(args.preset, {}).get("api_key_env")
+            secret = obtain_secret(env_name=args.secret_env, stdin_secret=args.secret_stdin, json_mode=args.json_mode, quiet=args.quiet) if not args.dry_run and (args.secret_env or args.secret_stdin or (key_reference and sys.stdin.isatty() and not args.json_mode and not args.quiet)) else None
+            return providers.add_provider(paths, preset=args.preset, provider_id=args.id, provider_type=args.type, api_base=args.api_base, api_key_env=args.api_key_env, models=args.model, tags=args.tag, priority=args.priority, quality=args.quality, context_window=args.context_window, max_output_tokens=args.max_output_tokens, set_defaults=args.set_defaults, secret=secret, dry_run=args.dry_run, params=_provider_assignments(args.param, json_values=True), param_env=_provider_assignments(args.param_env, json_values=False)), 0
         if action == "login":
             if args.secret_env and args.secret_stdin:
                 raise CliError("secret_source_conflict", "Choose either --secret-env or --secret-stdin.", ExitCode.USAGE)
+            document = config_ops.read_document(paths.models) if paths.models.exists() else {"providers": []}
+            providers.provider_secret_name(document, args.id)
             secret = obtain_secret(env_name=args.secret_env, stdin_secret=args.secret_stdin, json_mode=args.json_mode, quiet=args.quiet) if not args.dry_run and (args.secret_env or args.secret_stdin or (sys.stdin.isatty() and not args.json_mode and not args.quiet)) else None
             return providers.login(paths, args.id, args.secret_env or "", secret, args.dry_run), 0
         if action == "logout":
