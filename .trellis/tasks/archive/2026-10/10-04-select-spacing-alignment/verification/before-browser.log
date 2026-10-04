@@ -1,0 +1,27 @@
+
+Running 21 tests using 2 workers
+
+  ✓   1 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 320px en light (508ms)
+  ✓   2 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 320px en dark (508ms)
+  ✓   4 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 320px zh-CN light (477ms)
+  ✓   3 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 320px zh-CN dark (477ms)
+  ✓   5 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 390px en light (460ms)
+  ✓   6 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 390px en dark (460ms)
+  ✓   8 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 390px zh-CN dark (471ms)
+  ✓   7 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 390px zh-CN light (471ms)
+  ✓   9 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1280px en light (433ms)
+  ✓  10 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1280px en dark (433ms)
+  ✓  12 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1280px zh-CN dark (464ms)
+  ✓  11 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1280px zh-CN light (465ms)
+  ✓  14 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1701px en dark (423ms)
+  ✓  13 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1701px en light (424ms)
+  ✓  15 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1701px zh-CN dark (472ms)
+  ✓  16 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1701px zh-CN light (472ms)
+  ✓  18 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1920px en dark (419ms)
+  ✓  17 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1920px en light (420ms)
+  ✓  20 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1920px zh-CN dark (468ms)
+  ✓  19 frontend/tests/browser/select-controls.spec.ts:35:3 › native select geometry 1920px zh-CN light (469ms)
+  -  21 frontend/tests/browser/select-controls.spec.ts:75:1 › native keyboard, focus, disabled and listbox/forced-colors fallback
+
+  1 skipped
+  20 passed (5.4s)

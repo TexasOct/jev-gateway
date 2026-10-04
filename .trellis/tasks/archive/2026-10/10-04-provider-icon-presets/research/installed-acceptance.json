@@ -1,0 +1,27 @@
+{
+  "installedWheel": true,
+  "realGatewayCSP": "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+  "llmTemplates": 41,
+  "decisionTemplates": 1,
+  "logosLoadedAndHashVerified": 39,
+  "diskIconSaveAndReload": true,
+  "decisionIconSave": true,
+  "unknownIconsSavedAndRead": [
+    "future-brand-icon",
+    "constructor",
+    "__proto__",
+    "toString",
+    "hasOwnProperty"
+  ],
+  "automaticReset": true,
+  "advancedParametersPreserved": true,
+  "modelReferencesPreserved": true,
+  "cloudParametersSavedToDisk": [
+    "azure",
+    "vertex_ai",
+    "bedrock"
+  ],
+  "exactLicenseTextRendered": true,
+  "narrowLayout": 390,
+  "externalRequests": 0
+}

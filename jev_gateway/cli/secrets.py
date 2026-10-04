@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
-import re
 from pathlib import Path
 
 from jev_gateway.cli.output import CliError, ExitCode
 from jev_gateway.cli.paths import prompt_value
-from jev_gateway.config_transaction import configuration_lock, optional_bytes, replace_configuration
-from jev_gateway.provider_config import env_update
+from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
+from jev_gateway.credentials import credential_path, credential_values, credential_update, env_update, read_credential_bytes
 
 
 def obtain_secret(*, env_name: str | None, stdin_secret: bool, json_mode: bool, quiet: bool) -> str:
@@ -27,49 +26,32 @@ def obtain_secret(*, env_name: str | None, stdin_secret: bool, json_mode: bool, 
     return prompt_value("API key: ", json_mode=json_mode, quiet=quiet)
 
 
-def _read_lines(path: Path) -> list[str]:
-    try:
-        return path.read_text(encoding="utf-8").splitlines()
-    except FileNotFoundError:
-        return []
-
-
 def upsert_env(path: Path, name: str, value: str) -> None:
-    if not name.isidentifier():
-        raise CliError("invalid_env_name", "Credential variable name must be an identifier.", ExitCode.USAGE)
-    lines = _read_lines(path)
-    if not value or any(character in value for character in "\r\n\x00"):
-        raise CliError("invalid_secret", "Credential must be nonempty and fit on one line.", ExitCode.USAGE)
-    replacement = f"{name}={value}"
-    if any(c in value for c in " \t#$\\'\""):
-        replacement = env_update(b"", name, value).decode().rstrip("\n")
-    found = False
-    output: list[str] = []
-    for line in lines:
-        if re.match(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=", line):
-            if not found:
-                output.append(replacement)
-                found = True
-        else:
-            output.append(line)
-    if not found:
-        output.append(replacement)
-    _write_env(path, output)
+    """Compatibility name for writing the effective protected JSON store."""
+    models_file = path.parent / "models.json"
+    with configuration_read_lock(models_file):
+        original = read_credential_bytes(models_file)
+        target = credential_path(models_file)
+        replace_configuration(models_file, {
+            target: credential_update(original, name, value),
+            target.with_name("credentials.json.backup"): original,
+        })
 
 
 def remove_env(path: Path, name: str) -> bool:
-    lines = _read_lines(path)
-    output = [line for line in lines if not re.match(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=", line)]
-    if len(output) == len(lines):
-        return False
-    _write_env(path, output)
-    return True
-
-
-def _write_env(path: Path, lines: list[str]) -> None:
     models_file = path.parent / "models.json"
-    with configuration_lock(models_file):
-        replace_configuration(models_file, {
-            path: ("\n".join(lines) + ("\n" if lines else "")).encode(),
-            path.with_name(".env.backup"): optional_bytes(path),
-        })
+    with configuration_read_lock(models_file):
+        original = read_credential_bytes(models_file)
+        legacy = optional_bytes(path)
+        cleared = env_update(legacy, name, None)
+        changes: dict[Path, bytes | None] = {}
+        if name in credential_values(original):
+            target = credential_path(models_file)
+            changes[target] = credential_update(original, name, None)
+            changes[target.with_name("credentials.json.backup")] = original
+        if cleared != (legacy or b""):
+            changes[path] = cleared
+            changes[path.with_name(".env.backup")] = legacy
+        if changes:
+            replace_configuration(models_file, changes)
+        return bool(changes)

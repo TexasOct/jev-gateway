@@ -1,14 +1,16 @@
 # `models.json` 配置参考
 
-`models.json` 是网关的静态配置文件，默认从启动时的工作目录读取。它同时定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。可从 [`jev_gateway/templates/models.example.json`](../jev_gateway/templates/models.example.json) 复制起步；示例中的地址、模型名称和价格仅是配置示例，应按实际上游核对。
+`models.json` 是网关的静态配置文件，从 `JEV_GATEWAY_HOME`、安装状态或 `$HOME/.jev-gateway` 指定的运行目录读取。
+它定义服务运行参数、上游连接、模型元数据和路由策略。文件必须是合法 JSON，不能写注释。
+安装和默认启动会在文件不存在时初始化配置，保留已有文件。默认模板只包含运行参数与
+`task_aware`、`quality`、`economy` 策略方案，没有供应商、模型或上游密钥。
 
 ```bash
-cp jev_gateway/templates/models.example.json models.json
-# 在 .env 中设置 providers[*].api_key_env 指向的密钥；启用 decision 时还需配置对应决策提供方的密钥
-uv run jev-gateway
+jev start
+# 打开 http://127.0.0.1:8000/dashboard 设置管理密钥；供应商和模型可稍后配置
 ```
 
-`models.json` 是唯一的静态配置来源：providers、models、策略、重路由和网关运行参数都从这里读取。进程不读取固定的 `JEV_API_BASE`、`JEV_API_KEY`、`JEV_ROUTES`、`JEV_MODELS_FILE`，也不读取路由或策略覆盖变量。密钥只按配置中声明的名字解析，包括 `providers[].api_key_env`、`providers[].param_env`、`decision.providers[].api_key_env` 和 `gateway.api_key_env`。前两类用于上游调用，后两类分别用于分类器调用和入站鉴权；策略与检查响应只返回变量名或密钥是否存在的标记，不返回密钥内容。
+`models.json` 是唯一的静态路由与运行参数来源：providers、models、策略、重路由和网关运行参数都从这里读取。进程不读取固定的 `JEV_API_BASE`、`JEV_API_KEY`、`JEV_ROUTES`、`JEV_MODELS_FILE`，也不读取路由或策略覆盖变量。密钥只按配置中声明的名字解析，包括 `providers[].api_key_env`、`providers[].param_env`、`decision.providers[].api_key_env` 和 `gateway.api_key_env`。这些字段现在是凭证引用，优先从同目录 `credentials.json` 读取，其次是 `.env`，最后是启动进程环境。前两类用于上游调用，后两类分别用于分类器调用和入站鉴权；策略与检查响应只返回引用名称或密钥是否存在的标记，不返回密钥内容。文件格式与纯服务端示例见 [`credentials.md`](credentials.md)。
 
 以下默认值指字段省略时程序采用的值，不一定与仓库现有 `models.json` 的显式取值相同。配置文件变更后调用 `POST /v1/routing/reload`；`gateway.host` 和 `gateway.port` 改动需重启进程。
 
@@ -16,29 +18,59 @@ uv run jev-gateway
 
 | 字段 | 含义 |
 | --- | --- |
-| `providers` | 必填、非空数组；上游服务的地址和密钥引用。 |
-| `models` | 必填、非空数组；可路由的具体模型。 |
-| `policy` | 顶层路由策略，注册为名为 `default` 的策略；没有 `strategies` 时必须提供有效的 `labels` 或兼容格式 `tier_models`。如果 `strategies.default` 指向一个显式定义的策略，可省略。 |
-| `strategies` | 可选；具名策略及默认策略名称。 |
+| `providers` | 可省略或为空数组；上游服务的地址和密钥引用。 |
+| `models` | 可省略或为空数组；可路由的具体模型。 |
+| `defaults` | 可选；全局默认模型，所有策略共同继承。 |
+| `policy` | 可选；具名策略可继承的公共策略设置。默认模板通过各策略自己的 `policy` 定义设置，无需顶层样例策略。 |
+| `strategies` | 必填；具名策略与默认策略。支持紧凑格式及 `{default, definitions}` 包装格式，默认模板使用后者。 |
 | `gateway` | 可选；监听、入站鉴权、会话及内存决策日志设置。 |
 | `storage` | 可选；SQLite 请求和决策记录。 |
 | `decision` | 可选；外部决策提供方配置。 |
 
+## `defaults` 全局默认模型
+
+`defaults.default_model` 使用已配置模型的完整 `provider/upstream_model` ID，
+不能指向不存在的模型。省略、空对象或 `default_model: null` 表示尚未设置；
+`defaults` 本身必须是对象，不能写成 `null`，也不能包含其他字段。
+
+```json
+{
+  "defaults": {
+    "default_model": "my-service/confirmed-model"
+  }
+}
+```
+
+该 ID 是示例，需替换为实际导入的模型。Settings 提供一处全局默认模型选择，
+通过现有带 revision 的配置事务保存到 `models.json` 并加载。所有策略命中的
+tag 没有模型时，使用这个全局模型，最终 label/tier 为 `default`，中文显示“默认”。
+策略的第一标签、矩阵 fallback 和选模偏好不能覆盖它；每个策略的独立默认配置延后。
+尚未设置全局默认且需要空 tag 回退时，返回 `503 setup_incomplete`，不调用生成上游。
+有模型的标签池仍可独立服务。清除默认值会恢复待配置状态，不删除模型或策略。
+模型删除或 CLI 强制移除供应商不能留下失效的全局引用，应先明确清除默认值。
+
 ## `providers` 与 `models`
 
 每个 provider 可以供多个模型共用。`providers` 中的 `id` 必须唯一；`models` 中的 `(provider, upstream_model)` 组合也必须唯一。
+
+空数组和未分配模型的标签池是有效的待配置状态，可以启动、编辑、保存和重载。
+没有模型时，对话与路由预览返回 `503 setup_incomplete`，不会调用上游。
+已有模型时仍须满足实际请求的能力与模型选择约束。显式引用不存在的模型、错误字段、
+重复 ID 仍会导致校验失败。直接目录解析和 CLI 校验要求已声明的供应商凭据有值；
+网关启动与重载允许供应商凭据待配置，选中缺少凭据的供应商时在调用上游前返回
+`503 provider_credentials_missing`。已声明的网关密钥始终要求有值。
 
 | 字段 | 类型 / 默认值 | 含义 |
 | --- | --- | --- |
 | `providers[].id` | 非空字符串，必填 | 目录中的 Provider 标识，例如 `deepseek`；不决定 LiteLLM 的适配器。 |
 | `providers[].type` | LiteLLM 支持的 provider 前缀，必填 | 例如 `deepseek`、`openai`、`azure` 或 `vertex_ai`；加载时校验是否由已安装的 LiteLLM 支持。 |
 | `providers[].api_base` | 非空字符串，可选 | 上游基础地址；解析时去掉末尾 `/`。`type: "openai"` 时必填。 |
-| `providers[].api_key_env` | 非空字符串，可选 | `api_key` 对应的环境变量名；设置后变量必须有值。`type: "openai"` 时必填。 |
+| `providers[].api_key_env` | 非空字符串，可选 | `api_key` 对应的凭证引用；`type: "openai"` 时必填。网关允许暂缺值以完成初始化，选中缺失凭据的提供方时返回 503；直接目录解析和 CLI 校验保持严格。 |
 | `providers[].params` | 对象，默认 `{}` | 发给 LiteLLM `completion()` 的非敏感 provider 参数，如 `api_version` 或 `vertex_location`；不可覆盖 `model`、`messages`、`stream`、`api_base`、`api_key`。 |
-| `providers[].param_env` | 对象，默认 `{}` | 参数名到环境变量名的映射，供额外凭据使用，如 `vertex_credentials`；解析后的密钥不出现在策略响应中。 |
+| `providers[].param_env` | 对象，默认 `{}` | 参数名到凭证引用的映射，供额外凭据使用，如 `vertex_credentials`；同样支持 JSON、dotenv 和进程环境，解析后的密钥不出现在策略响应中。 |
 | `providers[].display_name` | 非空字符串或 `null`，可选 | Provider 页的显示名称；不改变实例 ID 或模型 ID，省略或 `null` 时显示实例 ID。 |
 | `providers[].brand_id` | 非空字符串或 `null`，可选 | 供应商品牌标识，用于本地预设、图标和元数据来源匹配；不选择 LiteLLM transport。 |
-| `providers[].icon_id` | 非空字符串或 `null`，可选 | 本地图标标识；无法识别时界面显示中性回退。 |
+| `providers[].icon_id` | 非空字符串或 `null`，可选 | 独立选择的本地图标；`null` 自动匹配品牌，`initials` 使用首字母，也可选其他品牌或通用图标。未知标识保留并显示中性回退。 |
 | `providers[].allow_private_network` | 布尔值，默认 `false` | 显式允许模型发现访问 localhost 或私网；只控制发现，不改变聊天 transport。 |
 | `models[].provider` | 非空字符串，必填 | 引用已有的 `providers[].id`。 |
 | `models[].upstream_model` | 非空字符串，必填 | 发给该 provider 的实际模型名。 |
@@ -63,7 +95,9 @@ uv run jev-gateway
 
 ### Provider 页与模型导入
 
-Provider 页分别管理 LLM 与 decision 实例。供应商预设和自定义表单都提交同一种规范配置；展示名称、品牌和图标可独立修改，实例 ID 保持稳定。Settings 继续管理语言和外观。
+Provider 页分别管理 LLM 与 decision 实例。供应商预设和自定义表单都提交同一种规范配置；展示名称、品牌和图标可独立修改，实例 ID 保持稳定。Settings 管理全局默认模型、语言和外观。
+
+新建和编辑表单的图标入口提供预览、品牌与通用图标搜索以及恢复自动图标。图标选择不修改品牌、调用协议或模型引用；取消不保存。供应商模板覆盖国内外模型厂商、聚合平台、云平台和本地服务，名称与别名均可搜索。云平台的新建模板显示所需项目、区域、额外凭据环境引用与官方配置链接；账户专属端点须自行填写。模板只是未保存的起点，不会自动加入运行目录或导入模型。品牌图形随应用打包，其固定来源和许可可从图标入口查看。
 
 LLM 模型发现支持 OpenAI 兼容、Anthropic 和 DeepSeek transport；不支持的 transport 可手动添加模型。列表只生成候选，搜索、刷新和取消都不会写入有效目录。选中模型后，用户补齐或确认元数据，再显式导入；已有 `provider/upstream_model` 跳过导入，保留原有配置和 routing overlay。
 
@@ -73,11 +107,18 @@ LLM 模型发现支持 OpenAI 兼容、Anthropic 和 DeepSeek transport；不支
 
 发现默认要求公网 HTTPS。`allow_private_network: true` 允许 localhost/私网的 HTTP 或 HTTPS；重定向、link-local、云 metadata、未指定地址和组播仍被拒绝，HTTPS 证书校验保持开启。公共元数据查询使用固定公开源，不接收用户的上游密钥或自定义地址。
 
-Provider 配置写入需要已配置的 `gateway.api_key_env`。管理操作在同一事务中验证 baseline、凭证引用与 overlay；旧 revision 返回冲突，失败恢复旧配置。密钥保存在邻近 `.env`，JSON 继续只保存环境变量引用。高级 `params` 和 `param_env` 在普通表单操作中省略时保留原值；配置读取只返回安全投影，不能把投影当原始高级参数写回。HTTP 请求格式见 [`http-api.md`](./http-api.md)。
+Provider 配置写入需要已配置的 `gateway.api_key_env`。首次打开本机面板时，初始化表单设置
+管理密钥和对应引用；终端或远程部署可先执行 `jev setup`。供应商与模型可以稍后配置，
+也可以先保存供应商，再导入模型。管理操作在同一事务中验证 baseline、凭证引用与 overlay；
+旧 revision 返回冲突，失败恢复旧配置。新密钥写入邻近的受限权限 `credentials.json`，
+`models.json` 继续只保存引用，已有引用名称保持不变。公共监听和反向代理连接须先通过
+CLI 或文件设置密钥；两个 HTTP 初始化入口使用相同的本机引导检查。
+高级 `params` 和 `param_env` 在普通表单操作中省略时保留原值；配置读取只返回安全投影，
+不能把投影当原始高级参数写回。HTTP 请求格式见 [`http-api.md`](./http-api.md)。
 
-`clear` 清除本地 `.env` 条目；启动 shell 仍提供该引用时，有效凭证继续存在，读取的 `has_api_key` 反映这一状态。凭证解析使用局部映射，不临时修改进程环境。
+SET 将输入值写入 JSON 凭据文件；KEEP 保留已有值。`clear` 同时清除 JSON 中的该引用与本地 `.env` 条目；启动 shell 仍提供该引用时，有效凭证继续存在，读取的 `has_api_key` 反映这一状态。凭证解析使用局部映射，不临时修改进程环境。
 
-未标记的旧 `.env` 赋值保留 python-dotenv `override=True` 的文件顺序、重复赋值与 `${NAME}` / `${NAME:-default}` 展开规则；单引号本身不会禁止旧规则展开。管理 SET 使用单引号并转义反斜线和单引号，值含 `${` 时在行尾添加 ` # jev-managed-literal-v1`，只对该记录保留字面值。例如 `FIXTURE_KEY='fake-${BASE_KEY}' # jev-managed-literal-v1` 在 JEV 中解析为字面 `fake-${BASE_KEY}`。这是同一 `.env` 中的 JEV 约定，通用 dotenv 读取器不实现该标记。SET/CLEAR 替换目标名称的所有赋值，其他记录保持原顺序。
+JSON 值始终按字面解析，包括 `${NAME}`。未标记的旧 `.env` 赋值保留 python-dotenv `override=True` 的文件顺序、重复赋值与 `${NAME}` / `${NAME:-default}` 展开规则；单引号本身不会禁止旧规则展开。旧文件中的行尾标记 ` # jev-managed-literal-v1` 继续让该记录按字面解析，例如 `FIXTURE_KEY='fake-${BASE_KEY}' # jev-managed-literal-v1` 在 JEV 中解析为字面 `fake-${BASE_KEY}`。通用 dotenv 读取器不实现该标记。CLEAR 删除目标名称的所有旧赋值，其他记录保持原顺序。
 
 多文件恢复失败留下 journal 时，修复前禁止从磁盘加载、reload 或发现部分配置；已有健康的内存目录可继续服务。正常 CLI 写入期间 startup/reload 等待共同文件锁，不能把尚未完成的写入误报为需要恢复。
 
@@ -275,7 +316,7 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | --- | --- | --- |
 | `host` | `127.0.0.1` | 网关监听地址。 |
 | `port` | `8000` | 监听端口，范围 `1` 至 `65535`。 |
-| `api_key_env` | `null` | 可选入站鉴权密钥的环境变量名；设置后变量必须有值。 |
+| `api_key_env` | `null` | 可选入站鉴权密钥的凭证引用，支持同目录 JSON、dotenv 和进程环境。声明后必须有值；未声明时可在本机面板初始化。 |
 | `session_strategy` | `derived` | `derived` 从用户标识和首条用户消息生成会话 ID；`header` 仅使用请求头；`user` 使用请求的 user 字段；`off` 禁用会话。非 `off` 模式下有效的 `X-JEV-Session-Id` 请求头优先。 |
 | `session_ttl_seconds` | `1800` | 内存会话过期时间，须大于 0。 |
 | `max_sessions` | `2048` | 内存会话数量上限，至少为 1。 |
@@ -318,13 +359,13 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | `providers[].id` | 必填 | 唯一的决策提供方名称。 |
 | `providers[].protocol` | 必填 | 协议；目前仅支持 `system_one`。 |
 | `providers[].api_base` | 必填 | 决策请求的完整 URL；直接向该地址发起 POST。 |
-| `providers[].api_key_env` | 必填 | 密钥环境变量名；缺失时跳过该提供方。 |
+| `providers[].api_key_env` | 必填 | 密钥凭证引用，支持 JSON、dotenv 和进程环境；缺失时跳过该提供方。 |
 | `providers[].model` | `null` | 可选模型名；省略时请求不带 `model`。 |
 | `providers[].display_name` | `null` | 可选显示名称；省略时界面使用实例 ID。 |
 | `providers[].brand_id` | `null` | 可选品牌标识，与 `protocol` 分开。 |
 | `providers[].icon_id` | `null` | 可选本地图标标识，缺失或未知时显示中性回退。 |
 
-例如，`jev_gateway/templates/models.example.json` 禁用外部决策并使用不带模型名的通用端点。启用时按实际端点填写地址和密钥环境变量；若端点要求模型名，再显式设置 `model`。不要把密钥明文放进 JSON。
+`jev_gateway/templates/models.example.json` 禁用外部决策，不包含决策提供方实例。启用时按实际端点填写地址和凭证引用；若端点要求模型名，再显式设置 `model`。密钥值只写入 `credentials.json` 或兼容的环境来源，不能放进 `models.json`。
 
 旧顶层键 `jev` 已移除，配置中必须使用 `decision`：将 `sources` 改为 `providers`、`default_source` 改为 `default_provider`，并为每个提供方显式填写 `protocol: "system_one"`。若旧端点依赖原先省略 `model` 时的默认值，还需显式填写 `model`；新配置不会代填。旧策略类型 `jev`、`jev_matrix` 也已移除，分别改用 `decision`、`decision_matrix`。旧分类器前缀 `jev:` 和矩阵前缀 `jev_matrix:` 分别改为 `decision:` 和 `decision_matrix:`；`X-JEV-Reason` 响应头名称不变。
 
@@ -355,7 +396,10 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 - 未知策略名或未知模型 ID 会被拒绝。
 - 标签与模型的绑定靠标签：把模型放入某个标签就是给它加上 `{策略}/{标签}` 标签；改标签时只动这个标签，其它策略的标签（如 `quality/*`、`economy/*`）保持原样。
 
-覆盖文件会先合并进 `models.json` 文档，再走原有的解析与策略注册流程，所以标签没有对应模型、规则指向不存在的标签或选择模式等错误，都会用解析器自己的报错信息被拒绝，现役路由不受影响。写入是原子的：校验通过才落盘，落盘后重新加载；写盘后若加载失败，会恢复上一个文件内容并切回旧目录。每次成功应用都会在 `config_versions` 里留下一条记录。
+覆盖文件会先合并进 `models.json` 文档，再走解析与策略注册流程。尚未分配模型的标签池
+允许保存；未知模型引用、规则指向不存在的标签或选择模式等错误仍会被拒绝，现役路由
+不受影响。写入是原子的：校验通过才落盘，落盘后重新加载；写盘后若加载失败，会恢复
+上一个文件内容并切回旧目录。每次成功应用都会在 `config_versions` 里留下一条记录。
 
 `dashboard-theme.json` 只存面板主题的种子色，不存派生结果：
 

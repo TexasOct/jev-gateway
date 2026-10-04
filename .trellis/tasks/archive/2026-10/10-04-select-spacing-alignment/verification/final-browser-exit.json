@@ -1,0 +1,1 @@
+{"exit": 0, "command": "env -u SELECT_CAPTURE_BEFORE node_modules/.bin/playwright test -c playwright.config.ts --reporter=list,json", "port": 4178, "original_config": true}

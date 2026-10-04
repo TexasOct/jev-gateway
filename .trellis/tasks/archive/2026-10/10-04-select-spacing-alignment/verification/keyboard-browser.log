@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 frontend/tests/browser/select-controls.spec.ts:81:1 › native keyboard, focus, disabled and listbox/forced-colors fallback (548ms)
+
+  1 passed (1.5s)

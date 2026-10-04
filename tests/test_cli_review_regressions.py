@@ -56,8 +56,8 @@ def test_login_validation_leaves_catalog_and_env_unchanged(tmp_path, monkeypatch
     key = "secret-private-credential"
     monkeypatch.setenv("KEY_INPUT", key)
     assert main(["--home", str(tmp_path), "--json", "provider", "login", "openai", "--secret-env", "KEY_INPUT"]) == 0
-    assert key in paths.env.read_text()
-    assert stat.S_IMODE(paths.env.stat().st_mode) == 0o600
+    assert key in (tmp_path / "credentials.json").read_text()
+    assert stat.S_IMODE((tmp_path / "credentials.json").stat().st_mode) == 0o600
     assert paths.models.read_bytes() == before
     assert key not in json.dumps(list_providers(paths))
 

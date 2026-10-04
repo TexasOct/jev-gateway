@@ -394,6 +394,8 @@ def create_dashboard_router(
                 "session_id", "route", "strategy", "label", "turn_count",
                 "updated_at", "first_request_at",
             )}
+            if isinstance(snapshot.get("defaulted"), bool):
+                item["defaulted"] = snapshot["defaulted"]
             found = evidence.get(snapshot["session_id"], {})
             latest = found.get("latest_request")
             decision = found.get("latest_decision")
@@ -405,6 +407,11 @@ def create_dashboard_router(
                     strategy=decision.get("strategy") or item.get("strategy"),
                     label=decision.get("label") or item.get("label"),
                 )
+                # Source must describe the retained selection, even when a
+                # legacy decision has no source and its label equals the live one.
+                item.pop("defaulted", None)
+                if isinstance(decision.get("defaulted"), bool):
+                    item["defaulted"] = decision["defaulted"]
             else:
                 profile = state.engine.catalog.by_name(str(item.get("route", "")))
                 item["provider"] = profile.provider if profile is not None else None

@@ -5,7 +5,8 @@ JEV Gateway 支持 curl CLI、仓库开发模式、uv 隔离 CLI、容器运行�
 ```text
 $HOME/.jev-gateway/
 ├── models.json          # Provider、模型、策略和网关配置
-├── .env                 # 仅存放 models.json 所引用的密钥
+├── credentials.json     # 受限权限的密钥文件，键名对应 models.json 中的引用
+├── .env                 # 兼容已有环境配置，新模板只有注释示例
 └── jev-records.sqlite3  # 默认 SQLite 决策与请求记录
 ```
 
@@ -15,7 +16,14 @@ $HOME/.jev-gateway/
 export JEV_GATEWAY_HOME="$HOME/.jev-gateway-staging"
 ```
 
-网关启动时从该目录加载 `models.json` 和 `.env`。`storage.path` 使用相对路径时，也会相对于该目录保存。因此，配置、密钥和记录不会散落到启动终端所在目录。
+网关启动时从该目录加载 `models.json`、`credentials.json` 和兼容的 `.env`。`storage.path` 使用相对路径时，也会相对于该目录保存。网页初始化与无浏览器的文件配置步骤见 [`credentials.md`](credentials.md)。
+
+首次安装和默认前台启动只在文件不存在时初始化。默认配置保留三套策略方案，不包含
+供应商、模型或上游密钥。启动后打开本机 `/dashboard` 设置管理密钥，即可进入控制台；
+供应商和模型可稍后配置。终端和远程部署可先执行 `jev setup`；服务已运行时，再执行
+`jev config reload` 加载管理密钥。面板保存会加载新配置，手工修改文件后也可用
+`jev config reload` 重载。没有模型时，对话返回
+`503 setup_incomplete`，不会影响控制台或进程存活。
 
 ## 方案一：curl 安装 CLI
 
@@ -31,7 +39,7 @@ curl -fsSL https://github.com/TexasOct/jev-gateway/releases/latest/download/inst
 tag 的 URL 下载 `jev_gateway-X.Y.Z-py3-none-any.whl` 和同名 `.sha256` 文件，
 校验后才调用 `uv tool install --python 3.12 --managed-python`，不再解析 latest 或查询 GitHub API 寻找 wheel。
 安装完成后，`jev install init` 初始化运行目录。重复运行会保留已有的
-`models.json`、`.env` 和记录数据库。更新 Release wheel 后，如果指定运行目录中原有由
+`models.json`、`credentials.json`、`.env` 和记录数据库。新密钥文件初始为空，权限为 `0600`。更新 Release wheel 后，如果指定运行目录中原有由
 `jev` 管理且归属可验证的后台网关，安装器会重启它，最多等待 10 秒健康检查通过后
 才报告成功。原本未运行时不会自动启动；无法确认 PID 归属时不会发送停止信号。
 如果重启失败，wheel 已安装但安装器返回非零状态。请检查 PID 文件和日志，运行
@@ -135,18 +143,16 @@ scripts/build-frontend.sh
 # 初始化持久运行目录，只在文件不存在时复制模板
 ./scripts/install-local.sh --editable
 
-# 编辑运行配置和密钥
-$EDITOR "$HOME/.jev-gateway/models.json"
-$EDITOR "$HOME/.jev-gateway/.env"
-
 # 启动
 ~/.local/bin/jev-gateway-local
+# 打开本机面板设置管理密钥，供应商和模型可稍后配置
 ```
 
-`--editable` 使工具命令直接读取当前仓库代码。修改 Python 文件后重启网关即可，无需重新安装。修改 `models.json` 或轮换 `.env` 中已声明的密钥后可调用 reload：
+纯服务端可在启动前编辑同目录 `credentials.json`。`--editable` 使工具命令直接读取当前仓库代码。修改 Python 文件后重启网关即可，无需重新安装。修改 `models.json` 或轮换凭据文件中已声明的密钥后可调用 reload；已启用鉴权时需携带当前 Bearer：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/routing/reload
+curl -X POST http://127.0.0.1:8000/v1/routing/reload \
+  -H 'Authorization: Bearer <your-gateway-key>'
 ```
 
 开发常用命令：
@@ -189,9 +195,9 @@ scripts/build-frontend.sh
 
 1. 使用 `uv tool install --python 3.12 --managed-python` 创建隔离工具环境；缺少 uv 管理的 Python 3.12 时会下载。
 2. 安装 `jev-gateway` CLI。
-3. 初始化 `$HOME/.jev-gateway/models.json` 和 `$HOME/.jev-gateway/.env`。
+3. 初始化 `$HOME/.jev-gateway/models.json`、受限权限的空 `credentials.json` 和注释型 `.env`。
 4. 创建 `~/.local/bin/jev-gateway-local`，并自动设置 `JEV_GATEWAY_HOME`。
-5. 保留既有 `models.json`、`.env` 和 SQLite 文件，重复执行不会覆盖数据。
+5. 保留既有 `models.json`、`credentials.json`、`.env` 和 SQLite 文件，重复执行不会覆盖数据。
 
 启动：
 
@@ -273,7 +279,8 @@ Dockerfile 在 Node 阶段从 `frontend/` 构建面板，再复制到 Python 构
 容器使用挂载卷持久化 `$HOME/.jev-gateway`。首次启动时，如果宿主目录中缺少配置，entrypoint 会生成：
 
 - `models.json`，并将 `gateway.host` 设为 `0.0.0.0`
-- `.env` 模板
+- 权限为 `0600` 的空 `credentials.json`
+- 只有注释示例的 `.env` 模板
 
 构建并启动：
 
@@ -297,19 +304,20 @@ docker run --rm \
 
 ```bash
 $EDITOR "$HOME/.jev-gateway/models.json"
-$EDITOR "$HOME/.jev-gateway/.env"
+$EDITOR "$HOME/.jev-gateway/credentials.json"
 ```
 
-随后重启容器：
+容器监听 `0.0.0.0`，不开放匿名网页初始化；应按 [`credentials.md`](credentials.md) 在文件中设置网关与供应商密钥。随后重启容器：
 
 ```bash
 docker compose restart
 ```
 
-或只重新加载 JSON 配置：
+或在已有网关鉴权配置时携带当前 Bearer 重新加载：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/routing/reload
+curl -X POST http://127.0.0.1:8000/v1/routing/reload \
+  -H 'Authorization: Bearer <your-gateway-key>'
 ```
 
 Compose 默认只将容器端口绑定到 `127.0.0.1`。如需对局域网开放，请显式修改 `compose.yaml` 的 ports 配置，并在 `models.json` 中评估入站鉴权设置。
@@ -317,7 +325,7 @@ Compose 默认只将容器端口绑定到 `127.0.0.1`。如需对局域网开放
 ## 方案六：wheel 安装
 
 适合把固定版本交付给另一台机器。在源码仓库根目录先构建面板，再构建 wheel。
-下面以 `pyproject.toml` 中版本为 `0.1.0` 为例；构建和校验使用 Python 3.12+，
+下面以 `pyproject.toml` 中版本为 `0.1.1` 为例；构建和校验使用 Python 3.12+，
 传入的 tag 必须与项目版本完全对应，`dist/` 中只能有这一版 wheel：
 
 ```bash
@@ -325,19 +333,16 @@ uv sync --all-groups
 npm --prefix frontend install
 scripts/build-frontend.sh
 uv build
-python3 scripts/validate-release.py v0.1.0 dist
-uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.0-py3-none-any.whl
+python3 scripts/validate-release.py v0.1.1 dist
+uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.1-py3-none-any.whl
 ```
 
 校验脚本检查 wheel 内容，把 tag 写入 `dist/install.sh`，并生成脚本和 wheel 的
 两个 SHA256 文件。这些本地产物不会自动发布为 GitHub Release。安装好的 wheel
-包含面板，不需要 Node.js，也不包含用户配置、密钥和运行数据。安装后可将仓库中的
-模板复制到尚未初始化的标准目录；已有运行目录不要再次执行下面的复制命令：
+包含面板，不需要 Node.js，也不包含用户配置、密钥和运行数据。默认前台启动会初始化
+尚不存在的配置文件，保留已有运行目录。启动后用本机面板完成管理密钥设置：
 
 ```bash
-mkdir -p "$HOME/.jev-gateway"
-cp jev_gateway/templates/models.example.json "$HOME/.jev-gateway/models.json"
-cp jev_gateway/templates/env.example "$HOME/.jev-gateway/.env"
 JEV_GATEWAY_HOME="$HOME/.jev-gateway" jev-gateway
 ```
 

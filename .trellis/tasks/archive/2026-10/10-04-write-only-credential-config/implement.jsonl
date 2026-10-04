@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Package boundaries and full verification gates"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Credential projection, snapshots, shared references and transactions"}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"CLI credential source and runtime-directory contracts"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Typed network-free tests and Python/frontend gates"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Fixed public errors and secret-safe log/record paths"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Existing authentication, frontend state and packaging boundaries"}
+{"file":".trellis/tasks/archive/2026-10/10-04-write-only-credential-config/research/credential-map.md","reason":"Verified owner paths, install blockers and write/readback paths"}

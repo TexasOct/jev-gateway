@@ -32,6 +32,9 @@ function providerConfigurationSnapshot(catalog: typeof configuration): ProviderC
   return {
     revision: "fixture-provider-revision",
     write_available: catalog.write_available,
+    defaults: catalog.defaults ?? { default_model: null },
+    gateway: { api_key_env: "FIXTURE_GATEWAY_KEY", has_api_key: true },
+    gateway_bootstrap_available: false,
     providers: [...new Set(catalog.models.map(({ provider }) => provider))].map((id) => ({
       id, type: "openai", display_name: id, api_base: "https://example.test/v1",
       api_key_env: "FIXTURE_PROVIDER_KEY", has_api_key: true,
@@ -115,6 +118,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       await route.abort("blockedbyclient");
       return;
     }
+    if (url.pathname === "/v1/setup") return fulfill(route, { required: false, local_setup_available: false, revision: "fixture-setup", has_providers: true, has_models: true, routing_ready: true, next_step: "ready" });
     if (url.pathname === "/v1/provider-configuration" && url.search === "") return fulfill(route, providerConfigurationSnapshot(state.appliedConfiguration ?? configuration));
     if (url.pathname === "/v1/routing/providers/summary") return fulfill(route, state.providerOverride ?? providers);
     if (url.pathname === "/v1/routing/activity") {

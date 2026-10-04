@@ -74,6 +74,7 @@ export function MonitoringView(props: MonitoringViewProps) {
         t={props.t}
       />
       <SessionInspector
+        policyCatalog={props.policyCatalog}
         locale={props.locale}
         providers={props.providers}
         sessions={props.sessions}

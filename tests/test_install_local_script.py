@@ -43,16 +43,56 @@ def test_local_installer_uses_managed_python_and_packaged_templates(tmp_path: Pa
     templates = ROOT / "jev_gateway/templates"
     assert (home / "models.json").read_bytes() == (templates / "models.example.json").read_bytes()
     assert (home / ".env").read_bytes() == (templates / "env.example").read_bytes()
+    credentials = home / "credentials.json"
+    assert json.loads(credentials.read_text()) == {"version": 1, "values": {}}
+    assert credentials.stat().st_mode & 0o777 == 0o600
     assert (bin_dir / "jev-gateway-local").is_file()
 
     (home / "models.json").write_text("existing catalog\n")
     (home / ".env").write_text("existing credentials\n")
+    credentials.write_text('{"version":1,"values":{"TEST_KEY":"fake-retained-key"}}\n')
+    retained = credentials.read_bytes()
     subprocess.run(command, env=env, check=True, capture_output=True)
     assert (home / "models.json").read_text() == "existing catalog\n"
     assert (home / ".env").read_text() == "existing credentials\n"
+    assert credentials.read_bytes() == retained
 
 
 def test_container_copies_packaged_templates_to_entrypoint_locations() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert "COPY jev_gateway/templates/models.example.json ./models.example.json" in dockerfile
     assert "COPY jev_gateway/templates/env.example ./.env.example" in dockerfile
+    assert "COPY jev_gateway/templates/credentials.example.json ./credentials.example.json" in dockerfile
+
+
+def test_container_entrypoint_initializes_empty_credentials_and_preserves_operator_files(tmp_path: Path) -> None:
+    packaged = ROOT / "jev_gateway/templates"
+    templates = tmp_path / "opt"
+    templates.mkdir()
+    for source, target in (
+        ("models.example.json", "models.example.json"),
+        ("env.example", ".env.example"),
+        ("credentials.example.json", "credentials.example.json"),
+    ):
+        (templates / target).write_bytes((packaged / source).read_bytes())
+    entrypoint = tmp_path / "entrypoint.sh"
+    entrypoint.write_text(
+        (ROOT / "scripts/container-entrypoint.sh").read_text().replace("/opt/jev-gateway", str(templates))
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "python").symlink_to(sys.executable)
+    gateway = bin_dir / "jev-gateway"
+    gateway.write_text("#!/bin/sh\nexit 0\n")
+    gateway.chmod(0o755)
+    home = tmp_path / "runtime"
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JEV_GATEWAY_HOME": str(home)}
+    subprocess.run(["sh", str(entrypoint)], env=env, capture_output=True, check=True)
+    assert json.loads((home / "models.json").read_text())["gateway"]["host"] == "0.0.0.0"
+    credentials = home / "credentials.json"
+    assert json.loads(credentials.read_text()) == {"version": 1, "values": {}}
+    assert credentials.stat().st_mode & 0o777 == 0o600
+    credentials.write_text('{"version":1,"values":{"TEST_KEY":"fake-container-key"}}\n')
+    before = {name: (home / name).read_bytes() for name in ("models.json", "credentials.json", ".env")}
+    subprocess.run(["sh", str(entrypoint)], env=env, capture_output=True, check=True)
+    assert {name: (home / name).read_bytes() for name in before} == before

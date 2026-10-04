@@ -42,6 +42,12 @@ fi
 if [ ! -f "$config_dir/.env" ]; then
     cp "$repo_dir/jev_gateway/templates/env.example" "$config_dir/.env"
 fi
+if [ ! -f "$config_dir/credentials.json" ]; then
+    (
+        umask 077
+        cp "$repo_dir/jev_gateway/templates/credentials.example.json" "$config_dir/credentials.json"
+    )
+fi
 
 launcher="$bin_dir/jev-gateway-local"
 cat >"$launcher" <<EOF
@@ -61,8 +67,8 @@ Install mode:      $(if [ "$editable" = true ]; then printf editable; else print
 
 Next steps:
   1. Edit $config_dir/models.json
-  2. Edit $config_dir/.env
-  3. Run $launcher
+  2. Run $launcher and open /dashboard to initialize credentials locally
+  3. For a headless server, edit $config_dir/credentials.json before startup
 
-The installer preserves existing models.json and .env files on repeat runs.
+The installer preserves existing models.json, credentials.json and .env files on repeat runs.
 EOF

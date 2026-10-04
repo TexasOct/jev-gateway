@@ -1,5 +1,6 @@
-import type { ProviderRow, ProvidersPayload, RetainedRequest, SessionRequestsPayload, SessionRow, SessionsPayload } from "@/shared/api/types";
+import type { PolicyCatalog, ProviderRow, ProvidersPayload, RetainedRequest, SessionRequestsPayload, SessionRow, SessionsPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
+import { formatRouteLabel, routeLabelContext } from "@/shared/i18n/route-label";
 import { Card } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
@@ -7,6 +8,7 @@ import { RouteTrace } from "./RouteTrace";
 import { VirtualList } from "./VirtualList";
 
 interface Props {
+  policyCatalog?: PolicyCatalog | null;
   locale: "en" | "zh-CN";
   providers: ProvidersPayload | null;
   sessions: SessionsPayload | null;
@@ -80,7 +82,7 @@ function JsonBlock({ name, value, empty }: { name: string; value: unknown; empty
   );
 }
 
-function RequestCard({ item, t, formatDateTime, selected, onSelect }: { item: RetainedRequest; t: Translate; formatDateTime: FormatDateTime; selected: boolean; onSelect: () => void }) {
+function RequestCard({ item, t, formatDateTime, selected, onSelect, policyCatalog }: { item: RetainedRequest; t: Translate; formatDateTime: FormatDateTime; selected: boolean; onSelect: () => void; policyCatalog?: PolicyCatalog | null }) {
   const request = item.request;
   const requestId = typeof request["request_id"] === "string" ? request["request_id"] : t("unknownRequest");
   const receivedAt = typeof request["received_at"] === "number" ? request["received_at"] : null;
@@ -93,7 +95,7 @@ function RequestCard({ item, t, formatDateTime, selected, onSelect }: { item: Re
         <span>{formatDateTime(receivedAt)}</span>
         <span className="text-ink-muted">{requestId} · <span className={statusClass}>{status}</span></span>
       </button>
-      {selected ? <RouteTrace item={item} /> : null}
+      {selected ? <RouteTrace item={item} policyCatalog={policyCatalog} /> : null}
       <div className="request-evidence mt-2 min-w-0">
         <JsonBlock name={t("inboundRequest")} value={item.request} empty={t("notRecorded")} />
         <JsonBlock name={t("routingDecision")} value={item.decision} empty={t("notRecorded")} />
@@ -125,7 +127,7 @@ function guidance(locale: "en" | "zh-CN", sessions: SessionsPayload | null, sele
     : "The latest retained requests are listed below. Select one to inspect its route trace and recorded outcome.";
 }
 
-function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSelect }: { session: SessionRow | null; isPreview: boolean; locale: "en" | "zh-CN"; t: Translate; formatDateTime: FormatDateTime; onSelect: () => void }) {
+function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSelect, policyCatalog }: { session: SessionRow | null; isPreview: boolean; locale: "en" | "zh-CN"; t: Translate; formatDateTime: FormatDateTime; onSelect: () => void; policyCatalog?: PolicyCatalog | null }) {
   if (session === null) return null;
   const latest = session.latest_request ?? null;
   const result = latest === null ? t("notRecorded") : latest.ok === true ? t("succeeded") : latest.ok === false ? t("failed") : t("traceUnknown");
@@ -139,7 +141,7 @@ function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSele
           <span className={resultClass}>{t("recordedResult")}: {result}</span>
         </div>
         <div className="monitoring-meta break-words text-xs text-ink-muted">
-          {[session.strategy ?? t("strategyUnavailable"), session.label ?? t("labelUnavailable"), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}
+          {[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session, policyCatalog)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}
         </div>
         {isPreview ? <div className="monitoring-preview-hint text-xs text-ink-muted">{t("previewNotSelected")}</div> : null}
       </div>
@@ -149,7 +151,7 @@ function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSele
     </div>
   );
 }
-export function SessionInspector({ locale, providers, sessions, selectedSessionId, detail, selectedRequestId, sessionPageError, detailPageError, sessionLoading, detailLoading, monitoringError, providerError = false, distributionComplete, detailError, sessionListEpoch, detailListEpoch, t, formatDateTime, onSelectSession, onLoadMoreSessions, onLoadMoreDetail, onRetrySessions, onRetryDetail, onRetryMonitoring, onRetrySelectedDetail, onSelectRequest }: Props) {
+export function SessionInspector({ locale, providers, sessions, selectedSessionId, detail, selectedRequestId, sessionPageError, detailPageError, sessionLoading, detailLoading, monitoringError, providerError = false, distributionComplete, detailError, sessionListEpoch, detailListEpoch, t, formatDateTime, onSelectSession, onLoadMoreSessions, onLoadMoreDetail, onRetrySessions, onRetryDetail, onRetryMonitoring, onRetrySelectedDetail, onSelectRequest, policyCatalog }: Props) {
   const copy = (en: string, zh: string) => locale === "zh-CN" ? zh : en;
   const preview = selectedSessionId === null ? sessions?.data[0] ?? null : null;
   const selectedRequestSession = detail?.session;
@@ -161,6 +163,8 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
       upstream_model: typeof selectedRequestSession?.["upstream_model"] === "string" ? selectedRequestSession["upstream_model"] : null,
       strategy: typeof selectedRequestSession?.["strategy"] === "string" ? selectedRequestSession["strategy"] : null,
       label: typeof selectedRequestSession?.["label"] === "string" ? selectedRequestSession["label"] : null,
+      defaulted: typeof selectedRequestSession?.["defaulted"] === "boolean" ? selectedRequestSession["defaulted"] : undefined,
+      reason: typeof selectedRequestSession?.["reason"] === "string" ? selectedRequestSession["reason"] : null,
       turn_count: typeof selectedRequestSession?.["turn_count"] === "number" ? selectedRequestSession["turn_count"] : undefined,
       first_request_at: typeof selectedRequestSession?.["first_request_at"] === "number" ? selectedRequestSession["first_request_at"] : null,
       latest_request: null,
@@ -183,7 +187,7 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
         </div>
         {monitoringError ? <Button variant="outline" onClick={onRetryMonitoring}>{t("retryPage")}</Button> : null}
         {detailError && !monitoringError ? <Button variant="outline" onClick={onRetrySelectedDetail}>{t("retryPage")}</Button> : null}
-        <SessionOverview session={activeOverviewSession} isPreview={selectedSessionId === null && preview !== null} locale={locale} t={t} formatDateTime={formatDateTime} onSelect={() => { if (preview) onSelectSession(preview.session_id); }} />
+        <SessionOverview session={activeOverviewSession} isPreview={selectedSessionId === null && preview !== null} locale={locale} t={t} formatDateTime={formatDateTime} policyCatalog={policyCatalog} onSelect={() => { if (preview) onSelectSession(preview.session_id); }} />
       </Card>
 
       <Card className="monitoring-sessions-panel col-start-1 min-w-0 p-4 max-[899px]:col-start-1 max-[899px]:row-auto">
@@ -208,7 +212,7 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
               <span className="route">{session.route ?? t("routeUnavailable")}</span>
               <span className="text-ink-muted [overflow-wrap:anywhere]">{session.session_id}</span>
               <span className="text-ink-muted [overflow-wrap:anywhere]">{session.first_request_at == null ? t("unknownFirstRequest") : formatDateTime(session.first_request_at)}</span>
-              <span className="text-ink-muted [overflow-wrap:anywhere]">{[session.strategy ?? t("strategyUnavailable"), session.label ?? t("labelUnavailable"), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable"), `${session.turn_count ?? 0} ${t("turns")}`, status].join(" · ")}</span>
+              <span className="text-ink-muted [overflow-wrap:anywhere]">{[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session, policyCatalog)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable"), `${session.turn_count ?? 0} ${t("turns")}`, status].join(" · ")}</span>
             </button>;
           }}
         />
@@ -231,7 +235,7 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
           footer={detailPageError ? <Button variant="outline" onClick={onRetryDetail}>{t("retryPage")}</Button> : detail === null ? <div className="text-ink-muted [overflow-wrap:anywhere]">{detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("inspectRequests") : t("loading")}</div> : detail.requests.length === 0 ? <div className="text-ink-muted [overflow-wrap:anywhere]">{t("noRetainedRequests")}</div> : null}
           render={(item) => {
             const requestId = String(item.request["request_id"]);
-            return <RequestCard item={item} t={t} formatDateTime={formatDateTime} selected={requestId === activeRequestId} onSelect={() => onSelectRequest(requestId)} />;
+            return <RequestCard item={item} t={t} formatDateTime={formatDateTime} selected={requestId === activeRequestId} policyCatalog={policyCatalog} onSelect={() => onSelectRequest(requestId)} />;
           }}
         />
       </Card>

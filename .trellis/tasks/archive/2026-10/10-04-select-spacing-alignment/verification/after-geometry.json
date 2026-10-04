@@ -1,0 +1,1482 @@
+[
+  {
+    "phase": "after",
+    "width": 320,
+    "locale": "en",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 320,
+    "locale": "en",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 320,
+    "locale": "zh-CN",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 320,
+    "locale": "zh-CN",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 296,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 390,
+    "locale": "en",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 390,
+    "locale": "en",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 516.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 596.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 390,
+    "locale": "zh-CN",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 464.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 544.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 464.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 12,
+          "y": 544.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 390,
+    "locale": "zh-CN",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 12,
+          "y": 464.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 544.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 12,
+          "y": 464.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 12,
+          "y": 544.5,
+          "width": 366,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": -80,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "locale": "en",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "locale": "en",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "locale": "zh-CN",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "locale": "zh-CN",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 256,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 646,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1701,
+    "locale": "en",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1701,
+    "locale": "en",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1701,
+    "locale": "zh-CN",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1701,
+    "locale": "zh-CN",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 466.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 856.5,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1920,
+    "locale": "en",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1920,
+    "locale": "en",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1920,
+    "locale": "zh-CN",
+    "scheme": "light",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(24, 24, 27) calc(50% - 1px), rgb(24, 24, 27) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(24, 24, 27)",
+          "backgroundColor": "rgb(255, 255, 255)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  },
+  {
+    "phase": "after",
+    "width": 1920,
+    "locale": "zh-CN",
+    "scheme": "dark",
+    "measurements": [
+      {
+        "kind": "llm",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      },
+      {
+        "kind": "decision",
+        "selected": {
+          "x": 576,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "none",
+          "paddingRight": "32px",
+          "backgroundImage": "linear-gradient(45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px)), linear-gradient(-45deg, rgba(0, 0, 0, 0) calc(50% - 1px), rgb(244, 244, 245) calc(50% - 1px), rgb(244, 244, 245) calc(50% + 1px), rgba(0, 0, 0, 0) calc(50% + 1px))",
+          "backgroundPosition": "calc(100% - 17px) 50%, calc(100% - 12px) 50%",
+          "backgroundSize": "5px 5px, 5px 5px",
+          "backgroundRepeat": "no-repeat, no-repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "input": {
+          "x": 966,
+          "y": 348,
+          "width": 378,
+          "height": 44,
+          "appearance": "auto",
+          "paddingRight": "12px",
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "backgroundRepeat": "repeat",
+          "color": "rgb(244, 244, 245)",
+          "backgroundColor": "rgb(22, 22, 24)"
+        },
+        "topDifference": 0,
+        "heightDifference": 0
+      }
+    ]
+  }
+]

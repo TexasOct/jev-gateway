@@ -37,9 +37,9 @@ describe("semantic output channels", () => {
     expect(repaired.rules[0]!.when).toEqual(draft.rules[0]!.when);
   });
 
-  it("rejects missing, empty and unknown labels and protects fixed context/order links", () => {
+  it("rejects explicit empty and unknown labels and protects fixed context/order links", () => {
     const draft = draftFromConfiguration(configuration);
-    for (const label of [undefined, "", "missing"]) {
+    for (const label of ["", "missing"]) {
       expect(incompleteLabels({ ...draft, rules: [{ ...draft.rules[0]!, select: { label } }], fallback: { label } }, configuration)).toEqual(["rule-0", "fallback"]);
     }
     const edges = workflowEdges(draft, configuration);
@@ -47,6 +47,22 @@ describe("semantic output channels", () => {
     const order = edges.find((edge) => edge.kind === "unmatched")!;
     expect(classifyConnection(draft, configuration, { kind: "remove", edge: order }, order.to).reason).toBe("fixed");
     expect(connectMatchEdge(draft, configuration, "questions", "zone::balanced/default")).toBeNull();
+  });
+
+  it("resolves omitted labels through the first pool while keeping disconnected ports invalid with a global default", () => {
+    const config = { ...configuration, defaults: { default_model: configuration.models[0]!.id } };
+    const draft = draftFromConfiguration(config);
+    for (const model of Object.values(draft.models)) model.tags = [];
+    draft.rules[0]!.select = { selection: "quality_first" };
+    draft.fallback = {};
+    expect(incompleteLabels(draft, config)).toEqual([]);
+    expect(canvasOutputs(draft, config)["zone::balanced/default"]!.map((row) => row.kind)).toEqual(["default", "add"]);
+    const match = workflowEdges(draft, config).find((edge) => edge.from === "rule-0" && edge.kind === "match")!;
+    const cleared = disconnectEdge(draft, config, match)!;
+    expect(incompleteLabels(cleared, config)).toEqual(["rule-0"]);
+    expect(canvasOutputs(cleared, config)["rule-0"]![0]!.edge).toBeUndefined();
+    expect(toOverlayPayload(cleared, config).rules[0]!.select.label).toBe("");
+    expect(toOverlayPayload(cleared, config)).not.toHaveProperty("defaults");
   });
 
   it("uses resolved explicit members and a separate add output only for tag pools", () => {

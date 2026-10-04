@@ -19,6 +19,7 @@ import type {
   Question,
   RoutingOverlayPayload,
 } from "@/shared/api/types";
+import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 
 export interface ModelDraft {
   id: string;
@@ -259,7 +260,14 @@ export function toggleRuleQuestion(draft: RoutingDraft, index: number, question:
 }
 
 export function setFallback(draft: RoutingDraft, patch: Partial<RuleChoice>): RoutingDraft {
-  return { ...draft, fallback: { ...draft.fallback, ...patch } };
+  return { ...draft, fallback: updateChoice(draft.fallback, patch) };
+}
+
+function updateChoice(choice: RuleChoice, patch: Partial<RuleChoice>): RuleChoice {
+  const updated = { ...choice, ...patch };
+  if (Object.hasOwn(patch, "label")) delete updated.tier;
+  if (Object.hasOwn(patch, "tier")) delete updated.label;
+  return updated;
 }
 
 export function setQuestion(
@@ -278,7 +286,7 @@ export function setRuleChoice(
   const rule = draft.rules[index];
   if (rule === undefined) return draft;
   const rules = [...draft.rules];
-  rules[index] = { ...rule, select: { ...rule.select, ...patch } };
+  rules[index] = { ...rule, select: updateChoice(rule.select, patch) };
   return { ...draft, rules };
 }
 
@@ -292,10 +300,9 @@ export function addRule(
 ): RoutingDraft {
   const labelDefinition = config.labels.find((item) => item.name === label);
   // Use the known selectable catalog options; full catalog validity remains the server's authority.
-  const hasResolvedModels = labelDefinition !== undefined && (labelDefinition.resolution === "models"
-    ? labelDefinition.models.some((id) => Object.hasOwn(draft.models, id))
-    : config.models.some((model) => draft.models[model.id]?.tags.includes(labelDefinition.tag)));
-  if (!Object.hasOwn(draft.questions[question]?.criteria ?? {}, criterion) || !hasResolvedModels) return draft;
+  const selectable = labelDefinition !== undefined && (labelDefinition.resolution === "tag" ||
+    labelDefinition.models.some((id) => Object.hasOwn(draft.models, id)));
+  if (!Object.hasOwn(draft.questions[question]?.criteria ?? {}, criterion) || !selectable) return draft;
   const choices: RuleChoice = selection ? { label, selection } : { label };
   return { ...draft, rules: [...draft.rules, { when: { [question]: criterion }, select: choices }] };
 }
@@ -337,14 +344,18 @@ export function toOverlayPayload(
 export interface WorkflowEdge {
   from: string;
   to: string;
-  kind: "context" | "failure" | "match" | "unmatched" | "pool";
+  kind: "context" | "failure" | "match" | "unmatched" | "pool" | "default";
 }
 
 /** Empty labels remain repairable in the draft but must never reach validation/apply. */
 export function incompleteLabels(draft: RoutingDraft, config: ConfigurationPayload): string[] {
   const known = new Set(config.labels.map((label) => label.name));
-  return [...draft.rules.flatMap((rule, index) => !rule.select.label || !known.has(rule.select.label) ? [`rule-${index}`] : []),
-    ...(!draft.fallback.label || !known.has(draft.fallback.label) ? ["fallback"] : [])];
+  const incomplete = (choice: RuleChoice) => {
+    const label = matrixChoiceLabel(choice, config.labels[0]?.name);
+    return label === undefined || label === "" || !known.has(label);
+  };
+  return [...draft.rules.flatMap((rule, index) => incomplete(rule.select) ? [`rule-${index}`] : []),
+    ...(incomplete(draft.fallback) ? ["fallback"] : [])];
 }
 
 type QuestionError = { name: string; reason: "type" | "criteria" | "instructions" | "criterionName" | "criterionDescription" };
@@ -366,15 +377,20 @@ export function workflowEdges(draft: RoutingDraft, config: ConfigurationPayload)
   const edges: WorkflowEdge[] = [{ from: "questions", to: draft.rules.length ? "rule-0" : defaultPool, kind: "context" },
     { from: "questions", to: "fallback", kind: "failure" }];
   draft.rules.forEach((rule, index) => {
-    const tag = config.labels.find((label) => label.name === rule.select.label)?.tag;
+    const tag = config.labels.find((label) => label.name === matrixChoiceLabel(rule.select, config.labels[0]?.name))?.tag;
     if (tag !== undefined) edges.push({ from: `rule-${index}`, to: `zone::${tag}`, kind: "match" });
     edges.push({ from: `rule-${index}`, to: index + 1 < draft.rules.length ? `rule-${index + 1}` : defaultPool, kind: "unmatched" });
   });
-  const fallbackTag = config.labels.find((label) => label.name === draft.fallback.label)?.tag;
+  const fallbackTag = config.labels.find((label) => label.name === matrixChoiceLabel(draft.fallback, config.labels[0]?.name))?.tag;
   if (fallbackTag !== undefined) edges.push({ from: "fallback", to: `zone::${fallbackTag}`, kind: "match" });
   for (const label of config.labels) {
-    for (const model of label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((item) => item.id)) {
+    const members = label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((item) => item.id);
+    for (const model of members) {
       edges.push({ from: `zone::${label.tag}`, to: `model::${model}`, kind: "pool" });
+    }
+    const globalModel = config.defaults?.default_model;
+    if (label.resolution === "tag" && members.length === 0 && globalModel && config.models.some((model) => model.id === globalModel)) {
+      edges.push({ from: `zone::${label.tag}`, to: `model::${globalModel}`, kind: "default" });
     }
   }
   return edges;

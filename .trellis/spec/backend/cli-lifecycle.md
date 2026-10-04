@@ -10,6 +10,7 @@ Apply these contracts when changing the `jev` CLI, curl installer, provider onbo
 jev [--home PATH] [--json] <command>
 jev install init [--home PATH] [--ref REF | --version VERSION --source RELEASE_WHEEL_URL] [--method isolated]
 jev doctor | status | start | stop | restart | logs
+jev setup [--secret-env SOURCE_NAME | --secret-stdin]
 jev config path | show | validate | reload
 jev provider list | add PRESET | login ID | logout ID | remove ID
 jev uninstall [--dry-run] [--purge] [--yes]
@@ -37,9 +38,11 @@ back to raw `main`.
 `--ref REF` remains an explicit Git-source developer install, without Release
 checksum verification, and cannot be combined with `--version`. Release wheel
 state records `source_type: release_wheel`, `package_version`, and the exact
-wheel URL; legacy Git state remains readable. Provider presets are OpenAI,
-Anthropic, and DeepSeek; the `custom` branch accepts a caller-supplied provider
-type and endpoint. CLI login means API-key capture through a JEV command, not
+wheel URL; legacy Git state remains readable. Provider presets come from the
+shared `provider_presets.PRESETS` registry; argparse choices must use that same
+registry. The `custom` branch accepts a caller-supplied provider type and endpoint.
+Additional parameters use `--param NAME=VALUE` or `--param-env NAME=ENV` and retain
+the catalog's credential/reserved-name validation. CLI login means API-key capture through a JEV command, not
 reuse of an existing Codex or Claude login or subscription.
 
 ## 3. Contracts
@@ -48,9 +51,22 @@ reuse of an existing Codex or Claude login or subscription.
 - The initial `curl | sh` invocation cannot verify its own script bytes before execution. Documentation must provide a pinned-tag download/review/checksum/execute example, using the same tag for script and sidecar. A sidecar from the same publisher detects mismatches but is not an independent signature.
 - Runtime directory precedence: `--home`, `JEV_GATEWAY_HOME`, recorded install state, then `$HOME/.jev-gateway`. The server child receives its resolved directory in `JEV_GATEWAY_HOME`. The foreground `jev-gateway` entry point uses the same resolver without `--home`; the caller's working directory does not select its catalog. Explicit `models_file` arguments in application APIs remain supported.
 - Local lifecycle health probes set `trust_env=False` so exported HTTP proxy settings cannot redirect loopback readiness checks.
-- `models.json` remains the only static catalog. The CLI writes providers and models only. A provider's `api_key_env` names its credential; the value belongs in the runtime `.env` and its protected backup, not in JSON, arguments, logs, or install state.
-- Login can precede addition for a known preset, or set/rotate the declared key for an existing provider. Logout removes the variable from the runtime `.env` without deleting the catalog entry or revoking the upstream key. An exported shell variable can still supply the credential.
-- `--secret-env SOURCE_NAME` reads from the named process environment variable; `--secret-stdin` reads a bounded line; an interactive terminal can use a no-echo prompt. Never add a `--api-key VALUE` argument. `.env` and `.env.backup` must have mode `0600`.
+- `models.json` remains the only static catalog. General CLI management writes
+  providers and models; initial setup establishes the gateway key reference.
+  A provider's `api_key_env` names its credential in protected `credentials.json`.
+  Values never belong in `models.json`, arguments, logs, or install state. The
+  shared resolver uses JSON > neighboring `.env` > captured process values without
+  changing `os.environ`; see [credential configuration](./credential-configuration.md).
+- Initial `jev setup` establishes `gateway.api_key_env` through the same managed
+  credential owner as both HTTP setup endpoints. Preserve an existing declared
+  reference; use the owner's default only when none is declared. Packaged defaults contain strategy plans without
+  provider/model instances. Provider/model configuration may happen later;
+  startup and console access remain available with an empty catalog. Default
+  foreground startup initializes absent files without installation-state writes,
+  preserving existing files. Read [Runtime initialization](./initialization.md)
+  for bootstrap, revision, secret and incomplete-state contracts.
+- Login can precede addition for a known preset, or set/rotate the declared key for an existing provider. Logout removes the reference from JSON and legacy local dotenv without deleting the catalog entry or revoking the upstream key. An exported shell variable can still supply the credential.
+- `--secret-env SOURCE_NAME` reads from the named process environment variable; `--secret-stdin` reads a bounded line; an interactive terminal can use a no-echo prompt. Never add a `--api-key VALUE` argument. Credential store, backups and changed local dotenv files must have mode `0600`. All install paths initialize an empty protected JSON store and preserve existing files; new dotenv templates contain comments only.
 - Provider addition validates the candidate catalog before replacing `models.json` atomically and retains `models.json.bak`. Login-before-add must be possible even though catalog parsing normally requires referenced credentials; use a temporary validation environment for the candidate, without weakening validation of existing providers or persisting that placeholder.
 - `--json` outputs one JSON object to stdout, with `ok`, `command`, and either `data` or `error.code` plus `error.message`. No prompt is permitted in JSON or non-TTY mode. Uninstall preserves runtime data by default; `--purge` explicitly opts into removal.
 - The background server is managed through an owned PID record under `run/gateway.pid` and a non-credential launch token. A PID alone is not proof of ownership: verify that PID still belongs to this home and launch token before signaling it. Read actual argv through `psutil.Process(pid).cmdline()` and require the exact module launch shape `[executable, "-m", "jev_gateway.cli.server", "--home", home, "--token", token]`. Rendered `ps` output loses argument boundaries for paths with spaces, and a `python -c` process with a matching suffix is not an owned server. Denied, disappeared, zombie, or dead processes fail ownership checks. Re-check ownership immediately before an update-triggered signal. `logs/gateway.log` is the managed output path.
@@ -85,7 +101,7 @@ reuse of an existing Codex or Claude login or subscription.
 
 ## 5. Good / base / bad cases
 
-Good: `jev provider login anthropic --secret-stdin` reads a key on stdin, writes only its declared variable to the protected `.env`, and returns no credential bytes. Base: `jev provider add custom --type openai --api-base https://example.invalid/v1 --api-key-env DEMO_KEY --model demo` registers a manually selectable model without changing strategy definitions. Bad: a stale PID file points to another user's process and `jev stop` signals it merely because the number is present. Similarly, a Release wheel with a missing or mismatched checksum must never reach `uv tool install`.
+Good: `jev provider login anthropic --secret-stdin` reads a key on stdin, writes only its declared reference to protected `credentials.json`, and returns no credential bytes. Base: `jev provider add custom --type openai --api-base https://example.invalid/v1 --api-key-env DEMO_KEY --model demo` registers a manually selectable model without changing strategy definitions. Bad: a stale PID file points to another user's process and `jev stop` signals it merely because the number is present. Similarly, a Release wheel with a missing or mismatched checksum must never reach `uv tool install`.
 
 ## 6. Tests required
 

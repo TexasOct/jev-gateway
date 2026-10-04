@@ -13,6 +13,7 @@ import pytest
 
 from jev_gateway import config_transaction
 from jev_gateway.catalog import catalog_from_document
+from jev_gateway.credentials import credential_update
 from jev_gateway.provider_config import ProviderConfiguration, RevisionConflict, credential_snapshot, env_update, metadata_envelope, revision
 from jev_gateway.strategy.decision_provider import DecisionClient
 from tests.helpers import single_route_document
@@ -46,6 +47,47 @@ def test_legacy_defaults_and_new_display_fields(tmp_path: Path) -> None:
     assert result["providers"][0]["display_name"] == "Local model"
     assert result["models"][0]["name"] == before["models"][0]["name"]
     assert current.read()["providers"][0]["allow_private_network"] is True
+
+
+@pytest.mark.parametrize("icon", ["anthropic", "gemini", "qwen", "cloud", "initials", "future-brand-icon", "constructor", "__proto__", "toString", "hasOwnProperty", None])
+def test_icon_selection_round_trips_without_changing_transport_or_model_identity(tmp_path: Path, icon: str | None) -> None:
+    current = service(tmp_path)
+    before = current.read()
+    document = json.loads(current.models_file.read_text())
+    document["providers"][0].update(brand_id="deepseek", params={"timeout": 12})
+    current.models_file.write_text(json.dumps(document))
+    body = upsert(current, brand_id="deepseek", icon_id=icon)
+    baseline = current.models_file.read_bytes()
+    validated = current.command(body)
+    assert current.models_file.read_bytes() == baseline
+    assert validated["providers"][0]["icon_id"] == icon
+    result = current.command(body, apply=True)
+    reread = ProviderConfiguration(current.models_file).read()
+    saved = json.loads(current.models_file.read_text())
+    for snapshot in (result, reread):
+        provider = snapshot["providers"][0]
+        assert provider["icon_id"] == icon
+        assert provider["brand_id"] == "deepseek"
+        assert provider["id"] == "test-provider"
+        assert provider["type"] == "openai"
+        assert provider["api_base"] == before["providers"][0]["api_base"]
+        assert snapshot["models"] == before["models"]
+    assert saved["providers"][0]["params"] == {"timeout": 12}
+    assert saved["providers"][0]["icon_id"] == icon
+    assert not (tmp_path / ".env").exists()
+
+
+def test_decision_icon_selection_is_independent_and_persists_after_read(tmp_path: Path) -> None:
+    current = service(tmp_path)
+    provider = {"id": "judge", "protocol": "system_one", "api_base": "https://fixture.example/evaluate", "api_key_env": "SYSTEM_FIXTURE_KEY", "brand_id": "openai", "icon_id": "qwen"}
+    body = {"expected_revision": revision(current.models_file), "operations": [{"action": "upsert", "kind": "decision", "provider": provider, "credential": {"action": "set", "value": "fake-decision-icon-key"}}]}
+    current.command(body, apply=True)
+    restored = ProviderConfiguration(current.models_file).read()["decision"]["providers"][0]
+    assert restored["icon_id"] == "qwen"
+    assert restored["brand_id"] == "openai"
+    assert restored["id"] == "judge" and restored["protocol"] == "system_one"
+    assert restored["api_base"] == provider["api_base"]
+    assert "fake-decision-icon-key" not in json.dumps(restored)
 
 
 @pytest.mark.parametrize("value", ["true", 1, None, {}, []])
@@ -136,7 +178,7 @@ def test_shared_credential_cannot_be_cleared(tmp_path: Path) -> None:
         current.command(body, apply=True)
 
 
-def test_credential_rotation_uses_snapshot_and_protected_env(tmp_path: Path) -> None:
+def test_credential_rotation_uses_snapshot_and_protected_json(tmp_path: Path) -> None:
     current = service(tmp_path)
     body = upsert(current)
     secret = "fake-hostile-'quoted'-$value-#comment"
@@ -146,14 +188,14 @@ def test_credential_rotation_uses_snapshot_and_protected_env(tmp_path: Path) -> 
     assert secret not in json.dumps(result)
     assert os.environ == process
     assert credential_snapshot(current.models_file)["TEST_PROVIDER_KEY"] == secret
-    assert stat.S_IMODE((tmp_path / ".env").stat().st_mode) == 0o600
+    assert stat.S_IMODE((tmp_path / "credentials.json").stat().st_mode) == 0o600
     assert not (tmp_path / ".provider-configuration.recovery").exists()
 
 
 def test_activation_failure_restores_files_and_runtime(tmp_path: Path) -> None:
     current = service(tmp_path)
-    env = tmp_path / ".env"
-    env.write_bytes(env_update(b"", "TEST_PROVIDER_KEY", "fake-before"))
+    env = tmp_path / "credentials.json"
+    env.write_bytes(credential_update(None, "TEST_PROVIDER_KEY", "fake-before"))
     old_catalog, old_env = current.models_file.read_bytes(), env.read_bytes()
     body = upsert(current, display_name="Edited")
     body["operations"][0]["credential"] = {"action": "set", "value": "fake-after"}

@@ -1,0 +1,290 @@
+[
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-en-light/llm.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-en-light/decision.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-en-dark/llm.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-en-dark/decision.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-zh-CN-light/llm.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-zh-CN-light/decision.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-zh-CN-dark/llm.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1280px-zh-CN-dark/decision.png",
+    "arrow_bounds": [
+      611,
+      368,
+      621,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-en-light/llm.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-en-light/decision.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-en-dark/llm.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-en-dark/decision.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-zh-CN-light/llm.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-zh-CN-light/decision.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-zh-CN-dark/llm.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1701px-zh-CN-dark/decision.png",
+    "arrow_bounds": [
+      822,
+      368,
+      832,
+      373
+    ],
+    "right_inset": 12.5,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-en-light/llm.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-en-light/decision.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-en-dark/llm.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-en-dark/decision.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-zh-CN-light/llm.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-zh-CN-light/decision.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-zh-CN-dark/llm.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  },
+  {
+    "image": "after/select-controls-native-select-geometry-1920px-zh-CN-dark/decision.png",
+    "arrow_bounds": [
+      931,
+      368,
+      941,
+      373
+    ],
+    "right_inset": 13,
+    "vertical_center_difference": 0.5,
+    "contrast_pixel_count": 26
+  }
+]

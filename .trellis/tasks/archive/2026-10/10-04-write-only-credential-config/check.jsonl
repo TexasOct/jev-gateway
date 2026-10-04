@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Full-scope package verification"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Credential and transaction safety invariants"}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"CLI and file configuration compatibility"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Test and type checks"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Secret-free errors and records"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Dashboard authentication, memory-only credentials and browser checks"}
+{"file":".trellis/tasks/archive/2026-10/10-04-write-only-credential-config/research/credential-map.md","reason":"Verified startup and initialization requirements"}

@@ -159,6 +159,38 @@ def test_existing_database_adds_upstream_request_table(tmp_path: Path) -> None:
     store.close()
 
 
+@pytest.mark.parametrize("source", [True, False, None, "true", 1])
+def test_decision_source_round_trip_uses_existing_signals_and_preserves_other_keys(
+    tmp_path: Path, source: object,
+) -> None:
+    path = tmp_path / "source.sqlite3"
+    settings = StorageSettings(enabled=True, path=str(path))
+    store = SqliteRecordStore(settings)
+    config_hash = store.register_config({}, "synthetic")
+    signals: dict[str, object] = {"legacy_evidence": {"value": 7}}
+    if source is not None:
+        signals["defaulted"] = source
+    store.record_request(_request("source"))
+    store.record_decision(replace(_decision("source", config_hash), signals=signals))
+    store.close()
+    reopened = SqliteRecordStore(settings)
+    try:
+        detail = reopened.session_request_evidence("session-1")[0]["decision"]
+        latest = reopened.latest_session_evidence(("session-1",))["session-1"]["latest_decision"]
+        for projection in (detail, latest):
+            if isinstance(source, bool):
+                assert projection["defaulted"] is source
+            else:
+                assert "defaulted" not in projection
+        with sqlite3.connect(path) as database:
+            assert json.loads(database.execute("SELECT signals_json FROM decisions").fetchone()[0]) == signals
+            assert "defaulted" not in {
+                row[1] for row in database.execute("PRAGMA table_info(decisions)")
+            }
+    finally:
+        reopened.close()
+
+
 def test_sanitize_upstream_payload_redacts_secrets_and_content() -> None:
     class RuntimeValue:
         def __str__(self) -> str:

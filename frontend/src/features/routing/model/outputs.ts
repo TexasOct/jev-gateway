@@ -37,7 +37,7 @@ export function canvasOutputs(draft: RoutingDraft, config: ConfigurationPayload)
   for (const label of config.labels) {
     const from = `zone::${label.tag}`;
     outputs[from] = edges.filter((edge) => edge.from === from).map((edge) => ({
-      id: edge.to, kind: "pool", name: edge.to.slice(7), edge, intent: { kind: "reconnect", edge },
+      id: edge.to, kind: edge.kind, name: edge.to.slice(7), edge, intent: { kind: "reconnect", edge },
     }));
     if (label.resolution === "tag") outputs[from]!.push({ id: "add", kind: "add", intent: { kind: "new-pool", from } });
   }

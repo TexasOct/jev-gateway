@@ -1,0 +1,12 @@
+{"file":".trellis/spec/backend/index.md","reason":"Full affected-scope review and quality gate inventory."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required Python, frontend, and packaging validation."}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Credential privacy, lifecycle, version, and installed-wheel regression checks."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Cross-branch provider configuration contract review."}
+{"file":".trellis/spec/backend/provider-identities.md","reason":"Verify provider icons and presets together with credential and select behavior."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Dashboard route preview and provider form regression review."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/branch-inventory.md","reason":"Verify temporary source ancestry, squash-tree parity, branch cleanup, and protected worktrees."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/setup-credential-integration.md","reason":"Verify shared setup/credential storage, bootstrap authorization, initialization templates, and readiness."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/worktree-safety-review.md","reason":"Native worktree recovery, stash OID, target index, path collisions, and squash cleanup proof requirements."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/select-icon-integration.md","reason":"Verify the final provider form retains native select alignment, preset metadata, no-key providers, and JSON credential ownership."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/credential-stage-results.md","reason":"Compare the final tree against verified credential-stage contracts; partial stage tests are not final acceptance."}
+{"file":".trellis/tasks/archive/2026-10/10-04-merge-completed-branches/research/integration-review-results.md","reason":"Close confirmed legacy gateway normalization and browser locator findings, verify literal JSON semantics, and require fresh final package acceptance."}

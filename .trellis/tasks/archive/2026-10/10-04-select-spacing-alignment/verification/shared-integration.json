@@ -1,0 +1,45 @@
+{
+  "handoff": {
+    "protection": "PASS",
+    "protected_other_files": 77,
+    "provider_hunk_only": true,
+    "branch_head_staging_preserved": true,
+    "commands": [
+      {
+        "label": "shared-build",
+        "exit_code": 0,
+        "log_sha256": "d77c1570519f036653c79175904b98cd3c76d8d85818fa668939cbc427ffee1b"
+      },
+      {
+        "label": "shared-freshness",
+        "exit_code": 0,
+        "log_sha256": "31989555f1454cddc27f9871726c8c9ed9280087b7c1bee465b5d2ea222dc58d"
+      }
+    ],
+    "integration_receipt_sha256": "4a4bccc62eddec0946a998bb42fb38f233db26bed2915cc0aa38368aa1bff074"
+  },
+  "integration": {
+    "source_stable": true,
+    "commands": [
+      {
+        "label": "build",
+        "exit_code": 0,
+        "log_sha256": "a11b130c58e0ed3228e45ff639027dbc4a41653b86482563e72a922b79e4bb66"
+      },
+      {
+        "label": "browser",
+        "exit_code": 0,
+        "log_sha256": "7dd8ae8ed86c0ac30831171b6e99607b033338fa0d5ceadec77029f183913e9f"
+      }
+    ],
+    "browser_stats": {
+      "startTime": "2026-10-04T04:45:49.837Z",
+      "duration": 6896.884,
+      "expected": 21,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "scope": "Current shared Provider work plus only owned select/grid hunks; synthetic APIs, private snapshot; no service/config/publication mutations."
+}

@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Verify dashboard configuration changes against the existing route and theme contracts."}
+{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-shell-visual-system/prd.md", "reason": "Check navigation integration against archived shell visual requirements; retain unresolved acceptance."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-unified-settings-provider-config/research/provider-management-merge.md", "reason": "Verify complete source acceptance coverage, explicit deferred capabilities and review gate preservation."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-unified-provider-management-ui/prd.md", "reason": "Review source requirements and acceptance against the receiver instead of inferring completion from overlap."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-unified-provider-management-ui/research/current-provider-surfaces.md", "reason": "Preserve source research safety and ownership constraints, and distinguish stale descriptions."}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Verify configuration, credential secrecy, transaction and discovery/import behavior."}
+{"file": ".trellis/spec/backend/decision-providers.md", "reason": "Verify decision/chat provider contract separation."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Repository frontend/API verification rules."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/acceptance.md", "reason": "Recorded integration checks and limitations, not proof of every older management-plan requirement."}
+{"file": ".trellis/tasks/archive/2026-10/09-30-unified-settings-provider-config/research/initialization-audit.md", "reason": "Check initialization and release acceptance boundaries"}
+{"file": ".trellis/spec/backend/initialization.md", "reason": "Initialization authorization, persistence and required regression coverage"}

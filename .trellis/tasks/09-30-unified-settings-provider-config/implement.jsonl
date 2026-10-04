@@ -1,9 +1,0 @@
-{"file": ".trellis/spec/backend/dashboard-routing-config.md", "reason": "Preserve dashboard navigation, theme, runtime configuration, and guarded-write contracts."}
-{"file": ".trellis/tasks/archive/2026-10/09-28-dashboard-shell-visual-system/prd.md", "reason": "Honor the archived shell visual system and navigation contracts; archive is not proof of full acceptance."}
-{"file": ".trellis/tasks/09-30-unified-settings-provider-config/research/provider-management-merge.md", "reason": "Merged source requirement/acceptance map, supported capability boundaries and unresolved user decisions."}
-{"file": ".trellis/tasks/archive/2026-10/09-30-unified-provider-management-ui/prd.md", "reason": "Preserve every original management-planning requirement, acceptance criterion and product-decision gate."}
-{"file": ".trellis/tasks/archive/2026-10/09-30-unified-provider-management-ui/research/current-provider-surfaces.md", "reason": "Source survey and parser/overlay/credential/provider-type constraints; recheck historical facts against current code."}
-{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Current configuration, credential service, discovery and import safety contract."}
-{"file": ".trellis/spec/backend/decision-providers.md", "reason": "Decision provider protocol remains distinct from chat/catalog provider configuration."}
-{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/api-contract.md", "reason": "Delivered Provider API/schema contract for supported management and model workflows."}
-{"file": ".trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/acceptance.md", "reason": "Existing mock-backed integration evidence and its explicit limitations."}

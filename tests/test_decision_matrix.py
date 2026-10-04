@@ -239,6 +239,28 @@ def test_matrix_cached_session_queries_once_and_honors_pin(monkeypatch) -> None:
     assert second.reason == "session_pinned"
 
 
+def test_matrix_cached_default_session_keeps_label_without_reclassification(monkeypatch) -> None:
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        raise AssertionError("Cached default sessions must not query decision providers")
+
+    monkeypatch.setattr(httpx, "post", post)
+    config = document()
+    config["strategies"]["definitions"]["matrix"]["policy"]["mode"] = "cached"
+    catalog = catalog_from_document(config, "cached default matrix")
+    strategy = StrategyRegistry.from_catalog(catalog).resolve("matrix")
+    facts = extract_facts([{"role": "user", "content": "hello"}])
+    session = SessionState(
+        "default-session", LARGE_MODEL_ID, "default", strategy="matrix",
+        created_at=0, updated_at=0, switched_at=0,
+    )
+    outcome = strategy.decide(RoutingRequest(facts, session, None, 2, 1), catalog)
+
+    assert outcome.model == LARGE_MODEL_ID
+    assert outcome.tier == "default"
+    assert outcome.reason == "session_pinned"
+    assert outcome.switched_from is None
+
+
 def test_matrix_falls_back_when_source_or_answers_fail(monkeypatch) -> None:
     monkeypatch.setenv("TEST_MATRIX_KEY", "key")
 

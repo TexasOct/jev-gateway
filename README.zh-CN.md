@@ -1,12 +1,14 @@
 # JEV Gateway
 
-[English](README.md) | **简体中文**
+[English](README.md) | **[简体中文](README.zh-CN.md)**
 
 ![AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue) ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 
 JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置的成本、质量和能力规则在多个提供方之间选择模型。客户端指定策略即可，无需写死模型；会话既可以固定模型，也可以逐轮重新选择。
 
-[快速开始](#快速开始) · [模型标识](#模型标识) · [路由策略](#路由策略) · [HTTP API](#http-api) · [文档](#文档) · [许可](#许可) · [开发](#开发)
+[快速开始](#quick-start) · [模型标识](#model-identity) · [路由策略](#routing-strategies) · [HTTP API](#http-api) · [文档](#documentation) · [许可](#license) · [开发](#development)
+
+<a id="what-it-does"></a>
 
 ## 它能做什么
 
@@ -19,6 +21,8 @@ JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置
 - 提供实时会话面板和路由检查接口。
 
 ![从请求到路由的流程](docs/routing-strategy-map.svg)
+
+<a id="quick-start"></a>
 
 ## 快速开始
 
@@ -65,30 +69,40 @@ scripts/build-frontend.sh
 ./scripts/install-local.sh --editable
 ```
 
-编辑 `$HOME/.jev-gateway/` 下的两个文件：
+默认配置保留 `task_aware`、`quality`、`economy` 策略方案，不包含供应商实例、模型或
+上游密钥。可以先启动网关，稍后再配置这些内容：
 
 ```bash
-${EDITOR:-vi} "$HOME/.jev-gateway/models.json"  # 提供方、模型、策略
-${EDITOR:-vi} "$HOME/.jev-gateway/.env"         # models.json 声明引用的密钥
+jev start
 ```
 
-把示例地址和模型名替换为你的提供方实际支持的值。模板声明了两个提供方，对应的 `.env` 需要：
-
-```dotenv
-DEEPSEEK_API_KEY=replace-with-deepseek-key
-OPENAI_API_KEY=replace-with-openai-key
-```
-
-curl 安装后用 `jev start` 启动网关；源码安装使用本地启动器：
+源码安装使用本地启动器：
 
 ```bash
 ~/.local/bin/jev-gateway-local
 ```
 
-在另一个终端发出第一个请求：
+打开 `http://127.0.0.1:8000/dashboard`，在初始化表单中设置网关管理密钥，即可进入
+控制台。供应商和模型可以稍后配置。保存的密钥写入受限权限的 `credentials.json`，
+面板不会读取或回显。请自行保留密钥供客户端使用。浏览器仅在内存中保存连接密钥，
+刷新页面后需要重新连接。首次网页初始化仅对本机连接开放。
+终端操作或远程部署可先用 `jev setup` 的无回显提示设置密钥，再打开面板。
+服务已经运行时，CLI 设置后再执行 `jev config reload` 加载密钥。
+文件配置与 `.env` 兼容规则见[密钥配置说明](docs/credentials.md)。
+导入模型后，可在 Settings 选择全局默认模型。所有策略命中空 tag 时都继承它，
+分流结果显示“默认”。有模型的标签池仍按原规则选择。
+
+在 Provider 页面保存供应商及凭据，发现或手动添加模型，核对元数据后显式导入。
+在策略页面将模型分配到模型池。面板保存会加载配置；手工修改文件后也可使用
+`jev config reload` 重载。尚未配置模型时，对话请求返回 `503 setup_incomplete`，
+控制台仍可使用。
+
+配置模型后，使用网关密钥发出第一个请求：
 
 ```bash
+read -r -s JEV_CLIENT_KEY
 curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Authorization: Bearer $JEV_CLIENT_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"model": "task_aware", "messages": [{"role": "user", "content": "Summarize this design."}]}'
 ```
@@ -97,10 +111,10 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 `GET /healthz` 可以确认进程已启动。长期运行、容器与 wheel 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
-网关以有效目录启动后，打开 `/dashboard`，在 Provider 页浏览供应商预设或配置自定义
-LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作。模型发现会生成可搜索的
-候选列表；核对价格和能力元数据后，再显式导入选中模型。配置步骤与私网开启方式见
+Provider 页面支持供应商预设以及自定义 LLM、decision 提供方。配置步骤与私网开启方式见
 [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入)。
+
+<a id="model-identity"></a>
 
 ## 模型标识
 
@@ -118,6 +132,8 @@ LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作
 ```
 
 这个模型的 ID 是 `deepseek/deepseek-flash`。手动指定模型时不能只写上游模型名，因为不同提供方可能使用同名模型。完整字段说明见 [`docs/models-config.md`](docs/models-config.md)。
+
+<a id="routing-strategies"></a>
 
 ## 路由策略
 
@@ -139,6 +155,8 @@ LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作
 | --- | --- | --- |
 | `GET` | `/healthz` | 存活状态与配置快照。 |
 | `GET` | `/dashboard` | 内置的运维面板，用于监控、提供方管理与路由配置。 |
+| `GET` | `/v1/setup` | 初始化状态与可稍后完成的配置进度。 |
+| `POST` | `/v1/setup` | 从本机连接设置首次管理密钥。 |
 | `GET` | `/v1/models` | 策略名与目录模型 ID。 |
 | `GET` | `/v1/routing/policy` | 当前策略快照。 |
 | `GET` | `/v1/routing/strategies` | 已注册的策略及其策略配置。 |
@@ -150,6 +168,7 @@ LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作
 | `GET` | `/v1/routing/sessions/{session_id}/requests` | 某个会话保留的请求。 |
 | `GET` | `/v1/routing/providers/summary` | 提供方保留的活动统计。 |
 | `GET` | `/v1/provider-configuration` | 安全的提供方配置、预设与 revision。 |
+| `PUT` | `/v1/gateway-credential` | 本机初始化或替换网关访问密钥，不回显保存值。 |
 | `POST` | `/v1/provider-configuration/validate` | 校验提供方改动或已确认的模型导入。 |
 | `PUT` | `/v1/provider-configuration` | 应用提供方改动或已确认的模型导入。 |
 | `POST` | `/v1/provider-discovery` | 获取上游候选模型，不执行导入。 |
@@ -165,19 +184,26 @@ LLM、decision 提供方。配置 `gateway.api_key_env` 后可使用管理操作
 
 成功的对话响应会带上 `X-JEV-Route`、`X-JEV-Provider`、`X-JEV-Model`、`X-JEV-Route-Label`、`X-JEV-Task-Type`、`X-JEV-Mode`、`X-JEV-Reason`、`X-JEV-Strategy`、`X-JEV-Decision-Id`，并在适用时附带请求、会话、切换、推理与切换受阻原因的响应头。端点契约、鉴权、错误码与 reload 语义见 [`docs/http-api.md`](docs/http-api.md)。
 
+<a id="documentation"></a>
+
 ## 文档
 
 | 文档 | 内容 |
 | --- | --- |
 | [`docs/local-install.md`](docs/local-install.md) | curl、本地、容器与 wheel 安装。 |
 | [`docs/cli.md`](docs/cli.md) | CLI 命令、提供方设置与生命周期管理。 |
+| [`docs/credentials.md`](docs/credentials.md) | 只写的网页密钥设置与纯服务端文件配置。 |
 | [`docs/models-config.md`](docs/models-config.md) | `models.json` 的全部字段。 |
 | [`docs/routing-design.md`](docs/routing-design.md) | 路由契约、策略、会话与证据。 |
 | [`docs/http-api.md`](docs/http-api.md) | 端点、响应头、错误与 reload。 |
 
+<a id="license"></a>
+
 ## 许可
 
 本项目以 [GNU Affero 通用公共许可证第 3 版或更新版本](LICENSE)（`AGPL-3.0-or-later`）授权。你可以在其条款下使用、修改和分发本项目。第 13 条补充了网络条款：如果你把修改版作为网络服务运行，就必须以同一协议向该服务的用户提供对应的源代码。协议允许商业托管，但受协议约束的修改版必须向这些用户提供对应源代码。
+
+<a id="development"></a>
 
 ## 开发
 

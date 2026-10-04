@@ -3,16 +3,19 @@ import type { useLocale } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import type { ProviderKind, ProviderPreset, ProviderProfile, ProviderSelector } from "@/shared/api/types";
 import type { ProviderManagement } from "./useProviderManagement";
-import { profileForWrite, searchProfiles } from "./model";
-import { controlClass, identityIcons } from "./constants";
+import { newPresetInstanceID, profileForWrite, searchProfiles } from "./model";
+import { controlClass } from "./constants";
+import { ProviderIconPicker } from "./ProviderIconPicker";
 import { ProviderIdentity } from "./ProviderIdentity";
 import { ProviderModels } from "./ProviderModels";
 import { AssetCredits } from "./AssetCredits";
+import { GatewayCredentialForm } from "./GatewayCredentialForm";
+import { ProviderSetupFields } from "./ProviderSetupFields";
+import { initialSetupValues, missingSetupFields, setupForWrite } from "./setup";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 type Props = { manager: ProviderManagement; t: Translate };
-type Editor = { original: ProviderProfile | null; draft: ProviderProfile; dirty: boolean };
-const iconLabels = { initials: "pmIconInitials", server: "pmIconServer", cloud: "pmIconCloud", circuit: "pmIconCircuit", globe: "pmIconGlobe" } as const;
+type Editor = { original: ProviderProfile | null; draft: ProviderProfile; dirty: boolean; preset: ProviderPreset | null; setup: Record<string, string> };
 
 export function ProviderView({ manager, t }: Props) {
   const [kind, setKind] = useState<ProviderKind>("llm");
@@ -48,11 +51,12 @@ export function ProviderView({ manager, t }: Props) {
   const openEditor = (profile: ProviderProfile | null, preset?: ProviderPreset) => {
     if (!leave()) return;
     const draft = profile ? { ...profile } : {
-      id: "", display_name: preset?.display_name ?? "", brand_id: preset?.brand_id ?? "", icon_id: preset?.icon_id ?? null,
+      id: preset ? newPresetInstanceID(preset.id, profiles) : "", display_name: preset?.display_name ?? "", brand_id: preset?.brand_id ?? "", icon_id: preset?.icon_id ?? null,
       api_base: preset ? preset.api_base : "", api_key_env: preset?.api_key_env ?? "",
-      ...(kind === "llm" ? { type: preset?.type ?? options[0] ?? "", allow_private_network: false } : { protocol: preset?.protocol ?? options[0] ?? "", model: preset?.model ?? "" }),
+      ...(kind === "llm" ? { type: preset?.type ?? options[0] ?? "", allow_private_network: preset?.allow_private_network === true } : { protocol: preset?.protocol ?? options[0] ?? "", model: preset?.model ?? "" }),
     };
-    setEditor({ original: profile, draft, dirty: false });
+    setEditor({ original: profile, draft, dirty: false, preset: profile ? null : preset ?? null, setup: initialSetupValues(profile ? undefined : preset) });
+    if (profile?.api_key_env && !profile.has_api_key) setCredentialAction("set");
     setNotice(false);
   };
   const change = (field: keyof ProviderProfile, value: string | boolean | null) => {
@@ -65,13 +69,24 @@ export function ProviderView({ manager, t }: Props) {
     if (candidatePreview && modelDirty && !window.confirm(t("pmDiscard"))) return;
     setCredentialAction(action); setSecret(value);
     setEditor((previous) => previous ? { ...previous, dirty: true } : previous);
-    manager.cancelQuery(); setCandidatePreview(false); setModelDirty(false); setNotice(false);
+    manager.cancelQuery(); setCandidatePreview(false); setModelDirty(false);
+    setNotice(false);
+  };
+  const changeSetup = (key: string, value: string) => {
+    if (candidatePreview && modelDirty && !window.confirm(t("pmDiscard"))) return;
+    setEditor((previous) => previous ? { ...previous, setup: { ...previous.setup, [key]: value }, dirty: true } : previous);
+    if (candidatePreview) { manager.cancelQuery(); setCandidatePreview(false); setModelDirty(false); }
+    setNotice(false);
   };
   const credential = credentialAction === "set" ? { action: "set" as const, value: secret } : { action: credentialAction };
+  const template = editor?.preset && (kind === "llm" ? editor.preset.type === editor.draft.type : editor.preset.protocol === editor.draft.protocol) ? editor.preset : null;
+  const incompleteSetup = !!editor && (missingSetupFields(template, editor.setup) || (template?.api_base === "" && !editor.draft.api_base?.trim()));
+  const writableProfile = editor ? { ...profileForWrite(editor.draft, kind), ...setupForWrite(template, editor.setup) } : null;
   const save = async () => {
-    if (!editor || disabled) return;
-    const success = await manager.save([{ action: "upsert", kind, provider: profileForWrite(editor.draft, kind), credential }]);
+    if (!editor || !writableProfile || disabled || incompleteSetup) return;
+    const operations = [{ action: "upsert" as const, kind, provider: writableProfile, credential }];
     setSecret("");
+    const success = await manager.save(operations);
     if (success) {
       setCredentialAction("keep"); setEditor(null); setCandidatePreview(false);
       if (candidatePreview && kind === "llm") {
@@ -82,11 +97,12 @@ export function ProviderView({ manager, t }: Props) {
   };
   const errorText = (status: number) => t(status === 409 ? "pmConflict" : status === 401 ? "authRequired" : status === 403 ? "pmForbidden" : "pmError");
   const field = (name: keyof ProviderProfile, label: keyof typeof import("@/shared/i18n/en").en, required = false, locked = false, disabledField = false) => <label className="grid min-w-0 gap-1 text-sm" key={name}><span>{t(label)}</span><input className={controlClass} name={name} required={required} readOnly={locked} disabled={disabledField} value={String(editor?.draft[name] ?? "")} autoComplete="off" onChange={(event) => change(name, event.target.value)} /></label>;
-  const candidateSelector: ProviderSelector | null = editor ? { provider: profileForWrite(editor.draft, kind), credential } : null;
+  const candidateSelector: ProviderSelector | null = writableProfile ? { provider: writableProfile, credential } : null;
 
   return <section ref={root} className="mx-auto grid w-full min-w-0 max-w-3xl gap-4 text-ink" aria-label={t("providerModels")} onKeyDown={(event) => { if (event.key === "Escape" && !manager.pending) { event.preventDefault(); leave(); } }}>
+    <GatewayCredentialForm manager={manager} t={t} />
     <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-outline pb-3">
-      <h2 className="m-0 mr-auto text-sm font-semibold">{t("providerModels")}</h2>
+      <h2 className="m-0 mr-auto shrink-0 text-sm font-semibold">{t("providerModels")}</h2>
       {(["llm", "decision"] as const).map((target) => <Button className="min-h-11 aria-pressed:border-primary aria-pressed:bg-panel-muted aria-pressed:text-primary" key={target} variant="outline" aria-pressed={kind === target} disabled={manager.pending} onClick={() => { if (target !== kind && leave()) { setKind(target); setSearch(""); setSupplierSearch(""); } }}>{t(target === "llm" ? "pmLLM" : "pmDecision")}</Button>)}
     </div>
     {manager.loading && <p role="status" className="m-0 text-sm text-ink-muted">{t("loading")}</p>}
@@ -97,11 +113,11 @@ export function ProviderView({ manager, t }: Props) {
     {editor ? <><form className="grid min-w-0 gap-4" aria-busy={manager.pending} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <fieldset disabled={manager.pending} className="m-0 grid min-w-0 gap-4 border-0 p-0">
       <div className="flex flex-wrap items-center gap-2"><h3 className="m-0 mr-auto text-sm font-semibold">{t(editor.original ? "pmEdit" : "pmAdd")}</h3><Button type="button" className="min-h-11" variant="ghost" disabled={manager.pending} onClick={leave}>{t("pmCancel")}</Button></div>
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
         {field("id", "pmID", true, editor.original !== null)}{field("display_name", "pmName")}
         <p className="m-0 text-xs text-ink-muted sm:col-span-2">{t("pmImmutable")}</p>
         <label className="grid min-w-0 gap-1 text-sm"><span>{t(kind === "llm" ? "pmType" : "pmProtocol")}</span><select className={controlClass} required value={kind === "llm" ? editor.draft.type : editor.draft.protocol} onChange={(event) => change(kind === "llm" ? "type" : "protocol", event.target.value)}><option value="">{t("pmUnknown")}</option>{options.map((option) => <option key={option} value={option}>{option === "system_one" ? "System One" : option}</option>)}</select></label>
-        <div className="grid min-w-0 content-start gap-1">{field("api_base", "pmEndpoint", true, false, kind === "llm" && editor.draft.api_base === null)}{kind === "llm" && <label className="flex min-h-11 items-center gap-2 text-sm text-ink-muted"><input type="checkbox" checked={editor.draft.api_base === null} onChange={(event) => change("api_base", event.target.checked ? null : "")} />{t("pmNativeEndpoint")}</label>}</div>
+        <div className="grid min-w-0 content-start gap-1">{field("api_base", "pmEndpoint", true, false, kind === "llm" && editor.draft.api_base === null)}{kind === "llm" && <label className="flex min-h-11 items-center gap-2 text-sm text-ink-muted"><input type="checkbox" disabled={template?.api_base === ""} checked={editor.draft.api_base === null} onChange={(event) => change("api_base", event.target.checked ? null : "")} />{t("pmNativeEndpoint")}</label>}</div>
         {kind === "decision" && <><p className="m-0 text-sm text-ink-muted sm:col-span-2">{t("pmSystemURL")}</p>{field("model", "pmModel")}</>}
         {field("api_key_env", "pmEnv", kind === "decision" || credentialAction === "set")}
         <label className="grid min-w-0 gap-1 text-sm"><span>{t("pmCredential")}</span><select className={controlClass} value={credentialAction} onChange={(event) => changeCredential(event.target.value as typeof credentialAction, "")}><option value="keep">{t("pmKeep")}</option><option value="set">{t("pmSet")}</option><option value="clear">{t("pmClear")}</option></select></label>
@@ -110,11 +126,14 @@ export function ProviderView({ manager, t }: Props) {
         {editor.original && <p className="m-0 text-xs text-ink-muted sm:col-span-2">{t(editor.original.has_api_key ? "pmCredentialConfigured" : "pmCredentialMissing")}</p>}
         {kind === "llm" && <div className="grid min-w-0 gap-1 sm:col-span-2"><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={editor.draft.allow_private_network === true} onChange={(event) => change("allow_private_network", event.target.checked)} />{t("pmPrivate")}</label><p className="m-0 text-xs text-ink-muted">{t("pmPrivateNote")}</p></div>}
       </div>
-      <details className="min-w-0 border-y border-outline py-3"><summary className="min-h-11 cursor-pointer text-sm font-medium">{t("pmAdvanced")}</summary><div className="grid min-w-0 gap-3 sm:grid-cols-2">{field("brand_id", "pmBrand")}<fieldset className="m-0 min-w-0 border-0 p-0"><legend className="mb-1 text-sm">{t("pmIcon")}</legend><div className="flex flex-wrap gap-2">{identityIcons.map((icon) => <Button className="min-h-11 aria-pressed:border-primary aria-pressed:bg-panel-muted aria-pressed:text-primary" type="button" variant="outline" key={icon} aria-pressed={(editor.draft.icon_id ?? "initials") === icon} onClick={() => change("icon_id", icon)}>{t(iconLabels[icon])}</Button>)}</div></fieldset><p className="m-0 text-xs text-ink-muted sm:col-span-2">{t("pmPreserved")}</p></div></details>
-      <div className="flex flex-wrap gap-2"><Button className="min-h-11" type="submit" disabled={disabled || !editor.draft.id.trim() || (!(kind === "llm" && editor.draft.api_base === null) && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)}>{t("pmSave")}</Button><Button className="min-h-11" type="button" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmCancel")}</Button>{kind === "llm" && <Button className="min-h-11" type="button" variant="ghost" disabled={disabled || !editor.draft.id.trim() || (editor.draft.api_base !== null && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)} onClick={() => { manager.cancelQuery(); setCandidatePreview(true); }}>{t("pmCandidate")}</Button>}</div>
+      {template && <ProviderSetupFields preset={template} values={editor.setup} onChange={changeSetup} />}
+      {incompleteSetup && <p className="m-0 text-sm text-ink-muted" role="status">{t("pmSetupRequired")}</p>}
+      <ProviderIconPicker provider={editor.draft} t={t} disabled={disabled} onChange={(id) => change("icon_id", id)} />
+      <details className="min-w-0 border-y border-outline py-3"><summary className="min-h-11 cursor-pointer text-sm font-medium">{t("pmAdvanced")}</summary><div className="grid min-w-0 gap-3 sm:grid-cols-2">{field("brand_id", "pmBrand")}<p className="m-0 text-xs text-ink-muted sm:col-span-2">{t("pmPreserved")}</p></div></details>
+      <div className="flex flex-wrap gap-2"><Button className="min-h-11" type="submit" disabled={disabled || incompleteSetup || !editor.draft.id.trim() || (!(kind === "llm" && editor.draft.api_base === null) && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)}>{t("pmSave")}</Button><Button className="min-h-11" type="button" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmCancel")}</Button>{kind === "llm" && <Button className="min-h-11" type="button" variant="ghost" disabled={disabled || incompleteSetup || !editor.draft.id.trim() || (editor.draft.api_base !== null && !editor.draft.api_base?.trim()) || (credentialAction === "set" && !secret)} onClick={() => { manager.cancelQuery(); setCandidatePreview(true); }}>{t("pmCandidate")}</Button>}</div>
       </fieldset>
     </form>{candidatePreview && candidateSelector && <ProviderModels key={editor.draft.id} providerId={editor.draft.id} selector={candidateSelector} manager={manager} t={t} onDirtyChange={setModelDirty} candidate />}</> : modelProvider ? <>
-      <div className="flex min-w-0 flex-wrap items-center gap-3"><ProviderIdentity provider={modelProvider} t={t} /><h3 className="m-0 min-w-0 flex-1 break-all text-sm font-semibold">{modelProvider.display_name || modelProvider.id}</h3><Button className="min-h-11" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmBack")}</Button></div>
+      <div className="flex min-w-0 flex-wrap items-center gap-3"><ProviderIdentity provider={modelProvider} t={t} /><h3 className="m-0 min-w-0 basis-36 flex-1 break-words text-sm font-semibold">{modelProvider.display_name || modelProvider.id}</h3><Button className="min-h-11" variant="outline" disabled={manager.pending} onClick={leave}>{t("pmBack")}</Button></div>
       <ProviderModels key={modelProvider.id} providerId={modelProvider.id} selector={{ provider_id: modelProvider.id }} manager={manager} t={t} onDirtyChange={setModelDirty} />
     </> : browsing ? <>
       <div className="flex flex-wrap items-center gap-2"><h3 className="m-0 mr-auto text-sm font-semibold">{t("pmSuppliers")}</h3><Button className="min-h-11" variant="ghost" onClick={leave}>{t("pmCancel")}</Button></div>

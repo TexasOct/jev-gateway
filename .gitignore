@@ -12,7 +12,12 @@ wheels/
 
 # Local configuration and runtime data
 .env
+.env.backup
+credentials.json
+credentials.json.backup
+.provider-configuration.recovery
 models.json
+models.json.bak
 logs/
 *node_modules/
 /jev_gateway/static/

@@ -32,11 +32,14 @@ async function open(page: Page) {
 }
 
 async function clickWire(page: Page, wire: Locator) {
-  const point = await wire.evaluate((element) => {
+  const point = await wire.evaluate(async (element) => {
+    // Layout restoration and locale-dependent chrome can move the SVG between frames.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     const path = element as SVGPathElement, matrix = path.getScreenCTM()!;
-    for (const fraction of [0.5, 0.3, 0.7, 0.2, 0.8]) {
+    for (const fraction of [0.2, 0.3, 0.5, 0.7, 0.8]) {
       const point = path.getPointAtLength(path.getTotalLength() * fraction).matrixTransform(matrix);
-      if (document.elementFromPoint(point.x, point.y) === path) return { x: point.x, y: point.y };
+      const x = Math.round(point.x), y = Math.round(point.y);
+      if ([-1, 0, 1].every((dx) => [-1, 0, 1].every((dy) => document.elementFromPoint(x + dx, y + dy) === path))) return { x, y };
     }
     throw new Error("Wire has no exposed native hit point");
   });

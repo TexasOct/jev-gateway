@@ -205,7 +205,7 @@ test("broken local supplier image uses the neutral fallback without changing ide
   const state = fixture(); state.configuration.providers[0]!.brand_id = "deepseek";
   await context.route("**/dashboard/assets/deepseek*.svg", (route) => route.fulfill({ status: 404, body: "" }));
   await installProviderFixture(context, state); await open(page);
-  const fallback = page.locator('[title="Neutral initials; no verified supplier logo packaged"]');
+  const fallback = page.locator('[title="Neutral icon or initials fallback"]');
   await expect(fallback).toHaveText("FI"); await expect(fallback.locator("img")).toHaveCount(0);
   const bounds = await fallback.boundingBox(); expect(bounds?.width).toBe(96); expect(bounds?.height).toBe(44);
 });
@@ -242,6 +242,7 @@ test("supplier aliases, custom entry, icon picker and System One are usable", as
   await page.getByLabel("Instance ID", { exact: true }).fill("custom");
   await page.getByLabel("Endpoint URL").fill("https://example.test/custom");
   await page.getByText("Advanced configuration", { exact: true }).click();
+  await page.getByRole("button", { name: "Choose icon", exact: true }).click();
   await page.getByRole("button", { name: "Cloud", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cloud", exact: true })).toHaveAttribute("aria-pressed", "true");
   page.once("dialog", (dialog) => dialog.accept());
@@ -411,7 +412,7 @@ test("native endpoint presets preserve null and fill their declared credential r
   await page.getByRole("button", { name: "Anthropic anthropic", exact: true }).click();
   await expect(page.getByLabel("Use the transport's default endpoint")).toBeChecked();
   await expect(page.getByLabel("Endpoint URL")).toBeDisabled();
-  await expect(page.getByLabel("Credential environment reference")).toHaveValue("ANTHROPIC_API_KEY");
+  await expect(page.getByLabel("Credential reference", { exact: true })).toHaveValue("ANTHROPIC_API_KEY");
   await page.getByLabel("Instance ID", { exact: true }).fill("native-anthropic");
   await page.getByRole("button", { name: "Validate and save" }).click();
   await expect(page.getByRole("heading", { name: "Anthropic", exact: true })).toBeVisible();

@@ -75,9 +75,7 @@ class DecisionMatrixStrategy(PolicyStrategy):
 
         tier = choice.get("label", next(iter(self.policy.labels)))
         selection = choice.get("selection", self.policy.selection)
-        facts = request.facts
-        if tier != next(iter(self.policy.labels)):
-            facts = replace(facts, route_label=tier)
+        facts = replace(request.facts, route_label=tier)
         policy = replace(self.policy, selection=selection)
         outcome = PolicyStrategy(self.name, policy, self.description).decide(
             replace(request, facts=facts), catalog

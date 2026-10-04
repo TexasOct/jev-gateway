@@ -1,0 +1,49 @@
+{
+  "requirements": {
+    "R1": "PASS",
+    "R2": "PASS",
+    "R3": "PASS",
+    "R4": "PASS",
+    "R5": "PASS"
+  },
+  "acceptance": {
+    "AC1": "PASS",
+    "AC2": "PASS",
+    "AC3": "PASS",
+    "AC4": "PASS",
+    "AC5": "PASS"
+  },
+  "evidence_hashes_verified": 116,
+  "complete_browser_stats": {
+    "startTime": "2026-10-04T04:15:45.429Z",
+    "duration": 15686.5,
+    "expected": 139,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "other_file_hashes_unchanged": 75,
+  "shared_journal_original_prefix_preserved": true,
+  "shared_history_rows_preserved": 4,
+  "shared_branch_head_staging_preserved": true,
+  "provider_owned_hunk_only": true,
+  "owned_ports_free": [
+    4178,
+    4197,
+    4198
+  ],
+  "source_build_and_freshness": [
+    {
+      "label": "shared-build",
+      "exit_code": 0,
+      "log_sha256": "d77c1570519f036653c79175904b98cd3c76d8d85818fa668939cbc427ffee1b"
+    },
+    {
+      "label": "shared-freshness",
+      "exit_code": 0,
+      "log_sha256": "31989555f1454cddc27f9871726c8c9ed9280087b7c1bee465b5d2ea222dc58d"
+    }
+  ],
+  "shared_snapshot_21_browser_passed": true,
+  "visual_limit": "Image attachments unavailable; actual Chromium DOM and PNG pixels were measured; other engines and subjective inspection not claimed."
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -11,12 +12,15 @@ import threading
 import time
 import warnings
 from collections.abc import AsyncIterator, Generator, Iterator
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from inspect import isawaitable
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
+import anyio
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -32,6 +36,7 @@ from jev_gateway.catalog import (
     catalog_from_document,
 )
 from jev_gateway.config import coerce_int
+from jev_gateway.initialization import initialize_configuration
 from jev_gateway.dashboard import (
     DashboardStatic,
     create_dashboard_router,
@@ -41,6 +46,7 @@ from jev_gateway.dashboard import (
 from jev_gateway.decision import (
     Decision,
     RoutingEngine,
+    SetupIncompleteError,
     UnknownModelError,
     UnknownStrategyError,
 )
@@ -75,6 +81,7 @@ from jev_gateway.sessions import (
     derive_session_id,
 )
 from jev_gateway.request_facts import content_text, estimate_tokens, latest_user_text
+from jev_gateway.setup import ManagementSetup, SetupAlreadyConfigured, SETUP_INCOMPLETE_MESSAGE
 
 logger = logging.getLogger(__name__)
 UPSTREAM_FAILURE_MESSAGE = "Upstream provider request failed."
@@ -180,15 +187,17 @@ def load_gateway_config(models_file: Path | None = None) -> GatewayConfig:
     """Build the gateway configuration from the selected catalog file."""
     path = models_file or runtime_directory() / "models.json"
     path = path.expanduser().resolve()
+    if models_file is None:
+        initialize_configuration(path)
     external = dict(os.environ)
     with configuration_read_lock(path):
         env = credential_snapshot(path, external=external)
         document = read_models_document(path)
         overlay, _error = read_overlay(path)
         try:
-            catalog = catalog_from_document(merge_overlay(document, overlay), str(path), env)
+            catalog = catalog_from_document(merge_overlay(document, overlay), str(path), env, allow_missing_credentials=True)
         except (ValueError, TypeError):
-            catalog = catalog_from_document(document, str(path), env)
+            catalog = catalog_from_document(document, str(path), env, allow_missing_credentials=True)
     catalog = _resolve_storage_path(catalog, path)
     settings: GatewaySettings = catalog.gateway
     return GatewayConfig(
@@ -405,7 +414,7 @@ def require_gateway_key(expected_key: str | None, authorization: str | None) -> 
     if not expected_key:
         return
     expected_header = f"Bearer {expected_key}"
-    if authorization is None or not hmac.compare_digest(authorization, expected_header):
+    if authorization is None or not hmac.compare_digest(authorization.encode("utf-8"), expected_header.encode("utf-8")):
         raise HTTPException(
             status_code=401,
             detail={
@@ -435,7 +444,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     """Create the gateway app. Supplying a config makes the app easy to test."""
     active = config or load_gateway_config()
     activity = active.routing_activity or ActivityRegistry()
-    reload_lock = threading.Lock()
+    reload_lock = threading.RLock()
+    listener_host = active.engine.catalog.gateway.host
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -482,6 +492,20 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     async def invalid_request_body(
         request: Request, error: RequestValidationError
     ) -> JSONResponse:
+        if request.url.path == "/v1/setup":
+            with reload_lock:
+                if active.gateway_api_key:
+                    return JSONResponse(status_code=409, content=error_body("Management key is already configured.", code="setup_already_configured"))
+                if not gateway_bootstrap_available(request):
+                    return JSONResponse(status_code=403, content=error_body("Management setup requires a local same-origin request.", code="setup_local_only"))
+            return JSONResponse(status_code=400, content=error_body("Provider configuration is invalid. Check fields, credentials, and references.", code="invalid_configuration"))
+        if request.url.path == "/v1/gateway-credential":
+            with reload_lock:
+                try:
+                    require_gateway_credential_write(request, request.headers.get("authorization"))
+                except HTTPException as denied:
+                    return JSONResponse(status_code=denied.status_code, content=denied.detail, headers=denied.headers)
+            return JSONResponse(status_code=400, content=error_body("Gateway credential operation is invalid.", code="invalid_gateway_credential"))
         if request.url.path == "/v1/chat/completions":
             # Read once: the stored request and the malformed-body fallback below
             # both record this same request-scoped value.
@@ -646,6 +670,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         """Return the routing answer for a request without serving or mutating it."""
         require_gateway_key(active.gateway_api_key, authorization)
+        if not active.engine.catalog.profiles:
+            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete"))
         message_text(body.messages)
         session_id = derive_session_id(
             body.messages,
@@ -704,6 +730,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 for name in selected
             ]
             return {"default": active.engine.strategies.default_name, "preview": previews}
+        except SetupIncompleteError:
+            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete")) from None
         except UnknownModelError as error:
             raise HTTPException(
                 status_code=404,
@@ -732,6 +760,49 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             )
 
     provider_service = ProviderConfiguration(active.models_file, external=active.credential_environment)
+    setup_service = ManagementSetup(active.models_file, external=active.credential_environment)
+
+    @app.get("/v1/setup")
+    def setup_status(request: Request, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_gateway_key(active.gateway_api_key, authorization)
+        try:
+            with reload_lock:
+                return setup_service.read(local=gateway_bootstrap_available(request))
+        except Exception as error:
+            raise provider_error(error) from None
+
+    @app.post("/v1/setup")
+    def setup_key(body: dict[str, Any], request: Request) -> dict[str, Any]:
+        if not active.gateway_api_key and not gateway_bootstrap_available(request):
+            raise HTTPException(403, detail=error_body("Management setup requires a local same-origin request.", code="setup_local_only"))
+        with reload_lock:
+            if active.gateway_api_key:
+                raise HTTPException(409, detail=error_body("Management key is already configured.", code="setup_already_configured"))
+            previous_catalog = active.engine.catalog
+            previous_registry = active.engine.strategies
+            previous_source = active.engine.config_source
+
+            def prepare(catalog: Catalog) -> Any:
+                resolved = _resolve_storage_path(catalog, active.models_file)
+                if resolved.storage != previous_catalog.storage:
+                    raise ValueError("Storage settings require a restart.")
+                return active.engine.prepare_catalog_reload(resolved)
+
+            def activate(catalog: Catalog, registry: Any) -> None:
+                resolved = _resolve_storage_path(catalog, active.models_file)
+                active.engine.reload_catalog(resolved, source=str(active.models_file), registry=registry)
+                active.apply_settings(resolved.gateway)
+
+            def restore() -> None:
+                active.engine.reload_catalog(previous_catalog, source=previous_source, registry=previous_registry)
+                active.apply_settings(previous_catalog.gateway)
+
+            try:
+                return setup_service.configure(body, prepare=prepare, activate=activate, restore_runtime=restore)
+            except SetupAlreadyConfigured:
+                raise HTTPException(409, detail=error_body("Management key is already configured.", code="setup_already_configured")) from None
+            except Exception as error:
+                raise provider_error(error) from None
 
     def provider_error(error: Exception) -> HTTPException:
         if isinstance(error, RevisionConflict):
@@ -740,16 +811,56 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             return HTTPException(400, detail=error_body("Provider configuration is invalid. Check fields, credentials, and references.", code="invalid_configuration"))
         return HTTPException(500, detail=error_body("Could not apply provider configuration.", code="provider_configuration_failed"))
 
+    def loopback_host(host: str) -> bool:
+        if host == "localhost":
+            return True
+        try:
+            return ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            return False
+
+    def gateway_bootstrap_available(request: Request) -> bool:
+        if active.gateway_api_key or not loopback_host(listener_host) or request.client is None or not loopback_host(request.client.host):
+            return False
+        if any(name in {"forwarded", "x-forwarded", "x-real-ip"} or name.startswith("x-forwarded-") for name in request.headers):
+            return False
+        hosts = request.headers.getlist("host")
+        origins = request.headers.getlist("origin")
+        if len(hosts) != 1 or len(origins) > 1:
+            return False
+        if any(not value.isascii() or any(not 33 <= ord(char) <= 126 for char in value) or "%" in value or "\\" in value for value in [*hosts, *origins]):
+            return False
+        try:
+            host = urlsplit(f"{request.url.scheme}://{hosts[0]}")
+            if host.username is not None or host.password is not None or host.path or host.query or host.fragment or not loopback_host(host.hostname or "") or "%" in hosts[0] or "\\" in hosts[0]:
+                return False
+            port = host.port or (443 if host.scheme == "https" else 80)
+            if origins:
+                origin = urlsplit(origins[0])
+                if origin.scheme != host.scheme or origin.hostname != host.hostname or (origin.port or (443 if origin.scheme == "https" else 80)) != port or origin.username is not None or origin.password is not None or origin.path or origin.query or origin.fragment:
+                    return False
+            return True
+        except ValueError:
+            return False
+
+    def require_gateway_credential_write(request: Request, authorization: str | None) -> None:
+        if active.gateway_api_key:
+            require_gateway_key(active.gateway_api_key, authorization)
+        elif not gateway_bootstrap_available(request):
+            raise HTTPException(403, detail=error_body("Gateway credential setup is unavailable for this request.", code="gateway_bootstrap_unavailable"))
+
     @app.get("/v1/provider-configuration")
-    def provider_configuration(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    def provider_configuration(request: Request, authorization: str | None = Header(default=None)) -> dict[str, Any]:
         require_gateway_key(active.gateway_api_key, authorization)
         try:
             with reload_lock:
-                return provider_service.read(write_available=bool(active.gateway_api_key))
+                result = provider_service.read(write_available=bool(active.gateway_api_key))
+                result["gateway_bootstrap_available"] = gateway_bootstrap_available(request)
+                return result
         except (OSError, ValueError, TypeError, RuntimeError) as error:
             raise provider_error(error) from None
 
-    def provider_command(body: dict[str, Any], *, apply: bool) -> dict[str, Any]:
+    def provider_command(body: dict[str, Any], *, apply: bool, gateway_credential: bool = False) -> dict[str, Any]:
         with reload_lock:
             previous_catalog = active.engine.catalog
             previous_registry = active.engine.strategies
@@ -771,10 +882,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 active.apply_settings(previous_catalog.gateway)
 
             try:
+                if gateway_credential:
+                    return provider_service.gateway_credential(body, prepare=prepare, activate=activate, restore_runtime=restore)
                 return provider_service.command(body, apply=apply, prepare=prepare, activate=activate, restore_runtime=restore)
             except Exception as error:
                 # Transaction recovery and all public errors deliberately exclude exception text.
+                if gateway_credential and not isinstance(error, RevisionConflict):
+                    if isinstance(error, (ValueError, TypeError)):
+                        raise HTTPException(400, detail=error_body("Gateway credential operation is invalid.", code="invalid_gateway_credential")) from None
+                    raise HTTPException(500, detail=error_body("Could not apply gateway credential.", code="gateway_credential_failed")) from None
                 raise provider_error(error) from None
+
+    @app.put("/v1/gateway-credential")
+    def set_gateway_credential(request: Request, body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        with reload_lock:
+            require_gateway_credential_write(request, authorization)
+            return provider_command(body, apply=True, gateway_credential=True)
 
     @app.post("/v1/provider-configuration/validate")
     def validate_provider_configuration(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
@@ -846,7 +969,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             raise ValueError("Overlay requires version, strategy, and rules or models.")
         merged = merge_overlay(baseline, overlay)
         catalog = _resolve_storage_path(
-            catalog_from_document(merged, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment)), active.models_file
+            catalog_from_document(merged, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment), allow_missing_credentials=True), active.models_file
         )
         registry = active.engine.prepare_catalog_reload(catalog)
         if catalog.storage != active.engine.catalog.storage:
@@ -884,7 +1007,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 raise invalid_configuration(error) from error
             baseline_models = {
                 f"{item['provider']}/{item['upstream_model']}": item
-                for item in baseline["models"]
+                for item in baseline.get("models", [])
             }
             models = [
                 {
@@ -944,6 +1067,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     "error": overlay_error,
                 },
                 "config_hash": active.engine.config_hash,
+                "defaults": catalog.defaults.as_dict(),
                 "questions": options.get("questions", {}),
                 "fallback": options.get("fallback", {}),
                 "rules": [
@@ -1033,7 +1157,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 require_readable_configuration(active.models_file)
                 baseline = read_models_document(active.models_file)
                 catalog = _resolve_storage_path(
-                    catalog_from_document(baseline, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment)), active.models_file
+                    catalog_from_document(baseline, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment), allow_missing_credentials=True), active.models_file
                 )
                 registry = active.engine.prepare_catalog_reload(catalog)
                 if catalog.storage != active.engine.catalog.storage:
@@ -1094,9 +1218,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             document = read_models_document(active.models_file)
             overlay, _overlay_error = read_overlay(active.models_file)
             try:
-                parsed = catalog_from_document(merge_overlay(document, overlay), str(active.models_file), env)
+                parsed = catalog_from_document(merge_overlay(document, overlay), str(active.models_file), env, allow_missing_credentials=True)
             except (ValueError, TypeError):
-                parsed = catalog_from_document(document, str(active.models_file), env)
+                parsed = catalog_from_document(document, str(active.models_file), env, allow_missing_credentials=True)
             catalog = _resolve_storage_path(
                 parsed, active.models_file
             )
@@ -1105,7 +1229,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 status_code=400,
                 detail={
                     "error": {
-                        "message": f"Reload rejected: {error}",
+                        "message": "Reload rejected: configuration is invalid.",
                         "type": "invalid_request_error",
                         "param": None,
                         "code": "invalid_configuration",
@@ -1226,6 +1350,8 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
     ) -> JSONResponse | StreamingResponse:
         require_gateway_key(active.gateway_api_key, authorization)
+        if not active.engine.catalog.profiles:
+            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete"))
         message_text(body.messages)
         session_id = derive_session_id(
             body.messages,
@@ -1301,9 +1427,12 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     }
                 },
             ) from error
+        except SetupIncompleteError:
+            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete")) from None
         except UnknownStrategyError as error:
             raise unknown_strategy_error(active.engine, error.name) from error
-        profile = active.engine.catalog.by_name(decision.route_name)
+        selected_catalog = active.engine.catalog
+        profile = selected_catalog.by_name(decision.route_name)
         if profile is None:
             raise HTTPException(
                 status_code=500,
@@ -1354,6 +1483,9 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         activity_tracked = activity.begin_request(activity_token, activity_path)
         started = time.perf_counter()
         try:
+            provider = selected_catalog.provider_for(profile)
+            if (provider.api_key_env and not provider.api_key) or any(not provider.resolved_params.get(name) for name in provider.param_env):
+                raise HTTPException(503, detail=error_body("Selected provider credentials are missing.", code="provider_credentials_missing", type_="server_error"))
             from litellm import completion
 
             payload = completion_payload(
@@ -1365,7 +1497,6 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             )
             if active.engine.record_store.enabled:
                 try:
-                    provider = active.engine.catalog.provider_for(profile)
                     capture_content = (
                         active.engine.record_store.settings.capture_content
                     )
@@ -1440,6 +1571,29 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 activity.finish_request(activity_token)
             raise
 
+        stream_response_close_started = False
+
+        async def close_stream_response() -> None:
+            nonlocal stream_response_close_started
+            with anyio.CancelScope(shield=True):
+                if stream_response_close_started:
+                    return
+                close = getattr(response, "aclose", None)
+                if not callable(close):
+                    close = getattr(response, "close", None)
+                if not callable(close):
+                    return
+                stream_response_close_started = True
+                try:
+                    result = close()
+                    if isawaitable(result):
+                        await result
+                except Exception as error:
+                    logger.warning(
+                        "upstream stream close failed",
+                        extra={"error_type": _safe_error_type(error)},
+                    )
+
         headers = decision_headers(decision)
         echoed_model = body.model if active.echo_requested_model else None
         response_adapter = adapter_for(profile.provider_type)
@@ -1448,8 +1602,13 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 session, active.engine.record_store
             )
         except BaseException:
-            if activity_tracked:
-                activity.finish_request(activity_token)
+            try:
+                if body.stream:
+                    # FastAPI runs this synchronous route in an AnyIO worker.
+                    anyio.from_thread.run(close_stream_response)
+            finally:
+                if activity_tracked:
+                    activity.finish_request(activity_token)
             raise
         if body.stream:
             logger.debug(
@@ -1461,8 +1620,44 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 },
             )
 
+            stream_finish_reason: str | None = None
+            stream_usage: dict[str, Any] | None = None
+            stream_model: str | None = None
+            stream_outcome_recorded = False
+            stream_completed = False
+            stream_interrupted = threading.Event()
+            stream_body_lock = threading.Lock()
+
+            def observe_stream_chunk(chunk: dict[str, Any]) -> None:
+                nonlocal stream_finish_reason, stream_usage, stream_model
+                response_capture.observe(chunk)
+                reason = finish_reason(chunk)
+                if reason is not None:
+                    stream_finish_reason = reason
+                usage = chunk.get("usage")
+                if isinstance(usage, dict):
+                    stream_usage = dict(usage)
+                model = chunk.get("model")
+                if isinstance(model, str):
+                    stream_model = model
+
+            def record_stream_outcome(ok: bool, error_type: str | None) -> None:
+                nonlocal stream_outcome_recorded
+                if stream_outcome_recorded:
+                    return
+                stream_outcome_recorded = True
+                active.engine.record_outcome(
+                    decision,
+                    ok=ok,
+                    finish_reason=stream_finish_reason,
+                    usage=stream_usage,
+                    returned_model=stream_model,
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                    error_type=error_type,
+                )
+
             def recorded_stream() -> Generator[str, None, None]:
-                ok = True
+                nonlocal stream_completed
                 error_type: str | None = None
                 completed = False
 
@@ -1470,11 +1665,19 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     yield from sse_chunks(
                         cast(Iterator[Any], response),
                         echoed_model,
-                        response_capture.observe,
+                        observe_stream_chunk,
                     )
-                    completed = True
+                    completed = (
+                        stream_finish_reason is not None
+                        and not stream_interrupted.is_set()
+                    )
+                    stream_completed = completed
+                    if not completed:
+                        error_type = (
+                            "StreamInterrupted" if stream_interrupted.is_set()
+                            else "StreamIncomplete"
+                        )
                 except Exception as error:
-                    ok = False
                     error_type = _safe_error_type(error)
                     logger.error(
                         "routing stream failed",
@@ -1497,55 +1700,100 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     return
                 finally:
                     if not completed:
-                        ok = False
                         error_type = error_type or "StreamInterrupted"
-                    if activity_tracked:
+                    if activity_tracked and not completed:
                         activity.finish_request(activity_token)
-                    active.engine.record_outcome(
-                        decision,
-                        ok=ok,
-                        latency_ms=(time.perf_counter() - started) * 1000,
-                        error_type=error_type,
-                    )
-                    if ok:
-                        logger.info(
-                            "routing served",
-                            extra={
-                                "decision_id": decision.decision_id,
-                                "provider": decision.provider,
-                                "model": decision.model,
-                                "ok": True,
-                                "latency_ms": round(
-                                    (time.perf_counter() - started) * 1000, 2
-                                ),
-                            },
-                        )
+                    if not completed:
+                        record_stream_outcome(False, error_type)
 
             stream_body = recorded_stream()
 
+            def next_stream_body() -> str | None:
+                with stream_body_lock:
+                    if stream_interrupted.is_set():
+                        return None
+                    return next(stream_body, None)
+
+            def close_stream_body() -> None:
+                with stream_body_lock:
+                    stream_body.close()
+
+            async def stream_content() -> AsyncIterator[str]:
+                while True:
+                    chunk = await anyio.to_thread.run_sync(next_stream_body)
+                    if chunk is None:
+                        break
+                    yield chunk
+
             class ActivityStreamingResponse(StreamingResponse):
                 async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+                    delivered = False
+                    terminal_delivered = False
+
+                    async def delivery_send(message: Any) -> None:
+                        nonlocal terminal_delivered
+                        await send(message)
+                        if message["type"] == "http.response.body" and not message.get("more_body", False):
+                            terminal_delivered = True
+
                     try:
-                        await super().__call__(scope, receive, send)
+                        await super().__call__(scope, receive, delivery_send)
+                        delivered = True
                     finally:
-                        if activity_tracked:
-                            activity.finish_request(activity_token)
-                        # AnyIO may still be exiting a worker-thread next() on cancellation.
-                        # Closing an executing generator raises ValueError; its token is
-                        # already finished, so this must not mask disconnect/cancellation.
-                        with suppress(ValueError):
-                            stream_body.close()
+                        stream_interrupted.set()
+                        try:
+                            with anyio.CancelScope(shield=True):
+                                # A cancelled ASGI task can leave next() running.
+                                # Wait off-loop for the same lock before closing either
+                                # the generator or its provider-owned SDK resource.
+                                await anyio.to_thread.run_sync(close_stream_body)
+                                await close_stream_response()
+                        finally:
+                            if activity_tracked:
+                                activity.finish_request(activity_token)
+                        if delivered and terminal_delivered and stream_completed:
+                            # Finalize only after ASGI delivers the terminal body frame.
+                            try:
+                                response_capture.finish()
+                            except Exception as error:
+                                logger.warning(
+                                    "routing record dropped",
+                                    extra={
+                                        "record_kind": "assistant_continuation",
+                                        "error_type": _safe_error_type(error),
+                                    },
+                                )
+                            record_stream_outcome(True, None)
+                            logger.info(
+                                "routing served",
+                                extra={
+                                    "decision_id": decision.decision_id,
+                                    "provider": decision.provider,
+                                    "model": decision.model,
+                                    "ok": True,
+                                    "latency_ms": round(
+                                        (time.perf_counter() - started) * 1000, 2
+                                    ),
+                                },
+                            )
+                        else:
+                            record_stream_outcome(False, "StreamInterrupted")
 
             try:
                 return ActivityStreamingResponse(
-                    stream_body,
+                    stream_content(),
                     media_type="text/event-stream",
                     headers={**headers, "Cache-Control": "no-cache"},
                 )
             except BaseException:
-                if activity_tracked:
-                    activity.finish_request(activity_token)
-                stream_body.close()
+                stream_interrupted.set()
+                try:
+                    close_stream_body()
+                    anyio.from_thread.run(close_stream_response)
+                finally:
+                    if activity_tracked:
+                        activity.finish_request(activity_token)
+                    record_stream_outcome(False, "StreamInterrupted")
                 raise
 
         if activity_tracked:

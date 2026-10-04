@@ -5,22 +5,18 @@ from __future__ import annotations
 import copy
 import hashlib
 import hmac
-import io
 import json
-import os
-import re
 import secrets
 from types import MappingProxyType
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from dotenv.parser import parse_stream
-from dotenv.variables import parse_variables
 from litellm import provider_list
 
 from jev_gateway.catalog import Catalog, catalog_from_document, provider_from_dict, model_metadata, _metadata_number
 from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
+from jev_gateway.credentials import credential_snapshot, env_update, credential_path, credential_update, read_credential_bytes, validate_secret
 from jev_gateway.provider_presets import provider_presets
 from jev_gateway.routing_overlay import merge_overlay, overlay_path, read_models_document, read_overlay
 from jev_gateway.strategy import StrategyRegistry
@@ -65,53 +61,14 @@ def metadata_envelope(candidate: Mapping[str, Any]) -> dict[str, Any]:
     return model_metadata({"version": 1, "sources": sources, "fields": fields})
 
 
-_LITERAL_MARKER = "# jev-managed-literal-v1"
-
-
-def credential_snapshot(models_file: Path, *, env_content: bytes | None = None, external: Mapping[str, str] | None = None) -> Mapping[str, str]:
-    with configuration_read_lock(models_file):
-        inherited = dict(os.environ if external is None else external)
-        content = optional_bytes(models_file.parent / ".env") if env_content is None else env_content
-        resolved: dict[str, str | None] = {}
-        if content is not None:
-            for binding in parse_stream(io.StringIO(content.decode())):
-                if binding.key is None:
-                    continue
-                value = binding.value
-                if value is not None and not binding.original.string.rstrip().endswith(_LITERAL_MARKER):
-                    # dotenv override=True resolves in file order, including duplicate
-                    # assignments and bare names, before updating the inherited values.
-                    variables = MappingProxyType({**inherited, **resolved})
-                    value = "".join(atom.resolve(variables) for atom in parse_variables(value))
-                resolved[binding.key] = value
-        inherited.update({key: value for key, value in resolved.items() if value is not None})
-        return MappingProxyType(inherited)
-
-
 def revision(models_file: Path) -> str:
     with configuration_read_lock(models_file):
         digest = hmac.new(_REVISION_KEY, digestmod=hashlib.sha256)
-        for path in (models_file, overlay_path(models_file), models_file.parent / ".env"):
-            data = optional_bytes(path)
+        for path in (models_file, overlay_path(models_file), models_file.parent / ".env", credential_path(models_file)):
+            data = read_credential_bytes(models_file) if path == credential_path(models_file) else optional_bytes(path)
             digest.update(path.name.encode() + b"\0")
             digest.update(b"missing" if data is None else len(data).to_bytes(8, "big") + data)
         return digest.hexdigest()
-
-
-def env_update(content: bytes | None, name: str, value: str | None) -> bytes:
-    if not isinstance(name, str) or not name.isascii() or not name.isidentifier():
-        raise ValueError("Credential variable name must be an ASCII identifier.")
-    if value is not None and (not isinstance(value, str) or not value or len(value.encode()) > 8192 or any(c in value for c in "\r\n\x00")):
-        raise ValueError("Credential must be nonempty and fit on one line within 8 KiB.")
-    lines = (content or b"").decode().splitlines()
-    # Handle dotenv's export and whitespace syntax without preserving duplicate assignments.
-    pattern = re.compile(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=")
-    output = [line for line in lines if not pattern.match(line)]
-    if value is not None:
-        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
-        marker = f" {_LITERAL_MARKER}" if "${" in value else ""
-        output.append(f"{name}='{escaped}'{marker}")
-    return ("\n".join(output) + ("\n" if output else "")).encode()
 
 
 def _references(document: dict[str, Any], name: str, *, exclude: tuple[str, str] | None = None) -> int:
@@ -122,10 +79,14 @@ def _references(document: dict[str, Any], name: str, *, exclude: tuple[str, str]
     count = int(gateway.get("api_key_env") == name)
     for kind, entries in (("llm", document.get("providers", [])), ("decision", decision.get("providers", []))):
         for item in entries:
-            if exclude == (kind, item.get("id")):
-                continue
-            count += int(item.get("api_key_env") == name)
-            count += sum(value == name for value in item.get("param_env", {}).values())
+            if not isinstance(item, dict):
+                raise ValueError("Provider entries must be objects.")
+            if exclude != (kind, item.get("id")):
+                count += int(item.get("api_key_env") == name)
+            bindings = item.get("param_env", {})
+            if not isinstance(bindings, dict):
+                raise ValueError("Provider param_env must be an object.")
+            count += sum(value == name for value in bindings.values())
     return count
 
 
@@ -165,15 +126,18 @@ class ProviderConfiguration:
             overlay, error = read_overlay(self.models_file)
             if error:
                 raise ValueError("Routing overlay could not be read.")
-            catalog = catalog_from_document(merge_overlay(document, overlay), str(self.models_file), env)
+            catalog = catalog_from_document(merge_overlay(document, overlay), str(self.models_file), env, allow_missing_credentials=True)
             return self.project(catalog, revision(self.models_file), write_available=write_available)
 
     @staticmethod
     def project(catalog: Catalog, token: str, *, write_available: bool = False) -> dict[str, Any]:
         return {
             "revision": token, "write_available": write_available,
+            "gateway": {"api_key_env": catalog.gateway.api_key_env, "has_api_key": bool(catalog.gateway.api_key)},
+            "gateway_bootstrap_available": False,
             "providers": [item.as_dict() for item in catalog.providers],
             "decision": catalog.decision.as_dict(),
+            "defaults": catalog.defaults.as_dict(),
             "models": [item.as_dict() for item in catalog.profiles],
             "presets": provider_presets(), "provider_types": list(provider_list),
             "decision_protocols": list(registered_protocols()),
@@ -190,14 +154,28 @@ class ProviderConfiguration:
                 raise RevisionConflict("Configuration changed. Refresh before applying.")
             document = read_models_document(self.models_file)
             candidate = copy.deepcopy(document)
+            candidate.setdefault("providers", [])
+            candidate.setdefault("models", [])
             env_path = self.models_file.parent / ".env"
             original_env = optional_bytes(env_path)
             env_content = original_env
+            secret_path = credential_path(self.models_file)
+            original_credentials = read_credential_bytes(self.models_file)
+            credential_content = original_credentials
+            credential_changes: list[tuple[str, tuple[str, str]]] = []
             imported = skipped = 0
             for operation in operations:
                 if not isinstance(operation, dict):
                     raise ValueError("Operation must be an object.")
                 action = operation.get("action")
+                if action == "set_default_model":
+                    if set(operation) != {"action", "model"}:
+                        raise ValueError("Invalid default model operation.")
+                    model = operation["model"]
+                    if model is not None and (not isinstance(model, str) or not model.strip()):
+                        raise ValueError("Default model must be a nonempty string or null.")
+                    candidate.setdefault("defaults", {})["default_model"] = model
+                    continue
                 if action == "import":
                     if set(operation) != {"action", "provider_id", "models", "confirmed"} or operation["confirmed"] is not True:
                         raise ValueError("Import requires confirmed: true and explicit model records.")
@@ -260,25 +238,29 @@ class ProviderConfiguration:
                             raise ValueError("Credential changes require api_key_env.")
                         if _references(candidate, reference, exclude=(kind, identifier)):
                             raise ValueError("Credential reference is shared; update each reference explicitly.")
-                        env_content = env_update(env_content, reference, credential.get("value") if secret_action == "set" else None)
+                        credential_changes.append((reference, (kind, identifier)))
                         if secret_action == "set" and "value" not in credential:
                             raise ValueError("Set requires a credential value.")
+                        value = validate_secret(credential.get("value")) if secret_action == "set" else None
+                        credential_content = credential_update(credential_content, reference, value)
+                        if secret_action == "clear":
+                            env_content = env_update(env_content, reference, None)
                     if existing is not None:
                         entries[entries.index(existing)] = provider
                     else:
                         entries.append(provider)
                 else:
                     raise ValueError("Unsupported provider operation.")
-            env = credential_snapshot(self.models_file, env_content=env_content or b"", external=self.external)
+            for reference, owner in credential_changes:
+                if _references(candidate, reference, exclude=owner):
+                    raise ValueError("Credential reference is shared; update each reference explicitly.")
+            env = credential_snapshot(self.models_file, env_content=env_content or b"", credential_content=credential_content or b'{"version":1,"values":{}}', external=self.external)
             overlay, error = read_overlay(self.models_file)
             if error:
                 raise ValueError("Routing overlay must be repaired before changing providers.")
             # Validate both baseline and effective catalog before preparing runtime state.
-            catalog_from_document(candidate, str(self.models_file), env)
-            catalog = catalog_from_document(merge_overlay(candidate, overlay), str(self.models_file), env)
-            for item in catalog.decision.providers:
-                if catalog.decision.enabled and not env.get(item.api_key_env):
-                    raise ValueError("Enabled decision providers require configured credentials.")
+            catalog_from_document(candidate, str(self.models_file), env, allow_missing_credentials=True)
+            catalog = catalog_from_document(merge_overlay(candidate, overlay), str(self.models_file), env, allow_missing_credentials=True)
             registry = prepare(catalog) if prepare else StrategyRegistry.from_catalog(catalog)
             if apply:
                 if body["expected_revision"] != revision(self.models_file):
@@ -287,8 +269,56 @@ class ProviderConfiguration:
                 if env_content != original_env:
                     changes[env_path] = env_content
                     changes[env_path.with_name(".env.backup")] = original_env
+                if credential_content != original_credentials:
+                    changes[secret_path] = credential_content
+                    changes[secret_path.with_name("credentials.json.backup")] = original_credentials
                 replace_configuration(self.models_file, changes, activate=(lambda: activate(catalog, registry)) if activate else None, restore_runtime=restore_runtime)
             return {"valid": True, "applied": apply, "imported": imported, "skipped": skipped, **self.project(catalog, revision(self.models_file), write_available=True)}
+
+    def gateway_credential(self, body: Any, *, prepare: Callable[[Catalog], Any], activate: Callable[[Catalog, Any], None], restore_runtime: Callable[[], None]) -> dict[str, Any]:
+        if not isinstance(body, dict) or set(body) != {"expected_revision", "credential"} or not isinstance(body["expected_revision"], str) or not body["expected_revision"]:
+            raise ValueError("Invalid gateway credential operation.")
+        credential = body["credential"]
+        if not isinstance(credential, dict) or set(credential) != {"action", "value"} or credential["action"] != "set":
+            raise ValueError("Gateway credential requires set.")
+        value = validate_secret(credential["value"])
+        if not value.isascii() or any(not (33 <= ord(char) <= 126) for char in value):
+            raise ValueError("Gateway credential must contain visible ASCII characters without whitespace.")
+        with configuration_read_lock(self.models_file):
+            if body["expected_revision"] != revision(self.models_file):
+                raise RevisionConflict("Configuration changed. Refresh before applying.")
+            document = read_models_document(self.models_file)
+            candidate = copy.deepcopy(document)
+            if candidate.get("gateway") is None:
+                candidate["gateway"] = {}
+            gateway = candidate.setdefault("gateway", {})
+            if not isinstance(gateway, dict):
+                raise ValueError("Gateway configuration must be an object.")
+            reference = gateway.get("api_key_env") or "JEV_GATEWAY_API_KEY"
+            # The current gateway reference itself is counted once.
+            if _references(candidate, reference) > int(gateway.get("api_key_env") == reference):
+                raise ValueError("Gateway credential reference is shared.")
+            gateway["api_key_env"] = reference
+            original = read_credential_bytes(self.models_file)
+            content = credential_update(original, reference, value)
+            env = credential_snapshot(self.models_file, credential_content=content, external=self.external)
+            overlay, error = read_overlay(self.models_file)
+            if error:
+                raise ValueError("Routing overlay must be repaired before changing credentials.")
+            catalog_from_document(candidate, str(self.models_file), env, allow_missing_credentials=True)
+            catalog = catalog_from_document(merge_overlay(candidate, overlay), str(self.models_file), env, allow_missing_credentials=True)
+            registry = prepare(catalog)
+            if body["expected_revision"] != revision(self.models_file):
+                raise RevisionConflict("Configuration changed while validating.")
+            path = credential_path(self.models_file)
+            changes = {
+                self.models_file: (json.dumps(candidate, ensure_ascii=False, indent=2) + "\n").encode(),
+                self.models_file.with_name("models.json.bak"): optional_bytes(self.models_file),
+                path: content,
+                path.with_name("credentials.json.backup"): original,
+            }
+            replace_configuration(self.models_file, changes, activate=lambda: activate(catalog, registry), restore_runtime=restore_runtime)
+            return {"valid": True, "applied": True, **self.project(catalog, revision(self.models_file), write_available=True)}
 
     def discovery_provider(self, body: Any) -> tuple[dict[str, Any], str | None, set[str]]:
         if not isinstance(body, dict) or ("provider_id" in body) == ("provider" in body):
@@ -297,7 +327,7 @@ class ProviderConfiguration:
             document = read_models_document(self.models_file)
             env = credential_snapshot(self.models_file, external=self.external)
             if "provider_id" in body:
-                provider = next((p for p in document["providers"] if p["id"] == body["provider_id"]), None)
+                provider = next((p for p in document.get("providers", []) if p["id"] == body["provider_id"]), None)
                 if provider is None:
                     raise ValueError("LLM provider does not exist.")
                 provider = copy.deepcopy(provider)
@@ -315,12 +345,12 @@ class ProviderConfiguration:
                 if not isinstance(reference, str):
                     raise ValueError("Candidate credential requires an env reference.")
                 if credential["action"] == "clear":
-                    env = credential_snapshot(self.models_file, external=self.external, env_content=env_update(optional_bytes(self.models_file.parent / ".env"), reference, None))
+                    env = credential_snapshot(self.models_file, external=self.external, env_content=env_update(optional_bytes(self.models_file.parent / ".env"), reference, None), credential_content=credential_update(read_credential_bytes(self.models_file), reference, None))
                 else:
-                    env_update(b"", reference, credential.get("value"))
+                    credential_update(None, reference, validate_secret(credential.get("value")))
                     if not isinstance(credential.get("value"), str):
                         raise ValueError("Set requires a credential value.")
                     env = MappingProxyType({**env, reference: credential["value"]})
-            profile = provider_from_dict(provider, 0, env)
-            imported = {f"{m['provider']}/{m['upstream_model']}" for m in document["models"]}
+            profile = provider_from_dict(provider, 0, env, allow_missing_credentials=True)
+            imported = {f"{m['provider']}/{m['upstream_model']}" for m in document.get("models", [])}
             return provider, profile.api_key, imported

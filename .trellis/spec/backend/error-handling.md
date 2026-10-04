@@ -27,6 +27,7 @@ The project defines a small set of domain exceptions:
 | `UnknownStrategyError(ValueError)` | `jev_gateway/strategy/contracts.py` | The requested strategy is not registered |
 | `StrategyContractError(RuntimeError)` | `jev_gateway/strategy/contracts.py` | A strategy returned an invalid or unknown route |
 | `StorageUnavailableError(RuntimeError)` | `jev_gateway/records.py` | The evidence writer cannot accept or persist work |
+| `SetupIncompleteError(ValueError)` | `jev_gateway/strategy/contracts.py` | An empty catalog or matched empty tag has no usable configured route |
 
 Catalog validation uses `TypeError` and `ValueError` with specific English
 messages. Preserve exception chaining when wrapping I/O or parsing failures:
@@ -78,6 +79,7 @@ Python or domain exceptions.
 | 500 | `catalog_mismatch` | A selected route cannot be resolved against the active catalog |
 | 502 | `upstream_error` | LiteLLM or the selected upstream failed |
 | 503 | `storage_unavailable` | A reload operation requires a healthy record store |
+| 503 | `setup_incomplete` | Catalog is empty or a matched empty tag has no global default; console and liveness remain usable |
 
 Pydantic request validation failures use HTTP 400 with
 `type: "invalid_request_error"` and no code.
@@ -88,6 +90,11 @@ Pydantic request validation failures use HTTP 400 with
 Invalid provider references, duplicate IDs, malformed tags, unknown keys,
 unsupported modes, and missing required values raise before application startup.
 Do not catch these errors merely to continue with defaults.
+
+Default startup creates absent configuration files through the initializer.
+Valid empty catalogs and unassigned tag pools are incomplete configuration,
+not parse failures. Explicit missing paths and existing-invalid files still fail.
+No-model chat and preview return setup_incomplete before provider calls.
 
 `POST /v1/routing/reload` is different because the current application is already
 healthy. It catches parsing and validation errors, returns
@@ -120,6 +127,25 @@ log an `Exception in ASGI application` traceback even though no replacement
 HTTP response can be sent. Finish the response body without `[DONE]` or an SSE
 error payload, and keep the original upstream exception text out of logs and
 responses.
+
+Stream resource cleanup belongs to the async response boundary. Prefer the SDK's
+public `aclose()` interface, await its result under cancellation shielding, and
+retain synchronous `close()` compatibility. A sync completion iterator may still
+expose only async cleanup. Invoke the selected cleanup interface once; generator
+exhaustion is not proof that the provider resource was closed.
+
+Use the same lock for advancing and closing the recorded generator. If ASGI
+cancellation leaves a worker in `next()`, wait off-loop for that worker before
+closing the generator and SDK. A synchronous FastAPI route worker must bridge
+pre-response cleanup with `anyio.from_thread.run()` rather than starting another
+event loop. Close failures use bounded type-only warnings and preserve an already
+delivered successful outcome.
+
+Successful assistant capture and outcome recording require SDK exhaustion, a
+finish reason and successful terminal ASGI delivery. SDK failure, incomplete
+exhaustion, disconnect and failed sends retain unsuccessful evidence without
+completed capture. Tests must cover normal delivery and response-start/body/
+`[DONE]`/terminal-frame failures with an async-only cleanup fixture.
 
 
 

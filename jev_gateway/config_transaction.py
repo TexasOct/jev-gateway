@@ -105,7 +105,7 @@ def replace_configuration(
     atomic_bytes(journal, content, protected=True)
     try:
         for path, data in changes.items():
-            atomic_bytes(path, data, protected=path.name.startswith(".env"))
+            atomic_bytes(path, data, protected=path.name.startswith(".env") or path.name in {"credentials.json", "credentials.json.backup"})
         if activate is not None:
             # All replacements are complete. The owning callback may reenter
             # readers under the same lock without mistaking its journal for an
@@ -122,7 +122,7 @@ def replace_configuration(
         failures: list[Exception] = []
         for path, data in previous.items():
             try:
-                atomic_bytes(path, data, protected=path.name.startswith(".env"))
+                atomic_bytes(path, data, protected=path.name.startswith(".env") or path.name in {"credentials.json", "credentials.json.backup"})
             except Exception as error:
                 failures.append(error)
         if restore_runtime is not None:

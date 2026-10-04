@@ -1,0 +1,335 @@
+
+Running 70 tests using 2 workers
+
+  ✘   1 frontend/tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event (1.1s)
+  ✘   2 frontend/tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once (1.1s)
+  ✘   3 frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese (1.1s)
+  ✘   4 frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese (1.1s)
+  ✘   6 frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese (1.1s)
+  ✘   5 frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese (1.1s)
+  ✓   8 frontend/tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after endpoint changes (804ms)
+  ✓   7 frontend/tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after transport changes (804ms)
+  ✓  10 frontend/tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for lookup to discovery, unknowns and manual overrides (669ms)
+  ✓   9 frontend/tests/browser/provider-management.spec.ts:28:3 › refresh invalidates delayed query and automatic evidence after credential revision changes (784ms)
+  ✓  11 frontend/tests/browser/provider-management.spec.ts:74:3 › latest evidence remains consistent for discovery to lookup, unknowns and manual overrides (620ms)
+  ✓  12 frontend/tests/browser/provider-management.spec.ts:104:1 › null beside known evidence prefills, reference-only stays unknown and real conflicts block import (553ms)
+  ✓  13 frontend/tests/browser/provider-management.spec.ts:124:3 › candidate credential action edits respect rejected and accepted discard (413ms)
+  ✓  14 frontend/tests/browser/provider-management.spec.ts:124:3 › candidate credential password edits respect rejected and accepted discard (452ms)
+  ✓  15 frontend/tests/browser/provider-management.spec.ts:152:1 › credential clear sends a value-free local clear and reports inherited effective presence (364ms)
+  ✓  17 frontend/tests/browser/provider-management.spec.ts:167:3 › save remains applied after catalog GET failure and read retry never duplicates PUT (386ms)
+  ✓  16 frontend/tests/browser/provider-management.spec.ts:167:3 › import remains applied after catalog GET failure and read retry never duplicates PUT (695ms)
+  ✓  18 frontend/tests/browser/provider-management.spec.ts:204:1 › broken local supplier image uses the neutral fallback without changing identity geometry (192ms)
+  ✓  19 frontend/tests/browser/provider-management.spec.ts:213:1 › provider editing preserves ID, clears secrets, and sends the shared contract (387ms)
+  ✓  20 frontend/tests/browser/provider-management.spec.ts:235:1 › supplier aliases, custom entry, icon picker and System One are usable (540ms)
+  ✓  21 frontend/tests/browser/provider-management.spec.ts:260:1 › selection scope, metadata edits and explicit import refresh the catalog (528ms)
+  ✓  22 frontend/tests/browser/provider-management.spec.ts:289:1 › unknown metadata blocks import and failed operations remain retryable (471ms)
+  ✓  23 frontend/tests/browser/provider-management.spec.ts:307:1 › revision conflicts preserve the draft, clear the secret and use the refreshed revision (474ms)
+  ✓  24 frontend/tests/browser/provider-management.spec.ts:328:1 › candidate private-network discovery is explicit and canceled results stay out of other tabs (468ms)
+  ✓  25 frontend/tests/browser/provider-management.spec.ts:349:1 › read-only and unauthorized configuration reads expose the appropriate recovery (322ms)
+  ✓  26 frontend/tests/browser/provider-management.spec.ts:361:1 › verified DeepSeek artwork loads locally, preserves proportions and retains attribution (332ms)
+  ✓  28 frontend/tests/browser/provider-management.spec.ts:406:1 › native endpoint presets preserve null and fill their declared credential reference (356ms)
+  ✓  27 frontend/tests/browser/provider-management.spec.ts:375:1 › metadata retry remains a metadata operation and batch values need an explicit null decision (732ms)
+  ✓  30 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en light (386ms)
+  ✓  29 frontend/tests/browser/provider-management.spec.ts:421:1 › saving a previewed provider keeps model selection and reviewed metadata for explicit import (629ms)
+  ✓  31 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px en dark (402ms)
+  ✓  32 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN light (408ms)
+  ✓  33 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 320px zh-CN dark (432ms)
+  ✓  34 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en light (373ms)
+  ✓  35 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px en dark (366ms)
+  ✓  36 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN light (436ms)
+  ✓  37 frontend/tests/browser/provider-management.spec.ts:446:3 › model confirmation fits 390px zh-CN dark (403ms)
+  ✓  38 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en light (279ms)
+  ✓  39 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px en dark (299ms)
+  ✓  40 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN light (314ms)
+  ✓  41 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 320px zh-CN dark (331ms)
+  ✓  42 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en light (302ms)
+  ✓  43 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px en dark (299ms)
+  ✓  44 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN light (297ms)
+  ✓  46 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en light (298ms)
+  ✓  45 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 390px zh-CN dark (331ms)
+  ✓  47 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px en dark (297ms)
+  ✓  48 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN light (279ms)
+  ✓  49 frontend/tests/browser/provider-management.spec.ts:467:3 › provider form fits 1280px zh-CN dark (332ms)
+  ✓  50 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 320px en light (454ms)
+  ✓  51 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 320px en dark (454ms)
+  ✓  52 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 320px zh-CN light (442ms)
+  ✓  53 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 320px zh-CN dark (479ms)
+  ✓  54 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 390px en light (458ms)
+  ✓  55 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 390px en dark (456ms)
+  ✓  56 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 390px zh-CN light (439ms)
+  ✓  57 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 390px zh-CN dark (438ms)
+  ✓  58 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1280px en light (427ms)
+  ✓  59 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1280px en dark (411ms)
+  ✓  60 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1280px zh-CN light (479ms)
+  ✓  61 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1280px zh-CN dark (447ms)
+  ✓  62 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1701px en light (433ms)
+  ✓  63 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1701px en dark (432ms)
+  ✓  64 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1701px zh-CN light (456ms)
+  ✓  65 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1701px zh-CN dark (431ms)
+  ✓  66 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1920px en light (428ms)
+  ✓  67 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1920px en dark (428ms)
+  ✓  68 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1920px zh-CN light (449ms)
+  ✓  69 frontend/tests/browser/select-controls.spec.ts:41:3 › native select geometry 1920px zh-CN dark (446ms)
+  ✓  70 frontend/tests/browser/select-controls.spec.ts:81:1 › native keyboard, focus, disabled and listbox/forced-colors fallback (400ms)
+
+
+  1) frontend/tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:11:9
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-preset-selectio-a7631-he-chosen-seed-exactly-once/error-context.md
+
+  2) frontend/tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:21:9
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-native-color-pi-91b52-ed-through-the-change-event/error-context.md
+
+  3) frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:46:11
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-has-no-settings-5a5ca-x900-in-English-and-Chinese/error-context.md
+
+  4) frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:46:11
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-has-no-settings-9cf3e-2511-in-English-and-Chinese/error-context.md
+
+  5) frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:46:11
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-has-no-settings-3692a-x820-in-English-and-Chinese/error-context.md
+
+  6) frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese 
+
+    Error: page.goto: net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:4197/dashboard/
+    Call log:
+      - navigating to "http://127.0.0.1:4197/dashboard/", waiting until "load"
+
+
+      2 |
+      3 | async function openSettings(page: import("@playwright/test").Page) {
+    > 4 |   await page.goto("/dashboard/");
+        |              ^
+      5 |   await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
+      6 |   await page.getByRole("button", { name: "Settings", exact: true }).click();
+      7 | }
+        at openSettings (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:4:14)
+        at /Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/appearance.spec.ts:46:11
+
+    Error: browser suite must remain isolated from unmocked APIs and origins
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://127.0.0.1:4197/dashboard/",
+    + ]
+
+       at fixtures.ts:14
+
+      12 |     });
+      13 |     await use(state);
+    > 14 |     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
+         |                                                                                                   ^
+      15 |     expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+      16 |   }, { auto: true }],
+      17 | });
+        at Object.base.extend.mockApi.auto (/Users/texas/Workspace/jev-select-spacing-alignment/frontend/tests/browser/fixtures.ts:14:99)
+
+    Error Context: .trellis/tasks/10-04-select-spacing-alignment/verification/after/appearance-has-no-settings-d246b-x820-in-English-and-Chinese/error-context.md
+
+  6 failed
+    frontend/tests/browser/appearance.spec.ts:9:1 › preset selection auto-saves the chosen seed exactly once 
+    frontend/tests/browser/appearance.spec.ts:19:1 › native color picker input previews are committed through the change event 
+    frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1280x900 in English and Chinese 
+    frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 1430x2511 in English and Chinese 
+    frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 390x820 in English and Chinese 
+    frontend/tests/browser/appearance.spec.ts:44:3 › has no settings document-level horizontal overflow at 320x820 in English and Chinese 
+  64 passed (19.3s)

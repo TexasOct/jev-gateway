@@ -129,6 +129,27 @@ export function useProviderManagement(enabled: boolean, onUnauthorized: () => vo
     } finally { writeLock.current = false; setPending(false); }
   }, [configuration, failure, cancelQuery, retryCatalogRefresh]);
 
-  return { configuration, loading, pending, importResult, error, discovery, metadata, evidence, evidenceVersion, catalogRefreshFailed, refreshingCatalog, retryCatalogRefresh, querying, queryError, lastQueryMode, load, save, query, cancelQuery, navigationGuardRef };
+  const saveGatewayCredential = useCallback(async (value: string) => {
+    if (writeLock.current || !configuration || !(configuration.write_available || configuration.gateway_bootstrap_available)) return false;
+    writeLock.current = true;
+    ++readGeneration.current;
+    cancelQuery();
+    setPending(true);
+    setLoading(false);
+    setError(null);
+    setCatalogRefreshFailed(false);
+    try {
+      const result = await api.saveGatewayCredential({ expected_revision: configuration.revision, credential: { action: "set", value } });
+      revision.current = result.revision;
+      setConfiguration(result);
+      await retryCatalogRefresh();
+      return true;
+    } catch (caught) {
+      setError(failure(caught));
+      return false;
+    } finally { writeLock.current = false; setPending(false); }
+  }, [configuration, failure, cancelQuery, retryCatalogRefresh]);
+
+  return { configuration, loading, pending, importResult, error, discovery, metadata, evidence, evidenceVersion, catalogRefreshFailed, refreshingCatalog, retryCatalogRefresh, querying, queryError, lastQueryMode, load, save, saveGatewayCredential, query, cancelQuery, navigationGuardRef };
 }
 export type ProviderManagement = ReturnType<typeof useProviderManagement>;
