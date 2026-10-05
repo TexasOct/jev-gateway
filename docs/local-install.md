@@ -325,7 +325,7 @@ Compose 默认只将容器端口绑定到 `127.0.0.1`。如需对局域网开放
 ## 方案六：wheel 安装
 
 适合把固定版本交付给另一台机器。在源码仓库根目录先构建面板，再构建 wheel。
-下面以 `pyproject.toml` 中版本为 `0.1.1` 为例；构建和校验使用 Python 3.12+，
+下面以 `pyproject.toml` 中版本为 `0.1.2` 为例；构建和校验使用 Python 3.12+，
 传入的 tag 必须与项目版本完全对应，`dist/` 中只能有这一版 wheel：
 
 ```bash
@@ -333,8 +333,8 @@ uv sync --all-groups
 npm --prefix frontend install
 scripts/build-frontend.sh
 uv build
-python3 scripts/validate-release.py v0.1.1 dist
-uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.1-py3-none-any.whl
+python3 scripts/validate-release.py v0.1.2 dist
+uv tool install --force --python 3.12 --managed-python dist/jev_gateway-0.1.2-py3-none-any.whl
 ```
 
 校验脚本检查 wheel 内容，把 tag 写入 `dist/install.sh`，并生成脚本和 wheel 的
