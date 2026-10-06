@@ -22,6 +22,7 @@ logs/
 *node_modules/
 /jev_gateway/static/
 .vitest/
+artifacts/
 
 # Trellis-generated local tooling
 # Regenerate integration files in a fresh clone with: trellis init --pi
@@ -32,6 +33,18 @@ logs/
 !.trellis/.gitignore
 .agents/
 .pi/
+
+# Trellis task residue (evidence, research, snapshots, logs) is not tracked.
+# Only task metadata stays under version control: task.json, prd.md, design.md,
+# implement.md, implement.jsonl, check.jsonl, acceptance*.md, verification*.md
+.trellis/tasks/**/research/
+.trellis/tasks/**/evidence/
+.trellis/tasks/**/evidence-successor/
+.trellis/tasks/**/verification/
+.trellis/tasks/**/snapshot/
+.trellis/tasks/**/.runtime/
+.trellis/tasks/**/*.log
+.trellis/tasks/**/*.jsonl.bak
 
 # Local routing evidence database
 jev-records.sqlite3*
