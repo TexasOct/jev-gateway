@@ -222,7 +222,7 @@ This document follows the [Google DESIGN.md alpha specification](https://github.
 
 The source baseline is the working tree for the 2026-09-30 Provider task, including uncommitted visual work. Existing differences are recorded with their sources. Provider interactions below are implemented and covered by 210 unit tests, 43 Provider browser cases within the 80-case full browser suite, and an independent review of the five state-handling corrections. The parent [acceptance record](.trellis/tasks/archive/2026-10/09-30-provider-configuration-experience/acceptance.md) tracks backend and release checks separately. Task-local `design.md` remains the technical architecture document; root `DESIGN.md` describes the interface.
 
-Preserve the current React, Tailwind and shared-component foundation. The shell has Monitoring, Strategy, Provider and Settings views without a client-side router. Settings owns language and appearance. Provider owns supplier browsing, instance configuration, model discovery, metadata review and explicit import.
+Preserve the current React, Tailwind and shared-component foundation. The shell has Monitoring, Strategy, Suppliers, Models and Settings views without a client-side router. Settings owns language, appearance, gateway access/security and the global default model. Suppliers owns upstream connections and credentials; Models owns model configuration, discovery, metadata review and explicit import.
 
 ## Colors
 
@@ -273,7 +273,7 @@ Existing shell headings use tight tracking, some monitoring text scales with the
 
 ## Layout
 
-Keep the four-view shell and page ownership. New provider screens fill the existing Provider entry; they do not move language/appearance or create another provider page in Settings. Use grid tracks, bounded containers and shrink/wrap behavior. Align repeated labels and actions, and keep control geometry stable when content changes.
+Keep the five-view shell and page ownership. Supplier connections and model configuration have separate navigation entries. Settings retains language and appearance alongside access/security and the global default model. Use grid tracks, bounded containers and shrink/wrap behavior. Align repeated labels and actions, and keep control geometry stable when content changes.
 
 | Surface | Existing geometry |
 | --- | --- |
@@ -402,10 +402,15 @@ Monitoring timestamps and outcomes describe retained evidence. A latest-session 
 | Palette, fallback and body font | [palette.ts](frontend/src/shared/theme/palette.ts), [tokens.css](frontend/src/styles/tokens.css), [base.css](frontend/src/styles/base.css) |
 | Utility mapping and shared controls | [index.css](frontend/src/styles/index.css), [button-variants.ts](frontend/src/shared/ui/button-variants.ts), [card.tsx](frontend/src/shared/ui/card.tsx) |
 | Monitoring and Appearance | [MonitoringView.tsx](frontend/src/features/monitoring/MonitoringView.tsx), [AppearanceView.tsx](frontend/src/features/appearance/AppearanceView.tsx) |
-| Provider forms and model review | [ProviderView.tsx](frontend/src/features/providers/ProviderView.tsx), [ProviderModels.tsx](frontend/src/features/providers/ProviderModels.tsx), [useProviderManagement.ts](frontend/src/features/providers/useProviderManagement.ts), [model.ts](frontend/src/features/providers/model.ts) |
+| Supplier connections and credentials | [ProviderView.tsx](frontend/src/features/providers/suppliers/ProviderView.tsx), [ProviderSetupFields.tsx](frontend/src/features/providers/suppliers/ProviderSetupFields.tsx), [TransportCredentialFields.tsx](frontend/src/features/providers/suppliers/TransportCredentialFields.tsx), [useSupplierConnection.ts](frontend/src/features/providers/suppliers/useSupplierConnection.ts) |
+| Model workspace and review | [ModelManagementView.tsx](frontend/src/features/providers/models/ModelManagementView.tsx), [ProviderModels.tsx](frontend/src/features/providers/models/ProviderModels.tsx), [ModelDialog.tsx](frontend/src/features/providers/models/ModelDialog.tsx), [ModelFields.tsx](frontend/src/features/providers/models/ModelFields.tsx), [model.ts](frontend/src/features/providers/models/model.ts) |
+| Shared provider configuration and identities | [useProviderManagement.ts](frontend/src/features/providers/shared/useProviderManagement.ts), [profiles.ts](frontend/src/features/providers/shared/profiles.ts), [ProviderIdentity.tsx](frontend/src/features/providers/shared/ProviderIdentity.tsx), [icons.ts](frontend/src/features/providers/shared/icons.ts), [AssetCredits.tsx](frontend/src/features/providers/shared/AssetCredits.tsx) |
+| Gateway access and security | [AccessSecurity.tsx](frontend/src/features/settings/AccessSecurity.tsx), [GatewayCredentialForm.tsx](frontend/src/features/settings/GatewayCredentialForm.tsx) |
 | Routing and geometry | [RoutingEditor.tsx](frontend/src/features/routing/RoutingEditor.tsx), [RoutingCanvas.tsx](frontend/src/features/routing/RoutingCanvas.tsx) |
 | Existing motion | [ConfiguredRouteFlow.tsx](frontend/src/features/routing/ConfiguredRouteFlow.tsx), [routing.css](frontend/src/styles/routing.css), [monitoring.css](frontend/src/styles/monitoring.css) |
 | Layout, privacy and packaging | [dashboard-routing-config.md](.trellis/spec/backend/dashboard-routing-config.md) |
+
+Provider source is grouped under `suppliers/`, `models/` and `shared/`; its twelve unit test files live in `__tests__/`. Shared modules consume API types, icons and common controls without importing supplier or model UI. Artwork and provenance remain in the root `assets/` directory. The [directory design](.trellis/tasks/10-05-admin-experience/research/provider-directory-design.md) records the move and extraction boundaries. Historical verification above retains its original candidate scope.
 
 The only stylesheet entry imports Tailwind theme/utilities without Preflight, followed by `tokens.css`, `base.css`, `shell.css`, `monitoring.css`, `routing.css`, `canvas-geometry.css`, `appearance.css`, and `virtual-list.css`. Static appearance stays in the existing utility system; measured coordinates and data-derived colors remain at their owning elements.
 

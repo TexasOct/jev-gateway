@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { ProviderConfiguration } from "@/shared/api/types";
 import { LocaleProvider, useLocale } from "@/shared/i18n";
 import type { Locale } from "@/shared/i18n";
-import type { ProviderManagement } from "@/features/providers/useProviderManagement";
+import type { ProviderManagement } from "@/features/providers/shared/useProviderManagement";
 import { GlobalDefaultModel } from "./GlobalDefaultModel";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -19,7 +19,7 @@ const configuration: ProviderConfiguration = {
 
 function renderSettings(locale: Locale, overrides: Partial<ProviderManagement> = {}): string {
   vi.stubGlobal("window", { localStorage: { getItem: () => locale, setItem: vi.fn() } });
-  const manager = { configuration, loading: false, pending: false, error: null, catalogRefreshFailed: false, refreshingCatalog: false, save: vi.fn(), load: vi.fn(), retryCatalogRefresh: vi.fn(), ...overrides } as ProviderManagement;
+  const manager = { configuration, active: true, loading: false, pending: false, error: null, operationError: null, errorOwner: "read", catalogRefreshOwner: null, catalogRefreshFailed: false, refreshingCatalog: false, save: vi.fn(), load: vi.fn(), retryCatalogRefresh: vi.fn(), ...overrides } as ProviderManagement;
   function View() {
     const { t } = useLocale();
     return <GlobalDefaultModel manager={manager} t={t} onOpenProviders={vi.fn()} />;
@@ -42,15 +42,24 @@ it("disables global model controls while loading, pending or read-only", () => {
   }
 });
 
-it("offers provider navigation when there are no imported models", () => {
+it("offers supplier navigation when there are no imported models", () => {
   const html = renderSettings("zh-CN", { configuration: { ...configuration, defaults: undefined, models: [] } });
-  expect(html).toContain("请先在 Provider 与模型配置中导入模型");
+  expect(html).toContain("请先在供应商的连接下导入模型");
+  expect(html).toContain(">供应商</button>");
   expect(html).toContain("未设置全局默认模型");
 });
 
 it("distinguishes revision conflict from a committed write whose refresh failed", () => {
-  expect(renderSettings("en", { error: 409 })).toContain("Configuration changed elsewhere");
-  const html = renderSettings("en", { catalogRefreshFailed: true });
+  expect(renderSettings("en", { operationError: 409, errorOwner: "default" })).toContain("Configuration changed elsewhere");
+  const html = renderSettings("en", { catalogRefreshFailed: true, catalogRefreshOwner: "default" });
   expect(html).toContain("The global default model was saved, but routing data could not be refreshed");
   expect(html).toContain("Retry catalog refresh");
+});
+
+it("shows only default-model save errors and distinguishes failed configuration reads", () => {
+  expect(renderSettings("en", { operationError: 500, errorOwner: "gateway" })).not.toContain('role="alert"');
+  expect(renderSettings("en", { operationError: 503, errorOwner: "read" })).toContain("current configuration could not be read");
+  const html = renderSettings("en", { operationError: 500, errorOwner: "default" });
+  expect(html).toContain("Your selection is retained");
+  expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Clear default model<\/button>/);
 });

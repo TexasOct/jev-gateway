@@ -100,9 +100,10 @@ strategies inherit it when a matched tag has no models and report the result as
 Default. Populated tag pools still
 use their normal selection rules.
 
-Use Provider to save a supplier and its credential, discover or manually add
-models, review their metadata, and explicitly import them. Assign models to
-strategy pools in Strategy workflow. Dashboard saves activate the configuration;
+Use Suppliers to save a connection and its upstream credential, then open Models
+to discover or manually add models, review metadata and import a selected batch.
+General settings owns the gateway access key. Assign models to strategy pools in
+Strategy workflow. Dashboard saves activate the configuration;
 `jev config reload` also rereads files after manual changes. Until models are
 configured, chat requests return `503 setup_incomplete` while the console stays
 available.
@@ -121,8 +122,8 @@ The template disables external decisions, so `task_aware` uses its configured fa
 `GET /healthz` confirms the process is up. For persistent, container, and wheel installs, see
 [`docs/local-install.md`](docs/local-install.md).
 
-Provider supports supplier presets and custom LLM or decision providers.
-Provider setup and private-network opt-in are covered
+Suppliers supports presets and custom LLM or decision connections.
+Supplier setup and private-network opt-in are covered
 in [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入).
 
 ## Model identity
@@ -210,6 +211,7 @@ authentication, error codes, and reload semantics: [`docs/http-api.md`](docs/htt
 | [`docs/local-install.md`](docs/local-install.md) | Curl, local, container, and wheel installation. |
 | [`docs/cli.md`](docs/cli.md) | CLI commands, provider setup, and lifecycle management. |
 | [`docs/credentials.md`](docs/credentials.md) | Write-only dashboard setup and file-based server credentials. |
+| [`docs/admin-experience.md`](docs/admin-experience.md) | Dashboard settings, supplier connections, model import/editing and canvas workflows. |
 | [`docs/models-config.md`](docs/models-config.md) | Every `models.json` field. |
 | [`docs/routing-design.md`](docs/routing-design.md) | Routing contracts, strategies, sessions, evidence. |
 | [`docs/http-api.md`](docs/http-api.md) | Endpoints, headers, errors, reload. |

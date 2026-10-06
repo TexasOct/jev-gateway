@@ -16,19 +16,39 @@ Set the first management key in the initialization form, then enter the console
 and configure suppliers when ready. For terminal setup, use `jev setup`; if the
 service is already running, follow it with `jev config reload`.
 
-In Provider & models:
+In General settings, open Access and security to replace the gateway access key.
+Retain your own copy for API clients and future Dashboard connections. The
+Dashboard uses this gateway key for its current Bearer authentication; supplier
+credentials authenticate the gateway's outbound calls instead.
 
-1. The gateway credential control supports initialization when eligible and
-   replacement when authenticated. Retain your own key for API clients and future
-   Dashboard connections.
-2. Edit a pending LLM provider. Enter its new credential and save. Presets provide
-   a credential reference; a custom provider can use an ASCII identifier such as
-   `MY_SERVICE_KEY`.
-3. Repeat for decision providers when needed. The decision endpoint and protocol
+In Suppliers:
+
+1. Choose a supplier or connection method and enter its required connection
+   information. The normal flow generates stable instance and credential-reference
+   identifiers. Existing environment/shared-reference setups remain available in
+   the advanced controls.
+2. Enter the upstream credential and save. An empty replacement preserves the
+   saved value; clearing a local credential is an explicit action.
+3. Repeat for decision suppliers when needed. The decision endpoint and protocol
    remain separate from LLM transport configuration.
 
+Vertex connections provide a service-account JSON input. Bedrock connections
+provide an access ID, secret access key and optional session token. The console
+generates the corresponding `param_env` references and submits explicit
+`transport_credentials` actions through the existing provider transaction. These
+values use the same protected credential store as primary API keys. Pasted Vertex
+JSON is canonicalized for submission; a failed save retains the original input.
+
+Cloud connections also offer server/default authentication. Selecting it detaches
+the direct credential bindings so they cannot override native authentication. It
+keeps the detached protected values; use an explicit Clear action to remove a local
+value. Account-specific project, location and region fields still apply. The
+connection test describes its model-listing scope and does not certify generation
+or native account access when that transport has no supported listing probe.
+
 The server writes `credentials.json` next to `models.json`. Credential inputs start
-empty, and submission or cancellation clears them. The browser keeps the active
+empty. A successful save or confirmed cancellation clears them; a failed save
+preserves the draft for retry. The browser keeps the active
 gateway connection key in module memory only. Refreshing the page loses that
 connection key and requires entering it again; saved provider keys remain on the
 server and are never inserted into the form.

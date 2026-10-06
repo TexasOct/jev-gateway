@@ -70,6 +70,7 @@ def _levels(value: Any) -> list[str] | None:
 def _empty_fields() -> dict[str, Any]:
     return {
         "input_per_million": None, "output_per_million": None,
+        "cache_read_per_million": None, "cache_write_per_million": None,
         "tools": None, "vision": None, "json_mode": None, "reasoning": None,
         "temperature": None, "reasoning_effort": None,
         "context_window": None, "max_output_tokens": None,
@@ -107,7 +108,7 @@ def _price_details(cost: Mapping[str, Any], *, multiplier: float, source: str) -
     """Keep only numeric charges and structured conditions from public sources."""
     allowed = {
         "input", "output", "reasoning", "cache_read", "cache_write", "input_audio", "output_audio",
-        "prompt", "completion", "input_cache_read", "input_cache_write", "web_search", "request",
+        "prompt", "completion", "input_cache_read", "input_cache_write", "input_cache_write_1h", "web_search", "request",
         "image", "internal_reasoning",
         "input_cost_per_token", "output_cost_per_token", "cache_read_input_token_cost", "cache_creation_input_token_cost",
         "input_cost_per_token_above_200k_tokens", "output_cost_per_token_above_200k_tokens",
@@ -184,8 +185,13 @@ def native_model_metadata(row: Mapping[str, Any], transport: str, provider_id: s
         if effort.get("supported") is False:
             _put(evidence, "capabilities.reasoning_effort", [], "capabilities.effort.supported")
         elif effort.get("supported") is True:
-            levels = [name for name in ("low", "medium", "high", "xhigh", "max") if _mapping(effort.get(name)).get("supported") is True]
-            _put(evidence, "capabilities.reasoning_effort", levels, "capabilities.effort")
+            names = ("low", "medium", "high", "xhigh", "max")
+            declarations = {name: _mapping(effort.get(name)).get("supported") for name in names}
+            levels = [name for name in names if declarations[name] is True]
+            # Named true declarations prove only those levels. An empty ladder
+            # requires every named level to be explicitly declared unsupported.
+            value = levels if levels or all(type(v) is bool for v in declarations.values()) else None
+            _put(evidence, "capabilities.reasoning_effort", value, "capabilities.effort")
     elif transport == "deepseek":
         for name in ("context_window", "max_output_tokens"):
             if name in row:
@@ -208,7 +214,7 @@ def _models_dev(row: Mapping[str, Any], source: str, provider: str, model: str, 
     if isinstance(updated, str) and re.fullmatch(r"\d{4}-\d{2}(?:-\d{2})?", updated):
         evidence["source_updated_at"] = updated
     cost = _mapping(row.get("cost"))
-    for key, field in (("input", "input_per_million"), ("output", "output_per_million")):
+    for key, field in (("input", "input_per_million"), ("output", "output_per_million"), ("cache_read", "cache_read_per_million"), ("cache_write", "cache_write_per_million")):
         if key in cost:
             _put(evidence, "cost." + field, _number(cost[key]), "cost." + key, "USD/M tokens")
     if cost:
@@ -220,7 +226,9 @@ def _models_dev(row: Mapping[str, Any], source: str, provider: str, model: str, 
     if "structured_output" in row and (row["structured_output"] is None or isinstance(row["structured_output"], bool)):
         _put(evidence, "structured_output", row["structured_output"], "structured_output")
     modalities = _mapping(row.get("modalities")).get("input")
-    if isinstance(modalities, list) and modalities and all(isinstance(v, str) and v in {"text", "image", "audio", "video", "pdf"} for v in modalities):
+    if isinstance(modalities, list) and len(modalities) <= 5 and all(isinstance(v, str) and v in {"text", "image", "audio", "video", "pdf"} for v in modalities) and len(set(modalities)) == len(modalities):
+        evidence["input_modalities"] = {"value": list(modalities), "source_field": "modalities.input"}
+    if "input_modalities" in evidence and modalities:
         _bool(evidence, "vision", "image" in modalities, "modalities.input")
     limit = _mapping(row.get("limit"))
     for key, field in (("context", "context_window"), ("output", "max_output_tokens")):
@@ -240,7 +248,7 @@ def _models_dev(row: Mapping[str, Any], source: str, provider: str, model: str, 
 def _openrouter(row: Mapping[str, Any], model: str, fetched_at: str) -> dict[str, Any]:
     evidence = _evidence("openrouter", "openrouter", model, fetched_at)
     cost = _mapping(row.get("pricing"))
-    for key, field in (("prompt", "input_per_million"), ("completion", "output_per_million")):
+    for key, field in (("prompt", "input_per_million"), ("completion", "output_per_million"), ("input_cache_read", "cache_read_per_million"), ("input_cache_write", "cache_write_per_million")):
         if key in cost:
             _put(evidence, "cost." + field, _number(cost[key], multiplier=1_000_000), "pricing." + key, "USD/M tokens")
     evidence["pricing"] = _price_details(cost, multiplier=1_000_000, source="openrouter")
@@ -261,7 +269,7 @@ def _openrouter(row: Mapping[str, Any], model: str, fetched_at: str) -> dict[str
 
 def _litellm(row: Mapping[str, Any], provider: str, model: str, fetched_at: str, applicable: bool) -> dict[str, Any]:
     evidence = _evidence("litellm_snapshot", provider, model, fetched_at, applicable=applicable)
-    for key, field in (("input_cost_per_token", "input_per_million"), ("output_cost_per_token", "output_per_million")):
+    for key, field in (("input_cost_per_token", "input_per_million"), ("output_cost_per_token", "output_per_million"), ("cache_read_input_token_cost", "cache_read_per_million"), ("cache_creation_input_token_cost", "cache_write_per_million")):
         if key in row:
             _put(evidence, "cost." + field, _number(row[key], multiplier=1_000_000), key, "USD/M tokens")
     evidence["pricing"] = _price_details(row, multiplier=1_000_000, source="litellm_snapshot")
@@ -434,7 +442,7 @@ class MetadataClient:
                     if isinstance(fact, dict):
                         source_fact = _models_dev(fact, "models_dev_catalog", "canonical", canonical, catalog.fetched_at, applicable)
                         # Canonical facts never carry a serving price.
-                        source_fact["fields"] = {k: v for k, v in source_fact["fields"].items() if k not in {"input_per_million", "output_per_million"}}
+                        source_fact["fields"] = {k: v for k, v in source_fact["fields"].items() if k not in {"input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"}}
                         source_fact.pop("pricing", None)
                         sources.append(source_fact)
             if not sources:
@@ -458,10 +466,15 @@ class MetadataClient:
 def _serving_matches(provider: Mapping[str, Any], source_provider: str) -> bool:
     defaults = {"anthropic": "https://api.anthropic.com", "deepseek": "https://api.deepseek.com", "openrouter": "https://openrouter.ai/api/v1"}
     transport = provider.get("type")
+    compatible = {"openai": {"openai"}, "anthropic": {"anthropic"}, "deepseek": {"deepseek", "openai"}, "openrouter": {"openrouter", "openai"}}
+    if not isinstance(transport, str) or transport not in compatible.get(source_provider, set()):
+        return False
     base = provider.get("api_base") or defaults.get(transport if isinstance(transport, str) else "", "")
     try:
+        if not isinstance(base, str) or any(ord(c) < 33 or ord(c) == 127 for c in base) or "\\" in base:
+            return False
         parts = urlsplit(base)
-        return parts.scheme == "https" and parts.port in {None, 443} and parts.username is None and not parts.query and not parts.fragment and (parts.hostname, parts.path.rstrip("/")) in _ENDPOINTS.get(source_provider, set())
+        return parts.scheme == "https" and not parts.netloc.endswith(":") and parts.port in {None, 443} and parts.username is None and not parts.query and not parts.fragment and (parts.hostname, parts.path.rstrip("/")) in _ENDPOINTS.get(source_provider, set())
     except (ValueError, TypeError):
         return False
 

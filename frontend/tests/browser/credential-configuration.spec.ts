@@ -18,9 +18,9 @@ async function open(page: import("@playwright/test").Page) {
   await expect(page.locator("#setup-key, [data-dashboard-view-nav]")).toBeVisible();
   if (await page.locator("#setup-key").count()) {
     await page.locator("#setup-key").fill("synthetic-fixture-key");
-    await page.getByRole("button", { name: "Create key and enter console", exact: true }).click();
+    await page.getByRole("button", { name: "Initialize gateway access key", exact: true }).click();
   }
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Fixture provider", exact: true })).toBeVisible();
 }
 
@@ -45,8 +45,9 @@ test("initializes access, configures both provider kinds and never reloads saved
   expect(JSON.stringify(await (await response).json())).not.toContain("synthetic-bootstrap-key");
   await expect(setupKey).toHaveCount(0);
   expect(state.setupWrites).toEqual([{ expected_revision: "r1", api_key: "synthetic-bootstrap-key" }]);
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   const key = page.getByLabel("New gateway access key", { exact: true });
   await expect(key).toHaveAttribute("type", "password");
@@ -54,6 +55,7 @@ test("initializes access, configures both provider kinds and never reloads saved
   expect(state.gatewayWrites ?? []).toEqual([]);
   expect(state.gatewayHeaders?.filter((request) => request.path === "/v1/routing/configuration").at(-1)?.authorization).toBe("Bearer synthetic-bootstrap-key");
   await page.getByRole("region", { name: "Gateway access key", exact: true }).getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   for (const [kind, secret] of [["LLM providers", "synthetic-llm-key"], ["Decision providers", "synthetic-decision-key"]] as const) {
     await page.getByRole("button", { name: kind, exact: true }).click();
     await page.getByRole("button", { name: "Edit", exact: true }).click();
@@ -74,7 +76,7 @@ test("initializes access, configures both provider kinds and never reloads saved
   await expect(page.getByLabel("Gateway API key", { exact: true })).toHaveValue("");
   await page.getByLabel("Gateway API key", { exact: true }).fill("synthetic-bootstrap-key");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await page.getByRole("button", { name: "LLM providers", exact: true }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByLabel("Credential action").selectOption("set");
@@ -86,6 +88,7 @@ test("clears submitted access keys while pending, prevents duplicate writes and 
   const state = pendingFixture(); let release!: () => void;
   state.delayGatewayWrite = () => new Promise<void>((resolve) => { release = resolve; });
   await installProviderFixture(context, state); await open(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   const key = page.getByLabel("New gateway access key", { exact: true });
   await key.fill("synthetic-initial-key");
@@ -97,6 +100,7 @@ test("clears submitted access keys while pending, prevents duplicate writes and 
   await expect(page.getByRole("button", { name: "Save access key", exact: true })).toBeDisabled();
   release();
   await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await key.fill("synthetic-rotated-key");
   await page.getByRole("button", { name: "Save access key", exact: true }).click();
@@ -105,34 +109,40 @@ test("clears submitted access keys while pending, prevents duplicate writes and 
   const headers = state.gatewayHeaders?.filter((request) => request.path === "/v1/gateway-credential");
   expect(headers?.[1]?.authorization).toBe("Bearer synthetic-initial-key");
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Fixture provider", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Gateway access key", exact: true })).toBeVisible();
   expect(state.gatewayHeaders?.filter((request) => request.path === "/v1/provider-configuration").at(-1)?.authorization).toBe("Bearer synthetic-rotated-key");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await expect(key).toHaveValue("");
   await key.fill("synthetic-cancelled-key");
+  page.once("dialog", (dialog) => dialog.accept());
   await key.press("Escape");
   await expect(key).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await expect(key).toHaveValue("");
   await assertNoStoredKey(page, context, ["synthetic-initial-key", "synthetic-rotated-key", "synthetic-cancelled-key"]);
 });
 
-test("failed replacement clears the key, reports conflict and retries with the refreshed revision", async ({ page, context }) => {
+test("failed replacement retains the key, reports conflict and retries with the refreshed revision", async ({ page, context }) => {
   const state = pendingFixture(); state.rejectGatewayWrite = 409;
   await installProviderFixture(context, state); await open(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   const key = page.getByLabel("New gateway access key", { exact: true });
   await key.fill("synthetic-rejected-key"); await key.press("Enter");
-  await expect(page.getByRole("alert")).toContainText("Configuration changed elsewhere");
-  await expect(key).toHaveValue("");
+  const access = page.getByRole("region", { name: "Gateway access key", exact: true });
+  await expect(access.getByRole("alert")).toContainText(/configuration changed elsewhere/i);
+  await expect(page.getByRole("region", { name: "Global default model", exact: true }).getByRole("alert")).toHaveCount(0);
+  await expect(key).toHaveValue("synthetic-rejected-key");
   await expect(page.getByText("synthetic-gateway-error-must-not-render")).toHaveCount(0);
   expect(state.configuration.gateway.has_api_key).toBe(true);
   state.configuration.revision = "external-r2";
-  await page.getByRole("button", { name: "Reload current configuration", exact: true }).click();
+  await access.getByRole("button", { name: "Reload current configuration", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await key.fill("synthetic-retry-key"); await key.press("Enter");
-  await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toBeEnabled();
   expect(state.gatewayWrites?.[1]?.expected_revision).toBe("external-r2");
   await assertNoStoredKey(page, context, ["synthetic-rejected-key", "synthetic-retry-key"]);
 });
@@ -149,6 +159,7 @@ test("remote anonymous configuration keeps management locked and explains local 
 
 test("waits for a successful rotation response before exposing an old read's early 401", async ({ page, context }) => {
   const state = pendingFixture(); await installProviderFixture(context, state); await open(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   const input = page.getByLabel("New gateway access key", { exact: true });
   await input.fill("synthetic-before-race"); await input.press("Enter");
@@ -165,6 +176,7 @@ test("waits for a successful rotation response before exposing an old read's ear
   await expect.poll(() => typeof releaseRead).toBe("function");
   let releaseWrite: (() => void) | undefined;
   state.delayGatewayWrite = () => new Promise<void>((resolve) => { releaseWrite = resolve; });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await input.fill("synthetic-after-race"); await input.press("Enter");
   await expect.poll(() => typeof releaseWrite).toBe("function");
@@ -215,13 +227,14 @@ for (const locale of ["en", "zh-CN"] as const) {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto("/dashboard/");
     await page.locator("#setup-key").fill("synthetic-mobile-initial-key");
-    await page.getByRole("button", { name: locale === "en" ? "Create key and enter console" : "创建密钥并进入控制台", exact: true }).click();
-    await page.getByRole("button", { name: locale === "en" ? "Provider & models" : "Provider 与模型配置", exact: true }).click();
+    await page.getByRole("button", { name: locale === "en" ? "Initialize gateway access key" : "初始化网关访问密钥", exact: true }).click();
+    await page.getByRole("button", { name: locale === "en" ? "Settings" : "通用设置", exact: true }).click();
     const initialize = page.getByRole("button", { name: locale === "en" ? "Replace access key" : "替换访问密钥", exact: true });
     await initialize.focus(); await initialize.press("Enter");
     const key = page.getByLabel(locale === "en" ? "New gateway access key" : "新的网关访问密钥", { exact: true });
     await page.screenshot({ path: test.info().outputPath(`credentials-form-${locale}.png`), fullPage: true });
     await key.focus(); await expect(key).toBeFocused(); await key.fill("synthetic-mobile-key");
+    page.once("dialog", (dialog) => dialog.accept());
     await key.press("Escape");
     await expect(initialize).toBeFocused();
     const width = await page.evaluate(() => ({ content: document.documentElement.scrollWidth, viewport: innerWidth }));

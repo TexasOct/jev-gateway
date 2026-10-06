@@ -106,7 +106,7 @@ class PolicyStrategy:
     ) -> StrategyOutcome:
         manual = request.manual
         current = catalog.by_name(session.route)
-        if current is None:
+        if current is None or not current.enabled:
             return self._initial(request, catalog)
 
         if manual is not None and manual.name != current.name:
@@ -352,7 +352,7 @@ class PolicyStrategy:
         """Resolve the global model without applying a strategy's ordering rule."""
         model_id = catalog.defaults.default_model
         profile = catalog.by_name(model_id) if model_id is not None else None
-        if profile is None:
+        if profile is None or not profile.enabled:
             raise SetupIncompleteError(
                 "Configure the global default model for unassigned routing labels."
             )
@@ -366,10 +366,10 @@ class PolicyStrategy:
                 profile
                 for model_id in route.models
                 for profile in [catalog.by_name(model_id)]
-                if profile is not None
+                if profile is not None and profile.enabled
             ]
         tag = route.tag or f"{self.name}/{tier}"
-        return [profile for profile in catalog.profiles if tag in profile.tags]
+        return [profile for profile in catalog.profiles if profile.enabled and tag in profile.tags]
 
     def _select(
         self,
@@ -404,7 +404,7 @@ class PolicyStrategy:
                 candidates = [
                     profile
                     for profile in pool
-                    if (exclude is None or profile.name != exclude)
+                    if profile.enabled and (exclude is None or profile.name != exclude)
                     and (not capability_strict or self._capable(profile, facts))
                     and profile.fits_context(context)
                     and (output is None or profile.fits_output(output))
@@ -419,10 +419,12 @@ class PolicyStrategy:
         fallback = [
             profile
             for profile in catalog.profiles
-            if exclude is None or profile.name != exclude
+            if profile.enabled and (exclude is None or profile.name != exclude)
         ]
+        if not fallback:
+            raise SetupIncompleteError("Configure an enabled model before sending requests.")
         return Selection(
-            profile=self._order(fallback or list(catalog.profiles), facts)[0],
+            profile=self._order(fallback, facts)[0],
             tier=tier,
             relaxed=True,
         )

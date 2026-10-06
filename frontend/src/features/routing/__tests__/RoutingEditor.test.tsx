@@ -42,6 +42,17 @@ const renderEditor = (payload = config) => renderToStaticMarkup(<LocaleProvider>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("full canvas editor structure", () => {
+  it.each<Locale>(["en", "zh-CN"])("identifies the actual strategy and source with localized policy status in %s", (locale) => {
+    vi.stubGlobal("window", { localStorage: { getItem: () => locale } });
+    const html = renderEditor();
+    const header = html.match(/<header class="workspace-heading[\s\S]*?<\/header>/)![0];
+    expect(header).toContain(">task_aware</h2>");
+    expect(header).toContain("models.json");
+    expect(header).toContain(messages[locale].ruleOrderFirstMatch);
+    expect(header).toContain(messages[locale].noPendingChanges);
+    expect(header).toContain(messages[locale].noOverlay);
+    expect(header).toContain('data-policy-draft="unchanged"');
+  });
   it.each<Locale>(["en", "zh-CN"])("keeps localized icon control names, state and DnD attributes in %s", (locale) => {
     vi.stubGlobal("window", { localStorage: { getItem: () => locale } });
     const words = messages[locale];
@@ -50,7 +61,7 @@ describe("full canvas editor structure", () => {
     const grip = words.reorderRule.replace("{index}", "1").replace("{total}", "1");
     const earlier = words.moveRuleEarlier.replace("{index}", "1");
     const later = words.moveRuleLater.replace("{index}", "1");
-    for (const name of [words.canvasSelectTool, words.canvasPanTool, words.addRule, words.canvasZoomOut, words.canvasZoomIn,
+    for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasAddNode, words.canvasZoomOut, words.canvasZoomIn,
       words.canvasPanLeft, words.canvasPanRight, words.canvasPanUp, words.canvasPanDown, grip, earlier, later]) {
       const button = named(name);
       expect(button).toBeDefined();
@@ -89,7 +100,7 @@ describe("full canvas editor structure", () => {
     expect(html).not.toMatch(/class="routing-canvas-node[^"]* selected/);
     expect(html.indexOf('class="canvas-frame absolute')).toBeLessThan(html.indexOf('class="canvas-tools absolute'));
     expect(html.indexOf('class="routing-canvas-scroll')).toBeLessThan(html.indexOf('Canvas help'));
-    expect(html.indexOf('id="routing-information"')).toBeLessThan(html.indexOf("models.json"));
+    expect(html.slice(html.indexOf('id="routing-information"'))).toContain("models.json");
   });
   it("composes chrome, help, advanced controls and review actions in the same workspace", () => {
     const html = renderEditor();
@@ -145,7 +156,7 @@ describe("full canvas editor structure", () => {
   });
   it("keeps write controls disabled while read-only navigation is available", () => {
     const html = renderEditor({ ...config, write_available: false });
-    expect(html).toMatch(/aria-label="Add rule"[^>]*disabled=""/);
+    expect(html).toMatch(/aria-label="Add node"[^>]*disabled=""/);
     expect(html).toMatch(/aria-label="Select nodes \(V\)" aria-pressed="true"/);
     expect(html).toMatch(/class="cursor-grab[^"]*"[^>]*disabled=""/);
     expect(html).toContain('aria-label="Pan right"');

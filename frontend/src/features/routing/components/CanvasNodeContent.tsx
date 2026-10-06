@@ -4,6 +4,7 @@ import type { ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
 import { labelMembers, workflowEdges } from "../model/draft";
 import { formatRouteLabel } from "@/shared/i18n/route-label";
+import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 import type { RoutingDraft } from "../model/draft";
 
 type CanvasNodeKind = "questions" | "rule" | "fallback" | "label" | "model" | "unknown";
@@ -60,13 +61,15 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
         const conditions = Object.entries(rule.when)
           .map(([name, value]) => `${name}=${Array.isArray(value) ? `(${value.join(" | ")})` : value}`)
           .join(", ");
-        summary = `${conditions || t("canvasNodeNoConditions")} → ${rule.select.label || t("labelUnavailable")}`;
+        summary = `${conditions || t("canvasNodeNoConditions")} → ${matrixChoiceLabel(rule.select, config.labels[0]?.name) || t("labelUnavailable")}`;
       }
       break;
     }
-    case "fallback":
-      summary = draft.fallback.label ? `${t("label")}: ${draft.fallback.label}` : t("labelUnavailable");
+    case "fallback": {
+      const label = matrixChoiceLabel(draft.fallback, config.labels[0]?.name);
+      summary = label ? `${t("label")}: ${label}` : t("labelUnavailable");
       break;
+    }
     case "label": {
       const label = config.labels.find((item) => `zone::${item.tag}` === id);
       if (label) {

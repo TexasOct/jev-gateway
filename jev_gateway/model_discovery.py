@@ -15,7 +15,7 @@ MAX_MODELS = 1000
 LISTING_LIMIT = 4 * 1024 * 1024
 _SLOTS = threading.BoundedSemaphore(4)
 _ADAPTERS = {"openai": "openai", "anthropic": "anthropic", "deepseek": "deepseek", "openrouter": "openai"}
-_DEFAULTS = {"anthropic": "https://api.anthropic.com", "deepseek": "https://api.deepseek.com", "openrouter": "https://openrouter.ai/api/v1"}
+_DEFAULTS = {"openai": "https://api.openai.com/v1", "anthropic": "https://api.anthropic.com", "deepseek": "https://api.deepseek.com", "openrouter": "https://openrouter.ai/api/v1"}
 
 
 def _listing_url(base: str, adapter: str, cursor: str | None) -> str:
@@ -137,3 +137,37 @@ def discover_models_with_dependencies(
 
 def discover_models(provider: Mapping[str, Any], api_key: str | None, *, imported_ids: set[str]) -> dict[str, Any]:
     return discover_models_with_dependencies(provider, api_key, imported_ids=imported_ids, fetch=safe_get_json)
+
+
+def test_provider_connection(provider: Mapping[str, Any], api_key: str | None) -> dict[str, Any]:
+    """Report the bounded listing probe's scope with fixed, safe diagnostics."""
+    result: dict[str, Any] = {
+        "provider_id": provider.get("id"), "status": "incomplete",
+        "scope": "model_listing", "model_count": 0,
+        "warnings": ["generation_unverified"],
+    }
+    if provider.get("type") not in _ADAPTERS or provider.get("kind") == "decision" or provider.get("protocol") == "system_one":
+        result["status"] = "unsupported"
+        result["warnings"].append("discovery_unsupported")
+        return result
+    if provider.get("api_key_env") and not api_key:
+        result["warnings"].append("credential_unconfigured")
+        return result
+    listing = discover_models(provider, api_key, imported_ids=set())
+    codes = set(listing["warnings"])
+    result["model_count"] = len(listing["items"])
+    if "authentication_failed" in codes or "invalid_credential" in codes:
+        status, message = "authentication_error", "authentication_failed"
+    elif codes & {"invalid_url", "blocked_target", "redirect_rejected", "address_not_found"}:
+        status, message = "address_error", "address_unavailable"
+    elif "listing_unsupported" in codes:
+        status, message = "unsupported", "listing_unsupported"
+    elif codes & {"dns_failed", "timeout", "upstream_failed", "rate_limited", "discovery_busy", "busy"}:
+        status, message = "network_error", "upstream_failed"
+    elif listing["complete"]:
+        status, message = "success", "listing_succeeded"
+    else:
+        status, message = "incomplete", "listing_incomplete"
+    result["status"] = status
+    result["warnings"].append(message)
+    return result

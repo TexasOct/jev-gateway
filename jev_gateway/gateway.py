@@ -506,6 +506,19 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 except HTTPException as denied:
                     return JSONResponse(status_code=denied.status_code, content=denied.detail, headers=denied.headers)
             return JSONResponse(status_code=400, content=error_body("Gateway credential operation is invalid.", code="invalid_gateway_credential"))
+        if (request.method, request.url.path) in {
+            ("POST", "/v1/provider-configuration/validate"),
+            ("PUT", "/v1/provider-configuration"),
+            ("POST", "/v1/provider-discovery"),
+            ("POST", "/v1/provider-metadata"),
+            ("POST", "/v1/provider-connection-test"),
+        }:
+            # Body parsing can fail before the endpoint's configuration guard runs.
+            with reload_lock:
+                try:
+                    require_config_write(request.headers.get("authorization"))
+                except HTTPException as denied:
+                    return JSONResponse(status_code=denied.status_code, content=denied.detail, headers=denied.headers)
         if request.url.path == "/v1/chat/completions":
             # Read once: the stored request and the malformed-body fallback below
             # both record this same request-scoped value.
@@ -636,6 +649,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                         "owned_by": "jev",
                     }
                     for name in active.engine.catalog.names()
+                    if (profile := active.engine.catalog.by_name(name)) is not None and profile.enabled
                 ],
             ],
         }
@@ -861,7 +875,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             raise provider_error(error) from None
 
     def provider_command(body: dict[str, Any], *, apply: bool, gateway_credential: bool = False) -> dict[str, Any]:
-        with reload_lock:
+        with reload_lock, active.engine.defer_config_publication():
             previous_catalog = active.engine.catalog
             previous_registry = active.engine.strategies
             previous_source = active.engine.config_source
@@ -909,11 +923,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         require_config_write(authorization)
         return provider_command(body, apply=True)
 
+    @app.post("/v1/provider-connection-test")
+    def provider_connection_test(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        try:
+            if set(body) - {"provider_id", "provider", "credential", "transport_credentials"}:
+                raise ValueError("Unknown connection test fields.")
+            provider, key, _imported = provider_service.discovery_provider(body)
+            return model_discovery.test_provider_connection(provider, key)
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
+            raise provider_error(error) from None
+
     @app.post("/v1/provider-discovery")
     def provider_discovery(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
         require_config_write(authorization)
         try:
-            if set(body) - {"provider_id", "provider", "credential"}:
+            if set(body) - {"provider_id", "provider", "credential", "transport_credentials"}:
                 raise ValueError("Unknown discovery fields.")
             provider, key, imported = provider_service.discovery_provider(body)
             result = model_discovery.discover_models(provider, key, imported_ids=imported)
@@ -927,7 +952,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     def provider_metadata(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
         require_config_write(authorization)
         try:
-            if set(body) - {"provider_id", "provider", "credential", "upstream_models", "refresh"}:
+            if set(body) - {"provider_id", "provider", "credential", "transport_credentials", "upstream_models", "refresh"}:
                 raise ValueError("Unknown metadata fields.")
             models = body.get("upstream_models")
             if not isinstance(models, list) or not models or len(models) > 1000 or any(not isinstance(item, str) or not item.strip() or len(item) > 512 for item in models):
@@ -935,7 +960,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             refresh = body.get("refresh", False)
             if type(refresh) is not bool:
                 raise ValueError("refresh must be a boolean.")
-            provider, _key, _imported = provider_service.discovery_provider(body)
+            provider, _key, _imported = provider_service.discovery_provider({key: value for key, value in body.items() if key not in {"upstream_models", "refresh"}})
             result = model_metadata.lookup_model_metadata(provider, models, refresh=refresh)
             for item in result.get("items", []):
                 item["metadata"] = metadata_envelope(item)
@@ -1104,7 +1129,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         body: dict[str, Any], authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         require_config_write(authorization)
-        with reload_lock, configuration_lock(active.models_file):
+        with reload_lock, configuration_lock(active.models_file), active.engine.defer_config_publication():
             try:
                 catalog, registry, warnings = prepare_overlay(body)
             except (ValueError, TypeError, RuntimeError) as error:
@@ -1112,14 +1137,17 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             path = overlay_path(active.models_file)
             try:
                 previous_content = path.read_bytes()
+                previous_mode = path.stat().st_mode & 0o7777
             except FileNotFoundError:
                 previous_content = None
+                previous_mode = None
             except OSError as error:
                 raise HTTPException(
                     status_code=500,
                     detail=error_body("Could not read the previous routing overlay.", code="overlay_apply_failed"),
                 ) from error
             previous_catalog = active.engine.catalog
+            previous_registry = active.engine.strategies
             previous_source = active.engine.config_source
             try:
                 write_overlay(active.models_file, body)
@@ -1132,13 +1160,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                         remove_overlay(active.models_file)
                     else:
                         # Preserve the original file bytes during rollback.
+                        assert previous_mode is not None
                         restore = path.with_name(f".{path.name}.restore")
                         try:
                             restore.write_bytes(previous_content)
+                            restore.chmod(previous_mode)
                             os.replace(restore, path)
                         finally:
                             restore.unlink(missing_ok=True)
-                    active.engine.reload_catalog(previous_catalog, source=previous_source)
+                    active.engine.reload_catalog(previous_catalog, source=previous_source, registry=previous_registry)
                 except Exception:
                     logger.exception("routing overlay rollback failed")
                 raise HTTPException(
@@ -1152,7 +1182,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         require_config_write(authorization)
-        with reload_lock, configuration_lock(active.models_file):
+        with reload_lock, configuration_lock(active.models_file), active.engine.defer_config_publication():
             try:
                 require_readable_configuration(active.models_file)
                 baseline = read_models_document(active.models_file)
@@ -1167,14 +1197,17 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             path = overlay_path(active.models_file)
             try:
                 previous_content = path.read_bytes()
+                previous_mode = path.stat().st_mode & 0o7777
             except FileNotFoundError:
                 previous_content = None
+                previous_mode = None
             except OSError as error:
                 raise HTTPException(
                     status_code=500,
                     detail=error_body("Could not read the previous routing overlay.", code="overlay_apply_failed"),
                 ) from error
             previous_catalog = active.engine.catalog
+            previous_registry = active.engine.strategies
             previous_source = active.engine.config_source
             try:
                 removed = remove_overlay(active.models_file)
@@ -1184,13 +1217,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             except Exception as error:
                 try:
                     if previous_content is not None:
+                        assert previous_mode is not None
                         restore = path.with_name(f".{path.name}.restore")
                         try:
                             restore.write_bytes(previous_content)
+                            restore.chmod(previous_mode)
                             os.replace(restore, path)
                         finally:
                             restore.unlink(missing_ok=True)
-                    active.engine.reload_catalog(previous_catalog, source=previous_source)
+                    active.engine.reload_catalog(previous_catalog, source=previous_source, registry=previous_registry)
                 except Exception:
                     logger.exception("routing overlay rollback failed")
                 raise HTTPException(
@@ -1349,107 +1384,108 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         x_jev_session_id: str | None = Header(default=None, alias=SESSION_HEADER),
         authorization: str | None = Header(default=None),
     ) -> JSONResponse | StreamingResponse:
-        require_gateway_key(active.gateway_api_key, authorization)
-        if not active.engine.catalog.profiles:
-            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete"))
-        message_text(body.messages)
-        session_id = derive_session_id(
-            body.messages,
-            header_value=x_jev_session_id,
-            user=body.user,
-            strategy=active.session_strategy,
-        )
-        received_at = time.time()
-        active.engine.store.record_intake(session_id, received_at)
-        session = (
-            active.engine.store.copy(session_id) if session_id is not None else None
-        )
-        chosen_strategy, explicit, routed_model = resolve_strategy_name(
-            active.engine,
-            requested_model=body.model,
-            session=session,
-        )
-        # OpenAI deprecates max_tokens in favour of max_completion_tokens, and the
-        # newer field wins when a client sends both.
-        output_budget = body.max_completion_tokens
-        if output_budget is None:
-            output_budget = body.max_tokens
-        requested_reasoning_effort = getattr(body, "reasoning_effort", None)
-        request_id = active.engine.new_request_id()
-        # The raw request is stored before routing validates anything, so unknown
-        # models and strategies still leave a request row.
-        active.engine.record_request(
-            request_id=request_id,
-            session_id=session_id,
-            received_at=received_at,
-            meta=RequestMeta(
-                endpoint=str(http_request.url.path),
-                client=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("user-agent"),
-                stream=body.stream,
-                requested_strategy=chosen_strategy,
-            ),
-            messages=body.messages,
-            requested_model=routed_model,
-            max_tokens=output_budget,
-            tools=body.tools,
-            response_format=body.response_format,
-        )
-
-        if explicit and not active.engine.strategies.has(chosen_strategy):
-            raise unknown_strategy_error(active.engine, chosen_strategy)
-
-        try:
-            decision = active.engine.decide(
+        with reload_lock:
+            require_gateway_key(active.gateway_api_key, authorization)
+            if not active.engine.catalog.profiles:
+                raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete"))
+            message_text(body.messages)
+            session_id = derive_session_id(
+                body.messages,
+                header_value=x_jev_session_id,
+                user=body.user,
+                strategy=active.session_strategy,
+            )
+            received_at = time.time()
+            active.engine.store.record_intake(session_id, received_at)
+            session = (
+                active.engine.store.copy(session_id) if session_id is not None else None
+            )
+            chosen_strategy, explicit, routed_model = resolve_strategy_name(
+                active.engine,
+                requested_model=body.model,
+                session=session,
+            )
+            # OpenAI deprecates max_tokens in favour of max_completion_tokens, and the
+            # newer field wins when a client sends both.
+            output_budget = body.max_completion_tokens
+            if output_budget is None:
+                output_budget = body.max_tokens
+            requested_reasoning_effort = getattr(body, "reasoning_effort", None)
+            request_id = active.engine.new_request_id()
+            # The raw request is stored before routing validates anything, so unknown
+            # models and strategies still leave a request row.
+            active.engine.record_request(
+                request_id=request_id,
+                session_id=session_id,
+                received_at=received_at,
+                meta=RequestMeta(
+                    endpoint=str(http_request.url.path),
+                    client=http_request.client.host if http_request.client else None,
+                    user_agent=http_request.headers.get("user-agent"),
+                    stream=body.stream,
+                    requested_strategy=chosen_strategy,
+                ),
                 messages=body.messages,
                 requested_model=routed_model,
-                session_id=session_id,
                 max_tokens=output_budget,
                 tools=body.tools,
                 response_format=body.response_format,
-                strategy=chosen_strategy,
-                request_id=request_id,
-                reasoning_effort=requested_reasoning_effort,
-            )
-        except UnknownModelError as error:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": {
-                        "message": (
-                            f"The model {body.model!r} does not exist. "
-                            "Available catalog models: "
-                            + ", ".join(active.engine.catalog.names())
-                        ),
-                        "type": "invalid_request_error",
-                        "param": "model",
-                        "code": "model_not_found",
-                    }
-                },
-            ) from error
-        except SetupIncompleteError:
-            raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete")) from None
-        except UnknownStrategyError as error:
-            raise unknown_strategy_error(active.engine, error.name) from error
-        selected_catalog = active.engine.catalog
-        profile = selected_catalog.by_name(decision.route_name)
-        if profile is None:
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "error": {
-                        "message": f"Routed model {decision.route_name!r} is missing.",
-                        "type": "server_error",
-                        "code": "catalog_mismatch",
-                    }
-                },
             )
 
-        # The decision creates a session on its first turn. Fetch it again so
-        # provider adapters can retain opaque continuation metadata.
-        session = (
-            active.engine.store.get(session_id) if session_id is not None else None
-        )
+            if explicit and not active.engine.strategies.has(chosen_strategy):
+                raise unknown_strategy_error(active.engine, chosen_strategy)
+
+            try:
+                decision = active.engine.decide(
+                    messages=body.messages,
+                    requested_model=routed_model,
+                    session_id=session_id,
+                    max_tokens=output_budget,
+                    tools=body.tools,
+                    response_format=body.response_format,
+                    strategy=chosen_strategy,
+                    request_id=request_id,
+                    reasoning_effort=requested_reasoning_effort,
+                )
+            except UnknownModelError as error:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": {
+                            "message": (
+                                f"The model {body.model!r} does not exist. "
+                                "Available catalog models: "
+                                + ", ".join(active.engine.catalog.names())
+                            ),
+                            "type": "invalid_request_error",
+                            "param": "model",
+                            "code": "model_not_found",
+                        }
+                    },
+                ) from error
+            except SetupIncompleteError:
+                raise HTTPException(503, detail=error_body(SETUP_INCOMPLETE_MESSAGE, type_="server_error", code="setup_incomplete")) from None
+            except UnknownStrategyError as error:
+                raise unknown_strategy_error(active.engine, error.name) from error
+            selected_catalog = active.engine.catalog
+            profile = selected_catalog.by_name(decision.route_name)
+            if profile is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": {
+                            "message": f"Routed model {decision.route_name!r} is missing.",
+                            "type": "server_error",
+                            "code": "catalog_mismatch",
+                        }
+                    },
+                )
+
+            # The decision creates a session on its first turn. Fetch it again so
+            # provider adapters can retain opaque continuation metadata.
+            session = (
+                active.engine.store.get(session_id) if session_id is not None else None
+            )
 
         logger.info(
             "routing decided",

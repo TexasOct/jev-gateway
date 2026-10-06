@@ -89,11 +89,12 @@ jev start
 终端操作或远程部署可先用 `jev setup` 的无回显提示设置密钥，再打开面板。
 服务已经运行时，CLI 设置后再执行 `jev config reload` 加载密钥。
 文件配置与 `.env` 兼容规则见[密钥配置说明](docs/credentials.md)。
-导入模型后，可在 Settings 选择全局默认模型。所有策略命中空 tag 时都继承它，
+导入模型后，可在通用设置选择全局默认模型。所有策略命中空 tag 时都继承它，
 分流结果显示“默认”。有模型的标签池仍按原规则选择。
 
-在 Provider 页面保存供应商及凭据，发现或手动添加模型，核对元数据后显式导入。
-在策略页面将模型分配到模型池。面板保存会加载配置；手工修改文件后也可使用
+在供应商页面保存连接及上游凭证，再进入模型管理，发现或手动添加模型，核对元数据后
+批量导入。网关访问密钥在通用设置中管理。在策略工作流中将模型分配到模型池。
+面板保存会加载配置；手工修改文件后也可使用
 `jev config reload` 重载。尚未配置模型时，对话请求返回 `503 setup_incomplete`，
 控制台仍可使用。
 
@@ -111,7 +112,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 `GET /healthz` 可以确认进程已启动。长期运行、容器与 wheel 安装方式见
 [`docs/local-install.md`](docs/local-install.md)。
 
-Provider 页面支持供应商预设以及自定义 LLM、decision 提供方。配置步骤与私网开启方式见
+供应商页面支持预设以及自定义 LLM、decision 连接。配置步骤与私网开启方式见
 [`docs/models-config.md`](docs/models-config.md#provider-页与模型导入)。
 
 <a id="model-identity"></a>
@@ -193,6 +194,7 @@ Provider 页面支持供应商预设以及自定义 LLM、decision 提供方。�
 | [`docs/local-install.md`](docs/local-install.md) | curl、本地、容器与 wheel 安装。 |
 | [`docs/cli.md`](docs/cli.md) | CLI 命令、提供方设置与生命周期管理。 |
 | [`docs/credentials.md`](docs/credentials.md) | 只写的网页密钥设置与纯服务端文件配置。 |
+| [`docs/admin-experience.md`](docs/admin-experience.md) | 后台设置、供应商连接、模型导入编辑与画布操作。 |
 | [`docs/models-config.md`](docs/models-config.md) | `models.json` 的全部字段。 |
 | [`docs/routing-design.md`](docs/routing-design.md) | 路由契约、策略、会话与证据。 |
 | [`docs/http-api.md`](docs/http-api.md) | 端点、响应头、错误与 reload。 |

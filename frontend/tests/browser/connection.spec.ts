@@ -28,12 +28,15 @@ function deferred() {
 }
 
 async function requireKey(page: Page) {
+  const port = process.env.JEV_BROWSER_PORT ?? "4178";
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw new Error("Invalid JEV_BROWSER_PORT");
+  const origin = `http://127.0.0.1:${Number(port)}`;
   const state = { requests: [] as { path: string; authorization: string | undefined }[], expired: false, abortTheme: false, initialDelay: null as Promise<void> | null, themeDelay: null as Promise<void> | null };
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const protectedRead = /^\/v1\/(routing\/(providers\/summary|strategies|policy|sessions|activity|configuration)|dashboard\/(theme|canvas-layout)|provider-configuration)$/.test(url.pathname);
-    if (url.origin !== "http://127.0.0.1:4178" || request.method() !== "GET" || !protectedRead) return route.fallback();
+    if (url.origin !== origin || request.method() !== "GET" || !protectedRead) return route.fallback();
     const authorization = request.headers().authorization;
     state.requests.push({ path: url.pathname, authorization });
     if (!authorization && state.initialDelay) await state.initialDelay;
@@ -51,9 +54,13 @@ async function requireKey(page: Page) {
 
 async function expectConnection(page: Page) {
   await expect(page.getByRole("heading", { name: "Connect", exact: true })).toBeVisible();
-  await expect(page.locator("[data-dashboard-view-nav]")).toHaveCount(0);
-  await expect(page.locator(".app-header, .routing-canvas-scroll")).toHaveCount(0);
-  await expect(page.getByText("Current sessions", { exact: true })).toHaveCount(0);
+  for (const control of await page.locator("[data-dashboard-view-nav], .app-header, .routing-canvas-scroll").all()) await expect(control).toBeHidden();
+  for (const content of await page.getByText("Current sessions", { exact: true }).all()) await expect(content).toBeHidden();
+  const workspace = page.locator(".app-shell");
+  if (await workspace.count()) {
+    await expect(workspace).toBeHidden();
+    await expect(workspace).toHaveAttribute("inert", "");
+  }
 }
 
 test("401 hides the console; blank input sends nothing and Enter waits for validation with one trimmed Bearer attempt", async ({ page }) => {
@@ -185,7 +192,7 @@ test("a successful connection keeps credentials out of browser storage and reloa
   await expect(page.locator("[data-dashboard-view-nav]")).toBeVisible();
   expect(await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }))).toEqual({ local: { "jev-dashboard-locale": "en" }, session: {}, cookie: "" });
   expect(await context.cookies()).toEqual([]);
-  expect(page.url()).toBe("http://127.0.0.1:4178/dashboard/");
+  expect(page.url()).toBe(`http://127.0.0.1:${Number(process.env.JEV_BROWSER_PORT ?? "4178")}/dashboard/`);
   const count = state.requests.length;
   await page.reload();
   await expectConnection(page);
@@ -196,7 +203,7 @@ test("a successful connection keeps credentials out of browser storage and reloa
 test("anonymous gateways retain normal navigation", async ({ page }) => {
   await page.goto("/dashboard/");
   await expect(page.locator("[data-dashboard-view-nav]")).toBeVisible();
-  for (const name of ["Strategy workflow", "Provider & models", "Settings", "Monitoring"]) {
+  for (const name of ["Strategy workflow", "Suppliers", "Settings", "Monitoring"]) {
     const button = page.getByRole("button", { name, exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");

@@ -15,7 +15,7 @@ test("initializes and rotates credentials against the real gateway without readb
   const initializedResponse = await initialized;
   expect(initializedResponse.status()).toBe(200);
   expect(await initializedResponse.text()).not.toContain(keys[0]!);
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Live fixture provider", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeEnabled();
 
@@ -51,6 +51,7 @@ test("initializes and rotates credentials against the real gateway without readb
   expect((await chat.json()).choices[0].message.content).toBe("Local transport verified.");
   for (const key of keys) expect(await chat.text()).not.toContain(key);
 
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   const gatewayInput = page.getByLabel("New gateway access key", { exact: true });
   await expect(gatewayInput).toHaveValue("");
@@ -62,14 +63,14 @@ test("initializes and rotates credentials against the real gateway without readb
   expect((await page.request.get(`${url}/healthz`, { headers: { Authorization: `Bearer ${keys[0]}` } })).status()).toBe(401);
   expect((await page.request.get(`${url}/healthz`, { headers: { Authorization: `Bearer ${keys[3]}` } })).status()).toBe(200);
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Live fixture decision", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Gateway access key", exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Connect", exact: true })).toBeVisible();
   await expect(page.getByLabel("Gateway API key", { exact: true })).toHaveValue("");
   await page.getByLabel("Gateway API key", { exact: true }).fill(keys[3]!);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   for (const tab of ["LLM providers", "Decision providers"]) {
     await page.getByRole("button", { name: tab, exact: true }).click();
     await page.getByRole("button", { name: "Edit", exact: true }).click();

@@ -23,13 +23,13 @@ for (const locale of ["en", "zh-CN"] as const) {
       await expect(page.locator("#setup-key")).toBeVisible();
       expect(mockApi.requests).toEqual([]);
       await page.locator("#setup-key").fill("fixture-management-key");
-      await page.getByRole("button", { name: locale === "en" ? "Create key and enter console" : "创建密钥并进入控制台" }).click();
+      await page.getByRole("button", { name: locale === "en" ? "Initialize gateway access key" : "初始化网关访问密钥" }).click();
       await expect(page.locator("#setup-key")).toHaveCount(0);
       expect(submitted).toEqual({ expected_revision: "empty-revision", api_key: "fixture-management-key" });
       await expect.poll(() => calls).toEqual(["GET", "POST", "GET"]);
       const progress = page.getByLabel(locale === "en" ? "Connection setup" : "连接配置进度", { exact: true });
       await expect(progress).toBeVisible();
-      await progress.getByRole("button", { name: locale === "en" ? "Provider & models" : "Provider 与模型配置", exact: true }).click();
+      await progress.getByRole("button", { name: locale === "en" ? "Suppliers" : "供应商", exact: true }).click();
       await expect(page.getByRole("button", { name: locale === "en" ? "Add provider" : "添加供应商", exact: true })).toBeVisible();
       await progress.getByRole("button", { name: locale === "en" ? "Go to monitoring; configure later" : "进入监控，稍后配置" }).click();
       await expect(progress).toHaveCount(0);
@@ -89,7 +89,7 @@ for (const locale of ["en", "zh-CN"] as const) {
     await expect(page.locator("#setup-key-note")).toContainText("ASCII");
     for (const key of [" fixture-management-key", "fixture-management-key ", "fixture interior key", "fixture-管理-management", "fixture-management-\tkey"]) {
       await input.fill(key);
-      await page.getByRole("button", { name: locale === "en" ? "Create key and enter console" : "创建密钥并进入控制台" }).click();
+      await page.getByRole("button", { name: locale === "en" ? "Initialize gateway access key" : "初始化网关访问密钥" }).click();
       await expect(page.getByRole("alert")).toContainText(locale === "en" ? "without spaces or other whitespace" : "不能包含空格或其他空白字符");
       await expect(input).toHaveValue(key);
       expect(posts).toBe(0);
@@ -115,13 +115,13 @@ test("setup preserves printable symbols through the POST and canonical Bearer he
   });
   await page.goto("/dashboard/");
   await page.locator("#setup-key").fill(key);
-  await page.getByRole("button", { name: "Create key and enter console" }).click();
+  await page.getByRole("button", { name: "Initialize gateway access key" }).click();
   await expect(page.locator("#setup-key")).toHaveCount(0);
   expect(posts).toBe(1);
   await expect.poll(() => authenticatedReads).toBe(1);
 });
 
-test("failed setup clears the submitted key and retries with the current revision", async ({ page }) => {
+test("failed setup retains the submitted draft and retries with the current revision", async ({ page }) => {
   let revision = "initial";
   let attempts = 0;
   await page.route("**/v1/setup", async (route) => {
@@ -138,13 +138,13 @@ test("failed setup clears the submitted key and retries with the current revisio
   });
   await page.goto("/dashboard/");
   await page.locator("#setup-key").fill("fixture-management-key");
-  await page.getByRole("button", { name: "Create key and enter console" }).click();
+  await page.getByRole("button", { name: "Initialize gateway access key" }).click();
   await expect(page.getByRole("alert")).toContainText("Configuration changed");
-  await expect(page.locator("#setup-key")).toHaveValue("");
+  await expect(page.locator("#setup-key")).toHaveValue("fixture-management-key");
   await page.getByRole("button", { name: "Retry setup status" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.locator("#setup-key").fill("fixture-management-key");
-  await page.getByRole("button", { name: "Create key and enter console" }).click();
+  await page.getByRole("button", { name: "Initialize gateway access key" }).click();
   await expect(page.locator("#setup-key")).toHaveCount(0);
   expect(attempts).toBe(2);
 });

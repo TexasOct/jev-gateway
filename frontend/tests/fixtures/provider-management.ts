@@ -1,14 +1,64 @@
 import type { BrowserContext } from "@playwright/test";
-import type { GatewayCredentialMutation, ImportModel, MetadataItem, ProviderConfiguration, ProviderModelView, ProviderMutation, ProviderSelector, SetupStatus } from "../../src/shared/api/types";
+import type { CanvasLayout, GatewayCredentialMutation, ImportModel, MetadataItem, ProviderConfiguration, ProviderModelView, ProviderMutation, ProviderSelector, SetupStatus } from "../../src/shared/api/types";
 import { isValidSetupKey } from "../../src/shared/api/setup-key";
 import { configuration as routingConfiguration } from "./configuration";
+
+/** Model the browser-visible transaction boundary, without keeping secret bytes. */
+function mutationError(configuration: ProviderConfiguration, body: ProviderMutation): { status: number; code: string; message: string } | null {
+  const invalid = (message: string) => ({ status: 400, code: "invalid_provider_configuration", message });
+  if (body.expected_revision !== configuration.revision) return { status: 409, code: "revision_conflict", message: "Configuration changed elsewhere" };
+  if (!configuration.write_available) return { status: 403, code: "write_unavailable", message: "Configuration writes are disabled" };
+  const profiles = [...configuration.providers.map((provider) => ({ kind: "llm", ...provider })), ...configuration.decision.providers.map((provider) => ({ kind: "decision", ...provider }))];
+  // Sharing is checked against the complete candidate, including later bindings.
+  for (const operation of body.operations) {
+    if (operation.action === "upsert") {
+      if (Object.values(operation.provider.params ?? {}).includes("[configured]")) return invalid("Redacted parameter markers cannot be saved");
+      const index = profiles.findIndex((profile) => profile.kind === operation.kind && profile.id === operation.provider.id);
+      const profile = { ...profiles[index], ...operation.provider, kind: operation.kind };
+      if (index < 0) profiles.push(profile); else profiles[index] = profile;
+    } else if (operation.action === "delete") {
+      const index = profiles.findIndex((profile) => profile.kind === operation.kind && profile.id === operation.id);
+      if (index >= 0) profiles.splice(index, 1);
+    }
+  }
+  const consumers: string[] = [configuration.gateway.api_key_env ?? "", ...profiles.flatMap((profile) => [profile.api_key_env ?? "", ...Object.values(profile.param_env ?? {})])];
+  for (const operation of body.operations) {
+    if (operation.action === "upsert") {
+      const profile = profiles.find((entry) => entry.kind === operation.kind && entry.id === operation.provider.id)!;
+      const changes = [{ reference: profile.api_key_env, credential: operation.credential }, ...Object.entries(operation.transport_credentials ?? {}).map(([parameter, credential]) => ({ reference: profile.param_env?.[parameter], credential }))];
+      for (const { reference, credential } of changes) {
+        if (credential.action === "keep") continue;
+        if (!reference) return invalid("Credential changes require a declared reference");
+        if (credential.action === "set" && (!credential.value.trim() || /[\r\n\0]/.test(credential.value))) return invalid("Invalid credential value");
+        if (consumers.filter((consumer) => consumer === reference).length > 1) return invalid("Shared references cannot be replaced or cleared");
+      }
+    } else if (operation.action === "update_model") {
+      const existing = configuration.models.find((model) => model.name === operation.model_id);
+      if (!existing || operation.model.upstream_model !== existing.upstream_model || (operation.model.provider !== undefined && operation.model.provider !== existing.provider)) return invalid("Model identity cannot change");
+    } else if (operation.action === "import") {
+      if (!operation.confirmed || !configuration.providers.some((provider) => provider.id === operation.provider_id)) return invalid("Confirmed models require a configured supplier");
+    }
+    if (operation.action === "update_model" || operation.action === "import") {
+      for (const model of operation.action === "update_model" ? [operation.model] : operation.models) {
+        if (operation.action === "import" && configuration.models.some((existing) => existing.provider === operation.provider_id && existing.upstream_model === model.upstream_model)) continue;
+        if (!model.upstream_model.trim() || Object.values(model.cost).some((value) => value !== null && (!Number.isFinite(value) || value < 0))) return invalid("Invalid model price or identity");
+        if ([model.context_window, model.max_output_tokens].some((value) => value !== null && (!Number.isInteger(value) || value <= 0))) return invalid("Invalid model token limit");
+        if (model.context_window !== null && model.max_output_tokens !== null && model.max_output_tokens > model.context_window) return invalid("Maximum output exceeds context window");
+      }
+    }
+  }
+  return null;
+}
 
 function modelView(provider: string, upstream_model: string, imported?: ImportModel): ProviderModelView {
   return {
     upstream_model, name: `${provider}/${upstream_model}`, provider, tags: [], api_base: "https://example.test/v1", provider_type: "openai", has_api_key: true, priority: 0, quality: 0.5,
     capabilities: { tools: false, vision: false, json_mode: true, reasoning: false, temperature: true, reasoning_effort: [] },
-    cost: { input_per_million: 1, output_per_million: 2 }, context_window: null, max_output_tokens: null,
+    display_name: null, enabled: true,
+    routing_overlay_fields: [],
+    context_window: null, max_output_tokens: null,
     ...imported,
+    cost: { input_per_million: 1, output_per_million: 2, cache_read_per_million: null, cache_write_per_million: null, ...imported?.cost },
   };
 }
 
@@ -29,6 +79,10 @@ export type ProviderFixtureState = {
   writes: ProviderMutation[];
   validations: ProviderMutation[];
   selectors: ProviderSelector[];
+  connectionSelectors?: ProviderSelector[];
+  delayConnection?: () => Promise<void>;
+  connectionStatus?: "success" | "authentication_error" | "address_error" | "network_error" | "unsupported" | "incomplete";
+  unexpected?: string[];
   rejectWrite?: number;
   delayWrite?: () => Promise<void>;
   rejectValidation?: number;
@@ -45,6 +99,7 @@ export type ProviderFixtureState = {
   rejectCatalogRead?: number;
   catalogReads?: number;
   inheritedCredential?: boolean;
+  inheritedTransportCredentials?: Record<string, boolean>;
   gatewayWrites?: GatewayCredentialMutation[];
   setupWrites?: Array<{ expected_revision: string; api_key: string }>;
   gatewayKey?: string;
@@ -54,8 +109,50 @@ export type ProviderFixtureState = {
   delayGatewayWrite?: () => Promise<void>;
   delayValidation?: () => Promise<void>;
   delayCatalogRead?: () => Promise<void>;
+  canvasLayout?: CanvasLayout;
+  canvasWrites?: CanvasLayout[];
 };
 export async function installProviderFixture(context: BrowserContext, state: ProviderFixtureState) {
+  const stage = (body: ProviderMutation) => {
+    const candidate = structuredClone(state.configuration);
+    let imported = 0; let skipped = 0;
+    for (const operation of body.operations) {
+      if (operation.action === "set_default_model") {
+        candidate.defaults = { default_model: operation.model };
+      } else if (operation.action === "upsert") {
+        const list = operation.kind === "llm" ? candidate.providers : candidate.decision.providers;
+        const index = list.findIndex((provider) => provider.id === operation.provider.id);
+        const previous = list[index];
+        const references = operation.provider.param_env ?? previous?.param_env ?? {};
+        const presence = Object.fromEntries(Object.entries(references).map(([parameter, reference]) => [parameter, state.inheritedTransportCredentials?.[reference] === true || (previous?.param_env?.[parameter] === reference && previous?.transport_credential_presence?.[parameter] === true)]));
+        const params = operation.provider.params === undefined ? previous?.params ?? {} : Object.fromEntries(Object.keys(operation.provider.params).map((parameter) => [parameter, "[configured]"]));
+        const view = { ...previous, ...operation.provider, has_api_key: operation.credential.action === "set" || state.inheritedCredential === true || (operation.credential.action === "keep" && previous?.has_api_key === true), ...(operation.kind === "llm" ? { params, param_env: references, transport_credential_presence: presence } : {}) };
+        if (operation.kind === "llm") for (const [parameter, credential] of Object.entries(operation.transport_credentials ?? {})) {
+          const reference = view.param_env?.[parameter];
+          if (!reference) throw new Error("Transport credential requires a declared reference");
+          view.transport_credential_presence![parameter] = credential.action === "set" || state.inheritedTransportCredentials?.[reference] === true || (credential.action === "keep" && previous?.transport_credential_presence?.[parameter] === true);
+        }
+        if (index >= 0) list[index] = view; else list.push(view);
+      } else if (operation.action === "update_model") {
+        const index = candidate.models.findIndex((model) => model.name === operation.model_id);
+        const existing = candidate.models[index];
+        if (!existing || operation.model.upstream_model !== existing.upstream_model) throw new Error("Model identity cannot change");
+        const updated = { ...existing, ...operation.model, display_name: operation.model.display_name ?? null, enabled: operation.model.enabled ?? true, cost: { cache_read_per_million: null, cache_write_per_million: null, ...operation.model.cost }, name: existing.name, provider: existing.provider, upstream_model: existing.upstream_model };
+        if (existing.routing_overlay_fields?.includes("tags")) updated.tags = existing.tags;
+        if (existing.routing_overlay_fields?.includes("priority")) updated.priority = existing.priority;
+        candidate.models[index] = updated;
+      } else if (operation.action === "import") {
+        for (const model of operation.models) {
+          if (!candidate.models.some((existing) => existing.provider === operation.provider_id && existing.upstream_model === model.upstream_model)) { candidate.models.push(modelView(operation.provider_id, model.upstream_model, model)); ++imported; }
+          else ++skipped;
+        }
+      } else if (operation.action === "delete") {
+        const list = operation.kind === "llm" ? candidate.providers : candidate.decision.providers;
+        const index = list.findIndex((provider) => provider.id === operation.id); if (index >= 0) list.splice(index, 1);
+      }
+    }
+    return { candidate, imported, skipped };
+  };
   const setupStatus = (): SetupStatus => {
     const required = !state.configuration.gateway.has_api_key;
     const hasProviders = state.configuration.providers.length > 0;
@@ -98,8 +195,22 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     state.configuration.revision = `gateway-r${state.gatewayWrites!.length}`;
     return reply({ ...state.configuration, valid: true, applied: true });
   });
-  await context.route("**/v1/dashboard/canvas-layout", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: 1, nodes: {}, viewport: { x: 0, y: 0 } }) }));
+  await context.route("**/v1/dashboard/canvas-layout", async (route) => {
+    const request = route.request();
+    if (request.method() === "PUT") {
+      state.canvasLayout = request.postDataJSON() as CanvasLayout;
+      (state.canvasWrites ??= []).push(structuredClone(state.canvasLayout));
+    } else if (request.method() !== "GET") {
+      (state.unexpected ??= []).push(`${request.method()} /v1/dashboard/canvas-layout`);
+      return route.abort("blockedbyclient");
+    }
+    return route.fulfill({ json: state.canvasLayout ?? { version: 1, nodes: {}, viewport: { x: 0, y: 0 } } });
+  });
   await context.route("**/v1/routing/configuration", async (route) => {
+    if (route.request().method() !== "GET") {
+      (state.unexpected ??= []).push(`${route.request().method()} /v1/routing/configuration`);
+      return route.abort("blockedbyclient");
+    }
     state.catalogReads = (state.catalogReads ?? 0) + 1;
     if (state.delayCatalogRead) { const delay = state.delayCatalogRead; state.delayCatalogRead = undefined; await delay(); }
     if (state.rejectCatalogRead) return route.fulfill({ status: state.rejectCatalogRead, contentType: "application/json", body: JSON.stringify({ error: { message: "synthetic-catalog-read-error" } }) });
@@ -109,46 +220,50 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     const request = route.request(); const path = new URL(request.url()).pathname;
     const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/v1/provider-configuration" && request.method() === "GET") return state.rejectRead ? reply({ error: { message: "synthetic-read-error" } }, state.rejectRead) : reply(state.configuration);
-    if (path === "/v1/provider-configuration/validate") {
-      state.validations.push(request.postDataJSON());
+    if (path === "/v1/provider-configuration/validate" && request.method() === "POST") {
+      const body = request.postDataJSON() as ProviderMutation;
+      state.validations.push(body);
       if (state.delayValidation) { const delay = state.delayValidation; state.delayValidation = undefined; await delay(); }
       if (state.rejectValidation) return reply({ error: { message: "synthetic-validation-error" } }, state.rejectValidation);
-      return reply({ ...state.configuration, valid: true, applied: false, imported: 0, skipped: 0 });
+      const error = mutationError(state.configuration, body);
+      if (error) return reply({ error: { code: error.code, message: error.message } }, error.status);
+      try {
+        const { candidate, imported, skipped } = stage(body);
+        return reply({ ...candidate, valid: true, applied: false, imported, skipped });
+      } catch {
+        return reply({ error: { code: "invalid_provider_configuration", message: "Invalid candidate configuration" } }, 400);
+      }
     }
     if (path === "/v1/provider-configuration" && request.method() === "PUT") {
       const body = request.postDataJSON() as ProviderMutation; state.writes.push(body);
       if (state.delayWrite) { const delay = state.delayWrite; state.delayWrite = undefined; await delay(); }
-      let imported = 0; let skipped = 0;
       if (state.rejectWrite) { const status = state.rejectWrite; state.rejectWrite = undefined; return reply({ error: { message: "synthetic-rejected-secret-must-not-render" } }, status); }
-      for (const operation of body.operations) {
-        if (operation.action === "set_default_model") {
-          state.configuration.defaults = { default_model: operation.model };
-        } else if (operation.action === "upsert") {
-          const list = operation.kind === "llm" ? state.configuration.providers : state.configuration.decision.providers;
-          const existing = list.findIndex((provider) => provider.id === operation.provider.id);
-          const view = { ...operation.provider, has_api_key: operation.credential.action === "set" || state.inheritedCredential === true || (operation.credential.action === "keep" && list[existing]?.has_api_key === true), ...(operation.kind === "llm" ? { params: list[existing]?.params ?? {}, param_env: list[existing]?.param_env ?? {} } : {}) };
-          if (existing >= 0) list[existing] = view; else list.push(view);
-        } else if (operation.action === "import") {
-          for (const model of operation.models) {
-            if (!state.configuration.models.some((existing) => existing.provider === operation.provider_id && existing.upstream_model === model.upstream_model)) { state.configuration.models.push(modelView(operation.provider_id, model.upstream_model, model)); ++imported; }
-            else ++skipped;
-          }
-        } else {
-          const list = operation.kind === "llm" ? state.configuration.providers : state.configuration.decision.providers;
-          const index = list.findIndex((provider) => provider.id === operation.id); if (index >= 0) list.splice(index, 1);
-        }
+      const error = mutationError(state.configuration, body);
+      if (error) return reply({ error: { code: error.code, message: error.message } }, error.status);
+      try {
+        const { candidate, imported, skipped } = stage(body);
+        candidate.revision = `r${state.writes.length + 1}`;
+        Object.assign(state.configuration, candidate);
+        return reply({ ...state.configuration, valid: true, applied: true, imported, skipped });
+      } catch {
+        return reply({ error: { code: "invalid_provider_configuration", message: "Invalid candidate configuration" } }, 400);
       }
-      state.configuration.revision = `r${state.writes.length + 1}`;
-      return reply({ ...state.configuration, valid: true, applied: true, imported, skipped });
     }
-    if (path === "/v1/provider-discovery") {
+    if (path === "/v1/provider-discovery" && request.method() === "POST") {
       const body = request.postDataJSON() as ProviderSelector; state.selectors.push(body);
       if (state.delayDiscovery) { const delay = state.delayDiscovery; state.delayDiscovery = undefined; await delay(); }
       if (state.rejectDiscovery) { const status = state.rejectDiscovery; state.rejectDiscovery = undefined; return reply({ error: { message: "synthetic-private-upstream-error" } }, status); }
       const id = "provider_id" in body ? body.provider_id : body.provider.id;
       return reply({ provider_id: id, supported: true, complete: false, warnings: [], items: ["existing", "alpha", "beta"].map((model) => ({ upstream_model: model, qualified_id: `${id}/${model}`, imported: state.configuration.models.some((configured) => configured.provider === id && configured.upstream_model === model), metadata: state.discoveryEvidence ?? { fields: {}, sources: [], warnings: [] }, metadata_envelope: state.discoveryEvidence?.metadata ?? { version: 1, sources: [] } })) });
     }
-    if (path === "/v1/provider-metadata") {
+    if (path === "/v1/provider-connection-test" && request.method() === "POST") {
+      const selector = request.postDataJSON() as ProviderSelector;
+      (state.connectionSelectors ??= []).push(selector);
+      if (state.delayConnection) { const delay = state.delayConnection; state.delayConnection = undefined; await delay(); }
+      const status = state.connectionStatus ?? "success";
+      return reply({ provider_id: "provider_id" in selector ? selector.provider_id : selector.provider.id, status, scope: "model_listing", model_count: status === "success" ? 3 : null, warnings: [] });
+    }
+    if (path === "/v1/provider-metadata" && request.method() === "POST") {
       state.metadataCalls = (state.metadataCalls ?? 0) + 1;
       const selector = request.postDataJSON() as ProviderSelector;
       (state.metadataSelectors ??= []).push(selector);
@@ -165,7 +280,9 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
         return { upstream_model, fields, sources: [{ ...commonSource, source_provider: "fixture", source_model: upstream_model }], warnings: [], metadata: { version: 1, sources: [{ ...commonSource, id: "native_listing-0", provider_id: "fixture", model_id: upstream_model }], fields: Object.fromEntries(Object.entries(fields).map(([field, value]) => [field, { status: value === null ? "unknown" : "known", value, source_ids: value === null ? [] : ["native_listing-0"] }])) } };
       }) });
     }
+    (state.unexpected ??= []).push(`${request.method()} ${path}`);
     await route.abort("blockedbyclient");
+    throw new Error(`Unexpected provider API: ${request.method()} ${path}`);
   });
   await context.route("**/v1/**", async (route) => {
     const request = route.request();
@@ -176,5 +293,17 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
       return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: { message: "Synthetic unauthorized", code: "invalid_api_key" } }) });
     }
     return route.fallback();
+  });
+  const port = process.env.JEV_BROWSER_PORT ?? "4178";
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw new Error("Invalid JEV_BROWSER_PORT");
+  const origin = `http://127.0.0.1:${Number(port)}`;
+  // This last-installed route checks every request before endpoint-specific mocks.
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin === origin) return route.fallback();
+    (state.unexpected ??= []).push(`${request.method()} ${url.origin}${url.pathname}`);
+    await route.abort("blockedbyclient");
+    throw new Error(`Unexpected browser origin: ${url.origin}`);
   });
 }

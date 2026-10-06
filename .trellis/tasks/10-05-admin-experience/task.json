@@ -1,0 +1,32 @@
+{
+  "id": "admin-experience",
+  "name": "admin-experience",
+  "title": "完善管理后台配置与工作流体验",
+  "description": "Implement prompt.md across settings, workflow canvas, suppliers and model metadata/import/editing with concurrent worktrees and browser acceptance.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-05",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-05-admin-settings-security",
+    "10-05-admin-workflow-canvas",
+    "10-05-admin-supplier-connections",
+    "10-05-admin-model-contracts",
+    "10-05-admin-model-workspace"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

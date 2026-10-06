@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -171,3 +172,42 @@ def test_hostile_payload_errors_do_not_echo_secrets(tmp_path: Path) -> None:
     assert "fake-hostile-secret" not in response.text
     assert "fake-write-only-secret" not in response.text
     assert not (tmp_path / ".env").exists()
+
+
+@pytest.mark.parametrize("method,path", [
+    ("POST", "/v1/provider-configuration/validate"), ("PUT", "/v1/provider-configuration"),
+    ("POST", "/v1/provider-discovery"), ("POST", "/v1/provider-metadata"),
+    ("POST", "/v1/provider-connection-test"),
+])
+@pytest.mark.parametrize("content", [
+    '[]', '"synthetic-private-payload"', 'null', 'true', '42',
+    '{"credential":"synthetic-private-payload"', '',
+])
+@pytest.mark.parametrize("authorization", ["missing", "wrong", "disabled", "authorized"])
+def test_malformed_management_body_preserves_authorization_priority_and_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str, path: str,
+    content: str, authorization: str,
+) -> None:
+    app, config = setup_app(tmp_path, key=authorization != "disabled")
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        pytest.fail("Malformed management request reached upstream")
+    monkeypatch.setattr(gateway.model_discovery, "discover_models", forbidden)
+    monkeypatch.setattr(gateway.model_discovery, "test_provider_connection", forbidden)
+    monkeypatch.setattr(gateway.model_metadata, "lookup_model_metadata", forbidden)
+    watched = ["models.json", "models.json.bak", "routing-overrides.json", ".env", ".env.backup", "credentials.json", "credentials.json.backup", ".provider-configuration.recovery", "dashboard-theme.json", "routing-canvas-layout.json"]
+    def snapshot() -> dict[str, Any]:
+        return {name: (file.read_bytes(), file.stat().st_mode) if (file := tmp_path / name).exists() else None for name in watched}
+    before, process = snapshot(), dict(os.environ)
+    catalog, registry, key = config.engine.catalog, config.engine.strategies, config.gateway_api_key
+    auth = headers(config) if authorization == "authorized" else {"Authorization": "Bearer wrong"} if authorization == "wrong" else {}
+    response = request(app, method, path, content=content, headers={**auth, "Content-Type": "application/json"})
+    expected = 403 if authorization == "disabled" else 400 if authorization == "authorized" else 401
+    assert response.status_code == expected
+    if expected != 400:
+        assert response.json()["error"]["code"] == ("config_writes_disabled" if expected == 403 else "invalid_api_key")
+    if expected == 401:
+        assert response.headers["WWW-Authenticate"] == "Bearer"
+    assert "synthetic-private-payload" not in response.text
+    assert snapshot() == before and dict(os.environ) == process
+    assert config.engine.catalog is catalog and config.engine.strategies is registry
+    assert config.gateway_api_key == key

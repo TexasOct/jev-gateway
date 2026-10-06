@@ -1,4 +1,0 @@
-{"file":".trellis/spec/backend/index.md","reason":"按 backend Quality Check 指引检查评估证据和行为覆盖。"}
-{"file":".trellis/tasks/09-28-gateway-typescript-port-assessment/research/gateway-inventory.md","reason":"核对评估覆盖面是否包括各服务接口、状态、测试和交付边界。"}
-{"file":".trellis/tasks/09-28-gateway-typescript-port-assessment/research/estimate-reconciliation.md","reason":"核查不同模块估算是否重叠、总区间是否可复核。"}
-{"file": ".trellis/tasks/09-28-gateway-typescript-port-assessment/research/cli-release-validation-estimate.md", "reason": "核查 CLI、发行和全链路验证范围及跨域去重。"}

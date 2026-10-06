@@ -52,6 +52,8 @@ export function createLayoutWriteQueue(write: (layout: CanvasLayout) => Promise<
     invalidate,
     enqueue(layout: CanvasLayout, saved: (layout: CanvasLayout, latest: boolean) => void, failed: (error: unknown) => void): Promise<void> {
       const request = version = { ...version, revision: version.revision + 1 };
+      // Pending includes waiting revisions, so navigation cannot mistake the gap between PUTs for idle.
+      pending = true;
       chain = chain.then(async () => {
         if (request.generation !== version.generation) return;
         pending = true;
@@ -65,7 +67,7 @@ export function createLayoutWriteQueue(write: (layout: CanvasLayout) => Promise<
         }
         const result = reconcileLayoutWrite(version, request, "saved");
         if (result === "ignore") return;
-        pending = false;
+        pending = result !== "latest";
         saved(layout, result === "latest");
       });
       return chain;
@@ -88,6 +90,7 @@ export function shiftRuleLayout(nodes: Record<string, Position>, from: number, d
 }
 
 export type RuleLayoutMutation =
+  | { kind: "remove-many"; indices: number[] }
   | { kind: "insert"; index: number }
   | { kind: "remove"; index: number }
   | { kind: "move"; from: number; to: number };
@@ -96,6 +99,7 @@ export type RuleLayoutMutation =
 export function reconcileRuleLayout(
   nodes: Record<string, Position>, mutation: RuleLayoutMutation,
 ): Record<string, Position> {
+  if (mutation.kind === "remove-many") return [...new Set(mutation.indices)].sort((a, b) => b - a).reduce((current, index) => reconcileRuleLayout(current, { kind: "remove", index }), nodes);
   if (mutation.kind === "insert") return shiftRuleLayout(nodes, mutation.index, 1);
   if (mutation.kind === "remove") return shiftRuleLayout(nodes, mutation.index, -1);
   return moveRuleLayout(nodes, mutation.from, mutation.to);

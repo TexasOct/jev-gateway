@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { useLocale } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
-import type { ProviderManagement } from "@/features/providers/useProviderManagement";
+import type { ProviderManagement } from "@/features/providers/shared/useProviderManagement";
+import { useUnsavedChanges } from "@/shared/navigation/useUnsavedChanges";
 
 type Props = {
   manager: ProviderManagement;
@@ -13,21 +14,26 @@ export function GlobalDefaultModel({ manager, t, onOpenProviders }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
   const [notice, setNotice] = useState(false);
   const config = manager.configuration;
+  const error = manager.errorOwner === "default" || manager.errorOwner === "read" ? manager.operationError : null;
+  const refreshFailed = manager.catalogRefreshFailed && manager.catalogRefreshOwner === "default";
   const saved = config?.defaults?.default_model ?? "";
   const selected = draft ?? saved;
-  const models = config?.models ?? [];
+  const models = (config?.models ?? []).filter((model) => model.enabled !== false);
   const missing = selected !== "" && !models.some((model) => model.name === selected);
-  const disabled = manager.loading || manager.pending || !config?.write_available;
-  const saveDisabled = disabled || manager.error !== null || missing;
+  const disabled = !manager.active || manager.loading || manager.pending || !config?.write_available;
+  const saveDisabled = disabled || missing || manager.defaultReloadRequired;
+  useUnsavedChanges(manager.navigationGuardRef, draft !== null && selected !== saved, () => {
+    setDraft(null);
+    setNotice(false);
+  }, t("pmDiscard"));
   const save = async (value: string) => {
-    if (disabled || manager.error !== null || (value !== "" && !models.some((model) => model.name === value))) return;
+    if (disabled || manager.defaultReloadRequired || (value !== "" && !models.some((model) => model.name === value))) return;
     setNotice(false);
     if (await manager.save([{ action: "set_default_model", model: value === "" ? null : value }])) {
       setDraft(null);
       setNotice(true);
     }
   };
-  const errorText = (status: number) => t(status === 409 ? "pmConflict" : status === 401 ? "authRequired" : status === 403 ? "pmForbidden" : "globalDefaultError");
 
   return <section aria-label={t("globalDefaultModel")} aria-busy={manager.loading || manager.pending} className="grid min-w-0 gap-3 rounded-lg border border-outline bg-panel p-4">
     <label htmlFor="settings-default-model" className="text-sm font-medium text-ink">{t("globalDefaultModel")}</label>
@@ -43,12 +49,12 @@ export function GlobalDefaultModel({ manager, t, onOpenProviders }: Props) {
     {config !== null && models.length === 0 && <div className="grid min-w-0 gap-2 text-sm text-ink-muted"><p className="m-0">{t("globalDefaultNoModels")}</p><Button type="button" variant="outline" className="min-h-11 justify-self-start" disabled={manager.pending} onClick={onOpenProviders}>{t("providerModels")}</Button></div>}
     {config !== null && !config.write_available && <p role="status" className="m-0 text-sm text-ink-muted">{t("pmReadOnly")}</p>}
     {manager.loading || manager.pending ? <p role="status" className="m-0 text-sm text-ink-muted">{t("loading")}</p> : null}
-    {manager.error !== null && <div role="alert" className="grid min-w-0 gap-2 text-sm text-ink-muted"><span>{errorText(manager.error)}</span><Button type="button" variant="outline" className="min-h-11 justify-self-start" disabled={manager.pending || manager.loading} onClick={() => { setNotice(false); void manager.load(); }}>{t("pmReload")}</Button></div>}
-    {notice && !manager.catalogRefreshFailed && <p role="status" className="m-0 text-sm text-ink-muted">{t("globalDefaultSaved")}</p>}
-    {manager.catalogRefreshFailed && <div role="alert" className="grid min-w-0 gap-2 text-sm text-ink-muted"><span>{t("globalDefaultRefreshFailed")}</span><Button type="button" variant="outline" className="min-h-11 justify-self-start" disabled={manager.pending || manager.refreshingCatalog} onClick={() => void manager.retryCatalogRefresh()}>{t("pmRetryCatalog")}</Button></div>}
+    {error !== null && <div role="alert" className="grid min-w-0 gap-2 text-sm text-ink-muted"><span>{t(manager.errorOwner === "read" ? "globalDefaultReadError" : error === 409 ? "pmConflict" : error === 401 ? "authRequired" : error === 403 ? "pmForbidden" : "globalDefaultError")}</span><Button type="button" variant="outline" className="min-h-11 justify-self-start" disabled={manager.pending || manager.loading} onClick={() => { setNotice(false); void manager.load(); }}>{t("pmReload")}</Button></div>}
+    {notice && !refreshFailed && <p role="status" className="m-0 text-sm text-ink-muted">{t("globalDefaultSaved")}</p>}
+    {refreshFailed && <div role="alert" className="grid min-w-0 gap-2 text-sm text-ink-muted"><span>{t("globalDefaultRefreshFailed")}</span><Button type="button" variant="outline" className="min-h-11 justify-self-start" disabled={manager.pending || manager.refreshingCatalog} onClick={() => void manager.retryCatalogRefresh()}>{t("pmRetryCatalog")}</Button></div>}
     <div className="flex min-w-0 flex-wrap gap-2">
       <Button type="button" className="min-h-11" disabled={saveDisabled || selected === saved} onClick={() => void save(selected)}>{t("globalDefaultSave")}</Button>
-      <Button type="button" variant="outline" className="min-h-11" disabled={disabled || manager.error !== null || saved === ""} onClick={() => void save("")}>{t("globalDefaultClear")}</Button>
+      <Button type="button" variant="outline" className="min-h-11" disabled={disabled || manager.defaultReloadRequired || saved === ""} onClick={() => void save("")}>{t("globalDefaultClear")}</Button>
     </div>
   </section>;
 }

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { WorkspaceActivity } from "@/shared/navigation/workspace-activity";
 import { RefreshCw } from "lucide-react";
 import type { ConfigurationPayload, SetupStatus } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
@@ -12,10 +13,11 @@ import { ToolButton } from "@/shared/ui/ToolButton";
 import type { Palette } from "@/shared/theme/palette";
 import type { RoutingActivityPayload } from "@/shared/api/types";
 import type { useMonitoringData } from "./hooks/useMonitoringData";
-import { ProviderView } from "@/features/providers/ProviderView";
-import type { ProviderManagement } from "@/features/providers/useProviderManagement";
+import { ProviderView } from "@/features/providers/suppliers/ProviderView";
+import type { ProviderManagement } from "@/features/providers/shared/useProviderManagement";
 import { ConnectionPage } from "./ConnectionPage";
 import { GlobalDefaultModel } from "@/features/settings/GlobalDefaultModel";
+import { AccessSecurity } from "@/features/settings/AccessSecurity";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 type FormatDateTime = ReturnType<typeof useLocale>["formatDateTime"];
@@ -51,7 +53,12 @@ type Props = {
   onSetup?: (event: FormEvent<HTMLFormElement>) => void;
   onRetrySetup?: () => void;
   providerManagement?: ProviderManagement;
+  onStrategyDirtyChange?: (dirty: boolean) => void;
+  onStrategyPendingChange?: (pending: boolean) => void;
+  onUnauthorized?: () => void;
+  navigationPending?: boolean;
   view: View;
+  workspaceActivated?: boolean;
   needsKey: boolean;
   connectionPending?: boolean;
   keyDraft: string;
@@ -75,7 +82,7 @@ type Props = {
   onRetryMonitoring: () => void;
 };
 
-function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError }: Pick<Props, "error" | "onReloadConfiguration" | "onError"> & { configuration: ConfigurationPayload }) {
+function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized"> & { configuration: ConfigurationPayload }) {
   const [informationOpen, setInformationOpen] = useState(false);
   return <RoutingEditor
     key={configuration.config_hash}
@@ -85,6 +92,9 @@ function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError
     onError={onError}
     informationOpen={informationOpen}
     onInformationOpenChange={setInformationOpen}
+    onDirtyChange={onStrategyDirtyChange}
+    onPendingChange={onStrategyPendingChange}
+    onUnauthorized={onUnauthorized}
   />;
 }
 
@@ -97,8 +107,13 @@ export function AppShell({
   onSetup,
   onRetrySetup,
   providerManagement,
+  onStrategyDirtyChange,
+  onStrategyPendingChange,
+  onUnauthorized,
+  navigationPending = false,
   view,
   needsKey,
+  workspaceActivated = !needsKey,
   connectionPending = false,
   keyDraft,
   error,
@@ -120,14 +135,41 @@ export function AppShell({
   onError,
   onRetryMonitoring,
 }: Props) {
-  if (setupLoading) {
+  const savedFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    // A native disabled submit/probe button may blur before its 401 arrives.
+    const remember = (event: FocusEvent) => {
+      if (event.target instanceof HTMLElement && event.target.closest(".app-shell")) savedFocus.current = event.target;
+    };
+    document.addEventListener("focusin", remember);
+    return () => document.removeEventListener("focusin", remember);
+  }, []);
+  useLayoutEffect(() => {
+    if (needsKey && document.activeElement instanceof HTMLElement && document.activeElement.closest(".app-shell")) savedFocus.current = document.activeElement;
+    const frame = requestAnimationFrame(() => {
+      if (needsKey) document.querySelector<HTMLInputElement>("#gateway-api-key")?.focus();
+      else if (!document.querySelector("dialog[open]")) {
+        if (savedFocus.current?.isConnected) savedFocus.current.focus();
+        if (!document.activeElement?.closest(".app-shell")) document.querySelector<HTMLButtonElement>("[data-dashboard-view-nav] button[aria-pressed='true']")?.focus();
+        savedFocus.current = null;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [needsKey, connectionPending]);
+  if (setupLoading && !workspaceActivated) {
     return <main className="min-h-dvh bg-page p-4 text-ink"><p role="status">{t("loading")}</p></main>;
   }
   if (setup?.required) {
     return <main className="min-h-dvh bg-page p-4 text-ink">
       <Card className="mx-auto grid w-full min-w-0 max-w-3xl gap-3 p-4">
-        <h2 className="text-sm font-semibold">{t("setupTitle")}</h2>
-        <p className="text-ink-muted">{t("setupDescription")}</p>
+        <h1 className="m-0 text-lg font-semibold">{t("settings")}</h1>
+        <section aria-label={t("accessSecurity")} className="grid gap-3">
+        <h2 className="m-0 text-sm font-semibold">{t("accessSecurity")}</h2>
+        <p className="m-0 text-ink-muted">{t("setupDescription")}</p>
+        <p className="m-0 text-sm text-ink-muted">{t("gwClientRole")}</p>
+        <p className="m-0 text-sm text-ink-muted">{t("gwDashboardRole")}</p>
+        <p className="m-0 text-sm text-ink-muted">{t("gwSupplierRole")}</p>
+        <p className="m-0 text-sm text-ink-muted">{t("gwInitializeEffects")}</p>
         <label className="flex items-center gap-2">{t("language")}
           <select value={locale} onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}>
             <option value="en">English</option><option value="zh-CN">简体中文</option>
@@ -138,19 +180,27 @@ export function AppShell({
           <input id="setup-key" type="password" autoComplete="new-password" minLength={16} maxLength={8192} required disabled={setupPending}
             className="min-h-9 min-w-0 rounded-lg border border-outline bg-panel px-3 text-ink"
             value={keyDraft} onChange={(event) => onKeyDraftChange(event.target.value)} aria-describedby="setup-key-note" />
-          <p id="setup-key-note" className="text-ink-muted">{t("setupKeyNote")}</p>
+          <p id="setup-key-note" className="m-0 text-ink-muted">{t("setupKeyNote")}</p>
           <Button type="submit" disabled={setupPending}>{t(setupPending ? "loading" : "setupSubmit")}</Button>
         </form> : <p className="text-ink-muted [overflow-wrap:anywhere]">{t("setupLocalOnly")}</p>}
         <Button type="button" variant="ghost" disabled={setupPending} onClick={onRetrySetup}>{t("setupRetry")}</Button>
         {error && <p role="alert" className="[overflow-wrap:anywhere]">{error}</p>}
+        </section>
       </Card>
     </main>;
   }
-  if (needsKey && !setupLoading && !setup?.required) {
+  if (needsKey && !workspaceActivated) {
     return <ConnectionPage keyDraft={keyDraft} error={error} pending={connectionPending} locale={locale} setLocale={setLocale} t={t} onConnect={onConnect} onKeyDraftChange={onKeyDraftChange} />;
   }
   return (
+    <>
+    {needsKey && <ConnectionPage keyDraft={keyDraft} error={error} pending={connectionPending} locale={locale} setLocale={setLocale} t={t} onConnect={onConnect} onKeyDraftChange={onKeyDraftChange} />}
+    <WorkspaceActivity.Provider value={!needsKey}>
     <div
+      hidden={needsKey}
+      inert={needsKey}
+      aria-hidden={needsKey || undefined}
+      style={needsKey ? { display: "none" } : undefined}
       data-view={view}
       className={
         view === "strategy"
@@ -194,6 +244,7 @@ export function AppShell({
               variant="ghost"
               size="sm"
               aria-pressed={view === target}
+              disabled={navigationPending}
               className="min-w-0 max-w-40 shrink-0 truncate rounded-md px-3 aria-pressed:border-outline aria-pressed:bg-panel aria-pressed:text-primary aria-pressed:shadow-xs"
               onClick={() => onOpenView(target)}
             >
@@ -207,6 +258,7 @@ export function AppShell({
               aria-label={t("refresh")}
               title={t("refresh")}
               onClick={onRefresh}
+              disabled={navigationPending}
             >
               <span
                 aria-hidden="true"
@@ -240,6 +292,7 @@ export function AppShell({
             <ul className="grid gap-1 text-sm">
               <li>{t("setupProvider")}: {t(setup.has_providers ? "setupDone" : "setupRemaining")}</li>
               <li>{t("setupModel")}: {t(setup.has_models ? "setupDone" : "setupRemaining")}</li>
+              <li>{t("globalDefaultModel")}: {t(configuration?.defaults?.default_model ? "setupDone" : "setupRemaining")}</li>
               <li>{t("setupRouting")}: {t(setup.routing_ready ? "setupDone" : "setupRemaining")}</li>
             </ul>
             <div className="flex flex-wrap gap-2">
@@ -304,10 +357,11 @@ export function AppShell({
               onSeedChange={theme.saveTheme}
               t={t}
             />
-            {providerManagement && !needsKey && <GlobalDefaultModel manager={providerManagement} t={t} onOpenProviders={() => onOpenView("providers")} />}
+            {providerManagement && <AccessSecurity manager={providerManagement} t={t} />}
+            {providerManagement && <GlobalDefaultModel manager={providerManagement} t={t} onOpenProviders={() => onOpenView("providers")} />}
           </section>
         ) : view === "providers" ? (
-          providerManagement && !needsKey ? <ProviderView manager={providerManagement} t={t} /> : <p role="status">{t("authRequired")}</p>
+          providerManagement ? <ProviderView manager={providerManagement} t={t} /> : <p role="status">{t("authRequired")}</p>
         ) : configuration === null ? (
           <Card className="min-w-0 p-4">
             <h2 className="mb-2 text-sm font-semibold">{t("configuration")}</h2>
@@ -321,9 +375,14 @@ export function AppShell({
             error={error}
             onReloadConfiguration={onReloadConfiguration}
             onError={onError}
+            onStrategyDirtyChange={onStrategyDirtyChange}
+            onStrategyPendingChange={onStrategyPendingChange}
+            onUnauthorized={onUnauthorized}
           />
         )}
       </main>
     </div>
+    </WorkspaceActivity.Provider>
+    </>
   );
 }

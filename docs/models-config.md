@@ -74,9 +74,11 @@ tag 没有模型时，使用这个全局模型，最终 label/tier 为 `default`
 | `providers[].allow_private_network` | 布尔值，默认 `false` | 显式允许模型发现访问 localhost 或私网；只控制发现，不改变聊天 transport。 |
 | `models[].provider` | 非空字符串，必填 | 引用已有的 `providers[].id`。 |
 | `models[].upstream_model` | 非空字符串，必填 | 发给该 provider 的实际模型名。 |
+| `models[].display_name` | 非空字符串或 `null`，可选 | 模型显示名称，不改变完整模型 ID。 |
+| `models[].enabled` | 布尔值；默认 `true` | 停用后保留配置，但自动分流、手动请求和会话固定均不能选择该模型。 |
 | `models[].tags` | 字符串数组；默认 `[]` | 模型所属的精确路由标签。推荐使用 `<策略名>/<标签名>`，例如 `quality/critical`。`/` 只用于作用域分隔，不执行前缀或通配匹配。 |
 | `models[].priority` | 整数；默认数组索引 × 10（索引从 0 开始） | 排序平局时优先较小的值。 |
-| `models[].quality` | 数值；默认 `0.5` | `quality_first` 与 `balanced` 排序使用的质量分值；代码不校验取值范围。 |
+| `models[].quality` | 有限数值；默认 `0.5` | `quality_first` 与 `balanced` 排序使用的质量分值。新建、导入或修改该值时限于 0 到 1；旧配置中的有限数值可原样保留。 |
 | `models[].context_window` | 整数或 `null`；默认 `null` | 上下文 token 容量；`null` 在筛选中视为不受限。 |
 | `models[].max_output_tokens` | 整数或 `null`；默认 `null` | 输出 token 上限；`null` 在筛选中视为不受限。 |
 | `models[].capabilities.tools` | 布尔值；默认 `true` | 是否支持工具调用。 |
@@ -87,6 +89,8 @@ tag 没有模型时，使用这个全局模型，最终 label/tier 为 `default`
 | `models[].capabilities.temperature` | 布尔值；默认 `true` | 是否支持 temperature；向上游转发时用于处理该参数。 |
 | `models[].cost.input_per_million` | 数值；默认 `0` | 每百万未命中输入 token 的美元估算单价，用于估算请求与会话成本。 |
 | `models[].cost.output_per_million` | 数值；默认 `0` | 每百万输出 token 的美元估算单价。 |
+| `models[].cost.cache_read_per_million` | 有限非负数或 `null`，可选 | USD/百万缓存读取 token；省略或 `null` 表示未知。 |
+| `models[].cost.cache_write_per_million` | 有限非负数或 `null`，可选 | USD/百万缓存写入 token；省略或 `null` 表示未知。 |
 | `models[].metadata` | 对象，可选 | 保存模型元数据来源和字段确认记录；路由继续使用上述 cost、capabilities 和 limit 字段。 |
 
 模型的唯一 ID 由 `<provider>/<upstream_model>` 自动生成。例如 `deepseek` + `deepseek-flash` 对应 `deepseek/deepseek-flash`。`type` 只控制 LiteLLM 上游适配器，不改变这个 ID。手动指定请求 `model` 时使用完整 ID。自动分流由 `models[].tags` 建池；一个模型可以同时属于多个策略和标签。不要在模型里写 `id`、`api_base`、`api_key` 或 `api_key_env`；连接信息由 provider 提供，明文 `api_key` 也不能写在 provider 中。`capabilities` 不接受表中以外的字段。
@@ -94,6 +98,17 @@ tag 没有模型时，使用这个全局模型，最终 label/tier 为 `default`
 `type: "deepseek"` 使用 LiteLLM 的原生适配器；`type: "openai"` 可连接自定义 OpenAI 兼容地址。Azure 可在 `params.api_version` 指定 API 版本，Vertex AI 可在 `params.vertex_project` 和 `params.vertex_location` 指定项目与区域；额外凭据使用 `param_env`。
 
 ### Provider 页与模型导入
+
+模型编辑通过 `update_model` 一次保存完整记录，使用同一 revision、原子写入和失败恢复机制。
+供应商与 upstream identity 保持不变；改名只修改 `display_name`。旧文件省略 `enabled` 时仍启用。
+停用模型仍可编辑，但不能作为有效的自动、显式或固定会话路由。停用的全局默认模型被实际使用时
+返回待配置错误；显式设置默认值须选择已启用模型。输出上限不能超过已知上下文容量，priority 必须
+为整数，可为负数，不接受布尔值。缓存报价不改变现有输入/输出成本估算。编辑保留 overlay 自有标签和 priority，
+不会把有效视图的覆盖值写进 baseline。
+
+加载旧配置允许有限且非布尔的 quality，包括 `2.5` 和负数。新建、导入或改变 quality 时
+必须使用 0 到 1 的数值。更新现有模型时，省略该字段或提交与实际存储记录相等的旧值，
+可以保留原值并修改其他字段；客户端兼容标记不能放宽校验。
 
 Provider 页分别管理 LLM 与 decision 实例。供应商预设和自定义表单都提交同一种规范配置；展示名称、品牌和图标可独立修改，实例 ID 保持稳定。Settings 管理全局默认模型、语言和外观。
 
@@ -136,9 +151,25 @@ JSON 值始终按字面解析，包括 `${NAME}`。未标记的旧 `.env` 赋值
 | `fields.<字段名>.method`、`confirmed_at` | 可选确认方式和确认时间；不代替来源更新时间。 |
 | `confirmation` | 可选整体确认记录，包含 `method` 和 `confirmed_at`。 |
 
-`fields` 接受十个扁平名称：`input_per_million`、`output_per_million`、`tools`、`vision`、`json_mode`、`reasoning`、`temperature`、`reasoning_effort`、`context_window`、`max_output_tokens`。导入时，`confirmed` 的值必须与对应的 `cost.*`、`capabilities.*` 或顶层 limit 一致；确认未知的 limit 使用 `value: null`。
+`fields` 接受 `input_per_million`、`output_per_million`、`cache_read_per_million`、`cache_write_per_million`、`tools`、`vision`、`json_mode`、`reasoning`、`temperature`、`reasoning_effort`、`context_window`、`max_output_tokens`。导入和编辑时，`confirmed` 的值必须与对应的 `cost.*`、`capabilities.*` 或顶层 limit 一致；确认未知的 limit 或缓存价格使用 `value: null`。
 
 来源中的 `fields` 还可保存 `max_input_tokens` 和 `structured_output` 作为证据，不能自动把它们当成 combined context window 或 JSON mode。每条证据包含 `value`、`source_field` 和可选单位。价格条件只允许经过限定的缓存、上下文分段和时段结构，不能直接保存任意上游响应。来源 URL 必须是无 userinfo、query 或 fragment 的 HTTPS 地址；配置解析器只保存它，不请求它。
+
+来源可附带 `input_modalities: {value, source_field}`。`value` 最多包含五个不重复的
+`text`、`image`、`audio`、`video`、`pdf`；`source_field` 是长度不超过 512 的非空来源字段路径。
+这项记录保留输入模态证据，不新增运行时能力字段。确认记录中的 `method` 和
+`confirmed_at` 最长为 160 个字符，不能包含 ASCII 控制字符或 DEL。
+
+原始 `source_reasoning_effort` 和来源 `fields.reasoning_effort.value` 最多 16 项。
+运行时与 envelope 字段的 effort 使用 `none`、`minimal`、`low`、`medium`、`high`、
+`xhigh`、`max` 七个合法值。管理写入会按该顺序去重运行时能力和非 `null` 的
+`known` / `confirmed` 字段值，再比较确认值；不同顺序或重复项不会造成虚假的不一致。
+原始来源列表保留顺序、重复项、供应商自定义文字和 `null`，不会被这个过程改写。
+未知或冲突字段仍只能省略值或使用 `null`；明确的空列表仍是已知值。
+256 KiB 限制在字段归一化前按原 envelope 的 UTF-8 JSON 大小检查，重复项缩短后仍不能绕过限制。
+读取旧配置会返回归一化字段，不自动改写配置文件。缺省 metadata 和显式 `null` 也保持原样。
+来源 ID、文字、字段路径、单位及原始 effort 文字拒绝 U+0000 至 U+001F 和 U+007F；
+合法 Unicode 证据不受影响。
 
 查询接口同时提供原始安全候选与规范 envelope：模型发现项使用 `metadata_envelope`，元数据查询项使用 `metadata`。确认时保留规范 envelope 的来源，按选择的值更新字段状态；不能把候选中的 `source_provider` / `source_model` 原样用作持久化字段。旧模型可省略 metadata，不会自动获得来源或确认记录。
 

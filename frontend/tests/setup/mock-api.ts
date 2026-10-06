@@ -19,6 +19,7 @@ export interface MockApiState {
   appliedConfiguration?: typeof configuration;
   canvasLayout?: CanvasLayout;
   canvasWrites?: CanvasLayout[];
+  routingModelOwnership?: Record<string, ("tags" | "priority")[]>;
   themeSeed: string;
   delayThemeRead?: () => Promise<void>;
   rejectThemeRead?: boolean;
@@ -28,7 +29,7 @@ export interface MockApiState {
   delayNextDetail?: () => Promise<void>;
 }
 
-function providerConfigurationSnapshot(catalog: typeof configuration): ProviderConfiguration {
+function providerConfigurationSnapshot(catalog: typeof configuration, ownership: MockApiState["routingModelOwnership"]): ProviderConfiguration {
   return {
     revision: "fixture-provider-revision",
     write_available: catalog.write_available,
@@ -48,6 +49,10 @@ function providerConfigurationSnapshot(catalog: typeof configuration): ProviderC
       capabilities: { tools: false, vision: false, json_mode: true, reasoning: false, temperature: true, reasoning_effort: [] },
       cost: { input_per_million: 1, output_per_million: 2 },
       context_window: null, max_output_tokens: null,
+      routing_overlay_fields: ownership?.[model.id] ?? [
+        ...(JSON.stringify(model.tags) !== JSON.stringify(model.baseline_tags) ? ["tags" as const] : []),
+        ...(model.priority !== model.baseline_priority ? ["priority" as const] : []),
+      ],
     })),
     presets: [
       { kind: "llm", id: "openai", display_name: "Fixture OpenAI", brand_id: null, icon_id: null, type: "openai", api_base: "https://example.test/v1", api_key_env: "FIXTURE_PROVIDER_KEY" },
@@ -64,10 +69,13 @@ async function fulfill(route: Route, body: unknown, status = 200) {
 
 /** Installs before page navigation; unknown traffic fails closed, including cross-origin requests. */
 export async function installMockApi(context: BrowserContext, state: MockApiState) {
+  const port = process.env.JEV_BROWSER_PORT ?? "4178";
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw new Error("Invalid JEV_BROWSER_PORT");
+  const origin = `http://127.0.0.1:${Number(port)}`;
   await context.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    if (url.origin !== "http://127.0.0.1:4178") {
+    if (url.origin !== origin) {
       state.unexpected.push(request.url());
       await route.abort("blockedbyclient");
       return;
@@ -93,6 +101,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
         state.configurationApplied = true;
         const payload = allowedWrite.body as { questions?: typeof configuration.questions; rules?: typeof configuration.rules; fallback?: typeof configuration.fallback; models?: Record<string, { tags: string[]; priority: number }> };
         const current = state.appliedConfiguration ?? configuration;
+        state.routingModelOwnership = Object.fromEntries(Object.entries(payload.models ?? {}).map(([id, fields]) => [id, Object.keys(fields).filter((field): field is "tags" | "priority" => field === "tags" || field === "priority")]));
         state.appliedConfiguration = {
           ...current,
           questions: payload.questions ?? configuration.questions,
@@ -107,6 +116,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       if (url.pathname === "/v1/routing/configuration" && method === "DELETE") {
         state.configurationApplied = false;
         state.appliedConfiguration = undefined;
+        state.routingModelOwnership = {};
         return fulfill(route, { applied: true, overlay_removed: true });
       }
       if (url.pathname === "/v1/dashboard/theme" && method === "PUT") { state.themeSeed = (allowedWrite.body as { seed?: string } | undefined)?.seed ?? "#3b66d9"; return fulfill(route, { version: 1, seed: state.themeSeed }); }
@@ -119,7 +129,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       return;
     }
     if (url.pathname === "/v1/setup") return fulfill(route, { required: false, local_setup_available: false, revision: "fixture-setup", has_providers: true, has_models: true, routing_ready: true, next_step: "ready" });
-    if (url.pathname === "/v1/provider-configuration" && url.search === "") return fulfill(route, providerConfigurationSnapshot(state.appliedConfiguration ?? configuration));
+    if (url.pathname === "/v1/provider-configuration" && url.search === "") return fulfill(route, providerConfigurationSnapshot(state.appliedConfiguration ?? configuration, state.routingModelOwnership));
     if (url.pathname === "/v1/routing/providers/summary") return fulfill(route, state.providerOverride ?? providers);
     if (url.pathname === "/v1/routing/activity") {
       if (state.delayNextActivity) { const delay = state.delayNextActivity; state.delayNextActivity = undefined; await delay(); }

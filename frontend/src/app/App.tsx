@@ -11,13 +11,17 @@ import { useDashboardTheme } from "./hooks/useDashboardTheme";
 import { useMonitoringData } from "./hooks/useMonitoringData";
 import { useRouteActivity } from "./hooks/useRouteActivity";
 import { useLocale } from "@/shared/i18n";
-import { useProviderManagement } from "@/features/providers/useProviderManagement";
+import { useProviderManagement } from "@/features/providers/shared/useProviderManagement";
 import { isValidSetupKey } from "@/shared/api/setup-key";
+import { hasUnsavedChanges } from "@/shared/navigation/unsaved-changes";
 
 export default function App() {
   const { locale, setLocale, t, formatDateTime } = useLocale();
   const [view, setView] = useState<View>("monitoring");
+  const [strategyDirty, setStrategyDirty] = useState(false);
+  const [strategyPending, setStrategyPending] = useState(false);
   const [needsKey, setNeedsKey] = useState(true);
+  const [workspaceActivated, setWorkspaceActivated] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
   const [connectionPending, setConnectionPending] = useState(true);
   const connectionBusy = useRef(false);
@@ -102,6 +106,7 @@ export default function App() {
         await loadTheme();
         setKeyDraft("");
         setNeedsKey(false);
+        setWorkspaceActivated(true);
       });
     } finally {
       connectionBusy.current = false;
@@ -153,9 +158,21 @@ export default function App() {
     await loadMonitoring();
     await loadSetup();
   }, [loadConfiguration, loadMonitoring, loadSetup]);
-  const providerManagement = useProviderManagement((view === "providers" || view === "settings") && !needsKey, onUnauthorized, refreshProviderCatalog);
+  const managementView = view === "providers" || view === "settings";
+  const providerManagement = useProviderManagement(managementView && !needsKey, onUnauthorized, refreshProviderCatalog);
   const providerNavigationGuard = providerManagement.navigationGuardRef;
   const cancelProviderQuery = providerManagement.cancelQuery;
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!strategyDirty && !strategyPending && !(managementView && providerManagement.pending) &&
+          !(managementView && hasUnsavedChanges(providerNavigationGuard))) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [strategyDirty, strategyPending, managementView, providerManagement.pending, providerNavigationGuard]);
 
   const connect = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -182,16 +199,23 @@ export default function App() {
     setConnectionPending(true);
     setSetupPending(true);
     const submittedKey = keyDraft;
-    setKeyDraft("");
     try {
       await run(async () => {
         const status = await api.initialize(setup.revision, submittedKey);
         setSetup(status);
-        await loadMonitoring();
-        await loadTheme();
-        await loadSetup();
-        await loadConfiguration();
-        setNeedsKey(false);
+        setView("settings");
+        setKeyDraft("");
+        try {
+          await loadMonitoring();
+          await loadTheme();
+          await loadSetup();
+          await loadConfiguration();
+          setNeedsKey(false);
+          setWorkspaceActivated(true);
+        } catch (caught) {
+          if (caught instanceof ApiError && caught.status === 401) throw caught;
+          throw new Error(t("setupRefreshFailed"), { cause: caught });
+        }
       });
     } finally {
       connectionBusy.current = false;
@@ -202,23 +226,33 @@ export default function App() {
 
   const openView = useCallback(
     (next: View) => {
-      if ((view === "providers" || view === "settings") && providerManagement.pending) return;
-      if (next !== "providers" && view === "providers") {
-        if (providerManagement.pending || providerNavigationGuard.current?.() === false) return;
+      if (needsKey) return false;
+      if (strategyPending) return false;
+      if (managementView && providerManagement.pending) return false;
+      if (next === view) {
+        if (next === "settings") void run(loadTheme);
+        return false;
+      }
+      if (view === "strategy" && strategyDirty && !window.confirm(t("strategyDiscard"))) return false;
+      if (managementView) {
+        if (providerNavigationGuard.current?.() === false) return false;
         cancelProviderQuery();
       }
+      setStrategyDirty(false);
       if (next !== "monitoring") stopRoutingActivity(false);
       setView(next);
-      if (needsKey) return;
+      if (needsKey) return true;
       if (next === "strategy") void run(loadConfiguration);
       if (next === "settings") void run(loadTheme);
+      return true;
     },
-    [loadConfiguration, loadTheme, needsKey, run, stopRoutingActivity, view, providerManagement.pending, providerNavigationGuard, cancelProviderQuery],
+    [loadConfiguration, loadTheme, needsKey, run, stopRoutingActivity, view, managementView, strategyDirty, strategyPending, t, providerManagement.pending, providerNavigationGuard, cancelProviderQuery],
   );
 
   return (
     <AppShell
       view={view}
+      workspaceActivated={workspaceActivated}
       setup={setup}
       setupLoading={setupLoading}
       setupPending={setupPending}
@@ -227,6 +261,10 @@ export default function App() {
       onSetup={submitSetup}
       onRetrySetup={() => void validateConnection()}
       providerManagement={providerManagement}
+      onStrategyDirtyChange={setStrategyDirty}
+      onStrategyPendingChange={setStrategyPending}
+      onUnauthorized={onUnauthorized}
+      navigationPending={strategyPending || (managementView && providerManagement.pending)}
       needsKey={needsKey}
       connectionPending={connectionPending}
       keyDraft={keyDraft}
@@ -243,9 +281,14 @@ export default function App() {
       theme={theme}
       onOpenView={openView}
       onRefresh={() => {
-        if ((view === "providers" || view === "settings") && providerManagement.pending) return;
+        if (needsKey) return;
+        if (strategyPending) return;
+        if (managementView && providerManagement.pending) return;
+        if (view === "strategy" && strategyDirty && !window.confirm(t("strategyDiscard"))) return;
+        if (managementView && providerNavigationGuard.current?.() === false) return;
+        if (managementView) cancelProviderQuery();
         void refresh();
-        if (view === "providers" || view === "settings") void providerManagement.load();
+        if (managementView) void providerManagement.load();
       }}
       onConnect={connect}
       onKeyDraftChange={setKeyDraft}

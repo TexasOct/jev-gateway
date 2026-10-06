@@ -1,0 +1,34 @@
+{
+  "id": "gateway-typescript-port-assessment",
+  "name": "gateway-typescript-port-assessment",
+  "title": "评估 jev_gateway TypeScript 1:1 移植与依赖替换",
+  "description": "基于当前实现评估等价移植范围、Python 上游依赖替代、风险与工作量，不修改网关实现",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-09-28",
+  "completedAt": "2026-10-05",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "archived_on_request",
+      "reason": "用户要求归档现有全部任务，不创建新任务。",
+      "previous_status": "planning",
+      "acceptance_complete": false,
+      "note": "archive-note.md"
+    }
+  }
+}

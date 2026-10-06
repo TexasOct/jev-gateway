@@ -6,6 +6,7 @@ import base64
 import fcntl
 import json
 import os
+import stat
 import tempfile
 import threading
 from collections.abc import Callable, Iterator, Mapping
@@ -43,7 +44,10 @@ def atomic_bytes(path: Path, content: bytes | None, *, protected: bool = False) 
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
-        if protected:
+        mode = getattr(_HELD, "restore_modes", {}).get(path)
+        if mode is not None:
+            os.fchmod(fd, mode)
+        elif protected:
             os.fchmod(fd, 0o600)
         with os.fdopen(fd, "wb") as stream:
             stream.write(content)
@@ -98,6 +102,7 @@ def replace_configuration(
 ) -> None:
     """Keep a protected recovery journal until disk and runtime activation succeed."""
     previous = {path: optional_bytes(path) for path in changes}
+    previous_modes = {path: stat.S_IMODE(path.stat().st_mode) for path, data in previous.items() if data is not None}
     journal = models_file.parent / ".provider-configuration.recovery"
     if journal.exists():
         raise RuntimeError("An unresolved configuration recovery file exists.")
@@ -121,10 +126,14 @@ def replace_configuration(
         # A failed restore intentionally keeps the journal for operator recovery.
         failures: list[Exception] = []
         for path, data in previous.items():
+            restore_modes = getattr(_HELD, "restore_modes", {})
+            _HELD.restore_modes = previous_modes
             try:
                 atomic_bytes(path, data, protected=path.name.startswith(".env") or path.name in {"credentials.json", "credentials.json.backup"})
             except Exception as error:
                 failures.append(error)
+            finally:
+                _HELD.restore_modes = restore_modes
         if restore_runtime is not None:
             try:
                 restore_runtime()

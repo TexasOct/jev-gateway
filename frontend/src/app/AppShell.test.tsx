@@ -15,7 +15,8 @@ it("keeps top-level view navigation labels from setting oversized button widths"
   const t = vi.fn((key: string) => ({
     monitoring: "Monitoring",
     strategyEditor: "Strategy workflow",
-    providerModels: "Provider & models",
+    providerModels: "Suppliers",
+    modelManagement: "Model management",
     settings: "Settings",
     views: "Views",
     refresh: "Refresh",
@@ -97,7 +98,9 @@ it("keeps top-level view navigation labels from setting oversized button widths"
   expect(nav).toContain("max-w-40");
   expect(nav).not.toContain("flex-1");
   expect(nav).not.toContain("min-w-max");
-  expect(nav).toContain("Provider &amp; models");
+  expect(nav).toContain("Suppliers");
+  expect(nav).not.toContain("Model management");
+  expect(nav?.match(/aria-pressed="false"/g)).toHaveLength(3);
   expect(nav).toContain("Settings");
   expect(nav).not.toContain("Theme</");
 });

@@ -23,6 +23,7 @@ class DiscoveryNetworkError(ValueError):
             "invalid_url", "blocked_target", "dns_failed", "timeout", "busy",
             "redirect_rejected", "authentication_failed", "rate_limited",
             "upstream_failed", "response_too_large", "invalid_response",
+            "address_not_found", "listing_unsupported",
         }
         self.code = code if code in allowed else "upstream_failed"
         super().__init__(self.code)
@@ -111,12 +112,18 @@ def validate_target(
             raise ValueError
         if "#" in url or "%" in parts.hostname:
             raise ValueError
-        for key, _ in parse_qsl(parts.query, keep_blank_values=True):
+        for key, value in parse_qsl(parts.query, keep_blank_values=True):
+            if any(ord(c) < 32 or ord(c) == 127 for c in key + value):
+                raise ValueError
             normalized = unquote(key).lower().replace("-", "_")
             if normalized in _CREDENTIAL_NAMES or any(word in normalized for word in ("token", "secret", "password", "credential", "api_key")):
                 raise ValueError
         host = parts.hostname.encode("idna").decode("ascii")
-        port = parts.port or (443 if parts.scheme == "https" else 80)
+        if parts.netloc.endswith(":"):
+            raise ValueError
+        port = parts.port
+        if port is None:
+            port = 443 if parts.scheme == "https" else 80
         if not 1 <= port <= 65535:
             raise ValueError
         path = parts.path or "/"
@@ -203,6 +210,10 @@ def safe_get_json(
             raise DiscoveryNetworkError("redirect_rejected")
         if response.status in {401, 403}:
             raise DiscoveryNetworkError("authentication_failed")
+        if response.status == 404:
+            raise DiscoveryNetworkError("address_not_found")
+        if response.status in {405, 501}:
+            raise DiscoveryNetworkError("listing_unsupported")
         if response.status == 429:
             raise DiscoveryNetworkError("rate_limited")
         if response.status not in {200, 304}:

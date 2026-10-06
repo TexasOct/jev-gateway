@@ -17,7 +17,7 @@ test("initializes the fresh installed default catalog through the Dashboard", as
   const reply = await saved;
   expect(reply.status()).toBe(200);
   expect(await reply.text()).not.toContain(key);
-  await page.getByRole("navigation", { name: "Views", exact: true }).getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views", exact: true }).getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeEnabled();
   await expect(input).toHaveCount(0);
   expect((await page.request.get(`${url}/healthz`)).status()).toBe(401);
@@ -30,7 +30,8 @@ test("initializes the fresh installed default catalog through the Dashboard", as
   await expect(page.getByLabel("Gateway API key", { exact: true })).toHaveValue("");
   await page.getByLabel("Gateway API key", { exact: true }).fill(key);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await page.getByRole("navigation", { name: "Views", exact: true }).getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views", exact: true }).getByRole("button", { name: "Suppliers", exact: true }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await expect(page.getByLabel("New gateway access key", { exact: true })).toHaveValue("");
   await page.getByRole("region", { name: "Gateway access key", exact: true }).getByRole("button", { name: "Cancel", exact: true }).click();

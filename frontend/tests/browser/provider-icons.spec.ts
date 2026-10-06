@@ -17,12 +17,13 @@ async function install(context: BrowserContext, state: ProviderFixtureState) {
 }
 async function open(page: Page) {
   await page.goto("/dashboard/");
-  await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Fixture provider", exact: true })).toBeVisible();
 }
 function picker(page: Page) { return page.locator("[data-provider-icon-picker]"); }
 async function edit(page: Page) {
   await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByText("Advanced configuration", { exact: true }).click();
   await expect(picker(page)).toBeVisible();
   await picker(page).getByRole("button", { name: "Choose icon", exact: true }).click();
 }
@@ -48,7 +49,7 @@ for (const kind of ["llm", "decision"] as const) {
     expect(state.writes[0]?.operations[0]).toMatchObject({ action: "upsert", kind, provider: { id: original.id, brand_id: original.brand_id, icon_id: "qwen", api_base: original.api_base, ...(kind === "llm" ? { type: original.type } : { protocol: original.protocol }) } });
     expect(state.configuration.models[0]!.name).toBe("fixture/existing");
     await page.reload();
-    await page.getByRole("button", { name: "Provider & models", exact: true }).click();
+    await page.getByRole("button", { name: "Suppliers", exact: true }).click();
     if (kind === "decision") await page.getByRole("button", { name: "Decision providers", exact: true }).click();
     await edit(page);
     await expect(picker(page).locator("[data-current-icon]")).toHaveText("Qwen");
@@ -67,28 +68,42 @@ for (const kind of ["llm", "decision"] as const) {
     await picker(page).getByRole("button", { name: "Anthropic", exact: true }).click();
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Cancel", exact: true }).first().click();
-    await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeFocused();
+    await expect(page.locator(`[data-provider-edit="${original.id}"][data-provider-kind="${kind}"]`)).toBeFocused();
     expect(state.writes).toHaveLength(2);
     await edit(page); await expect(picker(page).locator("[data-current-icon]")).toHaveText("Automatic");
   });
 
-  test(`${kind} custom create exposes compact picker outside advanced settings`, async ({ page, context }) => {
+  test(`${kind} custom create discloses compact picker in advanced settings`, async ({ page, context }) => {
     const state = fixture(); await install(context, state); await open(page);
     if (kind === "decision") await page.getByRole("button", { name: "Decision providers", exact: true }).click();
     await page.getByRole("button", { name: "Add provider", exact: true }).click();
     await page.getByRole("button", { name: "Custom provider", exact: true }).click();
+    await expect(picker(page)).not.toBeVisible();
+    await page.getByText("Advanced configuration", { exact: true }).click();
     await expect(picker(page)).toBeVisible();
     await expect(picker(page).getByRole("button", { name: "Choose icon", exact: true })).toHaveAttribute("aria-expanded", "false");
-    expect(await picker(page).evaluate((element) => element.closest("details"))).toBeNull();
-    await page.getByLabel("Instance ID", { exact: true }).fill(`${kind}-custom`);
+    expect(await picker(page).evaluate((element) => element.closest("details") !== null)).toBe(true);
+    const generatedID = await page.getByLabel("Instance ID", { exact: true }).inputValue();
+    await expect(page.getByLabel("Instance ID", { exact: true })).toHaveAttribute("readonly", "");
+    await page.getByLabel("Display name", { exact: true }).fill(`${kind} custom`);
     await page.getByLabel("Endpoint URL").fill("https://example.test/custom");
     if (kind === "decision") await page.getByLabel("Credential reference", { exact: true }).fill("CUSTOM_JUDGE_KEY");
+    else {
+      await expect(page.getByRole("button", { name: "Validate and save", exact: true })).toBeDisabled();
+      await page.getByLabel("New provider credential", { exact: true }).fill("synthetic-custom-key");
+    }
+    const reference = await page.getByLabel("Credential reference", { exact: true }).inputValue();
+    if (kind === "llm") expect(reference).toMatch(/^JEV_SUPPLIER_[A-F0-9]{32}_API_KEY$/);
+    else expect(reference).toBe("CUSTOM_JUDGE_KEY");
     await picker(page).getByRole("button", { name: "Choose icon", exact: true }).click();
     await picker(page).getByRole("button", { name: "OpenAI", exact: true }).click();
     expect(state.writes).toEqual([]);
     await page.getByRole("button", { name: "Validate and save", exact: true }).click();
     await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();
-    expect(state.writes[0]?.operations[0]).toMatchObject({ kind, provider: { id: `${kind}-custom`, brand_id: null, icon_id: "openai" } });
+    expect(state.writes[0]?.operations[0]).toMatchObject({ kind, provider: { id: generatedID, brand_id: null, icon_id: "openai" } });
+    expect(state.writes[0]?.operations[0]).toHaveProperty("provider.api_key_env", reference);
+    expect(state.writes[0]?.operations[0]).toHaveProperty("credential", kind === "llm" ? { action: "set", value: "synthetic-custom-key" } : { action: "keep" });
+    expect(state.validations).toEqual(state.writes);
   });
 }
 
@@ -110,6 +125,7 @@ test("adding an already configured template prefills a new ID and cancel writes 
   await install(context, state); await open(page);
   await page.getByRole("button", { name: "Add provider", exact: true }).click();
   await page.getByRole("button", { name: "OpenAI openai", exact: true }).click();
+  await page.getByText("Advanced configuration", { exact: true }).click();
   await expect(page.getByLabel("Instance ID", { exact: true })).toHaveValue("openai-3");
   await expect(page.getByLabel("Endpoint URL")).toBeDisabled();
   await expect(page.getByLabel("Use the transport's default endpoint")).toBeChecked();
@@ -170,6 +186,7 @@ test("all packaged SVGs load as same-origin files under gateway CSP and preserve
 test("keyboard selection never submits and Escape closes library before leaving form", async ({ page, context }) => {
   const state = fixture(); await install(context, state); await open(page);
   await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByText("Advanced configuration", { exact: true }).click();
   const toggle = picker(page).getByRole("button", { name: "Choose icon", exact: true });
   await toggle.focus(); await page.keyboard.press("Enter");
   await picker(page).getByLabel("Search icons by brand, alias or model name").fill("claude");
@@ -231,8 +248,9 @@ for (const width of [1280, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
     await page.addInitScript((language) => localStorage.setItem("jev-dashboard-locale", language), locale);
     await page.goto("/dashboard/");
-    await page.getByRole("button", { name: locale === "en" ? "Provider & models" : "Provider 与模型配置", exact: true }).click();
+    await page.getByRole("button", { name: locale === "en" ? "Suppliers" : "供应商", exact: true }).click();
     await page.getByRole("button", { name: locale === "en" ? "Edit" : "编辑", exact: true }).click();
+    await page.getByText(locale === "en" ? "Advanced configuration" : "高级配置", { exact: true }).click();
     const toggle = picker(page).getByRole("button", { name: locale === "en" ? "Choose icon" : "选择图标", exact: true });
     await toggle.click();
     const search = picker(page).getByLabel(locale === "en" ? "Search icons by brand, alias or model name" : "按品牌、别名或模型名称搜索图标");

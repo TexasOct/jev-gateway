@@ -95,15 +95,28 @@ serving. A selected pending provider fails before LiteLLM, including missing
 declared transport credentials. Missing decision credentials retain ordered skip
 and fallback behavior. Default direct catalog parsing and CLI validation are strict.
 
-The Dashboard uses password inputs with empty saved drafts. Submission and cancel
-clear input state. The current gateway connection key remains in module memory;
+The Dashboard starts saved credential fields empty and masks newly entered
+values. Capture submitted secrets and actions in component memory, lock controls
+and empty secret inputs while validation/write is pending. Failed validation,
+reauthentication or saving restores the captured draft; retain raw Vertex JSON
+and canonicalize it only for submission. Success and confirmed cancellation clear
+input state. A committed write followed by a failed catalog read keeps inputs
+empty and offers GET-only recovery. The current gateway connection key remains in module memory;
 refresh requires the operator to enter it again. Neither provider credentials nor
 the connection key go into URL, cookies, localStorage or sessionStorage. A GET's
 `401` waits for pending gateway writes to settle. A successful write installs the
 submitted connection key before releasing those reads; a failed write retains
 normal unauthorized handling. A stale GET may retry once using the newest key.
-Writes never retry automatically. Provider drafts clear before validation, not
-after the following catalog refresh.
+Writes never retry automatically. Provider inputs clear when capturing the
+validation payload and restore on failure; do not retain them during the
+following catalog refresh or lose them after a rejected write. Reauthentication
+retains drafts in the mounted hidden/inert workspace while suspending its activity.
+Deleting temporary replacement text with native input or keyboard actions
+restores KEEP before submission, for primary and every managed transport field.
+The deleted value must not survive in a captured payload or be restored after
+that submission fails. This UI rule does not permit an API `set` action with an
+empty string; the API continues to reject invalid SET values. Explicit CLEAR
+remains distinct from blank replacement and default-authentication detachment.
 
 New install paths create an empty version 1 store with mode `0600`; preserve
 existing files. Dotenv templates contain comments only. Installed wheels support
@@ -126,6 +139,7 @@ file-only startup without a browser or Node.js. Runtime selection remains
 | Gateway persistence/activation fails | `500 gateway_credential_failed`; recover old state |
 | A selected LLM provider lacks a declared credential | `503 provider_credentials_missing`; zero upstream calls |
 | A declared gateway reference loses its value | Reject load/reload/candidate activation; preserve healthy auth |
+| Replacement text is entered and then deleted in the UI | Submit KEEP without the removed value; preserve stored bytes and actions |
 
 ## 5. Good/base/bad cases
 
@@ -161,7 +175,13 @@ ambient vendor fallback.
 - Browser: initialization, early read `401` before a rotation response, failed
   rotation, no duplicate writes, conflict retry, cancel, both provider kinds with
   delayed validation/write/catalog reads, 320px English/Chinese keyboard access
-  and existing Provider workflows.
+  and existing Provider workflows. Assert captured-secret removal while pending,
+  failed-save raw value/action restoration, reauthentication retention, explicit
+  CLEAR versus default-auth detachment and GET-only committed-write recovery.
+  Exercise actual keyboard/input deletion after typing a temporary replacement,
+  then save through validation and applying PUT. Assert absent deleted values and
+  unchanged primary/transport credentials, including the AWS access ID, secret
+  and session token. Repeat against installed assets and real file persistence.
 - Installed acceptance: empty packaged store, JSON-only credentials, protected
   backups, key rotation, authenticated reload/restart, file preservation and normal
   uninstall in a throwaway runtime home.
@@ -186,4 +206,79 @@ pending upstream setup while retaining strict inbound authentication resolution.
 Wrong: let a stale GET disconnect the Dashboard while the rotation response is
 pending, or retain a submitted provider key in its input during catalog refresh.
 Correct: settle the authentication handover before read failure handling and clear
-provider input state as soon as the submission payload is captured.
+provider input state as soon as the submission payload is captured, restoring the
+captured values/actions only if validation or the write fails.
+
+## Scenario: supplier focus frames preserve native secret editing
+
+### 1. Scope / trigger
+
+Opening a supplier schedules initial form focus. Cancelling another editor may
+also schedule return focus. A delayed frame must respect the user's subsequent
+focus and native text selection, including Select All followed by Backspace.
+
+### 2. Signatures
+
+```ts
+useWorkspaceFrames(active: boolean): (callback: () => void) => number
+scheduleFocus(target: () => HTMLElement | null | undefined): void
+```
+
+`ProviderView` keeps focus operation generation, observed focus generation and
+the scheduled frame handle in memory. These are UI ownership markers, with no
+credential, model, configuration or persisted-schema effect.
+
+### 3. Contracts
+
+Each scheduled focus cancels an older frame and captures operation/focus
+ownership. A later `focusin`, superseding operation, workspace suspension or
+unmount prevents that callback from moving focus. Cleanup removes the listener
+and cancels the frame. Preserve initial focus when the user has not moved it.
+
+Capture the original Edit target before scheduling return focus; an instance
+kind and stable ID select the current visible trigger, with the existing visible
+Add fallback. Later mutable trigger changes cannot redirect an older callback.
+
+Native input capture and KEEP/SET/CLEAR semantics remain unchanged. A scheduled
+focus must never collapse a selected replacement before its native deletion.
+An actually empty replacement submits KEEP without a value and preserves
+credential bytes. A nonempty captured value remains SET.
+
+### 4. Validation and error matrix
+
+| Event | Required result |
+| --- | --- |
+| Open editor, user has not moved focus | Existing initial form focus |
+| User focuses/selects a password before the frame | No later focus theft or collapsed selection |
+| New opening/cancellation supersedes an older frame | Only current operation may focus |
+| Workspace suspension/unmount | Pending frames cannot affect reconnect/new owner |
+| Native deleted replacement followed by save | Length zero, KEEP, absent value, unchanged actual credential bytes |
+| Pending validation/write failure | Captured raw values/actions restored; no stale focus resets the draft |
+
+### 5. Good / base / bad examples
+
+The operator selects all 23 characters and presses Backspace. The input becomes
+empty and the existing credential remains unchanged. A baseline delayed focus
+to the first select collapses that selection; deleting only one character leaves
+a nonempty replacement and causes SET. This proves focus interference, not an
+empty DOM value being converted to SET.
+
+### 6. Required assertions
+
+Preserve the original installed N1 failure and immediate DOM/action/selection/
+focus/frame instrumentation. Repeat primary, AWS and Vertex native typing and
+deletion in both languages and narrow/desktop windows, with actual PUT/file
+bytes, pending clearing and failed raw-draft restoration. Keep N2's historical
+standalone typing failure open until independent current-source reconciliation;
+passing baseline/fixed runs cannot erase it. Source compilation and installed
+wheel evidence must identify their different asset/runtime provenance.
+
+### 7. Wrong vs correct
+
+Wrong: unconditional `requestAnimationFrame(...focus())` after the user has
+already selected a secret input. Correct: schedule through workspace activity,
+cancel previous requests and check operation plus subsequent-focus ownership.
+
+Wrong: certify cleanup after refusing a changed process identity while its
+gateway remains listening. Correct: retain the failure, reconcile authentic
+owned identity, and verify any later cleanup with separate current evidence.

@@ -49,7 +49,7 @@ def test_models_dev_prices_are_usd_per_million_and_unknown_false_stay_distinct()
     client = client_for(api={"openai": {"models": {"exact": {"id": "exact", "cost": {"input": 0, "output": 8, "cache_read": 0.2, "tiers": [{"tier": {"type": "context", "size": 300000}, "input": 4}]}, "tool_call": False, "reasoning": None, "temperature": False, "structured_output": True, "limit": {"context": 128000, "output": None}, "last_updated": "2024-01-01", "benchmarks": {"quality": 99}}}}})
     result = client.lookup(PROVIDER, ["exact"])
     item = result["items"][0]
-    assert item["fields"] == {"input_per_million": 0, "output_per_million": 8, "tools": False, "vision": None, "json_mode": None, "reasoning": None, "temperature": False, "reasoning_effort": None, "context_window": 128000, "max_output_tokens": None}
+    assert item["fields"] == {"input_per_million": 0, "output_per_million": 8, "cache_read_per_million": 0.2, "cache_write_per_million": None, "tools": False, "vision": None, "json_mode": None, "reasoning": None, "temperature": False, "reasoning_effort": None, "context_window": 128000, "max_output_tokens": None}
     source = item["sources"][0]
     assert source["source_updated_at"] == "2024-01-01"
     assert source["fetched_at"] != source["source_updated_at"]
@@ -85,10 +85,12 @@ def test_native_prices_and_capabilities_are_reference_only_for_custom_endpoints(
 
 
 def test_matching_is_exact_and_canonical_links_are_explicit() -> None:
-    client = client_for(catalog={"providers": {"openai": {"models": {"alias": {"id": "alias", "canonical_model_id": "vendor/base"}, "exact": {"cost": {"input": 2}}}}}, "models": {"vendor/base": {"limit": {"context": 64000}, "cost": {"input": 99}}}})
+    client = client_for(catalog={"providers": {"openai": {"models": {"alias": {"id": "alias", "canonical_model_id": "vendor/base"}, "exact": {"cost": {"input": 2}}}}}, "models": {"vendor/base": {"limit": {"context": 64000}, "cost": {"input": 99, "cache_read": 9, "cache_write": 99}}}})
     result = client.lookup(PROVIDER, ["alias", "exa", "exact"])
     assert result["items"][0]["fields"]["context_window"] == 64000
     assert result["items"][0]["fields"]["input_per_million"] is None
+    assert result["items"][0]["fields"]["cache_read_per_million"] is None
+    assert result["items"][0]["fields"]["cache_write_per_million"] is None
     assert result["items"][1]["sources"] == []
     assert result["items"][2]["fields"]["input_per_million"] == 2
 

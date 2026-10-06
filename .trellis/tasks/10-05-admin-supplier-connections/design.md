@@ -1,0 +1,7 @@
+# Design
+
+Own ProviderView/setup/identity/symbol assets and supplier-focused tests. Parent mounts a separate model workspace; remove gateway key controls and replace dense import ownership with a model-count/open-models affordance (optional `onOpenModels(providerId)` callback). Model workspace owns ProviderModels/ModelFields/model.ts/useProviderManagement. Preserve compatible helper exports rather than editing them in parallel.
+
+Consume `api.testProviderConnection(selector, signal?)` and the parent design's status/scope response from Contracts. Use a supplier-owned hook if needed; do not duplicate authentication or persist secrets. Direct API key replacement can allocate a safe reference from generated stable ID; shared/env paths stay explicit advanced choices. Keep own account-scoped fields and native endpoint restrictions.
+
+Direct credential controls also cover supported transport setup credentials, including Vertex service-account JSON and Bedrock access ID/secret/session token. The form submits optional `transport_credentials` actions against stable `param_env` bindings and reads only `transport_credential_presence`. Generate a missing reference once, keep existing bindings, retain all failed drafts and keep blank replacements by default. Ordinary controls accept the credential value; the advanced path edits compatible existing references. Platform/default authentication is an explicit explained choice. No secret enters `params`, browser persistence, source queries, screenshots or public responses.

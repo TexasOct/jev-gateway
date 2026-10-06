@@ -1,0 +1,80 @@
+import { test, expect } from "../fixtures/provider-browser";
+import { installProviderFixture, providerFixture } from "../fixtures/provider-management";
+import type { ProviderFixtureState } from "../fixtures/provider-management";
+
+test("existing Edit focus survives reauthentication", async ({ page, context }) => {
+  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], rejectValidation: 401 };
+  await installProviderFixture(context, state);
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await expect(page.locator("[data-connection-page]")).toBeVisible();
+  state.rejectValidation = undefined;
+  await page.locator("#gateway-api-key").fill("synthetic-reconnect-key");
+  await page.locator("[data-connection-page] button[type=submit]").click();
+  await expect(page.getByLabel("Display name", { exact: true })).toHaveValue("Fixture provider");
+  await page.getByRole("button", { name: "Cancel", exact: true }).last().click();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
+  expect(state.writes).toEqual([]);
+});
+
+test("restored endpoint and credential drafts are clean while Clear remains guarded", async ({ page, context }) => {
+  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [] };
+  await installProviderFixture(context, state);
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const endpoint = page.getByLabel("Endpoint URL", { exact: true });
+  const initial = await endpoint.inputValue();
+  await endpoint.fill("https://changed.test/v1");
+  await endpoint.fill(initial);
+  const secret = page.getByLabel("New provider credential", { exact: true });
+  await secret.fill("synthetic-temporary");
+  await secret.fill("");
+  let dialogs = 0;
+  page.on("dialog", async (dialog) => { dialogs++; await dialog.dismiss(); });
+  await page.getByRole("combobox", { name: "Credential action", exact: true }).selectOption("clear");
+  await page.getByRole("button", { name: "Cancel", exact: true }).last().click();
+  expect(dialogs).toBe(1);
+  await page.getByRole("combobox", { name: "Credential action", exact: true }).selectOption("keep");
+  await page.getByRole("button", { name: "Cancel", exact: true }).last().click();
+  expect(dialogs).toBe(1);
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
+  expect(state.writes).toEqual([]);
+});
+
+test("ordinary recreate requires credentials and allocates a fresh reference", async ({ page, context }) => {
+  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [] };
+  await installProviderFixture(context, state);
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
+  const add = async () => {
+    await page.getByRole("button", { name: "Add provider", exact: true }).click();
+    await page.getByRole("button", { name: "OpenAI openai", exact: true }).click();
+  };
+  await add();
+  await expect(page.getByRole("button", { name: "Validate and save", exact: true })).toBeDisabled();
+  await page.getByLabel("New provider credential", { exact: true }).fill("synthetic-retired-key");
+  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();
+  const original = state.configuration.providers.find((profile) => profile.id === "openai")!;
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("heading", { name: "OpenAI", exact: true }).locator("../..").getByRole("button", { name: "Delete provider", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "OpenAI", exact: true })).toHaveCount(0);
+  await add();
+  const writes = state.writes.length;
+  await expect(page.getByRole("button", { name: "Validate and save", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Test connection", exact: true })).toBeDisabled();
+  await page.getByText("Advanced configuration", { exact: true }).click();
+  const reference = await page.getByLabel("Credential reference", { exact: true }).inputValue();
+  expect(reference).not.toBe(original.api_key_env);
+  expect(reference).toMatch(/^[A-Z_][A-Z0-9_]{1,239}$/);
+  await page.getByLabel("Display name", { exact: true }).fill("Replacement OpenAI");
+  await expect(page.getByLabel("Credential reference", { exact: true })).toHaveValue(reference);
+  expect(state.writes).toHaveLength(writes);
+  await page.getByLabel("New provider credential", { exact: true }).fill("synthetic-replacement-key");
+  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();
+  expect(state.writes.at(-1)!.operations[0]).toMatchObject({ provider: { id: "openai", api_key_env: reference }, credential: { action: "set", value: "synthetic-replacement-key" } });
+});

@@ -21,21 +21,8 @@ Three files next to the active `models.json` hold runtime edits:
 | `routing-canvas-layout.json` | node positions and scroll viewport | `PUT /v1/dashboard/canvas-layout` |
 
 `models.json` is the baseline. Routing-overlay, theme, and canvas-layout APIs
-keep their own write surfaces. Provider-management writes have a separate
-contract and must not expand the routing-overlay schema.
-
-The overlay accepts the same matrix choices as the baseline: an omitted label
-uses the first configured label, `{}` is a legal choice, and `tier` is the
-existing alias for `label`. Reject both names in one choice and reject unknown
-keys. Validation, merge and reload preserve unedited choice fields in the JSON
-document. An explicit label edit removes its former alias; display resolution
-alone must not add a choice field to an overlay.
-
-Default installations contain strategies without supplier or model instances.
-The local setup form establishes management access, then allows console use
-while providers/models are configured later. Empty tag-based pools remain
-editable. See [Runtime initialization](./initialization.md) for its API, CLI,
-authorization and persistence contracts.
+leave its bytes unchanged. Provider-management writes have a separate contract
+and must not expand the routing-overlay schema.
 
 Module ownership: `jev_gateway/routing_overlay.py` owns overlay shape, merge,
 atomic write, and `load_catalog_with_overlay()`. It must not import
@@ -98,11 +85,10 @@ Overlay request body:
   sections are unreachable, so a credential cannot be smuggled in.
 - Label membership is tag-based: adding a model to a label adds `{strategy}/{label}`
   to that model's `tags`. Tags owned by other strategies must survive an edit.
-- Gateway credential: `gateway.api_key_env` must be configured for routing-overlay
+- Environment key: `gateway.api_key_env` must be configured for routing-overlay
   and canvas-layout writes. Theme writes follow the ordinary gateway Bearer rule
   and remain available without a configured key. The key is resolved at catalog
-  load through JSON > local dotenv > captured process values, and activated after
-  a successful managed write. See [credential configuration](./credential-configuration.md).
+  load; no new variable is introduced.
 - The overlay file and theme file are created with the process umask.
 
 ### 4. Validation & Error Matrix
@@ -403,7 +389,6 @@ The layout is shared by browsers connected to the same installation. The API cur
 - `tests/test_gateway.py`: configured-key guard, Bearer checks, file failure, unchanged policy hash/version count and unchanged baseline/overlay bytes.
 - `frontend/src/features/routing/model/canvas.test.ts`: valid/invalid layout, representable connections, explicit-list protection and stale edges.
 - Browser checks: actual node/edge pointer gestures, keyboard alternatives, save/reload positions and layout load/write races. Pure graph tests do not prove pointer hit-testing works. For zoomed/scrolled canvases, `elementFromPoint(clientX, clientY)` must identify the intended `data-canvas-node`; verify with real browser mouse input because synthetic `PointerEvent` dispatch does not exercise browser pointer capture faithfully.
-- Sample a node's current bounds and center hit within one synchronous browser evaluation. Chrome measurement and viewport restoration can move the node between two awaited reads, making cached coordinates hit empty space. Keep the exact hit, native drag and policy-write assertions; a covering overlay must still fail the hit check. `canvas-hit.ts` and its synthetic origin-shift/occlusion regressions exercise this sampling boundary.
 - Browser checks for responsive canvas fitting should scroll the canvas into the visible page before measuring node bounds. Assert that the selected node's bounding box is inside the visible canvas after Fit, at a usable CSS size, rather than relying on absence of page-level horizontal overflow. When the whole board cannot fit at minimum readable zoom, focus a selected node or compact group and provide explicit pan controls; viewport changes remain layout-only and must not submit policy changes.
 - `RoutingEditor` selection is the source passed into canvas fitting and the inspector. Canvas node selection callbacks must update the parent `selectedNode`; otherwise Fit may focus a stale default node even when the user selected another module. Verify selection synchronization in browser tests after switching from an advanced panel.
 - The strategy-only shell is a `100dvh` grid with `auto minmax(0, 1fr)` rows. The shared header owns the auto row; the actual canvas fills the remaining row. Do not restore a fixed board height or make monitoring/appearance use this shell.
@@ -417,6 +402,80 @@ The layout is shared by browsers connected to the same installation. The API cur
 ### 7. Wrong vs Correct
 
 Wrong: validate compact JSON size, then pretty-print a file larger than the read bound. Correct: validate and write a consistent encoding within the same byte limit.
+
+## Scenario: Canvas asynchronous ownership and unresolved layout recovery
+
+### 1. Scope / Trigger
+
+Use when changing policy validation/apply/reset continuations, authentication suspension, layout reads or layout retry. A failed initial layout read does not establish that the installation has an empty layout. Work admitted before suspension cannot deliver feedback or callbacks into the reconnected workspace.
+
+### 2. Signatures
+
+```typescript
+// frontend/src/shared/api/client.ts
+api.canvasLayout(): Promise<CanvasLayout>
+api.saveCanvasLayout(layout: CanvasLayout): Promise<CanvasLayout>
+// RoutingEditor component-local operations
+startReview(): void
+save(): void
+reset(): void
+// RoutingCanvas component-local persistence
+writeLayout(next: CanvasLayout): Promise<void>
+persist(next: CanvasLayout): void
+```
+
+The existing `useWorkspaceActive()` and monotonic activity generation define admission. Policy operations also capture a component-local monotonic operation owner. No new API, environment key, layout field or business identity is introduced.
+
+### 3. Contracts
+
+Policy success, errors, unauthorized callbacks, reload callbacks and busy finalizers require all of: active workspace, unchanged activity generation and current operation owner. Suspension invalidates the old owner and releases its UI busy state; the old operation's eventual completion cannot clear a newer operation's busy state. These guards do not undo or automatically replay a server write that committed. Current authenticated reads recover the active configuration.
+
+Layout read trust remains separate from the layout error and serialized write queue. Only a valid GET with no `read_error` establishes a writable snapshot. HTTP failure, an invalid response and a `read_error` fallback keep `loaded` false and read trust unresolved. The visible retry increments `readRetry` to repeat GET. Persistence and native layout editing stay blocked until a trustworthy snapshot arrives. A legitimate empty or missing-file default GET is trusted and permits normal layout writes.
+
+Current reads and write callbacks capture their activity generation. An old GET cannot replace the reconnect snapshot, and an old write callback cannot replace its saved-layout state or deliver a late 401. A failed write after a known GET retains the existing rollback snapshot and PUT retry behavior. Layout PUT excludes `read_error` and preserves the independent policy/baseline/overlay/version boundary.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Initial GET fails, is invalid or carries `read_error` | Show read failure; disable native layout editing; offer GET retry; no PUT |
+| Retry obtains saved nonempty layout | Install exact nodes/viewport; enable editing; only a later legitimate edit writes |
+| GET returns valid empty/default layout | Permit native editing and serialized PUT |
+| Known-layout PUT fails | Restore the saved snapshot; retain the existing explicit PUT retry |
+| Root suspension/reconnection precedes old policy error or 401 | No old alert, unauthorized callback or reload callback |
+| New policy operation starts before old finalizer | New busy state remains until its own operation settles |
+| Held old layout GET resolves after reconnect | Preserve the current GET's positions and viewport |
+
+### 5. Good/Base/Bad Cases
+
+Good: GET fails while disk still holds `rule-0` at `{x:420,y:80}`. Retry performs GET, recovers that position, then a native keyboard move writes `{x:440,y:80}`. Base: a valid empty/default layout allows an ordinary first move. Bad: retry sends the locally empty fallback to PUT and replaces an unread saved layout.
+
+### 6. Tests Required
+
+Preserve independent C14/C24 assertions and failures. `canvas-tail-rework.spec.ts` adds four stale-validation status/new-owner variants, HTTP/invalid/`read_error` recovery, known-write retry, old-GET/reconnect and legitimate empty/default cases. Assert exact request order: unresolved recovery is `GET → GET → PUT` only after native editing, while a known write failure permits two explicit PUT attempts. Assert saved nodes/viewport, zero policy mutations, zero obsolete alerts and root disconnections, preserved draft, current busy ownership and actual key-driven movement. Retain existing workflow/history/header/connection/hit-testing/geometry and async suspension cases without weakening bounds or timeouts. Developer supporting runs and original-harness rechecks remain separate evidence.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```typescript
+catch (error) { setLoaded(true); }
+// Retry cannot know whether disk contains a valid saved layout.
+persist(layoutRef.current);
+finally { setBusy(false); }
+```
+
+Correct:
+
+```typescript
+const current = () => activeRef.current
+  && generation === activityGeneration.current
+  && owner === operation.current;
+catch (error) { if (current()) reportFailure(error); }
+finally { if (current()) setBusy(false); }
+// An unresolved read retries GET; PUT requires a trusted GET snapshot.
+setReadRetry((value) => value + 1);
+```
 
 ## Scenario: strategy canvas outputs and connection editing
 
@@ -472,6 +531,70 @@ Fit, reveal, marquee, dragging, board bounds and arrangement consume the same `N
 ### 7. Wrong vs Correct
 
 Wrong: remove a match edge and omit its label before saving. Correct: retain an explicit empty-label draft and its port, prevent review, then require a valid reconnection before validation and application.
+
+## Scenario: canvas context-menu draft ownership
+
+### 1. Scope / Trigger
+
+Use when changing node, edge or blank-board menus in `RoutingCanvas.tsx`. Rule IDs such as `rule-0` identify ordered UI slots. Removing a rule remaps later slots, so an open menu must retain the draft that gave its target meaning.
+
+### 2. Signatures
+
+```typescript
+openMenu(event: { clientX: number; clientY: number; preventDefault: () => void; stopPropagation: () => void }, node?: string, edge?: WorkflowEdge): void
+addNode(kind: "rule" | "question"): void
+deleteNode(id: string): void
+travelHistory(redo: boolean): void
+```
+
+These are component-local handlers. Their existing authorization, text-editing, geometry, layout-queue and draft-mutation guards remain applicable.
+
+### 3. Contracts
+
+The stored menu payload is `{ x, y, point, node?, edge?, draft: RoutingDraft }`. Capture the current immutable draft when opening the menu. Derive the visible/actionable menu only while `storedMenu.draft === draft`; rendering, keyboard suppression, focus/dismiss effects and every menu action consume that derived value.
+
+Draft mutations replace the draft object. A different object invalidates all three menu kinds even if a slot ID still exists. Canvas undo/redo clears stored menu state before restoring a historical draft object, so history cannot reopen an invalidated menu. Discard creates a fresh baseline draft and advances the existing history/discard boundaries. Keep this ownership in component state; do not add draft references or menu data to serialized configuration/layout, change rule IDs, assign refs during render, or add a state-setting invalidation effect.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Current draft is the opening draft | Existing menu actions remain available under their usual guards |
+| Draft changed while menu was open | Menu is absent; old target cannot mutate the new draft |
+| Removed rule's slot now identifies its successor | The old menu remains invalid even though the slot exists |
+| Fresh menu opened for the successor | Operates on that current rule and preserves normal undo/layout restoration |
+| Undo/redo restores an earlier draft object | Stored menu is cleared before restoration |
+| Read-only, fixed object or text-field editing | Existing restrictions remain; no unintended draft deletion |
+
+### 5. Good/Base/Bad Cases
+
+- Good: open a menu on the first of three distinct rules, keyboard-delete it through the inspector, retain both successors and their remapped positions, then use a fresh menu and undo to restore them.
+- Base: an unchanged draft supports native right-click, keyboard actions, bounds handling and normal dismissal.
+- Bad: retain only `node: "rule-0"`, check that the ID still exists after removal, and delete the replacement rule through the old menu.
+
+### 6. Tests Required
+
+- `canvas-workflow-actions.spec.ts`: the stale-menu regression must fail on the unchanged product with two survivors becoming one. After the fix, assert two distinct conditions/destinations, no menu, exact remapped coordinates, fresh-menu deletion and two undos restoring intermediate/original rules and positions.
+- Use `elementFromPoint` to establish the exposed node, a native right-click and keyboard Enter on inspector/menu controls. A pointer click outside the menu dismisses it first and can mask the defect. Preserve existing suite assertions and normal timeouts/retries.
+- Check node, edge and blank-board menus all consume the same derived ownership guard. Retain connection, protected-object, history/discard, suspension and responsive bounds regressions.
+- Preserve independent C13 failure/assertions and record its final-source recheck separately from developer supporting results.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```typescript
+const menu = storedMenu;
+// A surviving slot ID can now identify a different rule.
+```
+
+Correct:
+
+```typescript
+const menu = storedMenu?.draft === draft ? storedMenu : null;
+setMenu({ ...at, point: pointerOnBoard(event), node, edge, draft });
+// travelHistory clears stored menu state before onDraft(snapshot.draft).
+```
 
 ## Scenario: monitoring lists with cursors and virtual windows
 
@@ -578,15 +701,49 @@ The projection carries an opaque process instance ID, completeness flag and aggr
 ## Frontend conventions
 
 - One app entry, no client-side router. Authentication has a standalone connection
-  page; connected view state switches between Monitoring, Strategy, Provider and
-  Settings. At wide widths, center and bound the Monitoring view to 1280px,
-  Provider and Settings content to 768px, and the Strategy workspace to 1440px.
+  page; connected view state switches between Monitoring, Strategy, Suppliers
+  and Settings. Settings owns gateway access/security and the global
+  default model. Suppliers owns upstream connections/credentials and lists each
+  connection's models beneath its row. Each model has an Edit action opening the
+  unified model Dialog; discovery/import is disclosed under that same supplier.
+  There is no separate Models destination or additional record-details action.
+  At wide widths, center and bound the
+  Monitoring view to 1280px, Suppliers and Settings content to 768px, and the
+  Strategy workspace to 1440px.
   Keep the strategy shell full viewport height and preserve canvas pan, fit,
   node-size and hit-target behavior within the centered workspace.
 - Keep `App.tsx` as the state/API orchestration boundary. Extract substantial
   presentational views into view-owned components with typed props and narrowly
   scoped CSS; pass existing callbacks through rather than duplicating API,
   persistence, or request-state logic in the view.
+- Embedded model lists are keyed and filtered by the actual supplier connection
+  ID, including when two same-brand connections share an upstream model ID.
+  Preserve the shared model transaction and evidence contracts. Supplier search,
+  kind changes, preset browsing, deletion and connection editing consult the
+  aggregate dirty/pending guard before hiding model drafts. Escape from a native
+  model dialog must not invoke the enclosing supplier editor's dismissal handler.
+  Model query results, failure notices and retries stay with their request's
+  supplier; a shared manager response must not populate another group's import
+  preview. Keep all model Edit triggers reachable at 320px and restore focus to
+  their visible trigger or a visible supplier/model search fallback on close.
+- Record the model query selector at request admission, including when discovery
+  fails before producing a source response. Automatic enrichment failure uses
+  that request's upstream IDs when the initial discovery call had no explicit
+  metadata targets. Keep per-record failure flags and retries in the owning group.
+- Track the admitted model operation's provider ID and operation kind separately
+  from the broad `model` error owner. Configured-model failures appear in the
+  owning editor/group; import failures have one local alert with direct
+  configuration reload. A 409 reload preserves selection and manual edits while
+  invalidating automatic evidence and requiring review again. Both committed
+  imports and configured-model updates expose catalog-read retry only in their
+  owning supplier, without another configuration write or another group's draft
+  discard. A prior configured save must not produce a second import-error alert.
+- Native dialogs intercept Escape at keydown, prevent its browser default and
+  call the same guarded close handler used by Cancel/backdrop. Retain `cancel`
+  handling as a fallback, but do not rely on `cancel.preventDefault()` alone:
+  repeated native close requests can emit a non-cancelable event and bypass a
+  rejected close. Browser coverage must include pending save, failed save,
+  Keep editing, repeated Escape, retained draft and final discard/focus return.
 - Use progressive disclosure for dense operational detail: summarize the
   selected live session and known recorded outcome first, then keep source
   evidence and provider observations available through accessible controls.
@@ -648,9 +805,11 @@ The projection carries an opaque process instance ID, completeness flag and aggr
 ## Standalone connection and authentication admission
 
 `App.tsx` owns connection attempts, draft input, errors and unauthorized callbacks.
-`AppShell` renders the connection page exclusively while access is unresolved or
-a key is required. The dashboard header, navigation and business panels do not
-mount alongside the connection form. Presentational connection controls reuse
+`AppShell` presents only the connection page while access is unresolved or a
+key is required. Initial admission does not mount dashboard panels. After a later
+401, retain the existing workspace and drafts while hiding it and making it
+inert. Suspend native dialogs, restore them after successful reconnection and
+skip inert focus-restoration targets. Presentational connection controls reuse
 the existing palette and UI primitives; they do not own API or storage logic.
 
 `setCredential(string | null)` remains the single module-memory write path.
@@ -670,9 +829,9 @@ Preserve arbitrary API/network error text separately from those message keys.
 | --- | --- |
 | Blank key | Local error, no validation request |
 | Validation pending | Connection page stays visible, controls prevent duplicate submissions |
-| Validation succeeds | Enter the connected shell after awaited success |
+| Validation succeeds | Enter the connected shell after all required authenticated reads, including theme, finish |
 | Wrong key or failed network read | Stay on connection page with an accessible error and retry |
-| Later 401 | Clear credential, stop route activity and return to connection page |
+| Later 401 | Clear credential, suspend workspace activity, retain drafts and return to connection page |
 | No gateway key configured | Initial successful anonymous data access admits the console |
 
 `App.run(work)` catches errors and resolves `Promise<void>`. Its completion is not
@@ -680,6 +839,14 @@ proof that `work` succeeded. Authentication admission belongs inside the success
 awaited work, or a separately owned explicit success result. Do not clear
 `needsKey` unconditionally after `run` resolves or before the validation requests
 finish. Preserve the error and credential cleanup owned by unauthorized handling.
+Validation admission carries a monotonic suspension generation: work admitted
+before suspension cannot submit after reconnection, even if another component
+caused the 401. Cancel hidden requests, gestures, timers, queued validation,
+animation frames and measurements. Retain policy history and intended layout
+coordinates; pending policy writes and queued layout writes independently block
+navigation before any discard confirmation. Committed writes followed by a
+failed catalog read report that distinction and retry GET only. Keep errors with
+their originating view so a hidden failure cannot replace current feedback.
 
 Browser regressions must assert absent dashboard navigation/business panels
 during pending/failed validation, delayed and duplicate submit behavior, initial
@@ -689,6 +856,12 @@ compatibility. Inspect URL, cookies and both storage objects for synthetic-key
 absence. Cover both locales, desktop/320px and system light/dark schemes with
 computed overflow and visible keyboard focus. Static structure tests complement
 these interactions; they do not establish authentication success.
+The unchanged Settings successor harness holds default validation across a
+theme 401/reconnection and requires zero late configuration PUTs. Async boundary
+tests also cover retained drafts, cancelled hidden work and GET-only recovery.
+After a default-model revision conflict, Save/Clear remain blocked until a fresh
+configuration read succeeds; changing the selection or failing that read cannot
+restore write admission.
 
 Use portable per-test output paths for screenshots and private evidence. For
 computed button contrast, wait for active color transitions to finish and assert

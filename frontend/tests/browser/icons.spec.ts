@@ -63,13 +63,15 @@ for (const { width, locale, font } of scenarios) {
 
       const toolbar = page.getByRole("toolbar", { name: words.canvasTools });
       const tool = (name: string) => toolbar.getByRole("button", { name, exact: true });
-      for (const name of [words.canvasSelectTool, words.canvasPanTool, words.addRule, words.canvasZoomOut, words.canvasZoomIn,
+      for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasZoomOut, words.canvasZoomIn,
         words.canvasPanLeft, words.canvasPanRight, words.canvasPanUp, words.canvasPanDown]) {
         const button = tool(name);
         await expectDecorativeIcon(button, name);
         await expect(button).toHaveCSS("width", "40px");
         await expect(button).toHaveCSS("height", "40px");
       }
+      await expectDecorativeIcon(tool(words.canvasAddNode), words.canvasAddNode);
+      await expect(tool(words.canvasAddNode)).toHaveCSS("height", "40px");
       await expect(tool(words.canvasZoomReset)).toHaveText("1:1");
       await expect(tool(words.canvasZoomFit)).toHaveText(words.canvasZoomFit);
       await expect(tool(words.canvasSelectTool)).toHaveAttribute("aria-pressed", "true");
@@ -143,11 +145,12 @@ for (const { width, locale, font } of scenarios) {
       await expect(page.locator("#routing-information")).toBeVisible();
       await disclosure.click();
       await expect(page.locator("#routing-information")).toBeHidden();
-      await tool(words.addRule).click();
-      await expect(disclosure).toHaveAttribute("aria-expanded", "true");
-      await expect(page.locator(".rule-add select").first()).toBeFocused();
-
-      await page.getByRole("button", { name: words.editQuestions, exact: true }).first().click();
+      await tool(words.canvasAddNode).click();
+      const nodeMenu = page.getByRole("menu", { name: words.canvasActions });
+      await expect(nodeMenu).toBeVisible();
+      await expect(nodeMenu.getByRole("menuitem", { name: words.addRule, exact: true })).toBeEnabled();
+      await nodeMenu.getByRole("menuitem", { name: words.canvasAddQuestion, exact: true }).click();
+      await expect(disclosure).toHaveAttribute("aria-expanded", "false");
       const close = page.getByRole("button", { name: words.closeInspector, exact: true });
       await expectDecorativeIcon(close, words.closeInspector);
       await expect(close).toHaveCSS("height", "36px");

@@ -72,12 +72,14 @@ describe("layout write reconciliation", () => {
     const failed = vi.fn();
     const firstDone = queue.enqueue(layout(140), saved, failed);
     const secondDone = queue.enqueue(layout(150), saved, failed);
+    expect(queue.pending).toBe(true);
     await Promise.resolve();
     expect(write).toHaveBeenCalledTimes(1);
     first.resolve();
     await firstDone;
     expect(saved).toHaveBeenCalledWith(layout(140), false);
     expect(checkpoint).toEqual(layout(140));
+    expect(queue.pending).toBe(true);
     second.reject(new Error("second PUT failed"));
     await secondDone;
     expect(failed).toHaveBeenCalledTimes(1);

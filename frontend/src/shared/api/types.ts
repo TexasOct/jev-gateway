@@ -228,6 +228,7 @@ export type ProviderProfile = {
   has_api_key?: boolean;
   params?: Record<string, JsonValue>;
   param_env?: Record<string, string>;
+  transport_credential_presence?: Record<string, boolean>;
 };
 export type ProviderSetupField = {
   key: string;
@@ -262,32 +263,47 @@ export type ProviderConfiguration = {
 export type ImportModel = {
   provider?: string;
   upstream_model: string;
+  display_name?: string | null;
+  enabled?: boolean;
   tags?: string[];
   priority?: number;
   quality?: number;
   capabilities: { tools: boolean; vision: boolean; json_mode: boolean; reasoning: boolean; temperature: boolean; reasoning_effort: string[] };
-  cost: { input_per_million: number; output_per_million: number };
+  cost: { input_per_million: number; output_per_million: number; cache_read_per_million?: number | null; cache_write_per_million?: number | null };
   context_window: number | null;
   max_output_tokens: number | null;
   metadata?: ModelMetadata;
 };
-export type ProviderModelView = ImportModel & { name: string; provider: string; tags: string[]; api_base: string | null; provider_type: string; has_api_key: boolean; priority: number; quality: number };
+export type ProviderModelView = ImportModel & { name: string; provider: string; tags: string[]; api_base: string | null; provider_type: string; has_api_key: boolean; priority: number; quality: number; routing_overlay_fields?: ("tags" | "priority")[] };
 export type ProviderCommandResult = ProviderConfiguration & { valid: true; applied: boolean; imported: number; skipped: number };
 export type GatewayCredentialMutation = { expected_revision: string; credential: { action: "set"; value: string } };
 export type GatewayCredentialResult = ProviderConfiguration & { valid: true; applied: true };
 export type ProviderOperation =
+  | { action: "update_model"; model_id: string; model: ImportModel }
   | { action: "set_default_model"; model: string | null }
-  | { action: "upsert"; kind: ProviderKind; provider: ProviderProfile; credential: CredentialChange }
+  | { action: "upsert"; kind: ProviderKind; provider: ProviderProfile; credential: CredentialChange; transport_credentials?: Record<string, CredentialChange> }
   | { action: "delete"; kind: ProviderKind; id: string }
   | { action: "import"; provider_id: string; models: ImportModel[]; confirmed: true };
 export type ProviderMutation = { expected_revision: string; operations: ProviderOperation[] };
-export type ProviderSelector = ({ provider_id: string } | { provider: ProviderProfile }) & { credential?: CredentialChange };
+export type ProviderSelector = ({ provider_id: string } | { provider: ProviderProfile }) & { credential?: CredentialChange; transport_credentials?: Record<string, CredentialChange> };
+export type ProviderConnectionResult = {
+  provider_id: string | null;
+  status: "success" | "authentication_error" | "address_error" | "network_error" | "unsupported" | "incomplete";
+  scope: "model_listing";
+  model_count: number | null;
+  warnings: string[];
+};
 export type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue };
 export type MetadataFields = {
   input_per_million: number | null; output_per_million: number | null;
+  cache_read_per_million?: number | null; cache_write_per_million?: number | null;
   tools: boolean | null; vision: boolean | null; json_mode: boolean | null;
   reasoning: boolean | null; temperature: boolean | null; reasoning_effort: string[] | null;
   context_window: number | null; max_output_tokens: number | null;
+};
+export type InputModalityReference = {
+  value: Array<"text" | "image" | "audio" | "video" | "pdf">;
+  source_field: string;
 };
 export type CandidateSource = {
   source: string; source_provider: string; source_model: string; fetched_at: string;
@@ -295,6 +311,7 @@ export type CandidateSource = {
   fields: Record<string, { value: boolean | Array<string | null> | number | null; source_field: string; unit?: string; source_unit?: string }>;
   url?: string; schema_revision?: string; source_updated_at?: string; canonical_model_id?: string;
   source_reasoning_effort?: Array<string | null>; pricing?: ProjectedPricing;
+  input_modalities?: InputModalityReference;
 };
 export type MetadataFieldName = keyof MetadataFields;
 export type ProjectedPrice = { value: number | null; unit: "USD/M tokens" | "USD/source unit" };
@@ -315,6 +332,7 @@ export type MetadataSource = {
   provider_id?: string; model_id?: string; unit?: string; field_path?: string; source_unit?: string;
   applicable?: boolean; schema_revision?: string; canonical_model_id?: string;
   source_reasoning_effort?: Array<string | null>;
+  input_modalities?: InputModalityReference;
   fields?: Partial<Record<MetadataFieldName | "max_input_tokens" | "structured_output", { value: boolean | Array<string | null> | number | null; source_field: string; unit?: string; source_unit?: string }>>;
   pricing?: ProjectedPricing;
 };

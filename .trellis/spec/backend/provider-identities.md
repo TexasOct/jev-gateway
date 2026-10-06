@@ -11,8 +11,10 @@ transaction and credential rules remain in `provider-configuration.md`.
 `provider_presets.py` owns `PRESETS` and `provider_presets()`. The management API
 and `jev provider add PRESET` use this registry. CLI parameter options are
 `--param NAME=VALUE` and `--param-env NAME=ENV`. Frontend identity rendering and
-selection share `features/providers/icons.ts`; new-template parameter projection
-uses `initialSetupValues`, `missingSetupFields` and `setupForWrite` in `setup.ts`.
+selection share `features/providers/shared/icons.ts`; new-template parameter projection
+uses `initialSetupValues`, `missingSetupFields` and `setupForWrite` in
+`features/providers/suppliers/setup.ts`. Shared profile projection/search and
+preset ID allocation live in `features/providers/shared/profiles.ts`.
 
 ## 3. Contracts
 
@@ -41,8 +43,10 @@ sticky boolean so choosing another image works after a load failure. Generated
 SVG asset URLs must be same-origin files; force no inlining because gateway CSP
 uses `img-src 'self'` and excludes `data:`.
 
-Artwork uses pinned, unmodified SVG source bytes with per-file SHA-256, a supplier
-reference and license evidence. Retain DeepSeek's original repository attribution
+Artwork uses pinned SVG source bytes with per-file SHA-256, a supplier
+reference and license evidence. DeepSeek retains the original whale path and color,
+removes the wordmark and clips, and uses symbol-only bounds. Record both the
+original source hash and derived file hash with the extraction steps. Retain DeepSeek's original repository attribution
 and the MIT notice for Lobe Icons. Distinguish collection artwork from an official
 vendor distribution. No runtime CDN or new CSS/CSP/storage boundary is added.
 

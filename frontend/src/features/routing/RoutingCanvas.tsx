@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
+import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Hand, Minus, MousePointer2, Plus } from "lucide-react";
-import { api } from "@/shared/api/client";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Hand, Minus, MousePointer2, Plus, Undo2, Redo2 } from "lucide-react";
+import { api, ApiError } from "@/shared/api/client";
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
 import { formatRouteLabel } from "@/shared/i18n/route-label";
@@ -14,7 +16,9 @@ import { ToolButton } from "@/shared/ui/ToolButton";
 import { NODE_CARD_BASE_HEIGHT, NODE_CARD_OUTPUT_HEIGHT, NODE_CARD_WIDTH, nodeCardCenter, nodeCardPorts } from "./model/node-card";
 import { canvasDimensions, canvasOutputs } from "./model/outputs";
 import type { CanvasOutput } from "./model/outputs";
-import { workflowEdges } from "./model/draft";
+import { removeRule, invalidQuestions, incompleteLabels, workflowEdges } from "./model/draft";
+import { createEditableNode } from "./model/commands";
+import { createHistory, isTextEditing, menuPosition } from "./model/history";
 import type { RoutingDraft, WorkflowEdge } from "./model/draft";
 
 type VisualOutput = { from: string; output: CanvasOutput };
@@ -32,10 +36,13 @@ interface Props {
   onSelection: (ids: string[]) => void;
   onDraft: (draft: RoutingDraft, mutation?: RuleLayoutMutation) => void;
   onError: (message: string) => void;
-  onAddRule: () => void;
+  onUnauthorized?: () => void;
   canAddRule: boolean;
+  historyBoundary?: number;
+  discardBoundary?: number;
   onAnchor: (rect: DOMRect | null) => void;
   onDraggingChange?: (dragging: boolean) => void;
+  onLayoutDirtyChange?: (dirty: boolean) => void;
   revealNode: { id: string; serial: number } | null;
   onReveal: (id: string) => void;
   inspectorOpen: boolean;
@@ -54,7 +61,17 @@ const reasonKeys = { context: "canvasReason_context", stale: "canvasReason_stale
 function connectionReasonText(t: ReturnType<typeof useTranslation>["t"], reason: ConnectionReason) { return t(reasonKeys[reason]); }
 // The measured toolbar keeps its stable class hook; ordinary presentation is utility-styled.
 
-export default function RoutingCanvas({ heading, children, draft, config, disabled, selected, selection, onSelect, onSelection, onDraft, onAddRule, canAddRule, onAnchor, onDraggingChange, inspectorOpen, revealNode, onReveal, topology }: Props) {
+export default function RoutingCanvas({ heading, children, draft, config, disabled, selected, selection, onSelect, onSelection, onDraft, canAddRule, historyBoundary = 0, discardBoundary = 0, onAnchor, onDraggingChange, onLayoutDirtyChange, inspectorOpen, revealNode, onReveal, topology, onUnauthorized }: Props) {
+  const active = useWorkspaceActive();
+  const requestAnimationFrame = useWorkspaceFrames(active);
+  const activeRef = useRef(active);
+  const activityGeneration = useRef(0);
+  useLayoutEffect(() => {
+    if (!active) ++activityGeneration.current;
+    activeRef.current = active;
+    const generation = activityGeneration;
+    return () => { activeRef.current = false; ++generation.current; };
+  }, [active]);
   const { t } = useTranslation();
   const [layout, setLayout] = useState<CanvasLayout>(emptyLayout);
   const [zoom, setZoom] = useState(1);
@@ -70,7 +87,24 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const activeIntent = activeConnection?.intent ?? null;
   const [intentDraft, setIntentDraft] = useState<RoutingDraft | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  useEffect(() => { onLayoutDirtyChange?.(layoutSaving); }, [layoutSaving, onLayoutDirtyChange]);
   const [loaded, setLoaded] = useState(false);
+  const [readRetry, setReadRetry] = useState(0);
+  const trustedLayout = useRef(false);
+  const [storedMenu, setMenu] = useState<{ x: number; y: number; point: Position; node?: string; edge?: WorkflowEdge; draft: RoutingDraft } | null>(null);
+  const menu = storedMenu?.draft === draft ? storedMenu : null;
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuOrigin = useRef<HTMLElement | SVGElement | null>(null);
+  type Snapshot = { draft: RoutingDraft; nodes: CanvasLayout["nodes"]; selected: string; selection: string[] };
+  const history = useRef(createHistory<Snapshot>((a, b) => JSON.stringify([a.draft, a.nodes]) === JSON.stringify([b.draft, b.nodes])));
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const [historyAvailability, setHistoryAvailability] = useState({ undo: false, redo: false });
+  const restoringHistory = useRef(false);
+  const historyBoundaryRef = useRef(historyBoundary);
+  const discardBoundaryRef = useRef(discardBoundary);
+  const baselineDraft = useRef(draft);
+  const baselineNodes = useRef<CanvasLayout["nodes"] | null>(null);
   const dragEdge = useRef<{ intent: ConnectionIntent; visual: VisualOutput; draft: RoutingDraft; start: Position; moved: boolean; pointerId: number } | null>(null);
   const connectionDraft = useRef<RoutingDraft | null>(null);
   const connectionOrigin = useRef<HTMLElement | SVGElement | null>(null);
@@ -110,6 +144,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     return true;
   };
   const measureChrome = useCallback(() => {
+    if (!activeRef.current) return;
     const canvas = surface.current;
     if (!canvas) return;
     const viewport = canvas.getBoundingClientRect();
@@ -130,6 +165,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     }
   }, []);
   const reportAnchor = useCallback(() => {
+    if (!activeRef.current) return;
     if (dragNode.current?.moved) return;
     measureChrome();
     const canvas = surface.current;
@@ -141,6 +177,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     onAnchor(inspectorOpen && selection.length <= 1 && rect && available && rect.right > available.left && rect.left < available.right && rect.bottom > available.top && rect.top < available.bottom ? rect : null);
   }, [inspectorOpen, measureChrome, onAnchor, selected, selection.length]);
   useEffect(() => {
+    if (!active) return;
     const viewport = surface.current;
     const observer = new ResizeObserver(reportAnchor);
     if (viewport) observer.observe(viewport);
@@ -153,19 +190,65 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     window.visualViewport?.addEventListener("scroll", reportAnchor);
     const frame = requestAnimationFrame(reportAnchor);
     return () => { cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", reportAnchor); window.removeEventListener("scroll", reportAnchor, true); window.visualViewport?.removeEventListener("resize", reportAnchor); window.visualViewport?.removeEventListener("scroll", reportAnchor); };
-  }, [reportAnchor, zoom, layout, selected]);
+  }, [active, reportAnchor, zoom, layout, selected, requestAnimationFrame]);
   const suppressClick = useRef(false);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const layoutRef = useRef(layout);
   const savedLayout = useRef(layout);
-  const layoutWrites = useRef(createLayoutWriteQueue((next) => api.saveCanvasLayout(next)));
+  const layoutInFlight = useRef(false);
+  const unauthorizedRef = useRef(onUnauthorized);
+  useLayoutEffect(() => { unauthorizedRef.current = onUnauthorized; }, [onUnauthorized]);
+  const writeLayout = useCallback(async (next: CanvasLayout) => {
+    if (!activeRef.current || !trustedLayout.current) return;
+    const generation = activityGeneration.current;
+    const current = () => activeRef.current && generation === activityGeneration.current;
+    layoutInFlight.current = true;
+    try { await api.saveCanvasLayout(next); if (current()) savedLayout.current = next; }
+    catch (caught) {
+      if (current() && caught instanceof ApiError && caught.status === 401) unauthorizedRef.current?.();
+      throw caught;
+    } finally {
+      layoutInFlight.current = false;
+      if (aliveRef.current && current()) setLayoutSaving(layoutWrites.current.pending);
+    }
+  }, []);
+  const layoutWrites = useRef(createLayoutWriteQueue(api.saveCanvasLayout));
+  useLayoutEffect(() => { layoutWrites.current = createLayoutWriteQueue(writeLayout); }, [writeLayout]);
   const aliveRef = useRef(true);
+  useEffect(() => {
+    if (active) return;
+    layoutWrites.current.invalidate();
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = null;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+    if (viewportRestoreFrame.current !== null) cancelAnimationFrame(viewportRestoreFrame.current);
+    if (dragEndFrame.current !== null) cancelAnimationFrame(dragEndFrame.current);
+    viewportRestoreFrame.current = null; dragEndFrame.current = null;
+    restoringViewport.current = false;
+    const drag = dragNode.current;
+    dragNode.current = null;
+    if (drag) {
+      layoutRef.current = drag.layout;
+      if (drag.target.hasPointerCapture(drag.pointerId)) drag.target.releasePointerCapture(drag.pointerId);
+    }
+    dragEdge.current = null; panDrag.current = null; marqueeRef.current = null;
+    dragScrollLock.current = null; connectionDraft.current = null;
+    void Promise.resolve().then(() => {
+      setLayout(layoutRef.current); setLayoutSaving(layoutInFlight.current); setMenu(null); setMarquee(null);
+      setActiveConnection(null); setIntentDraft(null); setEdgePointer(null);
+      setDraggingNodes([]); setDragPosition(null); draggingChangeRef.current?.(false);
+    });
+  }, [active]);
   const restoreViewport = useCallback((saved: Position) => {
+    if (!activeRef.current) return;
     restoringViewport.current = true;
     if (viewportRestoreFrame.current !== null) cancelAnimationFrame(viewportRestoreFrame.current);
     viewportRestoreFrame.current = requestAnimationFrame(() => {
+      if (!activeRef.current) return;
       measureChrome();
       viewportRestoreFrame.current = requestAnimationFrame(() => {
+        if (!activeRef.current) return;
         const canvas = surface.current;
         if (canvas) {
           const next = restoreCanvasViewport(saved, zoomRef.current, viewportReference(canvas, originY.current));
@@ -175,23 +258,29 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
         viewportRestoreFrame.current = requestAnimationFrame(() => { restoringViewport.current = false; viewportRestoreFrame.current = null; });
       });
     });
-  }, [measureChrome]);
+  }, [measureChrome, requestAnimationFrame]);
 
   useEffect(() => {
     let alive = true;
     const writes = layoutWrites.current;
     aliveRef.current = true;
+    if (!active) return () => { aliveRef.current = false; };
+    const generation = activityGeneration.current;
+    const current = () => alive && activeRef.current && generation === activityGeneration.current;
+    trustedLayout.current = false;
+    queueMicrotask(() => { if (current()) setLoaded(false); });
     void api.canvasLayout().then((loaded) => {
-      if (!alive) return;
-      if (validLayout(loaded)) {
+      if (!current()) return;
+      if (validLayout(loaded) && !loaded.read_error) {
+        trustedLayout.current = true;
         layoutRef.current = loaded;
         savedLayout.current = loaded;
         setLayout(loaded);
-        setLayoutError(loaded.read_error ? "unreadable" : null);
+        setLayoutError(null);
         restoreViewport(loaded.viewport);
-      } else setLayoutError("unreadable");
-      setLoaded(true);
-    }).catch((error: unknown) => { if (alive) { setLayoutError(error instanceof Error ? error.message : String(error)); setLoaded(true); } });
+        setLoaded(true);
+      } else { setLayoutError("unreadable"); setLoaded(false); }
+    }).catch((error: unknown) => { if (current()) { if (error instanceof ApiError && error.status === 401) unauthorizedRef.current?.(); setLayoutError(error instanceof Error ? error.message : String(error)); setLoaded(false); } });
     return () => {
       alive = false;
       aliveRef.current = false;
@@ -208,7 +297,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
         if (drag.moved) draggingChangeRef.current?.(false);
       }
     };
-  }, [restoreViewport]);
+  }, [active, readRetry, restoreViewport]);
 
   const nodes = useMemo(() => [
     { id: "questions", text: t("questions") },
@@ -226,7 +315,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const positions = useMemo(() => Object.fromEntries(nodes.map((node) => [node.id, layout.nodes[node.id] ?? defaults[node.id]!])) as Record<string, Position>, [nodes, layout.nodes, defaults]);
   const boardWidth = Math.max(BOARD_WIDTH, ...Object.entries(positions).map(([id, at]) => at.x + dimensions[id]!.width + 20));
   const boardHeight = Math.max(BOARD_HEIGHT, ...Object.entries(positions).map(([id, at]) => at.y + dimensions[id]!.height + 29));
-  const canEdit = loaded && !disabled;
+  const canEdit = active && loaded && !disabled;
   const canConnect = canEdit && tool === "select";
 
   const clearNodeGesture = (cancel: boolean) => {
@@ -253,18 +342,24 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     clearNodeGesture(true);
     layoutRef.current = savedLayout.current;
     setLayout(savedLayout.current);
+    setLayoutSaving(layoutWrites.current.pending);
     restoreViewport(savedLayout.current.viewport);
   };
   const persistRef = useRef<(next: CanvasLayout) => void>(() => undefined);
   const persist = (next: CanvasLayout) => {
-    if (!canEdit) return;
+    if (!canEdit || !activeRef.current || !trustedLayout.current) return;
+    const generation = activityGeneration.current;
+    const current = () => aliveRef.current && activeRef.current && generation === activityGeneration.current && trustedLayout.current;
+    setLayoutSaving(true);
     // read_error describes a failed GET; it is never part of a layout PUT.
     const writable: CanvasLayout = { version: 1, nodes: next.nodes, viewport: next.viewport };
     void layoutWrites.current.enqueue(writable, (writable, latest) => {
+      if (!current()) return;
       savedLayout.current = writable;
-      if (aliveRef.current && latest) setLayoutError(null);
+      if (aliveRef.current && latest) { setLayoutError(null); setLayoutSaving(scrollTimer.current !== null || !!dragNode.current?.moved); }
     }, (error: unknown) => {
-      if (aliveRef.current) {
+      if (current()) {
+        setLayoutSaving(false);
         rollbackLayout();
         setLayoutError(error instanceof Error ? error.message : String(error));
       }
@@ -273,13 +368,118 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const appliedTopology = useRef(0);
   useEffect(() => { persistRef.current = persist; });
   useEffect(() => {
-    if (!loaded || !topology || topology.serial === appliedTopology.current) return;
+    if (!active || !loaded || !topology || topology.serial === appliedTopology.current) return;
     appliedTopology.current = topology.serial;
     const nodes = reconcileRuleLayout(layoutRef.current.nodes, topology.mutation);
     const next = { ...layoutRef.current, nodes };
     layoutRef.current = next;
-    queueMicrotask(() => { if (aliveRef.current) { setLayout(next); persistRef.current(next); } });
-  }, [loaded, topology]);
+    const generation = activityGeneration.current;
+    queueMicrotask(() => { if (aliveRef.current && activeRef.current && generation === activityGeneration.current) { setLayout(next); persistRef.current(next); } });
+  }, [active, loaded, topology]);
+  useEffect(() => {
+    if (!active || !loaded || dragNode.current?.moved) return;
+    if (discardBoundaryRef.current !== discardBoundary) {
+      discardBoundaryRef.current = discardBoundary;
+      if (baselineNodes.current) {
+        const next = { ...layoutRef.current, nodes: baselineNodes.current };
+        layoutRef.current = next;
+        const generation = activityGeneration.current;
+        queueMicrotask(() => { if (aliveRef.current && activeRef.current && generation === activityGeneration.current) { setLayout(next); persistRef.current(next); } });
+      }
+    }
+    const snapshot = { draft, nodes: layoutRef.current.nodes, selected, selection };
+    if (historyBoundaryRef.current !== historyBoundary) {
+      historyBoundaryRef.current = historyBoundary;
+      history.current.reset(snapshot);
+      baselineDraft.current = draft;
+      baselineNodes.current = snapshot.nodes;
+    } else if (restoringHistory.current) restoringHistory.current = false;
+    else history.current.record(snapshot);
+    if (baselineNodes.current === null || JSON.stringify(draft) === JSON.stringify(baselineDraft.current)) baselineNodes.current = snapshot.nodes;
+    const generation = activityGeneration.current;
+    queueMicrotask(() => { if (aliveRef.current && activeRef.current && generation === activityGeneration.current) { setHistoryRevision((value) => value + 1); setHistoryAvailability({ undo: history.current.canUndo, redo: history.current.canRedo }); } });
+  }, [active, draft, layout.nodes, loaded, selected, selection, historyBoundary, discardBoundary]);
+  useEffect(() => {
+    if (!active || !menu) return;
+    const origin = menuOrigin.current;
+    menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+    const boundMenu = () => {
+      const element = menuRef.current; if (!element) return;
+      const view = window.visualViewport;
+      const width = view?.width ?? window.innerWidth, height = view?.height ?? window.innerHeight;
+      const left = view?.offsetLeft ?? 0, top = view?.offsetTop ?? 0;
+      element.style.maxWidth = `${Math.max(0, width - 16)}px`;
+      element.style.maxHeight = `${Math.max(0, height - 16)}px`;
+      const at = menuPosition({ x: menu.x - left, y: menu.y - top }, { width, height }, { width: element.offsetWidth, height: element.offsetHeight });
+      element.style.left = `${at.x + left}px`; element.style.top = `${at.y + top}px`;
+    };
+    boundMenu(); window.addEventListener("resize", boundMenu);
+    window.visualViewport?.addEventListener("resize", boundMenu);
+    window.visualViewport?.addEventListener("scroll", boundMenu);
+    const dismiss = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) { setMenu(null); origin?.focus({ preventScroll: true }); } };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setMenu(null); origin?.focus({ preventScroll: true }); } };
+    document.addEventListener("pointerdown", dismiss, true);
+    document.addEventListener("keydown", escape, true);
+    return () => { document.removeEventListener("pointerdown", dismiss, true); document.removeEventListener("keydown", escape, true); window.removeEventListener("resize", boundMenu); window.visualViewport?.removeEventListener("resize", boundMenu); window.visualViewport?.removeEventListener("scroll", boundMenu); };
+  }, [active, menu]);
+  const travelHistory = (redo: boolean) => {
+    if (!canEdit || dragNode.current || dragEdge.current) return;
+    const snapshot = redo ? history.current.redo() : history.current.undo();
+    if (!snapshot) return;
+    restoringHistory.current = true;
+    cancelConnection(); setMenu(null);
+    const next = { ...layoutRef.current, nodes: snapshot.nodes };
+    layoutRef.current = next; setLayout(next); persist(next);
+    onDraft(snapshot.draft);
+    if (snapshot.selection.length > 1) onSelection(snapshot.selection);
+    else if (snapshot.selected) onSelect(snapshot.selected);
+    else onSelection([]);
+    setHistoryRevision((value) => value + 1);
+    setHistoryAvailability({ undo: history.current.canUndo, redo: history.current.canRedo });
+  };
+  const openMenu = (event: { clientX: number; clientY: number; preventDefault: () => void; stopPropagation: () => void }, node?: string, edge?: WorkflowEdge) => {
+    event.preventDefault(); event.stopPropagation();
+    if (dragNode.current || dragEdge.current || panDrag.current || marqueeRef.current) return;
+    menuOrigin.current = document.activeElement as HTMLElement | SVGElement | null;
+    cancelConnection();
+    if (node) onSelect(node);
+    const at = menuPosition({ x: event.clientX, y: event.clientY }, { width: window.innerWidth, height: window.innerHeight }, { width: 252, height: 240 });
+    setMenu({ ...at, point: pointerOnBoard(event), node, edge, draft });
+  };
+  const addNode = (kind: "rule" | "question") => {
+    if (!canEdit || !menu) return;
+    const created = createEditableNode(draft, config, kind);
+    if (!created) return;
+    if (kind === "question") {
+      onDraft(created.draft);
+      onSelect("questions", true); onReveal("questions");
+    } else {
+      if (!canAddRule) return;
+      const id = created.id;
+      const at = { x: Math.round(Math.max(0, Math.min(9700, menu.point.x))), y: Math.round(Math.max(0, Math.min(9700, menu.point.y))) };
+      if (!Object.hasOwn(layoutRef.current.nodes, id) && Object.keys(layoutRef.current.nodes).length >= 256) { setFeedback(t("canvasLayoutFull")); return; }
+      const nextLayout = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, [id]: at } };
+      layoutRef.current = nextLayout; setLayout(nextLayout); persist(nextLayout);
+      onDraft(created.draft); onSelect(id, true); onReveal(id);
+    }
+    setMenu(null);
+  };
+  const deleteNode = (id: string) => {
+    if (!canEdit) return;
+    if (!/^rule-\d+$/.test(id)) { setFeedback(t("canvasProtectedNode")); return; }
+    const index = Number(id.slice(5));
+    const next = removeRule(draft, index);
+    if (next !== draft) { onDraft(next, { kind: "remove", index }); onSelection([]); surface.current?.focus({ preventScroll: true }); }
+    setMenu(null);
+  };
+  const deleteSelection = () => {
+    const indices = selection.filter((id) => /^rule-\d+$/.test(id)).map((id) => Number(id.slice(5))).sort((a, b) => b - a);
+    if (!indices.length) { setFeedback(t("canvasProtectedNode")); return; }
+    const next = indices.reduce((current, index) => removeRule(current, index), draft);
+    onDraft(next, { kind: "remove-many", indices });
+    onSelection([]); surface.current?.focus({ preventScroll: true });
+    if (indices.length !== selection.length) setFeedback(t("canvasProtectedNode"));
+  };
   const moveGroup = (ids: string[], starts: Record<string, Position>, delta: Position, save: boolean) => {
     const additions = ids.filter((id) => !Object.hasOwn(layoutRef.current.nodes, id)).length;
     if (Object.keys(layoutRef.current.nodes).length + additions > 256) { setLayoutError(t("canvasLayoutFull")); return; }
@@ -323,6 +523,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (!drag.moved && !crossedDragThreshold(start, current)) return;
     if (!drag.moved) {
       drag.moved = true;
+      setLayoutSaving(true);
       setDraggingNodes(Object.keys(drag.start));
       onDraggingChange?.(true);
       if (scrollTimer.current) { clearTimeout(scrollTimer.current); scrollTimer.current = null; }
@@ -352,7 +553,17 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (!drag.moved) return;
     if (cancel || !drag.changed) {
       layoutRef.current = drag.layout; setLayout(drag.layout);
-    } else persist(layoutRef.current);
+      // Starting a drag absorbs a pending viewport debounce. Cancel must still save that
+      // pre-drag viewport, and supersede any older queued revision with its restored snapshot.
+      if (layoutWrites.current.pending || JSON.stringify(drag.layout) !== JSON.stringify(savedLayout.current)) persist(drag.layout);
+      else setLayoutSaving(false);
+    } else {
+      persist(layoutRef.current);
+      history.current.record({ draft, nodes: layoutRef.current.nodes, selected, selection });
+      if (JSON.stringify(draft) === JSON.stringify(baselineDraft.current)) baselineNodes.current = layoutRef.current.nodes;
+      setHistoryRevision((value) => value + 1);
+      setHistoryAvailability({ undo: history.current.canUndo, redo: history.current.canRedo });
+    }
     if (dragEndFrame.current !== null) cancelAnimationFrame(dragEndFrame.current);
     dragEndFrame.current = requestAnimationFrame(() => { dragEndFrame.current = null; reportAnchor(); });
   };
@@ -504,8 +715,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   };
   const revealedSerial = useRef(0);
   useEffect(() => {
-    if (!loaded || !revealNode || revealNode.serial === revealedSerial.current || !positions[revealNode.id]) return;
+    if (!active || !loaded || !revealNode || revealNode.serial === revealedSerial.current || !positions[revealNode.id]) return;
     const frame = requestAnimationFrame(() => {
+      if (!activeRef.current) return;
       const viewport = surface.current;
       if (!viewport || dragNode.current) return;
       revealedSerial.current = revealNode.serial;
@@ -523,8 +735,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       reportAnchor();
     });
     return () => cancelAnimationFrame(frame);
-  }, [loaded, revealNode, positions, dimensions, zoom, reportAnchor, inspectorOpen, draggingNodes.length]);
+  }, [active, loaded, revealNode, positions, dimensions, zoom, reportAnchor, inspectorOpen, draggingNodes.length, requestAnimationFrame]);
   const fitBoard = () => {
+    if (!activeRef.current) return;
     if (dragNode.current) stopNode(dragNode.current.pointerId, true);
     const viewport = surface.current;
     if (!viewport || !nodes.length) return;
@@ -541,7 +754,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     zoomRef.current = plan.zoom;
     setZoom(plan.zoom);
     const fitPageScroll = () => {
-      if (!aliveRef.current || dragNode.current) { restoringViewport.current = false; return; }
+      if (!aliveRef.current || !activeRef.current || dragNode.current) { restoringViewport.current = false; return; }
       const bounds = viewport.getBoundingClientRect();
       const visible = canvasAvailableRect(viewport);
       viewport.scrollLeft = Math.max(0, plan.scroll.x - (visible ? visible.left - bounds.left : 0));
@@ -568,9 +781,33 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     const destination = output.edge?.to;
     return `${source} · ${outputName(output)}${destination ? ` → ${nodes.find((node) => node.id === destination)?.text ?? destination}` : ""}`;
   };
-  return <section className="canvas-section absolute inset-0 min-w-0" aria-label={t("routingCanvas")}>
+  const nodeState = (id: string) => {
+    if (id === "questions" && invalidQuestions(draft).length) return "invalid";
+    if (incompleteLabels(draft, config).some((item) => item === id)) return "incomplete";
+    return selected === id || selection.includes(id) ? "selected" : "normal";
+  };
+  return <section className="canvas-section absolute inset-0 min-w-0" aria-label={t("routingCanvas")} data-history-revision={historyRevision} onKeyDown={(event) => {
+    if (isTextEditing(event.target) || disabled || menu) return;
+    const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && (key === "z" || key === "y")) { event.preventDefault(); event.stopPropagation(); travelHistory(key === "y" || event.shiftKey); return; }
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault(); event.stopPropagation();
+      if (activeConnection?.intent.kind === "reconnect") removeEdge(activeConnection.intent.edge);
+      else if (selection.length > 1) deleteSelection();
+      else { const focused = event.target instanceof Element ? event.target.closest("[data-canvas-node]")?.getAttribute("data-canvas-node") : null; if (focused || selected) deleteNode(focused || selected); }
+    }
+  }}>
+    {menu && <div ref={menuRef} role="menu" aria-label={t("canvasActions")} className="fixed z-50 grid w-[252px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)] gap-1 overflow-auto rounded-lg border border-outline bg-panel p-2 text-sm text-ink shadow-lg [&_button]:min-h-10 [&_button]:rounded-md [&_button]:px-2 [&_button]:text-start [&_button:hover]:bg-panel-muted [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-primary" style={{ left: menu.x, top: menu.y }} onKeyDown={(event) => {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault(); const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      items[event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+    }}>
+      {menu.node ? <><button role="menuitem" type="button" onClick={() => { onReveal(menu.node!); setMenu(null); }}>{t("canvasOpenDetails")}</button><button role="menuitem" type="button" disabled={!canEdit || !menu.node.startsWith("rule-")} onClick={() => deleteNode(menu.node!)}>{t("remove")}</button>{!menu.node.startsWith("rule-") && <p className="p-2 text-xs text-ink-muted">{t("canvasProtectedNode")}</p>}</> : menu.edge ? <><button role="menuitem" type="button" onClick={(event) => { openConnection({ kind: "reconnect", edge: menu.edge! }, event.currentTarget); setMenu(null); }}>{t("canvasReconnect")}</button><button role="menuitem" type="button" disabled={!canEdit || !!classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason} onClick={() => { removeEdge(menu.edge!); setMenu(null); }}>{t("canvasDisconnect")}</button>{(() => { const reason = classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason; return reason ? <p className="p-2 text-xs text-ink-muted">{connectionReasonText(t, reason)}</p> : null; })()}</> : <><span className="px-2 py-1 text-xs text-ink-muted">{t("canvasAddNode")}</span><button role="menuitem" type="button" disabled={!canEdit || !canAddRule} onClick={() => addNode("rule")}>{t("addRule")}</button><button role="menuitem" type="button" disabled={!canEdit} onClick={() => addNode("question")}>{t("canvasAddQuestion")}</button><p className="px-2 text-xs text-ink-muted">{t("canvasQuestionEntry")}</p></>}
+    </div>}
     <div className="workspace-chrome absolute left-3 right-3 top-3 z-[9] pointer-events-none [&>*]:pointer-events-auto" data-canvas-occlusion="top">
     {heading}
+    <p className="min-h-4 truncate text-xs text-ink-muted" role="status" title={layoutSaving ? t("canvasSavingLayout") : t("canvasLayoutOnly")}>{!loaded ? t("loading") : layoutSaving ? t("canvasSavingLayout") : t("canvasLayoutOnly")}</p>
     {intent && <div ref={panelRef} className="canvas-connection-panel flex max-h-52 flex-wrap items-end gap-2 overflow-auto rounded-lg border border-primary bg-panel p-3 text-sm text-ink shadow-lg" role="region" aria-label={t("canvasConnectionActions")} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConnection(); } }}>
       <p className="w-full break-words text-xs text-ink-muted">{activeConnection?.visual ? outputDescription(activeConnection.visual) : intent.kind === "reconnect" || intent.kind === "remove" ? edgeDescription(intent.edge) : `${nodes.find((node) => node.id === intent.from)?.text ?? intent.from} · ${t(intent.kind === "new-match" ? "match" : "canvasAddPoolEdge")}`}</p>
       {intentStale ? <p role="status">{t("canvasReason_stale")}</p> : !canConnect ? <p role="status">{t("canvasReadOnly")}</p> : <>
@@ -583,7 +820,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       </>}
       <Button variant="outline" type="button" onClick={cancelConnection}>{t("cancel")}</Button>
     </div>}
-    {layoutError && <p className="notice warn" role="status">{layoutError === "unreadable" ? t("canvasLayoutUnreadable") : layoutError}{canEdit && <button type="button" onClick={() => { setLayoutError(null); persist(layoutRef.current); }}>{t("canvasRetryLayout")}</button>}{loaded && <button type="button" onClick={discardLayout}>{t("canvasDiscardLayout")}</button>}</p>}
+    {layoutError && <p className="notice warn" role="status">{layoutError === "unreadable" ? t("canvasLayoutUnreadable") : layoutError}{active && !loaded && <button type="button" onClick={() => setReadRetry((value) => value + 1)}>{t("canvasRetryLayoutRead")}</button>}{canEdit && <button type="button" onClick={() => { setLayoutError(null); persist(layoutRef.current); }}>{t("canvasRetryLayout")}</button>}{loaded && <button type="button" onClick={discardLayout}>{t("canvasDiscardLayout")}</button>}</p>}
     {feedback && <p className="notice warn" role="status">{feedback}</p>}
     {pointerReason && <p className="notice" role="status">{connectionReasonText(t, pointerReason)}</p>}
     {fitMode && <div className="meta" role="status">{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</div>}
@@ -599,7 +836,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     }}>
       <Button variant={tool === "select" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasSelectTool")} aria-label={t("canvasSelectTool")} aria-pressed={tool === "select"} onClick={() => chooseTool("select")}><MousePointer2 aria-hidden="true" focusable="false" /></Button>
       <Button variant={tool === "pan" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasPanTool")} aria-label={t("canvasPanTool")} aria-pressed={tool === "pan"} onClick={() => chooseTool("pan")}><Hand aria-hidden="true" focusable="false" /></Button>
-      <Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" title={t("addRule")} aria-label={t("addRule")} disabled={disabled || !canAddRule} onClick={onAddRule}><Plus aria-hidden="true" focusable="false" /></Button>
+      <Button variant="outline" className="min-h-10" type="button" aria-label={t("canvasAddNode")} disabled={!canEdit} onClick={(event) => { const rect = surface.current && canvasAvailableRect(surface.current); if (rect) openMenu({ clientX: (rect.left + rect.right) / 2, clientY: (rect.top + rect.bottom) / 2, preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }); }}><Plus aria-hidden="true" focusable="false" />{t("canvasAddNode")}</Button>
+      <Button variant="outline" size="icon" type="button" aria-label={t("canvasUndo")} disabled={!canEdit || !historyAvailability.undo} onClick={() => travelHistory(false)}><Undo2 aria-hidden="true" /></Button>
+      <Button variant="outline" size="icon" type="button" aria-label={t("canvasRedo")} disabled={!canEdit || !historyAvailability.redo} onClick={() => travelHistory(true)}><Redo2 aria-hidden="true" /></Button>
       <ToolButton type="button" disabled={!canEdit} onClick={() => saveArrangement(defaults)}>{t("canvasArrangeAll")}</ToolButton>
       <ToolButton type="button" disabled={!canEdit || selectedCount < 2} onClick={() => saveArrangement(alignNodes(positions, selection, "x"))}>{t("canvasAlignLeft")}</ToolButton>
       <ToolButton type="button" disabled={!canEdit || selectedCount < 2} onClick={() => saveArrangement(alignNodes(positions, selection, "y"))}>{t("canvasAlignTop")}</ToolButton>
@@ -607,6 +846,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       <div className="canvas-pan flex gap-[0.3rem] max-[600px]:flex-nowrap max-[600px]:gap-[0.2rem]" role="group" aria-label={t("canvasPan")}><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(-1, 0)} aria-label={t("canvasPanLeft")}><ArrowLeft aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(1, 0)} aria-label={t("canvasPanRight")}><ArrowRight aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(0, -1)} aria-label={t("canvasPanUp")}><ArrowUp aria-hidden="true" focusable="false" /></Button><Button variant="outline" size="icon" className="min-h-10 min-w-10" type="button" onClick={() => pan(0, 1)} aria-label={t("canvasPanDown")}><ArrowDown aria-hidden="true" focusable="false" /></Button></div>
     </div>
     <div className={`routing-canvas-scroll absolute inset-0 max-w-full min-h-0 overflow-auto overscroll-contain [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${tool === "pan" ? "tool-pan" : "tool-select"}`} ref={surface} tabIndex={0} aria-label={t("routingCanvas")}
+      onContextMenu={(event) => { if (event.target instanceof Element && event.target.closest("[data-canvas-node], [data-canvas-input], [data-canvas-output], [data-canvas-edge]")) return; openMenu(event); }}
       onPointerDown={(event) => { if (event.button !== 0 || marqueeRef.current) return; if (event.target instanceof Element && event.target.closest("[data-canvas-node], [data-canvas-input], [data-canvas-output], [data-canvas-edge]")) return; if (tool === "pan") { panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }; event.currentTarget.setPointerCapture(event.pointerId); return; } if (intent) return; const point = pointerOnBoard(event); marqueeRef.current = { pointerId: event.pointerId, start: point, end: point, additive: event.shiftKey }; event.currentTarget.setPointerCapture(event.pointerId); setMarquee({ start: point, end: point }); }}
       onPointerMove={(event) => { const drag = panDrag.current; if (drag?.pointerId === event.pointerId) { event.currentTarget.scrollLeft = drag.left + drag.x - event.clientX; event.currentTarget.scrollTop = drag.top + drag.y - event.clientY; return; } if (!marqueeRef.current || marqueeRef.current.pointerId !== event.pointerId || !event.currentTarget.hasPointerCapture(event.pointerId)) return; const point = pointerOnBoard(event); marqueeRef.current.end = point; setMarquee({ start: marqueeRef.current.start, end: point }); }}
       onPointerUp={(event) => { if (panDrag.current?.pointerId === event.pointerId) { panDrag.current = null; return; } const current = marqueeRef.current; if (!current || current.pointerId !== event.pointerId) return; const found = marqueeNodes(current.start, current.end, positions, dimensions); const next = current.additive ? [...new Set([...selection.filter((id) => Object.hasOwn(positions, id)), ...found])] : found; onSelection(next); marqueeRef.current = null; setMarquee(null); }}
@@ -617,19 +857,22 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
           if (intent || dragEdge.current) { event.preventDefault(); event.stopPropagation(); cancelConnection(); return; }
           onSelection([]); return;
         }
-        const editing = event.target instanceof Element && !!event.target.closest("input, textarea, select, [contenteditable='true']");
+        const editing = isTextEditing(event.target);
         const next = canvasToolShortcut(event.key, editing, event.altKey || event.ctrlKey || event.metaKey || event.shiftKey);
         if (next) { event.preventDefault(); chooseTool(next); }
       }}
       onScroll={(event) => {
+        if (!activeRef.current) return;
         if (holdNodeScroll(event.currentTarget)) return;
         reportAnchor();
         if (!canEdit || restoringViewport.current || layoutError === "unreadable") return;
         const viewport = canonicalViewport({ x: event.currentTarget.scrollLeft, y: event.currentTarget.scrollTop }, zoomRef.current, viewportReference(event.currentTarget, originY.current));
         const next = { ...layoutRef.current, viewport };
         layoutRef.current = next;
+        // This viewport change is unsaved during the debounce interval as well as during its PUT.
+        setLayoutSaving(true);
         if (scrollTimer.current) clearTimeout(scrollTimer.current);
-        scrollTimer.current = setTimeout(() => persist(layoutRef.current), 450);
+        scrollTimer.current = setTimeout(() => { scrollTimer.current = null; persist(layoutRef.current); }, 450);
       }}>
       <div className="routing-canvas-board relative min-h-full overflow-clip bg-panel bg-[radial-gradient(var(--border)_0.9px,transparent_0.9px)] bg-[length:20px_20px]" style={{ width: boardWidth * zoom, height: `calc(${boardHeight * zoom}px + var(--canvas-origin-y, 0px) + var(--canvas-end-space, 0px))` }}><div className="routing-canvas-content absolute left-0 top-[var(--canvas-origin-y,0px)]" style={{ width: boardWidth, height: boardHeight, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
         <svg className="routing-canvas-lines pointer-events-none absolute inset-0 text-ink-muted" width={boardWidth} height={boardHeight} pointerEvents="none">
@@ -646,9 +889,10 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
             return <g key={`${edge.from}:${output.id}`}>
               <path data-workflow-edge={edge.kind} d={path} fill="none" stroke={chosen ? "var(--accent)" : "currentColor"} strokeWidth={chosen ? 3 : 2} strokeDasharray={edge.kind === "unmatched" || edge.kind === "default" ? "6 5" : undefined} markerEnd="url(#canvas-arrow)" />
               {edge.kind === "default" && <text x={(sx + tx) / 2} y={(sy + ty) / 2 - 8} className="fill-ink-muted text-xs" pointerEvents="none">{defaultPath}</text>}
-              {edge.kind !== "default" && <path data-canvas-edge={JSON.stringify([edge.from, output.id, edge.to])} data-edge-kind={edge.kind} data-edge-from={edge.from} data-edge-to={edge.to}
+              {<path data-canvas-edge={JSON.stringify([edge.from, output.id, edge.to])} data-edge-kind={edge.kind} data-edge-from={edge.from} data-edge-to={edge.to}
                 d={path} fill="none" stroke="transparent" strokeWidth="16" className="cursor-pointer [pointer-events:stroke] focus-visible:stroke-primary/30" role="button" tabIndex={0}
                 aria-label={`${t("canvasSelectConnection")}: ${outputName(output)} · ${edgeDescription(edge)}`} aria-pressed={chosen}
+                onContextMenu={(event) => openMenu(event, undefined, edge)}
                 onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (tool === "select") openConnection(output.intent, event.currentTarget, { from: edge.from, output }); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openConnection(output.intent, event.currentTarget, { from: edge.from, output }); } }} />}
             </g>;
@@ -656,9 +900,11 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
           {edgePointer && <circle cx={edgePointer.x} cy={edgePointer.y} r="7" className="canvas-edge-preview pointer-events-none fill-primary opacity-75" />}
         </svg>
         {nodes.map(({ id, text }) => <button key={id} type="button" data-canvas-node={id} data-node-kind={getCanvasNodeKind(id)}
+          data-node-state={nodeState(id)} aria-invalid={nodeState(id) === "invalid" || nodeState(id) === "incomplete" || undefined}
+          onContextMenu={(event) => openMenu(event, id)}
           className={`routing-canvas-node absolute block w-[190px] overflow-hidden p-0 text-left [touch-action:none] cursor-grab text-ink [--canvas-node-accent:var(--text-muted)] [background:color-mix(in_srgb,var(--canvas-node-accent)_5%,var(--surface))] [border:1px_solid_color-mix(in_srgb,var(--canvas-node-accent)_45%,var(--border))] [border-inline-start:3px_solid_var(--canvas-node-accent)] [box-shadow:0_3px_14px_color-mix(in_srgb,var(--text)_10%,transparent)] rounded-lg data-[node-kind=questions]:[--canvas-node-accent:var(--accent)] data-[node-kind=questions]:rounded-xl data-[node-kind=rule]:[--canvas-node-accent:var(--good)] data-[node-kind=rule]:rounded data-[node-kind=fallback]:[--canvas-node-accent:var(--warn)] data-[node-kind=fallback]:[border-style:dashed] data-[node-kind=fallback]:[border-inline-start-style:solid] data-[node-kind=label]:[--canvas-node-accent:var(--accent)] data-[node-kind=label]:[border-inline-start-style:double] data-[node-kind=label]:[border-radius:0.75rem_0.25rem_0.25rem_0.75rem] data-[node-kind=model]:[border-inline-start-width:1px] data-[node-kind=model]:[border-inline-end:3px_solid_var(--canvas-node-accent)] data-[node-kind=model]:rounded hover:not-disabled:[background:color-mix(in_srgb,var(--canvas-node-accent)_9%,var(--surface))] hover:not-disabled:[border-color:var(--canvas-node-accent)] focus-visible:outline-[3px] focus-visible:outline-text focus-visible:outline-offset-1 ${tool === "pan" ? "cursor-grab" : ""}${selection.length > 1 ? selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : "" : selected === id || selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : ""}${intent && classifyConnection(draft, config, intent, id).reason === null ? " compatible [outline:3px_dashed_var(--accent)] outline-offset-0" : intent && hoverTarget === id ? " incompatible opacity-[0.68]" : ""}${draggingNodes.includes(id) ? " dragging z-[4] cursor-grabbing [box-shadow:0_6px_18px_color-mix(in_srgb,var(--text)_22%,transparent)] animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate] motion-reduce:animate-none" : ""}${!canEdit ? " read-only cursor-default shadow-none" : ""}`}
           data-dragging={draggingNodes.includes(id) || undefined}
-          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: dimensions[id]!.height }}
+          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: dimensions[id]!.height, borderColor: nodeState(id) === "invalid" || nodeState(id) === "incomplete" ? "var(--warn)" : undefined }}
           onDoubleClick={() => onReveal(id)}
           title={`${text} · ${id}`}
           aria-label={text}
@@ -677,6 +923,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
             moveGroup(ids, Object.fromEntries(ids.map((item) => [item, positions[item]!])), delta, true);
           }}>
           <CanvasNodeContent id={id} text={text} draft={draft} config={config} />
+          {(nodeState(id) === "invalid" || nodeState(id) === "incomplete") && <span className="absolute end-1 top-1 max-w-[110px] truncate rounded bg-panel px-1 text-[9px] font-semibold text-ink" title={t(nodeState(id) === "invalid" ? "canvasInvalidState" : "canvasIncompleteState")}>{t(nodeState(id) === "invalid" ? "canvasInvalidState" : "canvasIncompleteState")}</span>}
           {(outputs[id] ?? []).map((output, index) => <span key={output.id} className="absolute left-0 right-0 flex items-center justify-between gap-1 border-t border-outline px-3 text-[11px] leading-3" style={{ top: NODE_CARD_BASE_HEIGHT + index * NODE_CARD_OUTPUT_HEIGHT, height: NODE_CARD_OUTPUT_HEIGHT }} title={outputName(output)}>
             <span className="shrink-0 text-[9px] text-ink-muted">{t("canvasOutput")}</span><span className="truncate">{outputName(output)}{!output.edge && output.kind !== "add" ? ` · ${t("canvasDisconnected")}` : ""}</span>
           </span>)}

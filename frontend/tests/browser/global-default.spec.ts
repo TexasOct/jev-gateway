@@ -78,7 +78,7 @@ test("global model validation failure prevents PUT and a successful read allows 
   const region = await openSettings(page);
   await region.getByLabel("Global default model", { exact: true }).selectOption("fixture/existing");
   await region.getByRole("button", { name: "Save default model" }).click();
-  await expect(region.getByRole("alert")).toContainText("Could not read or save the global default model");
+  await expect(region.getByRole("alert")).toContainText("The global default model could not be saved. Your selection is retained");
   expect(state.writes).toEqual([]);
   state.rejectValidation = undefined;
   await region.getByRole("button", { name: "Reload current configuration" }).click();
@@ -113,11 +113,15 @@ test("pending global model save disables controls and prevents navigation and du
   await region.getByRole("button", { name: "Save default model" }).click();
   await expect.poll(() => state.writes.length).toBe(1);
   await expect(region.getByLabel("Global default model", { exact: true })).toBeDisabled();
-  await page.locator("header").getByRole("button", { name: "Monitoring", exact: true }).click();
-  await page.locator("header").getByRole("button", { name: "Refresh", exact: true }).click();
+  const monitoring = page.locator("header").getByRole("button", { name: "Monitoring", exact: true });
+  const refresh = page.locator("header").getByRole("button", { name: "Refresh", exact: true });
+  await expect(monitoring).toBeDisabled();
+  await expect(refresh).toBeDisabled();
   await expect(region).toBeVisible();
   release();
   await expect(region).toContainText("Global default model saved.");
+  await expect(monitoring).toBeEnabled();
+  await expect(refresh).toBeEnabled();
   expect(state.writes).toHaveLength(1);
   expect(state.validations).toHaveLength(1);
 });
@@ -133,14 +137,15 @@ test("global model read-only state keeps appearance usable and refuses writes", 
   expect(state.writes).toEqual([]);
 });
 
-test("empty model catalog links to Provider and incomplete routing offers the global setting", async ({ page, context }) => {
+test("empty model catalog links to Suppliers and incomplete routing offers the global setting", async ({ page, context }) => {
   const state = fixture(); state.configuration.models = []; delete state.configuration.defaults;
   await installProviderFixture(context, state);
   const region = await openSettings(page);
-  await expect(region).toContainText("Import a model in Provider & models");
+  await expect(region).toContainText("Import a model under a connection in Suppliers");
   await expect(region.getByLabel("Global default model", { exact: true })).toHaveValue("");
-  await region.getByRole("button", { name: "Provider & models", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeVisible();
+  await region.getByRole("button", { name: "Suppliers", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Views", exact: true }).getByRole("button", { name: "Suppliers", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toHaveCount(0);
   await page.route("**/v1/setup", (route) => route.fulfill({ json: { required: false, local_setup_available: true, revision: "fixture", has_providers: true, has_models: true, routing_ready: false, next_step: "routing" } }));
   await page.reload();
   const progress = page.getByLabel("Connection setup", { exact: true });
@@ -152,7 +157,7 @@ test("failed global model read is retryable and unauthorized read returns to Con
   const state = fixture(); state.rejectRead = 503;
   await installProviderFixture(context, state);
   const region = await openSettings(page);
-  await expect(region.getByRole("alert")).toContainText("Could not read or save");
+  await expect(region.getByRole("alert")).toContainText("The current configuration could not be read");
   await expect(region.getByLabel("Global default model", { exact: true })).toBeDisabled();
   state.rejectRead = undefined;
   await region.getByRole("button", { name: "Reload current configuration" }).click();

@@ -1,0 +1,34 @@
+{
+  "id": "auto-gateway-restart",
+  "name": "auto-gateway-restart",
+  "title": "Add automatic gateway restart after update",
+  "description": "Restart an already-running managed gateway after the installed package is updated.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-01",
+  "completedAt": "2026-10-05",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "closure": {
+      "disposition": "archived_on_request",
+      "reason": "用户要求归档现有全部任务，不创建新任务。",
+      "previous_status": "in_progress",
+      "acceptance_complete": false,
+      "note": "archive-note.md"
+    }
+  }
+}

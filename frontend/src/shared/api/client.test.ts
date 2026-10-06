@@ -69,6 +69,23 @@ describe("registered strategies read", () => {
 });
 
 describe("managed gateway credential activation", () => {
+  it("keeps upstream connection results distinct from Dashboard authorization failures", async () => {
+    setCredential("fixture-management-key");
+    const result = { provider_id: "supplier", status: "authentication_error", scope: "model_listing", model_count: 0, warnings: ["The upstream rejected the supplied credential."] };
+    const fetchMock = vi.fn(async (_path: string, init: RequestInit) => {
+      expect(init.method).toBe("POST");
+      expect(new Headers(init.headers).get("Authorization")).toBe("Bearer fixture-management-key");
+      expect(JSON.parse(String(init.body))).toEqual({ provider_id: "supplier" });
+      return new Response(JSON.stringify(result), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.testProviderConnection({ provider_id: "supplier" })).resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith("/v1/provider-connection-test", expect.any(Object));
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: { code: "invalid_api_key" } }), { status: 401 }));
+    await expect(api.testProviderConnection({ provider_id: "supplier" })).rejects.toMatchObject({ status: 401, code: "invalid_api_key" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["setup", "gateway"] as const)("waits for %s activation before retrying an early unauthorized read", async (endpoint) => {
     const key = "fixture-rotated-management-key";
     setCredential("fixture-previous-key");

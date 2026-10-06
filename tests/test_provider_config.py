@@ -13,6 +13,7 @@ import pytest
 
 from jev_gateway import config_transaction
 from jev_gateway.catalog import catalog_from_document
+from jev_gateway.catalog import model_metadata
 from jev_gateway.credentials import credential_update
 from jev_gateway.provider_config import ProviderConfiguration, RevisionConflict, credential_snapshot, env_update, metadata_envelope, revision
 from jev_gateway.strategy.decision_provider import DecisionClient
@@ -196,6 +197,8 @@ def test_activation_failure_restores_files_and_runtime(tmp_path: Path) -> None:
     current = service(tmp_path)
     env = tmp_path / "credentials.json"
     env.write_bytes(credential_update(None, "TEST_PROVIDER_KEY", "fake-before"))
+    env.chmod(0o600)
+    current.models_file.chmod(0o640)
     old_catalog, old_env = current.models_file.read_bytes(), env.read_bytes()
     body = upsert(current, display_name="Edited")
     body["operations"][0]["credential"] = {"action": "set", "value": "fake-after"}
@@ -208,6 +211,7 @@ def test_activation_failure_restores_files_and_runtime(tmp_path: Path) -> None:
     assert env.read_bytes() == old_env
     assert restored == [True]
     assert stat.S_IMODE(env.stat().st_mode) == 0o600
+    assert stat.S_IMODE(current.models_file.stat().st_mode) == 0o640
 
 
 def test_second_file_failure_restores_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -381,6 +385,113 @@ def test_query_sources_preserve_reference_fields_raw_effort_units_and_conditions
     {"applicable": 1},
 ])
 def test_persisted_source_rejects_arbitrary_evidence_and_pricing(source: dict[str, Any]) -> None:
-    from jev_gateway.catalog import model_metadata
     with pytest.raises((ValueError, TypeError), match="metadata"):
         model_metadata({"version": 1, "sources": [{"id": "fixture", **source}]})
+
+
+@pytest.mark.parametrize("source_ids", [None, [], ["missing"]])
+def test_source_confirmation_requires_resolved_references(tmp_path: Path, source_ids: Any) -> None:
+    current = service(tmp_path)
+    entry = model()
+    evidence = {"status": "confirmed", "value": True, "method": "source"}
+    if source_ids is not None:
+        evidence["source_ids"] = source_ids
+    entry["metadata"] = {"version": 1, "sources": [{"id": "source"}], "fields": {"tools": evidence}}
+    before = current.models_file.read_bytes()
+    for apply in (False, True):
+        with pytest.raises(ValueError, match="source references"):
+            current.command(import_body(current, [entry]), apply=apply)
+        assert current.models_file.read_bytes() == before
+        assert not (tmp_path / "models.json.bak").exists()
+
+
+@pytest.mark.parametrize("name,value", [
+    ("tools", False), ("input_per_million", 0),
+    ("reasoning_effort", []), ("context_window", None),
+])
+def test_manual_and_source_confirmation_preserve_explicit_values(tmp_path: Path, name: str, value: Any) -> None:
+    current = service(tmp_path)
+    entry = model()
+    target = entry["capabilities"] if name in entry["capabilities"] else entry["cost"] if name in entry["cost"] else entry
+    target[name] = value
+    manual = {"version": 1, "fields": {name: {"status": "confirmed", "value": value, "method": "manual", "source_ids": []}}}
+    entry["metadata"] = manual
+    result = current.command(import_body(current, [entry]), apply=True)
+    assert result["models"][1]["metadata"] == manual
+    source = {"id": "fixture", "url": "https://models.dev/api.json"}
+    sourced = {"version": 1, "sources": [source], "fields": {name: {"status": "confirmed", "value": value, "method": "source", "source_ids": ["fixture"]}}}
+    entry["metadata"] = sourced
+    body = {"expected_revision": revision(current.models_file), "operations": [{"action": "update_model", "model_id": "test-provider/vendor/new", "model": entry}]}
+    current.command(body, apply=True)
+    assert current.read()["models"][1]["metadata"] == sourced
+
+
+@pytest.mark.parametrize("status", ["unknown", "conflict"])
+@pytest.mark.parametrize("name,value", [("tools", False), ("input_per_million", 0), ("reasoning_effort", []), ("context_window", 1)])
+def test_uncertain_metadata_cannot_supply_an_automatic_value(status: str, name: str, value: Any) -> None:
+    envelope = {"version": 1, "fields": {name: {"status": status, "value": value}}}
+    with pytest.raises(ValueError, match="null automatic value"):
+        model_metadata(envelope)
+    envelope["fields"][name]["value"] = None
+    assert model_metadata(envelope) == envelope
+    envelope["fields"][name].pop("value")
+    assert model_metadata(envelope) == envelope
+
+
+@pytest.mark.parametrize("url", [
+    "https://127.0.0.1/evidence", "https://10.0.0.1/evidence", "https://172.16.0.1/evidence",
+    "https://192.168.0.1/evidence", "https://169.254.169.254/evidence", "https://168.63.129.16/evidence",
+    "https://0.0.0.0/evidence", "https://100.64.0.1/evidence", "https://224.0.0.1/evidence",
+    "https://192.0.2.1/evidence", "https://[::1]/evidence", "https://[fc00::1]/evidence",
+    "https://[fe80::1]/evidence", "https://[::]/evidence", "https://[ff02::1]/evidence",
+    "https://[::ffff:8.8.8.8]/evidence", "https://[2002:0808:0808::1]/evidence",
+    "https://localhost/evidence", "https://localhost./evidence", "https://x.localhost/evidence",
+    "https://router.local/evidence", "https://metadata.google.internal/evidence",
+    "https://2130706433/evidence", "https://127.1/evidence", "https://0x7f.0.0.1/evidence",
+    "https://%31%32%37.0.0.1/evidence", "http://models.dev/api.json", "https://user@models.dev/api.json",
+    "https://@models.dev/api.json", "https://models.dev/api.json?", "https://models.dev/api.json#",
+    "https://models.dev:0/api.json", "https://models.dev:65536/api.json", "https://models.dev:bad/api.json",
+    "https://models.dev:/api.json", "https://models.dev/%0a", "https://models.dev\\@127.0.0.1/evidence",
+    "https://models dev/api.json", "https://-invalid.example/evidence",
+])
+def test_metadata_rejects_nonpublic_and_malformed_source_urls_offline(url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *_args, **_kwargs: pytest.fail("Evidence validation must not resolve DNS"))
+    with pytest.raises(ValueError, match="public HTTPS without credentials"):
+        model_metadata({"version": 1, "sources": [{"id": "fixture", "url": url}]})
+
+
+@pytest.mark.parametrize("url", [
+    "https://models.dev/api.json", "https://openrouter.ai/api/v1/models",
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+    "https://public.example:8443/evidence", "https://8.8.8.8/evidence",
+    "https://[2606:4700:4700::1111]/evidence", "https://bücher.example/evidence",
+])
+def test_metadata_preserves_valid_source_urls_without_network(url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    import socket
+    from jev_gateway import discovery_network
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        pytest.fail("Persisted evidence must not make network requests")
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    monkeypatch.setattr(discovery_network, "safe_get_json", forbidden)
+    envelope = {"version": 1, "sources": [{"id": "fixture", "url": url}]}
+    assert model_metadata(envelope) == envelope
+
+
+@pytest.mark.parametrize("name,first,second", [
+    ("tools", True, False), ("input_per_million", 0, 2),
+    ("cache_read_per_million", 0, 0.25), ("reasoning_effort", [], ["high"]),
+    ("context_window", 1024, 2048),
+])
+def test_metadata_envelope_conflicts_clear_candidate_value_and_retain_evidence(name: str, first: Any, second: Any) -> None:
+    source = {"source": "fixture", "applicable": True, "fields": {name: {"value": first, "source_field": name}}}
+    other = {**source, "fields": {name: {"value": second, "source_field": name}}}
+    conflict = metadata_envelope({"fields": {name: first}, "sources": [source, other]})
+    assert conflict["fields"][name] == {"status": "conflict", "value": None, "source_ids": ["fixture-0", "fixture-1"]}
+    assert [s["fields"][name]["value"] for s in conflict["sources"]] == [first, second]
+    for ignored in (None, second):
+        other["fields"][name]["value"] = ignored
+        other["applicable"] = ignored is None
+        known = metadata_envelope({"fields": {name: first}, "sources": [source, other]})
+        assert known["fields"][name]["status"] == "known"
+        assert known["fields"][name]["value"] == first

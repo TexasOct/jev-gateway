@@ -32,6 +32,15 @@ function renderNode(id: string, text: string, locale: Locale = "en", draft: Rout
 afterEach(() => vi.unstubAllGlobals());
 
 describe("canvas node content", () => {
+  it("shows the first policy label for inherited choices and retains explicit empty repair states", () => {
+    const draft = draftFromConfiguration(config);
+    draft.fallback = {};
+    draft.rules[0] = { ...draft.rules[0]!, select: {} };
+    expect(renderNode("fallback", "Fallback", "en", draft)).toContain('title="Label: craft"');
+    expect(renderNode("rule-0", "Rule 1", "en", draft)).toContain('title="scale=large → craft"');
+    draft.fallback = { label: "" };
+    expect(renderNode("fallback", "Fallback", "en", draft)).toContain(messages.en.labelUnavailable);
+  });
   it.each<Locale>(["en", "zh-CN"])("keeps empty tag identity and names its inherited default in %s", (locale) => {
     const payload = { ...config, defaults: { default_model: "p/b" }, models: config.models.map((model) => ({ ...model, tags: [] })) };
     const draft = draftFromConfiguration(payload);
@@ -123,8 +132,8 @@ describe("canvas node content", () => {
 
   it("handles empty conditions, missing destinations and missing providers", () => {
     const draft = draftFromConfiguration(config);
-    draft.rules[0] = { when: {}, select: {} };
-    draft.fallback = {};
+    draft.rules[0] = { when: {}, select: { label: "" } };
+    draft.fallback = { label: "" };
     expect(renderNode("rule-0", "Rule 1", "en", draft)).toContain('title="No conditions → Label unavailable"');
     expect(renderNode("fallback", "Fallback", "en", draft)).toContain('title="Label unavailable"');
     const payload = { ...config, models: config.models.map((model) => ({ ...model, provider: "" })) };

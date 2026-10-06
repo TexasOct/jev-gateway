@@ -36,16 +36,23 @@ for (const viewport of [
     await expect(page.locator('header button[aria-label="Refresh"]')).toBeVisible();
     for (const locale of ["en", "zh-CN"] as const) {
       const words = locale === "en" ? en : zhCN;
+      await expect(page.getByRole("button", { name: /^(Settings|通用设置)$/, exact: true })).toBeEnabled();
       await page.getByRole("button", { name: /^(Settings|通用设置)$/, exact: true }).click();
       await page.locator("[data-settings-language]").selectOption(locale);
       for (const scheme of ["light", "dark"]) {
+        await expect(page.getByRole("button", { name: words.settings, exact: true })).toBeEnabled();
         await page.getByRole("button", { name: words.settings, exact: true }).click();
         await page.locator("[data-settings-scheme]").selectOption(scheme);
+        // Keep each locale/scheme geometry sample independent of prior saved viewports.
+        mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: {} };
         await page.getByRole("button", { name: words.strategyEditor, exact: true }).click();
         const canvas = page.locator(".routing-canvas-scroll");
         const toolbar = page.getByRole("toolbar", { name: words.canvasTools });
         await expect(toolbar).toBeVisible();
+        const layoutSaved = page.waitForResponse((response) => response.url().endsWith("/v1/dashboard/canvas-layout") && response.request().method() === "PUT" && response.ok());
         await toolbar.getByRole("button", { name: words.canvasZoomFit, exact: true }).click();
+        await layoutSaved;
+        await expect(page.getByText(words.canvasSavingLayout, { exact: true })).toHaveCount(0);
         await expect(page.locator("html")).toHaveAttribute("data-scheme", scheme);
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         const canvasBox = await canvas.boundingBox();
@@ -60,12 +67,19 @@ for (const viewport of [
           const box = element.getBoundingClientRect();
           return document.elementFromPoint(box.x + box.width / 2, box.y + 20)?.closest("[data-canvas-node]")?.getAttribute("data-canvas-node");
         });
+        await testInfo.attach(`native-hit-${locale}-${scheme}`, { body: JSON.stringify(await questions.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const target = document.elementFromPoint(box.x + box.width / 2, box.y + 20);
+          return { box: box.toJSON(), target: target?.outerHTML, chrome: document.querySelector(".workspace-chrome")?.getBoundingClientRect().toJSON() };
+        })), contentType: "application/json" });
         expect(hit).toBe("questions");
         await page.keyboard.press("Tab");
         await questions.focus();
         await expect(questions).toBeFocused();
         expect(await questions.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
         await expect(questions).toHaveCSS("outline-style", "solid");
+        await expect(page.locator(".workspace-heading h2")).toHaveText(catalog.strategy);
+        await expect(page.locator(".workspace-heading summary")).toHaveText(words.ruleOrderFirstMatch);
 
         const geometry = await canvas.locator("[data-canvas-node]").evaluateAll((elements) => elements.map((element) => {
           const style = getComputedStyle(element);
@@ -96,6 +110,7 @@ for (const viewport of [
         }, null, 2));
         await page.screenshot({ path: testInfo.outputPath(`strategy-${viewport.width}-${locale}-${scheme}.png`), fullPage: true });
         await testInfo.attach(`geometry-${locale}-${scheme}`, { body: JSON.stringify(geometry, null, 2), contentType: "application/json" });
+        await expect(page.getByText(words.canvasSavingLayout, { exact: true })).toHaveCount(0);
       }
     }
     expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);

@@ -74,7 +74,7 @@ describe("node card geometry", () => {
     const html = renderToStaticMarkup(createElement(LocaleProvider, null, createElement(RoutingCanvas, {
       heading: "", children: () => null, draft: draftFromConfiguration(config), config,
       disabled: false, selected: "", selection: [], onSelect: noop, onSelection: noop, onDraft: noop,
-      onError: noop, onAddRule: noop, canAddRule: true, onAnchor: noop, revealNode: null,
+      onError: noop, canAddRule: true, onAnchor: noop, revealNode: null,
       onReveal: noop, inspectorOpen: false, topology: null,
     })));
     const cards = [...html.matchAll(/<button[^>]*data-canvas-node="[^"]+"[^>]*>/g)].map(([tag]) => tag);

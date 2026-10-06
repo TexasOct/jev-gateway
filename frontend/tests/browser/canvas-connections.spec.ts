@@ -166,6 +166,10 @@ test("reconnects an empty failure fallback by pointer drag and cancels keyboard 
   await expect(panel.locator("p").first()).toHaveText("Decision failure fallback · Match → default");
   await panel.getByLabel("Choose destination").press("Escape");
   await expect(panel).toHaveCount(0); await expect(output).toBeFocused();
+  // Removing the top connection panel changes the measured content origin over two frames.
+  // Read native bounds after that layout settles, then confirm the port is exposed.
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
+  expect(await output.evaluate((element) => { const rect = element.getBoundingClientRect(); return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === element; })).toBe(true);
   const box = await output.boundingBox();
   await page.mouse.move(box!.x + 9, box!.y + 9); await page.mouse.down();
   await page.mouse.move(box!.x + 40, box!.y + 20);

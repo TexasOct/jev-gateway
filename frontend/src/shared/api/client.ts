@@ -20,7 +20,7 @@ import type {
   ThemePayload,
   SetupStatus,
 } from "./types";
-import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, DiscoveryResult, MetadataResult, GatewayCredentialMutation, GatewayCredentialResult } from "./types";
+import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, ProviderConnectionResult, DiscoveryResult, MetadataResult, GatewayCredentialMutation, GatewayCredentialResult } from "./types";
 import { isValidSetupKey } from "./setup-key";
 
 export class ApiError extends Error {
@@ -102,11 +102,12 @@ export const api = {
   validateProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration/validate", { method: "POST", body: JSON.stringify(payload) }),
   saveProviders: (payload: ProviderMutation) => request<ProviderCommandResult>("/v1/provider-configuration", { method: "PUT", body: JSON.stringify(payload) }),
   discoverModels: (payload: ProviderSelector, signal?: AbortSignal) => request<DiscoveryResult>("/v1/provider-discovery", { method: "POST", body: JSON.stringify(payload), signal }),
+  testProviderConnection: (payload: ProviderSelector, signal?: AbortSignal) => request<ProviderConnectionResult>("/v1/provider-connection-test", { method: "POST", body: JSON.stringify(payload), signal }),
   providerMetadata: (payload: ProviderSelector & { upstream_models: string[]; refresh: boolean }, signal?: AbortSignal) => request<MetadataResult>("/v1/provider-metadata", { method: "POST", body: JSON.stringify(payload), signal }),
   providers: () => request<ProvidersPayload>("/v1/routing/providers/summary"),
   routingActivity: (signal?: AbortSignal) =>
     request<RoutingActivityPayload>("/v1/routing/activity", { signal }),
-  strategies: () => request<StrategiesPayload>("/v1/routing/strategies"),
+  strategies: (signal?: AbortSignal) => request<StrategiesPayload>("/v1/routing/strategies", { signal }),
   policy: () => request<PolicyCatalog>("/v1/routing/policy"),
   sessions: (cursor?: string, signal?: AbortSignal) =>
     request<SessionsPayload>(

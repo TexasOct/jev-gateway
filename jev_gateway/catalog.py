@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import math
 import os
@@ -12,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from litellm import provider_list
 
@@ -107,6 +109,8 @@ class ModelCost:
 
     input_per_million: float = 0.0
     output_per_million: float = 0.0
+    cache_read_per_million: float | None = None
+    cache_write_per_million: float | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +144,7 @@ class ProviderProfile:
             "allow_private_network": self.allow_private_network,
             "params": dict.fromkeys(self.params, "[configured]"),
             "param_env": dict(self.param_env),
+            "transport_credential_presence": {name: bool(self.resolved_params.get(name)) for name in self.param_env},
         }
 
 
@@ -162,6 +167,8 @@ class ModelProfile:
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
     cost: ModelCost = field(default_factory=ModelCost)
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    display_name: str | None = None
+    enabled: bool = True
 
     def supports(self, *, tools: bool, vision: bool, json_mode: bool) -> bool:
         """Check the capability gates for one request."""
@@ -195,6 +202,8 @@ class ModelProfile:
             "name": self.name,
             "provider": self.provider,
             "upstream_model": self.model,
+            "display_name": self.display_name,
+            "enabled": self.enabled,
             "tags": list(self.tags),
             "api_base": self.api_base,
             "provider_type": self.provider_type,
@@ -216,6 +225,8 @@ class ModelProfile:
             "cost": {
                 "input_per_million": self.cost.input_per_million,
                 "output_per_million": self.cost.output_per_million,
+                "cache_read_per_million": self.cost.cache_read_per_million,
+                "cache_write_per_million": self.cost.cache_write_per_million,
             },
             **({"metadata": _json_value_as_dict(self.metadata)} if self.metadata else {}),
         }
@@ -745,16 +756,20 @@ def display_fields(item: dict[str, Any]) -> dict[str, str | None]:
     return result
 
 
-_METADATA_FIELDS = {"tools", "vision", "json_mode", "reasoning", "temperature", "reasoning_effort", "context_window", "max_output_tokens", "input_per_million", "output_per_million"}
-_PRICE_FIELDS = {"input", "output", "reasoning", "cache_read", "cache_write", "input_audio", "output_audio", "prompt", "completion", "input_cache_read", "input_cache_write", "web_search", "request", "image", "internal_reasoning"}
+_METADATA_FIELDS = {"tools", "vision", "json_mode", "reasoning", "temperature", "reasoning_effort", "context_window", "max_output_tokens", "input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"}
+_PRICE_FIELDS = {"input", "output", "reasoning", "cache_read", "cache_write", "input_audio", "output_audio", "prompt", "completion", "input_cache_read", "input_cache_write", "input_cache_write_1h", "web_search", "request", "image", "internal_reasoning"}
 _PRICE_FIELD_PATTERN = re.compile(r"(?:(?:input|output)_cost_per_token(?:_(?:above_\d+k_tokens|batches|cache_hit|flex|priority))*|cache_(?:creation|read)_input_(?:audio_)?token_cost(?:_(?:above_\d+k_tokens|above_\d+hr|flex|priority))*|citation_cost_per_token)")
 
 
 def _metadata_number(value: Any) -> bool:
+    return _finite_number(value) and value >= 0
+
+
+def _finite_number(value: Any) -> bool:
     if type(value) not in (int, float):
         return False
     try:
-        return math.isfinite(value) and value >= 0
+        return math.isfinite(value)
     except OverflowError:
         return False
 
@@ -807,7 +822,7 @@ def _metadata_source_fields(value: Any) -> None:
         if not isinstance(evidence, dict) or set(evidence) - {"value", "source_field", "unit", "source_unit"} or "value" not in evidence or "source_field" not in evidence:
             raise ValueError("Invalid model metadata source evidence.")
         for key, text in evidence.items():
-            if key != "value" and (not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 for c in text)):
+            if key != "value" and (not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 or ord(c) == 127 for c in text)):
                 raise ValueError("Invalid model metadata source evidence text.")
         raw = evidence["value"]
         if raw is None:
@@ -816,10 +831,40 @@ def _metadata_source_fields(value: Any) -> None:
             if type(raw) is not bool:
                 raise ValueError("Invalid model metadata source capability.")
         elif name == "reasoning_effort":
-            if not isinstance(raw, list) or len(raw) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 for c in v)) for v in raw):
+            if not isinstance(raw, list) or len(raw) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 or ord(c) == 127 for c in v)) for v in raw):
                 raise ValueError("Invalid model metadata source effort.")
         elif not _metadata_number(raw) or (name in {"context_window", "max_output_tokens", "max_input_tokens"} and type(raw) is not int):
             raise ValueError("Invalid model metadata source number.")
+
+
+def _metadata_source_url(value: str) -> None:
+    """Validate persisted evidence offline; host names are never resolved here."""
+    message = "Model metadata source URL must be public HTTPS without credentials."
+    try:
+        if any(ord(char) < 33 or ord(char) == 127 for char in value) or "\\" in value:
+            raise ValueError
+        url = urlsplit(value)
+        if url.scheme != "https" or not url.hostname or url.username is not None or url.password is not None or "?" in value or "#" in value:
+            raise ValueError
+        if url.netloc.endswith(":") or (url.port is not None and not 1 <= url.port <= 65535):
+            raise ValueError
+        if "%" in url.hostname or any(ord(char) < 32 or ord(char) == 127 for char in unquote(url.path)):
+            raise ValueError
+        host = url.hostname.encode("idna").decode("ascii").lower().rstrip(".")
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            # Reject local names and numeric/alternate IP spellings without DNS.
+            labels = host.split(".")
+            if len(host) > 253 or len(labels) < 2 or labels[-1].isdigit() or labels[-1] in {"localhost", "local", "internal", "home", "lan"} or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in labels):
+                raise ValueError
+        else:
+            if not address.is_global or address.is_multicast or address.is_reserved or str(address) == "168.63.129.16":
+                raise ValueError
+            if isinstance(address, ipaddress.IPv6Address) and (address.ipv4_mapped or address.sixtofour or address.teredo or address.scope_id):
+                raise ValueError
+    except (ValueError, UnicodeError):
+        raise ValueError(message) from None
 
 
 def model_metadata(value: Any) -> dict[str, Any]:
@@ -835,14 +880,22 @@ def model_metadata(value: Any) -> dict[str, Any]:
     sources = value.get("sources", [])
     if not isinstance(sources, list) or len(sources) > 32:
         raise ValueError("Model metadata sources must be a bounded list.")
-    source_keys = {"id", "source", "url", "fetched_at", "source_updated_at", "provider_id", "model_id", "unit", "field_path", "source_unit", "applicable", "fields", "schema_revision", "canonical_model_id", "source_reasoning_effort", "pricing"}
+    source_keys = {"id", "source", "url", "fetched_at", "source_updated_at", "provider_id", "model_id", "unit", "field_path", "source_unit", "applicable", "fields", "schema_revision", "canonical_model_id", "source_reasoning_effort", "pricing", "input_modalities"}
     source_ids: set[str] = set()
     for source in sources:
         if not isinstance(source, dict) or set(source) - source_keys or not isinstance(source.get("id"), str) or not source["id"] or source["id"] in source_ids:
             raise ValueError("Invalid model metadata source.")
         source_ids.add(source["id"])
-        if any(not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 for c in text) for key, text in source.items() if key not in {"applicable", "fields", "pricing", "source_reasoning_effort"}):
+        if any(not isinstance(text, str) or len(text) > 512 or any(ord(c) < 32 or ord(c) == 127 for c in text) for key, text in source.items() if key not in {"applicable", "fields", "pricing", "source_reasoning_effort", "input_modalities"}):
             raise ValueError("Invalid model metadata source text.")
+        if "input_modalities" in source:
+            declaration = source["input_modalities"]
+            if not isinstance(declaration, dict) or set(declaration) != {"value", "source_field"}:
+                raise ValueError("Invalid model metadata input modalities.")
+            modalities = declaration["value"]
+            path = declaration["source_field"]
+            if not isinstance(modalities, list) or len(modalities) > 5 or any(not isinstance(v, str) or v not in {"text", "image", "audio", "video", "pdf"} for v in modalities) or len(set(modalities)) != len(modalities) or not isinstance(path, str) or not path or len(path) > 512 or any(ord(c) < 32 or ord(c) == 127 for c in path):
+                raise ValueError("Invalid model metadata input modalities.")
         if "applicable" in source and type(source["applicable"]) is not bool:
             raise ValueError("Invalid model metadata source applicability.")
         if "fields" in source:
@@ -851,17 +904,15 @@ def model_metadata(value: Any) -> dict[str, Any]:
             _metadata_pricing(source["pricing"])
         if "source_reasoning_effort" in source:
             efforts = source["source_reasoning_effort"]
-            if not isinstance(efforts, list) or len(efforts) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 for c in v)) for v in efforts):
+            if not isinstance(efforts, list) or len(efforts) > 16 or any(v is not None and (not isinstance(v, str) or len(v) > 64 or any(ord(c) < 32 or ord(c) == 127 for c in v)) for v in efforts):
                 raise ValueError("Invalid model metadata original effort evidence.")
         if "url" in source:
-            from urllib.parse import urlsplit
-            url = urlsplit(source["url"])
-            if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment:
-                raise ValueError("Model metadata source URL must be public HTTPS without credentials.")
+            _metadata_source_url(source["url"])
     fields = value.get("fields", {})
     allowed_fields = _METADATA_FIELDS
     if not isinstance(fields, dict) or set(fields) - allowed_fields:
         raise ValueError("Invalid model metadata field names.")
+    effort_ladder: tuple[str, ...] | None = None
     for name, evidence in fields.items():
         if not isinstance(evidence, dict) or set(evidence) - {"status", "value", "source_ids", "confirmed_at", "method"}:
             raise ValueError("Invalid model metadata evidence.")
@@ -870,8 +921,12 @@ def model_metadata(value: Any) -> dict[str, Any]:
         ids = evidence.get("source_ids", [])
         if not isinstance(ids, list) or len(ids) > 32 or any(not isinstance(x, str) or x not in source_ids for x in ids):
             raise ValueError("Invalid model metadata evidence source references.")
+        if evidence["status"] == "confirmed" and evidence.get("method") == "source" and not ids:
+            raise ValueError("Confirmed model metadata source method requires source references.")
+        if evidence["status"] in {"unknown", "conflict"} and evidence.get("value") is not None:
+            raise ValueError("Unknown or conflicting model metadata must have a null automatic value.")
         for key in ("confirmed_at", "method"):
-            if key in evidence and (not isinstance(evidence[key], str) or len(evidence[key]) > 160):
+            if key in evidence and (not isinstance(evidence[key], str) or len(evidence[key]) > 160 or any(ord(c) < 32 or ord(c) == 127 for c in evidence[key])):
                 raise ValueError("Invalid model metadata confirmation text.")
         if "value" in evidence and evidence["value"] is not None:
             raw = evidence["value"]
@@ -880,17 +935,20 @@ def model_metadata(value: Any) -> dict[str, Any]:
             elif name == "reasoning_effort":
                 if not isinstance(raw, list):
                     raise ValueError("Metadata reasoning effort must be a list.")
-                ladder_from_list(raw, "metadata reasoning effort")
+                effort_ladder = ladder_from_list(raw, "metadata reasoning effort")
             elif name in {"context_window", "max_output_tokens"}:
                 if type(raw) is not int or raw <= 0:
                     raise ValueError("Metadata limits must be positive integers.")
             elif not _metadata_number(raw):
                 raise ValueError("Metadata prices must be finite nonnegative numbers.")
     confirmation = value.get("confirmation", {})
-    if not isinstance(confirmation, dict) or set(confirmation) - {"confirmed_at", "method"} or any(not isinstance(x, str) or len(x) > 160 for x in confirmation.values()):
+    if not isinstance(confirmation, dict) or set(confirmation) - {"confirmed_at", "method"} or any(not isinstance(x, str) or len(x) > 160 or any(ord(c) < 32 or ord(c) == 127 for c in x) for x in confirmation.values()):
         raise ValueError("Invalid model metadata confirmation.")
     import copy
-    return copy.deepcopy(value)
+    result = copy.deepcopy(value)
+    if effort_ladder is not None:
+        result["fields"]["reasoning_effort"]["value"] = list(effort_ladder)
+    return result
 
 
 def _resolve_api_key(api_key_env: str, subject: str, credentials: Mapping[str, str] | None = None, *, allow_missing_credentials: bool = False, trim_legacy: bool = False) -> str:
@@ -1052,6 +1110,8 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
         "capabilities",
         "cost",
         "metadata",
+        "display_name",
+        "enabled",
     }
     unknown_fields = set(item) - known_fields
     if unknown_fields:
@@ -1074,8 +1134,30 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
         if clean_tag in tags:
             raise ValueError(f"Model {name!r} declares tag {clean_tag!r} more than once.")
         tags.append(clean_tag)
+    price_fields = {"input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"}
+    if set(cost_value) - price_fields or any(
+        not _metadata_number(value)
+        for key, value in cost_value.items()
+        if value is not None or key in {"input_per_million", "output_per_million"}
+    ):
+        raise ValueError("Model prices must be finite nonnegative numbers; cache prices may be null.")
+    for key in ("context_window", "max_output_tokens"):
+        value = item.get(key)
+        if value is not None and (type(value) is not int or value <= 0):
+            raise ValueError("Model limits must be positive integers or null.")
+    context = item.get("context_window")
+    output = item.get("max_output_tokens")
+    if context is not None and output is not None and output > context:
+        raise ValueError("Model max_output_tokens must not exceed context_window.")
+    quality = item.get("quality", 0.5)
+    if not _finite_number(quality):
+        raise ValueError("Model quality must be a finite number.")
+    if "priority" in item and type(item["priority"]) is not int:
+        raise ValueError("Model priority must be an integer.")
     return ModelProfile(
         name=name,
+        display_name=display_fields({"display_name": item.get("display_name")})["display_name"],
+        enabled=_document_bool(item.get("enabled", True), "Model enabled"),
         provider=provider,
         model=model,
         tags=tuple(tags),
@@ -1099,6 +1181,8 @@ def profile_from_dict(item: dict[str, Any], index: int) -> ModelProfile:
             }
         ),
         cost=ModelCost(
+            cache_read_per_million=cost_value.get("cache_read_per_million"),
+            cache_write_per_million=cost_value.get("cache_write_per_million"),
             input_per_million=_document_float(
                 cost_value.get("input_per_million", 0.0),
                 f"Model {name!r} cost.input_per_million",

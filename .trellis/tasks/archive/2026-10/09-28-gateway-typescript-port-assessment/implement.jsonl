@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"评估服务端行为合同与后续验证范围时参考 backend 规范索引。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/gateway-inventory.md","reason":"实现盘点、API/状态行为和验收锚点的基线研究。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/dependency-mapping.md","reason":"Node.js 依赖替代与兼容风险研究。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/rust-path.md","reason":"Rust 依赖边界、模块估算与全项目粗估。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/api-provider-estimate.md","reason":"HTTP/SSE 与上游 provider 的模块估算。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/routing-config-estimate.md","reason":"路由、配置、策略和 session 模块估算。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/storage-monitoring-estimate.md","reason":"SQLite、activity 与 dashboard 模块估算。"}
+{"file":".trellis/tasks/archive/2026-10/09-28-gateway-typescript-port-assessment/research/cli-release-validation-estimate.md","reason":"CLI、发行及横向验收区间和共享成本。"}

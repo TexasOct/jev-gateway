@@ -23,11 +23,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
 
-import { api } from "@/shared/api/client";
+import { api, ApiError } from "@/shared/api/client";
+import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
+import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
 import { useLocale } from "@/shared/i18n";
 import { formatRouteLabel } from "@/shared/i18n/route-label";
 import { matrixChoiceLabel } from "@/shared/routing/choice-label";
@@ -54,6 +56,12 @@ interface EditorProps {
   onError: (message: string) => void;
   informationOpen?: boolean;
   onInformationOpenChange?: (open: boolean) => void;
+  /** True for policy drafts, unfinished add/rename inputs, and unsaved layout work (drag,
+   * viewport debounce, queued/in-flight PUTs). Layout work autosaves without applying policy.
+   * Parent navigation/beforeunload guards must retain the editor while this is true. */
+  onDirtyChange?: (dirty: boolean) => void;
+  onPendingChange?: (pending: boolean) => void;
+  onUnauthorized?: () => void;
 }
 
 const POOL_ID = "pool";
@@ -110,9 +118,9 @@ function ChoiceFields({ choice, labels, selections, onChoice }: {
     <label>{t("label")}<select value={matrixChoiceLabel(choice, labels[0]?.name) ?? ""} onChange={(event) => onChoice({ label: event.target.value })}>
       <option value="">{t("unboundLabel")}</option>{labels.map((label) => <option key={label.name} value={label.name}>{label.name}</option>)}
     </select></label>
-    <label>{t("selection")}<select value={choice.selection ?? ""} onChange={(event) => onChoice({ selection: event.target.value || undefined })}>
+    <details className="border-t border-outline pt-2"><summary className="cursor-pointer text-xs text-ink-muted">{t("canvasAdvancedChoice")}</summary><label>{t("selection")}<select value={choice.selection ?? ""} onChange={(event) => onChoice({ selection: event.target.value || undefined })}>
       <option value="">{t("inheritedSelection")}</option>{selections.map((value) => <option key={value} value={value}>{selectionCaption(value, t)}</option>)}
-    </select></label>
+    </select></label></details>
   </>;
 }
 
@@ -309,10 +317,46 @@ function DropZone({
   );
 }
 
-export default function RoutingEditor({ config, error, onReloaded, onError, informationOpen, onInformationOpenChange }: EditorProps) {
+export default function RoutingEditor({ config, error, onReloaded, onError, informationOpen, onInformationOpenChange, onDirtyChange, onPendingChange, onUnauthorized }: EditorProps) {
+  const active = useWorkspaceActive();
+  const requestAnimationFrame = useWorkspaceFrames(active);
+  const activeRef = useRef(active);
+  const activityGeneration = useRef(0);
+  useLayoutEffect(() => {
+    if (!active) ++activityGeneration.current;
+    activeRef.current = active;
+    const generation = activityGeneration;
+    return () => { activeRef.current = false; ++generation.current; };
+  }, [active]);
+  const reportFailure = useCallback((caught: unknown) => {
+    if (caught instanceof ApiError && caught.status === 401) onUnauthorized?.();
+    onError(caught instanceof Error ? caught.message : String(caught));
+  }, [onError, onUnauthorized]);
+  const [strategyMetadata, setStrategyMetadata] = useState<{ strategy: string; description: string | null } | null>(null);
+  const strategyDescription = strategyMetadata?.strategy === config.strategy ? strategyMetadata.description : null;
+  useEffect(() => {
+    if (!active) return;
+    const controller = new AbortController();
+    let current = true;
+    void api.strategies(controller.signal).then((payload) => {
+      if (current) setStrategyMetadata({ strategy: config.strategy, description: payload.data.find((strategy) => strategy.name === config.strategy)?.description ?? null });
+    }).catch((caught: unknown) => {
+      if (current) reportFailure(caught);
+    });
+    return () => { current = false; controller.abort(); };
+  }, [active, config.strategy, reportFailure]);
   const [draft, setDraft] = useState<RoutingDraft>(() => draftFromConfiguration(config));
+  const [historyBoundary, setHistoryBoundary] = useState(0);
+  const [discardBoundary, setDiscardBoundary] = useState(0);
+  const [layoutDirty, setLayoutDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const operation = useRef(0);
+  useEffect(() => {
+    if (active) return;
+    const owner = ++operation.current;
+    queueMicrotask(() => { if (owner === operation.current) setBusy(false); });
+  }, [active]);
   const [serverWarnings, setServerWarnings] = useState<string[]>([]);
   const [selectedNode, setSelectedNode] = useState("");
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
@@ -336,12 +380,13 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const openDrawerAt = useCallback((target: "rule" | "review") => {
     setInfoOpen(true);
     requestAnimationFrame(() => {
+      if (!activeRef.current) return;
       const body = drawerBodyRef.current;
       const item = target === "rule" ? ruleFormRef.current : reviewRef.current;
       if (body && item) body.scrollTop += item.getBoundingClientRect().top - body.getBoundingClientRect().top;
       (item?.querySelector<HTMLElement>("select, input, button") ?? item)?.focus({ preventScroll: true });
     });
-  }, [setInfoOpen]);
+  }, [setInfoOpen, requestAnimationFrame]);
   const handoffFocus = () => {
     const workspace = workspaceRef.current;
     const canvas = workspace?.querySelector<HTMLElement>(".routing-canvas-scroll") ?? null;
@@ -352,7 +397,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const selectEditorNode = (id: string) => {
     handoffFocus();
     setAnchor(null);
-    setInfoOpen(true);
+    setInfoOpen(false);
     setSelectedNodes([]); setSelectedNode(id); setInspectorOpen(true);
     setRevealNode((current) => ({ id, serial: (current?.serial ?? 0) + 1 }));
   };
@@ -368,11 +413,11 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
     setSelectedNode(id);
     setInspectorOpen(true);
     setInfoOpen(false);
-    if (focusInspector) requestAnimationFrame(() => requestAnimationFrame(() => inspectorRef.current?.querySelector("button")?.focus({ preventScroll: true })));
+    if (focusInspector) requestAnimationFrame(() => { if (activeRef.current) requestAnimationFrame(() => { if (activeRef.current) inspectorRef.current?.querySelector("button")?.focus({ preventScroll: true }); }); });
   };
   const closeInspector = () => {
     handoffFocus();
-    selectLayoutNodes([]);
+    setInspectorOpen(false);
   };
   const [review, setReview] = useState<{ payload: RoutingOverlayPayload; warnings: string[]; diff: DraftDiff } | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -388,6 +433,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const { t } = useTranslation();
   const { locale } = useLocale();
   const updateInspectorPosition = useCallback(() => {
+    if (!activeRef.current) return;
     const workspace = workspaceRef.current;
     const panel = inspectorRef.current;
     if (!workspace || !panel) return;
@@ -400,7 +446,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
     setInspectorAt({ ...next, x: next.x - bounds.left, y: next.y - bounds.top, fallback: !position });
   }, [anchor]);
   useLayoutEffect(() => {
-    if (!inspectorOpen || nodeDragging) return;
+    if (!active || !inspectorOpen || nodeDragging) return;
     updateInspectorPosition();
     const observer = new ResizeObserver(updateInspectorPosition);
     if (inspectorRef.current) observer.observe(inspectorRef.current);
@@ -411,7 +457,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
     window.visualViewport?.addEventListener("resize", updateInspectorPosition);
     window.visualViewport?.addEventListener("scroll", updateInspectorPosition);
     return () => { observer.disconnect(); window.removeEventListener("resize", updateInspectorPosition); window.removeEventListener("scroll", updateInspectorPosition, true); window.visualViewport?.removeEventListener("resize", updateInspectorPosition); window.visualViewport?.removeEventListener("scroll", updateInspectorPosition); };
-  }, [inspectorOpen, nodeDragging, anchor, updateInspectorPosition]);
+  }, [active, inspectorOpen, nodeDragging, anchor, updateInspectorPosition]);
   const tr = useCallback((key: Parameters<typeof t>[0], values: Record<string, string> = {}) =>
     Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, value), t(key)), [t]);
 
@@ -430,9 +476,16 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   );
 
   const diff = diffSummary(draft, config);
-  const incomplete = incompleteLabels(draft, config).length > 0;
+  const pendingFields = !!(newQuestion || newRuleQuestion || newRuleCriterion || newRuleLabel) || Object.values(newCriteria).some(Boolean) || Object.entries(questionNames).some(([name, value]) => value !== name) || Object.entries(criterionNames).some(([name, value]) => name.slice(name.indexOf("::") + 2) !== value);
+  const dirty = diff.changed || pendingFields || layoutDirty;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
+  useEffect(() => { onPendingChange?.(busy || layoutDirty); }, [busy, layoutDirty, onPendingChange]);
+  useEffect(() => () => { onPendingChange?.(false); }, [onPendingChange]);
+  const incompleteNodes = incompleteLabels(draft, config);
+  const incomplete = incompleteNodes.length > 0;
   const questionErrors = invalidQuestions(draft);
-  const writeDisabled = !config.write_available;
+  const writeDisabled = !active || !config.write_available;
   const editDisabled = writeDisabled || busy || review !== null || resetReview;
   const edges = workflowEdges(draft, config);
   const addableQuestions = Object.entries(draft.questions).filter(([, question]) => Object.keys(question.criteria).length > 0);
@@ -500,71 +553,99 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   );
 
   const startReview = useCallback(() => {
-    if (writeDisabled || busy || !diff.changed || incompleteLabels(draft, config).length || invalidQuestions(draft).length) return;
+    if (writeDisabled || busy || layoutDirty || pendingFields || !diff.changed || incompleteLabels(draft, config).length || invalidQuestions(draft).length) return;
     setBusy(true);
     setServerWarnings([]);
     const payload = toOverlayPayload(draft, config);
     const reviewedDiff = diffSummary(draft, config);
+    const generation = activityGeneration.current;
+    const owner = ++operation.current;
+    const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
     void (async () => {
       try {
         const result = await api.validateConfiguration(payload);
+        if (!current()) return;
         if (!result.valid) throw new Error(t("invalidConfiguration"));
         setReview({ payload, diff: reviewedDiff, warnings: result.warnings.map((warning) => tr("validationWarning", { code: warning.code, message: warning.message })) });
         setAcknowledged(false);
         openDrawerAt("review");
       } catch (caught) {
-        onError(caught instanceof Error ? caught.message : String(caught));
+        if (current()) reportFailure(caught);
       } finally {
-        setBusy(false);
+        if (current()) setBusy(false);
       }
     })();
-  }, [writeDisabled, busy, diff.changed, draft, config, t, tr, onError, openDrawerAt]);
+  }, [writeDisabled, busy, layoutDirty, pendingFields, diff.changed, draft, config, t, tr, reportFailure, openDrawerAt]);
 
   const save = useCallback(() => {
-    if (review === null || busy || writeDisabled || (review.warnings.length > 0 && !acknowledged)) return;
+    if (review === null || busy || layoutDirty || writeDisabled || (review.warnings.length > 0 && !acknowledged)) return;
     setBusy(true);
+    const generation = activityGeneration.current;
+    const owner = ++operation.current;
+    const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
     void (async () => {
       try {
         const response = await api.applyConfiguration(review.payload);
+        if (!current()) return;
         setServerWarnings(response.warnings.map((warning) => tr("validationWarning", { code: warning.code, message: warning.message })));
         setNotice(t("routingApplied"));
+        setHistoryBoundary((value) => value + 1);
         setReview(null);
         setInfoOpen(false);
         await onReloaded();
       } catch (caught) {
-        onError(caught instanceof Error ? caught.message : String(caught));
+        if (current()) reportFailure(caught);
       } finally {
-        setBusy(false);
+        if (current()) setBusy(false);
       }
     })();
-  }, [review, busy, writeDisabled, acknowledged, onError, onReloaded, t, tr, setInfoOpen]);
+  }, [review, busy, layoutDirty, writeDisabled, acknowledged, reportFailure, onReloaded, t, tr, setInfoOpen]);
 
   const reset = useCallback(() => {
-    if (writeDisabled || busy || !resetReview) return;
+    if (writeDisabled || busy || layoutDirty || !resetReview) return;
     setBusy(true);
+    const generation = activityGeneration.current;
+    const owner = ++operation.current;
+    const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
     void (async () => {
       try {
         await api.resetConfiguration();
+        if (!current()) return;
         setResetReview(false);
         setNotice(t("overlayRemoved"));
+        setHistoryBoundary((value) => value + 1);
         setServerWarnings([]);
         await onReloaded();
       } catch (caught) {
-        onError(caught instanceof Error ? caught.message : String(caught));
+        if (current()) reportFailure(caught);
       } finally {
-        setBusy(false);
+        if (current()) setBusy(false);
       }
     })();
-  }, [onError, onReloaded, t, writeDisabled, busy, resetReview]);
+  }, [reportFailure, onReloaded, t, writeDisabled, busy, layoutDirty, resetReview]);
 
   const heading = <>
       {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
-      <header className="workspace-heading flex flex-wrap items-center justify-between gap-2"><div><span className="meta text-xs text-ink-muted">{t("routingWorkflow")}</span><h2 className="text-[17px] font-semibold text-ink">{t("configuration")}</h2></div><span className="workspace-status rounded-md border border-outline bg-panel-muted px-2 py-1 text-xs text-ink-muted" role="status" data-policy-draft={diff.changed ? "pending" : "unchanged"}>{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span></header>
+      <header className="workspace-heading flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+          <span className="meta text-xs text-ink-muted">{t("routingWorkflow")}</span>
+          <h2 className="text-[17px] font-semibold text-ink">{config.strategy}</h2>
+          <details className="text-xs text-ink-muted">
+            <summary className="cursor-pointer">{t("ruleOrderFirstMatch")}</summary>
+            {strategyDescription ? <p className="mt-1">{strategyDescription}</p> : <p className="mt-1">{t("canvasQuestionEntry")}</p>}
+            <p className="mt-1">{t("from")} <code>{config.baseline_source}</code> · {config.overlay.applied ? t("overlayApplied") : t("noOverlay")}</p>
+          </details>
+        </div>
+        <span className="workspace-status max-w-full rounded-md border border-outline bg-panel-muted px-2 py-1 text-xs text-ink-muted [overflow-wrap:anywhere]" role="status" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
+          {busy ? t(review || resetReview ? "canvasApplyingPolicy" : "canvasValidatingPolicy") : pendingFields ? t("canvasIncompleteState") : incomplete || questionErrors.length > 0 ? t("canvasInvalidState") : review ? t("reviewChanges") : diff.changed ? t("pendingChanges") : t("noPendingChanges")}
+        </span>
+      </header>
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
-      {incomplete && <div className="notice warn" role="status">{t("canvasIncompleteDraft")}</div>}
-      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status">{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</div>)}
+      {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
+      {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <button type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</button></div>}
+      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <button type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</button>{reason === "type" && <button type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</button>}</div>)}
       {config.overlay.error === null ? null : (
-        <div className="notice warn">{tr("overlayUnreadable", { error: config.overlay.error })}</div>
+        <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <button type="button" disabled={writeDisabled || busy || layoutDirty || review !== null} onClick={() => { setResetReview(true); openDrawerAt("review"); }}>{t("resetBaseline")}</button></div>
       )}
       {writeDisabled ? (
         <div className="notice warn">
@@ -594,17 +675,22 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
     }}>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <RoutingCanvas heading={heading} draft={draft} config={config} disabled={editDisabled} selected={selectedNode} selection={selectedNodes}
-              onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onError={onError} topology={topology}
+               onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onError={onError} topology={topology}
+               onUnauthorized={onUnauthorized}
               inspectorOpen={inspectorOpen} onAnchor={setAnchor} revealNode={revealNode} onReveal={selectEditorNode}
               onDraggingChange={setNodeDragging}
+              onLayoutDirtyChange={setLayoutDirty}
+              historyBoundary={historyBoundary}
+              discardBoundary={discardBoundary}
               canAddRule={addableQuestions.length > 0 && addableLabels.length > 0}
-              onAddRule={() => { selectLayoutNodes([]); openDrawerAt("rule"); }}>
+              >
           {(canvasInformation: ReactNode) => <>
           {inspectorOpen && selectedNodes.length <= 1 && <aside className="workflow-inspector absolute z-[6] flex w-[min(340px,calc(100vw-24px))] max-h-[460px] flex-col overflow-hidden rounded-lg border border-outline bg-panel shadow-[0_8px_28px_color-mix(in_srgb,var(--text)_16%,transparent)] data-[fallback=true]:z-10" ref={inspectorRef} data-fallback={inspectorAt?.fallback} style={{ left: inspectorAt?.x, top: inspectorAt?.y, width: inspectorAt?.width, height: inspectorAt?.height, visibility: inspectorAt && !nodeDragging ? "visible" : "hidden" }} aria-label={t("nodeInspector")}>
             <header className="inspector-heading flex items-center justify-between gap-2 border-b border-outline bg-panel-muted p-3"><h3 className="text-sm font-semibold text-ink">{t("nodeInspector")}</h3><Button variant="outline" className={actionButtonClass} type="button" title={t("closeInspector")} aria-label={t("closeInspector")} onClick={closeInspector}><span className="inline-flex w-[9px] items-center justify-center"><X aria-hidden="true" focusable="false" /></span></Button></header>
         <div className="inspector-body min-h-0 flex-1 overflow-y-auto p-3 text-[13px] text-ink">
         <p className="mb-3 border-s-2 border-primary bg-panel-muted p-2 text-xs text-ink-muted">{t("reviewChanges")} · {diff.changed ? t("pendingChanges") : t("noPendingChanges")}</p>
-        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" aria-live="polite">
+        <p className="mb-3 text-xs text-ink-muted">{selectedRuleExists ? t("ruleOrderFirstMatch") : selectedNode === "questions" ? t("canvasQuestionEntry") : selectedNode === "fallback" ? t("unmatchedFallback") : selectedNode.startsWith("zone::") ? t("modelPool") : t("priority")}</p>
+        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&>fieldset]:border-0 [&>fieldset]:p-0 [&_fieldset_fieldset]:border-0 [&_fieldset_fieldset]:p-0 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_label:has(input[type=checkbox])]:flex [&_label:has(input[type=checkbox])]:items-center [&_label:has(input[type=checkbox])]:gap-2 [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" aria-live="polite">
           {selectedNode === "questions" ? <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" disabled={editDisabled}><legend>{t("questionDefinitions")}</legend>{Object.entries(draft.questions).map(([name, question]) => <div key={name}><label>{t("questionName")}<input value={questionNames[name] ?? name} onChange={(event) => setQuestionNames((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setDraft((current) => renameQuestion(current, name, questionNames[name]!)); setQuestionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(draft.questions).length <= 1 || draft.rules.some((rule) => Object.hasOwn(rule.when, name) && Object.keys(rule.when).length === 1)} onClick={() => setDraft((current) => removeQuestion(current, name))}>{t("remove")}</button><label>{t("instructions")}<textarea value={question.instructions} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, instructions: event.target.value }))} /></label><div>{Object.entries(question.criteria).map(([criterion, description]) => <div key={criterion}><label>{t("criterionKey")}<input value={criterionNames[`${name}::${criterion}`] ?? criterion} onChange={(event) => setCriterionNames((current) => ({ ...current, [`${name}::${criterion}`]: event.target.value }))} /></label><button type="button" disabled={!criterionNames[`${name}::${criterion}`] || (criterionNames[`${name}::${criterion}`] !== criterion && Object.hasOwn(question.criteria, criterionNames[`${name}::${criterion}`] ?? ""))} onClick={() => { setDraft((current) => renameCriterion(current, name, criterion, criterionNames[`${name}::${criterion}`]!)); setCriterionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(question.criteria).length <= 2 || draft.rules.some((rule) => { const value = rule.when[name]; return (Array.isArray(value) ? value.length === 1 && value[0] === criterion : value === criterion) && Object.keys(rule.when).length === 1; })} onClick={() => setDraft((current) => removeCriterion(current, name, criterion))}>{t("remove")}</button><label>{t("criterionDescription")}<input value={description} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, criteria: { ...question.criteria, [criterion]: event.target.value } }))} /></label></div>)}</div><label>{t("newCriterion")}<input value={newCriteria[name] ?? ""} onChange={(event) => setNewCriteria((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" onClick={() => { setDraft((current) => addCriterion(current, name, newCriteria[name] ?? "")); setNewCriteria((current) => ({ ...current, [name]: "" })); }}>{t("add")}</button></div>)}<label>{t("newQuestion")}<input value={newQuestion} onChange={(event) => setNewQuestion(event.target.value)} /></label><button type="button" onClick={() => { setDraft((current) => addQuestion(current, newQuestion)); setNewQuestion(""); }}>{t("add")}</button></fieldset> : null}
           {selectedNode === "fallback" && <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
             <legend>{t("unmatchedFallback")}</legend>
@@ -615,14 +701,14 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
             return <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
               <legend>{t("rule")} {index + 1}</legend>
               <button type="button" disabled={editDisabled} onClick={() => applyRuleRemoval(index)}>{t("deleteRule")}</button>
-              {Object.entries(draft.questions).map(([question, definition]) => {
+              <section aria-label={t("canvasConditions")} className="space-y-2"><h4 className="text-xs font-semibold">{t("canvasConditions")}</h4>{Object.entries(draft.questions).map(([question, definition]) => {
                 const selected = rule.when[question], values = selected === undefined ? [] : Array.isArray(selected) ? selected : [selected];
-                return <fieldset key={question}><legend>{question}</legend>
+                return <fieldset key={question} className="min-w-0 space-y-2"><legend className="mb-2 text-xs font-semibold">{question}</legend>
                   <label><input type="checkbox" checked={selected !== undefined} disabled={editDisabled || (selected !== undefined && Object.keys(rule.when).length === 1)} onChange={(event) => setDraft((current) => toggleRuleQuestion(current, index, question, event.target.checked))} />{t("includeQuestion")}</label>
                   {Object.keys(definition.criteria).map((criterion) => <label key={criterion}><input type="checkbox" disabled={editDisabled || selected === undefined} checked={values.includes(criterion)} onChange={(event) => setDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} />{criterion}</label>)}
                 </fieldset>;
-              })}
-              <ChoiceFields choice={rule.select} labels={config.labels} selections={selections} onChoice={(patch) => setDraft((current) => setRuleChoice(current, index, patch))} />
+              })}</section>
+              <section aria-label={t("canvasDestination")} className="space-y-2 border-t border-outline pt-2"><h4 className="text-xs font-semibold">{t("canvasDestination")}</h4><ChoiceFields choice={rule.select} labels={config.labels} selections={selections} onChoice={(patch) => setDraft((current) => setRuleChoice(current, index, patch))} /></section>
               <button type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</button>
               <button type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</button>
             </fieldset>;
@@ -811,21 +897,25 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
       </div>
       </div>
       <div className="workflow-toolbar flex flex-wrap items-center gap-2 border-outline bg-panel p-2 max-[900px]:col-start-1 max-[900px]:row-start-3 max-[900px]:border-t max-[600px]:col-start-2 max-[600px]:row-start-1 max-[600px]:flex-nowrap max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:overscroll-x-contain max-[600px]:gap-[0.35rem] max-[600px]:min-h-12 max-[600px]:p-[0.25rem_0.45rem] max-[600px]:border-t-0 max-[600px]:border-l max-[600px]:[touch-action:pan-x] max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap">
-        {review === null ? <Button className={primaryButtonClass} type="button" onClick={startReview} disabled={writeDisabled || busy || resetReview || !diff.changed || incomplete || questionErrors.length > 0}>{t("reviewChanges")}</Button> : <><Button className={primaryButtonClass} type="button" onClick={save} disabled={writeDisabled || busy || incomplete || questionErrors.length > 0 || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setReview(null)} disabled={busy}>{t("backToEditing")}</Button></>}
+        {review === null ? <Button className={primaryButtonClass} type="button" onClick={startReview} disabled={writeDisabled || busy || layoutDirty || pendingFields || resetReview || !diff.changed || incomplete || questionErrors.length > 0}>{t("reviewChanges")}</Button> : <><Button className={primaryButtonClass} type="button" onClick={save} disabled={writeDisabled || busy || layoutDirty || incomplete || questionErrors.length > 0 || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setReview(null)} disabled={busy}>{t("backToEditing")}</Button></>}
         <Button variant="outline"
           className={actionButtonClass}
           type="button"
           onClick={() => {
             setDraft(draftFromConfiguration(config));
+            setHistoryBoundary((value) => value + 1);
+            setDiscardBoundary((value) => value + 1);
+            setQuestionNames({}); setCriterionNames({}); setNewCriteria({});
+            setNewQuestion(""); setNewRuleQuestion(""); setNewRuleCriterion(""); setNewRuleLabel("");
             selectLayoutNodes([]);
             setNotice(null);
             setReview(null);
           }}
-          disabled={writeDisabled || busy || review !== null || !diff.changed}
+          disabled={writeDisabled || busy || review !== null || !dirty}
         >
           {t("cancel")}
         </Button>
-        {resetReview ? <><Button variant="outline" className={actionButtonClass} type="button" onClick={reset} disabled={writeDisabled || busy}>{t("confirmReset")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</Button></> : <Button variant="outline" className={actionButtonClass} type="button" onClick={() => { setResetReview(true); openDrawerAt("review"); }} disabled={writeDisabled || busy || review !== null || !config.overlay.applied}>{t("resetBaseline")}</Button>}
+        {resetReview ? <><Button variant="outline" className={actionButtonClass} type="button" onClick={reset} disabled={writeDisabled || busy || layoutDirty}>{t("confirmReset")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</Button></> : <Button variant="outline" className={actionButtonClass} type="button" onClick={() => { setResetReview(true); openDrawerAt("review"); }} disabled={writeDisabled || busy || layoutDirty || review !== null || !config.overlay.applied}>{t("resetBaseline")}</Button>}
       </div>
       </section>
       </>}

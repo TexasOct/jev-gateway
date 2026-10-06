@@ -15,6 +15,9 @@ import time
 import uuid
 from collections import deque
 from collections.abc import Callable
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
@@ -138,6 +141,9 @@ class RoutingEngine:
             record_store if record_store is not None else NullRecordStore()
         )
         self.config_source = config_source
+        self._config_publication: ContextVar[list[bool] | None] = ContextVar(
+            "config_publication", default=None
+        )
         self.strategies = StrategyRegistry.from_catalog(catalog)
         self.config_hash = self._register_config(catalog)
 
@@ -209,7 +215,7 @@ class RoutingEngine:
         reasoning_effort: str | None = None,
     ) -> Decision:
         """Route one request, using the stored session when one exists."""
-        if not self.catalog.profiles:
+        if not any(profile.enabled for profile in self.catalog.profiles):
             raise SetupIncompleteError("Configure a provider and model before sending requests.")
         strategy_impl = self.strategies.resolve(strategy)
         facts = extract_request_facts(
@@ -221,7 +227,7 @@ class RoutingEngine:
         manual: ModelProfile | None = None
         if requested_model is not None:
             manual = self.catalog.by_name(requested_model)
-            if manual is None:
+            if manual is None or not manual.enabled:
                 raise UnknownModelError(requested_model)
 
         session = self.store.copy(session_id) if session_id else None
@@ -238,7 +244,7 @@ class RoutingEngine:
             self.catalog,
         )
         profile = self.catalog.by_name(outcome.model)
-        if profile is None:
+        if profile is None or not profile.enabled:
             raise StrategyContractError(
                 f"Strategy {strategy_impl.name!r} selected unknown model "
                 f"{outcome.model!r}."
@@ -281,7 +287,7 @@ class RoutingEngine:
         reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Return the routing answer for a request without mutating any state."""
-        if not self.catalog.profiles:
+        if not any(profile.enabled for profile in self.catalog.profiles):
             raise SetupIncompleteError("Configure a provider and model before sending requests.")
         strategy_impl = self.strategies.resolve(strategy)
         facts = extract_request_facts(
@@ -293,7 +299,7 @@ class RoutingEngine:
         manual: ModelProfile | None = None
         if requested_model is not None:
             manual = self.catalog.by_name(requested_model)
-            if manual is None:
+            if manual is None or not manual.enabled:
                 raise UnknownModelError(requested_model)
 
         session = self.store.copy(session_id) if session_id else None
@@ -309,7 +315,7 @@ class RoutingEngine:
             self.catalog,
         )
         profile = self.catalog.by_name(outcome.model)
-        if profile is None:
+        if profile is None or not profile.enabled:
             raise StrategyContractError(
                 f"Strategy {strategy_impl.name!r} selected unknown model "
                 f"{outcome.model!r}."
@@ -334,7 +340,7 @@ class RoutingEngine:
             "reasoning_effort": effort,
             "reasoning_effort_source": effort_source,
             "turn_index": facts.turn_index,
-            "candidates": [profile.name for profile in self.catalog.profiles],
+            "candidates": [profile.name for profile in self.catalog.profiles if profile.enabled],
         }
 
     # Outcomes
@@ -483,9 +489,29 @@ class RoutingEngine:
 
     # Storage
 
+    @contextmanager
+    def defer_config_publication(self) -> Iterator[None]:
+        """Publish only after activation and its recovery journal finish.
+
+        The caller must serialize routing admission and catalog writers for the
+        entire scope. No SQLite job is submitted for an aborted candidate.
+        """
+        pending = [False]
+        token = self._config_publication.set(pending)
+        try:
+            yield
+        finally:
+            self._config_publication.reset(token)
+        if pending[0]:
+            self.config_hash = self._register_config(self.catalog)
+
     def _register_config(self, catalog: Catalog, source: str | None = None) -> str:
         active_source = source if source is not None else self.config_source
         snapshot = catalog.routing_snapshot()
+        pending = self._config_publication.get()
+        if pending is not None:
+            pending[0] = True
+            return build_config_hash(snapshot)
         try:
             return self.record_store.register_config(snapshot, active_source)
         except Exception as error:

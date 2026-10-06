@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["supplier-cloud.spec.ts", "supplier-cloud.config.ts", "supplier-cloud.tsx"]
+}

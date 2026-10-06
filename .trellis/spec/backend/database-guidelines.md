@@ -220,6 +220,119 @@ Wrong: query SQLite from a request thread and label missing outcomes `active`.
 Correct: submit the aggregate query with `wait=True` and label those rows
 `incomplete_evidence`.
 
+## Scenario: configuration publication after serialized activation
+
+### 1. Scope / trigger
+
+Provider/model/default writes and gateway-key rotation may activate a candidate
+catalog before their recovery journal is removed. A later activation, settings,
+or journal-completion failure must not leave that candidate in `config_versions`.
+Routing-overlay apply/reset also activate a candidate inside their file/runtime
+transaction. Both transaction owners preserve disk/runtime rollback. The routing
+engine owns publication admission; the record store retains its queue and schema.
+
+### 2. Signatures
+
+```python
+RoutingEngine.defer_config_publication(self) -> Iterator[None]
+RoutingEngine.reload_catalog(
+    self, catalog: Catalog, source: str | None = None,
+    *, registry: StrategyRegistry | None = None,
+) -> None
+RoutingEngine._register_config(self, catalog: Catalog, source: str | None = None) -> str
+RecordStore.register_config(self, payload: dict[str, Any], source: str) -> str
+```
+
+`defer_config_publication` is a context manager. Gateway management admission
+uses `with reload_lock, active.engine.defer_config_publication():` around
+`ProviderConfiguration.command` or `gateway_credential`. The reload lock remains
+held until deferred publication finishes. The context-local marker belongs to
+that engine; other requests must not inherit a pending activation scope.
+
+`PUT` and `DELETE /v1/routing/configuration` use
+`with reload_lock, configuration_lock(active.models_file), active.engine.defer_config_publication():`.
+Preparation, overlay write/removal, activation and rollback remain inside that
+scope. `POST /v1/routing/reload` retains its existing parse, registry, storage and
+activation boundary; do not invent a post-activation failure to justify changing it.
+
+### 3. Contracts
+
+Within the scope, `_register_config` computes `build_config_hash` from the
+candidate routing snapshot without calling or enqueueing `register_config`.
+This also suppresses redundant publication of the restored catalog during
+rollback. Normal scope exit publishes only the final active catalog and source,
+after file replacement, activation, settings application and recovery-journal
+completion where applicable. Overlay apply/reset publish after their successful
+activation. The active hash remains the digest of that final routing snapshot.
+
+Exceptional exit resets the context marker and publishes nothing. Preserve all
+previous `config_versions` rows, including an existing row with the candidate's
+hash, its original source/timestamp, and every referenced decision, session,
+continuation and in-memory history record. No version deletion or queue drain
+can substitute for preventing the failed candidate from being submitted.
+
+Overlay rollback restores the original bytes/existence and all permission bits
+(`st_mode & 0o7777`). Capture the prior registry and pass it to `reload_catalog`
+with the prior catalog/source; constructing an equivalent replacement registry
+does not preserve runtime identity.
+
+Storage remains best effort: publication failure logs the fixed record-drop
+message and safe error type, retains the final snapshot digest, and does not
+roll back an otherwise committed management transaction. No new API payload,
+SQLite schema, environment key or storage setting is introduced. See
+`provider-configuration.md` for revision, authorization and recovery ownership.
+
+### 4. Validation & error matrix
+
+| State | Required behavior |
+| --- | --- |
+| Validate/prepare only | No candidate publication, file change or active-catalog replacement |
+| Successful management transaction | Publish final active snapshot only after journal completion; HTTP success remains valid |
+| Failure before/after reload, during settings, or removing the journal | Existing `500 provider_configuration_failed`; restore previous bytes, existence, permission modes and runtime; version rows remain exact |
+| Successful overlay apply/reset | Publish final active snapshot after overlay write/removal and activation |
+| Overlay activation fails before/after reload | Existing `500 overlay_apply_failed`; restore overlay bytes/existence/all permission bits, exact catalog/registry/source/hash, authentication and history; version rows remain exact |
+| Candidate hash already has a retained version | Preserve that row and its evidence on both failure and success; retain `INSERT OR IGNORE` semantics |
+| Recorder unavailable on successful publication | Keep committed files/runtime/hash and serve normally; record degradation without exposing secrets |
+| Concurrent chat during activation | Wait for management admission to finish; a failed candidate cannot appear in decision hashes or reach the SDK |
+
+### 5. Good / base / bad cases
+
+Good: a model edit commits, its journal is removed, and one final snapshot is
+submitted before the next decision uses its hash. Base: rotating a key without
+changing the routing digest retains the existing content-addressed row. Bad:
+reload submits an async candidate, activation later fails, and disk rollback
+leaves an unreferenced candidate version in SQLite.
+
+### 6. Tests required
+
+`tests/test_activation_publication.py` exercises synchronous and asynchronous
+registration, existing/missing candidate hashes, model/provider/default/gateway
+operations, failure before/after reload, settings and journal completion. Compare
+exact version rows after `flush()`, file existence/bytes/modes, catalog/registry
+identity, source/hash/authentication, session snapshot and retained history.
+Verify healthy chat and restart after rollback. Event-controlled concurrent chat
+must wait and record only the restored hash. On success, assert publication
+follows journal removal; injected recorder failure must retain a successful
+management response and functioning chat. The independent T8 matrix supplies
+additional activation/atomic-replacement fault points without modifying its
+frozen assertions.
+
+`tests/test_routing_activation_publication.py` adds apply with absent/present
+overlay and reset with an overlay installed before initial gateway load. Cover
+both registration modes, candidate hash absent/already retained and failure
+before/after engine activation. Compare flushed SQLite rows, exact files/modes,
+registry identity, auth/session/history and a subsequent healthy synthetic chat.
+For successful apply/reset, assert activation precedes publication; unavailable
+recording must not undo a committed overlay. A reset fixture must not pre-register
+the baseline hash before startup when testing its absent-candidate case.
+
+### 7. Wrong vs correct
+
+Wrong: register the candidate before activation, then delete its version by hash
+after a failure. That can erase retained evidence or race an async writer.
+Correct: suppress registration within the serialized activation scope and
+publish the final active snapshot only on successful transaction completion.
+
 ## Common mistakes
 
 - Do not perform SQLite work in FastAPI request threads.

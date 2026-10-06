@@ -24,6 +24,64 @@ def test_unsafe_url_is_rejected_before_dns(url: str) -> None:
         network.validate_target(url, resolver=resolver)
 
 
+@pytest.mark.parametrize("code", [*range(32), 127])
+@pytest.mark.parametrize("component", ["/models/{encoded}", "/models?{encoded}=ok", "/models?x={encoded}"])
+def test_decoded_controls_reject_before_dns_or_connection(code: int, component: str) -> None:
+    def forbidden(*args: Any) -> Any:
+        pytest.fail("Unsafe syntax reached DNS or connection")
+    url = "https://public.example" + component.format(encoded=f"%{code:02x}")
+    with pytest.raises(network.DiscoveryNetworkError, match="^invalid_url$"):
+        network.safe_get_json(url, resolver=forbidden, connection_factory=forbidden)
+
+
+@pytest.mark.parametrize("scheme", ["http", "https"])
+@pytest.mark.parametrize("authority", ["public.example", "[2606:4700:4700::1111]", "[::1]"])
+@pytest.mark.parametrize("port", ["", "0", "65536", "-1", "abc", "443.0"])
+def test_explicit_invalid_ports_reject_before_dns_or_connection(scheme: str, authority: str, port: str) -> None:
+    def forbidden(*args: Any) -> Any:
+        pytest.fail("Invalid port reached DNS or connection")
+    with pytest.raises(network.DiscoveryNetworkError, match="^invalid_url$"):
+        network.safe_get_json(
+            f"{scheme}://{authority}:{port}/models", allow_private_network=True,
+            resolver=forbidden, connection_factory=forbidden,
+        )
+
+
+@pytest.mark.parametrize("authority,address,private", [
+    ("public.example", "8.8.8.8", False),
+    ("8.8.8.8", "8.8.8.8", False),
+    ("[2606:4700:4700::1111]", "2606:4700:4700::1111", False),
+    ("127.0.0.1", "127.0.0.1", True),
+    ("[::1]", "::1", True),
+])
+@pytest.mark.parametrize("port", [None, 443, 1, 8443, 65535])
+def test_safe_encoding_and_valid_https_ports_preserve_target(
+    authority: str, address: str, private: bool, port: int | None,
+) -> None:
+    suffix = "" if port is None else f":{port}"
+    request_target = "/models/a%20b/%2F/%25?x=hello%20world&cursor=a%2Bb%26c%3Dd&%71=ok&empty="
+    target = network.validate_target(
+        f"https://{authority}{suffix}{request_target}", allow_private_network=private,
+        resolver=lambda *_: [address],
+    )
+    assert target.port == (443 if port is None else port)
+    assert target.address == address
+    assert target.request_target == request_target
+    assert target.host_header == authority + (suffix if port not in {None, 443} else "")
+
+
+@pytest.mark.parametrize("authority", ["127.0.0.1", "[::1]"])
+@pytest.mark.parametrize("port", [None, 80, 1, 8080, 65535])
+def test_private_http_preserves_valid_ports(authority: str, port: int | None) -> None:
+    suffix = "" if port is None else f":{port}"
+    target = network.validate_target(
+        f"http://{authority}{suffix}/models?cursor=a%2Bb", allow_private_network=True,
+    )
+    assert target.port == (80 if port is None else port)
+    assert target.host_header == authority + (suffix if port not in {None, 80} else "")
+    assert target.request_target == "/models?cursor=a%2Bb"
+
+
 @pytest.mark.parametrize("address", ["127.0.0.1", "::1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "fd00::1"])
 def test_private_addresses_need_explicit_opt_in(address: str) -> None:
     host = f"[{address}]" if ":" in address else address
@@ -157,7 +215,7 @@ def test_zero_length_body_keeps_json_validation_and_bodyless_304_is_valid() -> N
     assert fetch_response(memory_response(b"HTTP/1.1 304 Not Modified\r\nContent-Length: 0\r\n\r\n")).status == 304
 
 
-@pytest.mark.parametrize("status,code", [(301, "redirect_rejected"), (302, "redirect_rejected"), (307, "redirect_rejected"), (401, "authentication_failed"), (403, "authentication_failed"), (429, "rate_limited"), (500, "upstream_failed")])
+@pytest.mark.parametrize("status,code", [(301, "redirect_rejected"), (302, "redirect_rejected"), (307, "redirect_rejected"), (401, "authentication_failed"), (403, "authentication_failed"), (404, "address_not_found"), (405, "listing_unsupported"), (501, "listing_unsupported"), (429, "rate_limited"), (500, "upstream_failed")])
 def test_errors_are_fixed_and_redirects_are_never_followed(status: int, code: str) -> None:
     with pytest.raises(network.DiscoveryNetworkError, match=code) as error:
         fetch_response(Response(status=status, body=b"fixture-secret"))

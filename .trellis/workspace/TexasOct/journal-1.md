@@ -41,7 +41,7 @@ Repaired foreground runtime lookup, process ownership, and local proxy handling;
 [OK] **Completed**
 
 
-## Session 3: Complete standalone dashboard gateway connection page
+## Session 4: Complete standalone dashboard gateway connection page
 <!-- trellis-session: v=2 fp=8b61e90e6a70805a -->
 
 **Date**: 2026-10-03
@@ -146,35 +146,33 @@ Final public release, installed feature and approved default-path upgrade accept
 [OK] **Completed**
 
 
-## Session 2: Complete public v0.1.0 and actual operator acceptance
-<!-- trellis-session: v=2 fp=64fe4ef06681b633 -->
+## Session 7: 原生选择框箭头留白与宽屏对齐
+<!-- trellis-session: v=2 fp=8c25e3addb786f3b -->
 
-**Date**: 2026-10-03
-**Task**: Complete public v0.1.0 and actual operator acceptance
-**Branch**: `fix/v0.1.0-macos-release`
+**Date**: 2026-10-04
+**Task**: 原生选择框箭头留白与宽屏对齐
+**Branch**: `fix/select-spacing-alignment`
 
 ### Summary
 
-完成首次设置、分步 Provider/model 配置、全局默认路由、真实业务与正式 v0.1.0 发布；实际配置备份删除后公开重装，原记录保留，服务健康运行。
+单选框保留32px文字区与至少12.5px实测箭头内缩；Provider宽屏控件44px且顶部对齐。
 
 ### Main Changes
 
-- 正式 tag 指向精确验收 commit；公开四资产与 sidecars/digests 一致，报告提交不移动 tag。
-- 实际 config 编辑/overlay/reload、三个策略和 supplied-assistant 续聊通过；四次真实调用无重试，原 6 条业务元组分别保留至 10 条。
-- 保留原 306/2 与 204/1 失败、20/0 retained verifier 和 2048 reasoning-only 边界；已完成独立验收并归档任务。
+- 共享CSS保留原生选择语义与forced-colors后备；主表单items-start阻止邻接辅助选项拉伸选择框。
+- 独立分支只提交本任务；共享ProviderView只增加对齐utility，77个其他已有文件、分支和暂存区保持不变。
 
 ### Git Commits
 
 | Hash | Message |
 |------|---------|
-| `c5adab66927816fdd8542fc8c3c1586d29939679` | feat: enable incremental setup and global default routing |
-| `019a3030ad735db63167bc5176f245f89293c0e4` | docs: record installed business requirements acceptance |
+| `95ef46f8fbfd4ae8a900dfc4e23bd8c06294a93c` | fix(dashboard): align select controls and inset arrows |
+| `4aa0eef9cc1338cea6c2d0b97d623d12ad517d40` | chore(trellis): archive select control styling task |
 
 ### Testing
 
-- [OK] 970 backend；267 frontend unit；120 browser；344 native；Pyright/types/lint/build/freshness/lock/shell/validator 通过。
-- [OK] 精确发布 head 的四个 CI job 成功；公共 wheel/installer 各 119 项；实际公开重装 0；实际 completion 239/0、4 次 stream。
-- [OK] 最终 status/doctor 0、authorized health ok、数据库完整、empty activity、cleanup warning 0；backup/auth/history/source parity 均保留。
+- [OK] 233 unit tests、139完整browser cases、2个复核probe通过；当前共享前端快照另有21个select检查通过。
+- [OK] lint、生产/browser类型检查、隔离与共享build/freshness均通过；24张渲染像素测量验证箭头内缩与中心。
 
 ### Status
 
@@ -213,111 +211,3 @@ Delivered independent icon selection, mainstream provider templates and cloud se
 ### Status
 
 [OK] **Completed**
-
-
-## Session 8: Write-only Dashboard and headless credential setup
-<!-- trellis-session: v=2 fp=822eced0a987c860 -->
-
-**Date**: 2026-10-04
-**Task**: Write-only Dashboard and headless credential setup
-**Branch**: `feat/write-only-credential-config`
-
-### Summary
-
-Added protected JSON credentials, Dashboard initialization/rotation and write-only Provider forms. Verified file-only transports, rollback/privacy and installed artifacts.
-
-### Main Changes
-
-- Gateway, LLM and decision credentials resolve from JSON, dotenv and captured environment with safe public projections.
-- Dashboard clears submitted secret inputs and hands over rotation authentication before retrying stale reads.
-- CLI/install/container paths preserve operator files and enforce shared transport-reference guards.
-
-### Git Commits
-
-| Hash | Message |
-|------|---------|
-| `015d384` | feat(credentials): support write-only dashboard and file setup |
-
-### Testing
-
-- [OK] 841 Python tests; Pyright clean; 238 frontend tests; lint/build and bundle freshness passed.
-- [OK] 56 Provider/credential browser regressions plus real gateway and default-installed initialization passed.
-- [OK] Final installed wheel passed 102 checks; digest verified; independent review PASS.
-
-### Status
-
-[OK] **Completed**
-
-
-## Session 7: 原生选择框箭头留白与宽屏对齐
-<!-- trellis-session: v=2 fp=8c25e3addb786f3b -->
-
-**Date**: 2026-10-04
-**Task**: 原生选择框箭头留白与宽屏对齐
-**Branch**: `fix/select-spacing-alignment`
-
-### Summary
-
-单选框保留32px文字区与至少12.5px实测箭头内缩；Provider宽屏控件44px且顶部对齐。
-
-### Main Changes
-
-- 共享CSS保留原生选择语义与forced-colors后备；主表单items-start阻止邻接辅助选项拉伸选择框。
-- 独立分支只提交本任务；共享ProviderView只增加对齐utility，77个其他已有文件、分支和暂存区保持不变。
-
-### Git Commits
-
-| Hash | Message |
-|------|---------|
-| `95ef46f8fbfd4ae8a900dfc4e23bd8c06294a93c` | fix(dashboard): align select controls and inset arrows |
-| `4aa0eef9cc1338cea6c2d0b97d623d12ad517d40` | chore(trellis): archive select control styling task |
-
-### Testing
-
-- [OK] 233 unit tests、139完整browser cases、2个复核probe通过；当前共享前端快照另有21个select检查通过。
-- [OK] lint、生产/browser类型检查、隔离与共享build/freshness均通过；24张渲染像素测量验证箭头内缩与中心。
-
-### Status
-
-[OK] **Completed**
-
-
-## Session 10: Completed-branch integration acceptance
-<!-- trellis-session: v=2 fp=5c6d41f98d8be24d -->
-
-**Date**: 2026-10-05
-**Task**: Completed-branch integration acceptance
-**Branch**: `main`
-
-### Summary
-
-Combined four completed branch tips and verified the v0.1.1 source for one squash delivery.
-
-Delivered the accepted tree to local main in one signed single-parent squash, restored all 231 latest protected files and 141 captured index entries, and deleted integrated local branches. Retained recovery refs/bundles and cleared only this task's assignment. Final amended commit and runtime cleanup proof are retained under `.trellis/.runtime/completed-main-merge/`.
-
-### Main Changes
-
-- Preserved main lifecycle, connection-page and canvas fixes while integrating initialization, default routing, managed credentials, selects and provider icons/presets.
-- Repaired legacy gateway credential provenance and synchronous browser hit sampling; retained all historical journal sections and failed acceptance evidence.
-- Retained initial and later native recovery snapshots; the latest capture preserves 231 files and 141 protected staged entries.
-
-### Git Commits
-
-| Hash | Message |
-|------|---------|
-| `1fcd9ac3d80617292464b64d1aa417973586290a` | fix: reconcile completed gateway branch integration |
-
-### Testing
-
-- [OK] 1189 backend tests; full Pyright with zero errors/warnings; lock, frontend freshness, build and release validation passed.
-- [OK] 311 frontend units, application/browser TypeScript and lint passed; four existing Fast Refresh warnings retained.
-- [OK] 243 browser cases once and 32 focused instances passed, zero skips/retries; actual synthetic decision/LLM key matching and owned-service cleanup passed.
-- [OK] Installed wheel v0.1.1 passed 169 checks; all 94 package files and 42 static files matched; independent repair/sampling/recovery reviews passed.
-
-### Status
-
-[OK] **Completed**
-
-### Next Steps
-
-- No product work remains for this task. The final delivery proof records metadata amendment, preserved files/index and temporary-worktree cleanup.

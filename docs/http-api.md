@@ -40,7 +40,7 @@ models can be configured after entering the console.
 | `GET` | `/dashboard` | Bundled operator UI (a Vite build shipped inside the package) served by the gateway process itself. |
 | `GET` | `/v1/setup` | Initialization status and optional configuration progress. |
 | `POST` | `/v1/setup` | Set the first management key through local bootstrap. |
-| `GET` | `/v1/models` | OpenAI model list: registered strategy names first, then concrete catalog model IDs. |
+| `GET` | `/v1/models` | OpenAI model list: registered strategy names first, then enabled concrete catalog model IDs. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot plus `session_strategy`. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and their policies. |
 | `POST` | `/v1/routing/preview` | Route a chat request through one or more strategies without serving it. |
@@ -56,6 +56,7 @@ models can be configured after entering the console.
 | `POST` | `/v1/provider-configuration/validate` | Validate provider changes or confirmed model imports without writing or activating them. |
 | `PUT` | `/v1/provider-configuration` | Apply validated provider changes and confirmed model imports to the baseline and credential file. |
 | `POST` | `/v1/provider-discovery` | Fetch candidate upstream models for a saved or in-memory LLM provider. |
+| `POST` | `/v1/provider-connection-test` | Test a saved or candidate LLM provider through a bounded model-listing request. |
 | `POST` | `/v1/provider-metadata` | Look up price, capability, and limit suggestions with source information. |
 | `GET` | `/v1/routing/configuration` | Editable routing surface: rule order, labels and their pools, every model with tags and priority, plus overlay state. |
 | `POST` | `/v1/routing/configuration/validate` | Validate an overlay payload against the full catalog pipeline without applying it. |
@@ -239,6 +240,12 @@ review, and explicit confirmation. A failed layout write reports an error and
 restores the last confirmed layout instead of silently claiming that the new
 coordinates persisted.
 
+An initial layout GET failure or `read_error` does not authorize an empty-layout
+PUT. The Dashboard blocks layout editing and retries GET to obtain a trustworthy
+snapshot first. A valid empty or missing-file default remains editable. Stale
+read/write callbacks from a suspended connection cannot replace the current
+snapshot or deliver an obsolete authentication failure after reconnection.
+
 Configured path and monitoring views show inherited global destinations for empty
 selectable pools. These dashed edges have no membership handle and cannot be
 reconnected or removed. They do not add tags or write inherited membership into
@@ -252,9 +259,13 @@ registry. Unassigned tag-based label pools remain valid editable states. An edit
 that names an unknown model, label or selection mode, or changes storage settings
 is rejected with the parser's
 own message and the active catalog is left alone. A write that fails after the
-file was replaced restores the previous content and reloads the previous catalog,
-then returns `500 overlay_apply_failed`. Each applied change registers a
-`config_versions` row, so the applied catalog is auditable by hash.
+file was replaced restores the previous content, existence and permission bits,
+with the exact previous catalog and strategy registry, then returns
+`500 overlay_apply_failed`. Failed apply/reset activation leaves existing
+`config_versions` rows and request/session history unchanged. Successful
+activation publishes the accepted content-addressed configuration after the
+overlay transaction completes. Recording remains best effort; its failure does
+not undo a committed overlay or turn that successful response into a write failure.
 
 Dashboard routing and canvas-layout writes require a configured `gateway.api_key_env`.
 Without one, they return `403 config_writes_disabled`. Their read routes remain
@@ -304,7 +315,7 @@ An explicit `icon_id` overrides automatic brand artwork without changing brand,
 transport, instance or model IDs; unknown icon IDs remain valid display metadata.
 
 Both validation and apply accept `{expected_revision, operations}`. An operation
-upserts a provider, deletes an unreferenced provider, explicitly imports models,
+upserts a provider, deletes an unreferenced provider, imports or edits models,
 or sets the global default model as described under Initialization.
 For example, a candidate LLM provider can be submitted as:
 
@@ -397,7 +408,9 @@ are illustrative; use the serving provider's applicable values.
 Validation leaves files, process environment, and the active registry unchanged.
 Apply uses a file lock and checks the expected revision; a stale revision returns
 `409 revision_conflict`. File replacement or activation failure restores the old files and active
-catalog. CLI provider mutations use the same transaction boundary.
+catalog, including the previous files' existence and permission modes. Failed management
+activation does not register the candidate in `config_versions`; existing versions and
+request history remain intact. CLI provider mutations use the same transaction boundary.
 
 Validation and successful apply return the configuration snapshot plus
 `{valid: true, applied, imported, skipped}`. Validation keeps the current revision
@@ -452,7 +465,67 @@ returns `403 gateway_bootstrap_unavailable`. Write or activation failures return
 `500 gateway_credential_failed` after restoring the old state. Errors use fixed
 text and never quote submitted values or file content.
 
+Whole-model edits use `{action: "update_model", model_id, model}`. `model_id` is
+the existing canonical `provider/upstream_model` ID; `model` uses the same strict
+record shape as import. Provider and upstream identity are immutable. The edit
+validates the baseline and effective overlay catalog before saving atomically,
+and uses the same revision/conflict and activation rollback rules as other writes.
+LLM `upsert` operations and provider selectors accept optional
+`transport_credentials: Record<parameter_name, CredentialChange>`. Each parameter
+must have a declared `provider.param_env` reference. For example,
+`{"vertex_credentials":{"action":"set","value":"synthetic-value"}}` sets
+the value for that binding. KEEP preserves local credential bytes; CLEAR removes
+JSON and dotenv assignments and may reveal an inherited value. SET stores literal
+text in the protected credential store. Decision upserts reject transport actions.
+The map accepts at most 128 entries; names are ASCII identifiers of at most 256
+characters. No arbitrary store names are accepted.
+
+Writes use the existing revision and rollback transaction. Sharing checks exclude
+only the edited binding and retain every other consumer, including the supplier's
+primary key and other parameters. They check the completed operation sequence.
+Candidate test, discovery and metadata selectors apply actions only in memory.
+Provider snapshots include `transport_credential_presence` booleans for declared
+parameters; responses never contain resolved values. Native cloud model listing
+remains unsupported where no bounded listing adapter exists.
+
+Omitted tags, priority, quality and metadata retain their baseline values.
+An explicitly supplied metadata envelope replaces the previous envelope; callers
+must retain any source evidence and confirmations they want to keep.
+Overlay-owned tags and priority remain in the overlay; an effective model view
+cannot copy those values into the baseline through this operation.
+
+Models accept optional `display_name: string|null` and `enabled: boolean`.
+Omitted `enabled` means true. Disabled models remain visible in management but
+are excluded from `/v1/models`, automatic selection, explicit requests and
+session pins. A disabled global default produces `setup_incomplete` when needed;
+setting a default explicitly requires an enabled model. Models may store optional
+nullable `cost.cache_read_per_million` and `cost.cache_write_per_million`, in USD
+per million tokens. Omission or null means unknown. These fields do not change
+the existing input/output request-cost estimate. Prices must be finite and
+nonnegative; limits must be positive integers or null, and known output limits
+must not exceed known context limits. New, imported or changed quality is between
+0 and 1. An update can omit quality or retain a finite legacy value equal to the
+actual stored record, including `2.5`; a client compatibility flag cannot grant
+this exception. Priority is a signed integer, excluding booleans. Confirmed
+provenance must match all saved runtime fields, including cache prices.
+
 ## Upstream discovery and metadata
+
+`POST /v1/provider-connection-test` accepts the same LLM provider selector and
+optional candidate credential as discovery. It requires the configured Dashboard
+Bearer key and never saves configuration or sends a generation request. Its
+response is `{provider_id, status, scope: "model_listing", model_count, warnings}`.
+Status is `success`, `authentication_error`, `address_error`, `network_error`,
+`unsupported`, or `incomplete`. A successful listing does not establish generation
+availability. Upstream credential rejection returns HTTP 200 with
+`authentication_error`; a rejected Dashboard key returns HTTP 401 before any
+probe. Missing declared upstream credentials return `incomplete`; transports
+without a supported safe listing probe return `unsupported`. Address failures
+include rejected targets, redirects and HTTP 404; HTTP 405/501 is unsupported.
+Warnings contain finite diagnostic codes, including `generation_unverified`, and
+never upstream bodies, addresses or secrets. The Dashboard translates these codes.
+The probe reuses discovery's address pinning, verified TLS, time/body/page limits
+and redirect rejection.
 
 `POST /v1/provider-discovery` accepts a saved `provider_id` or an in-memory
 `provider` candidate, with an optional write-only `credential`. It returns
@@ -475,7 +548,8 @@ generation or decision-provider endpoints.
 `upstream_models` and an optional `refresh` flag. It returns model suggestions
 with `fields`, `sources`, and warnings, plus retrieval time and stale-cache state.
 Each lookup item also has normalized `metadata` for the confirmation/import flow.
-Fields use `input_per_million`, `output_per_million`, `tools`, `vision`,
+Fields use `input_per_million`, `output_per_million`, optional
+`cache_read_per_million`, `cache_write_per_million`, `tools`, `vision`,
 `json_mode`, `reasoning`, `temperature`, `reasoning_effort`, `context_window`, and
 `max_output_tokens`. Missing fields remain unknown. Prices are USD per million
 tokens; conditional prices require review before import. Sources are matched to
@@ -493,7 +567,7 @@ projection as a metadata lookup item. Each source identifies `source`,
 `source_provider`, `source_model`, `fetched_at`, `applicable`, and a `fields` map.
 Field evidence includes `value` and `source_field`, with `unit` and `source_unit`
 where applicable. Sources may also contain their fixed public `url`,
-`source_updated_at`, `schema_revision`, `canonical_model_id`, original effort
+source_updated_at`, `schema_revision`, `canonical_model_id`, original effort
 declarations, and projected `pricing` conditions. Native-listing evidence contains
 no endpoint or credential. Source evidence can retain facts such as input-only
 limits or structured-output support that cannot directly fill a routing field.
@@ -506,7 +580,14 @@ the safe evidence and price conditions. Its `fields` entries use
 `{status, value, source_ids, method?, confirmed_at?}`; statuses are `known`,
 `unknown`, `conflict`, and `confirmed`. Preserve the normalized sources when
 confirming or manually editing values. A confirmed field value must match the
-corresponding imported routing value. The complete envelope constraints are in
+corresponding imported routing value. Effort capabilities and non-null known or
+confirmed effort fields use the existing ladder order with duplicates removed
+before confirmation comparison. Raw source effort history keeps its original
+order, duplicates and vendor text within the 16-item bound. Validate the complete
+original envelope's 262,144-byte limit before normalization. Source text and raw
+effort items reject C0 controls and DEL before any write or activation. Legacy
+reads project canonical fields without rewriting configuration files.
+The complete envelope constraints are in
 [`models-config.md`](./models-config.md#modelsmetadata).
 
 ## Strategy selection
