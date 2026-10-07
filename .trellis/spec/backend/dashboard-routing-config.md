@@ -720,7 +720,7 @@ The projection carries an opaque process instance ID, completeness flag and aggr
   ID, including when two same-brand connections share an upstream model ID.
   Preserve the shared model transaction and evidence contracts. Supplier search,
   kind changes, preset browsing, deletion and connection editing consult the
-  aggregate dirty/pending guard before hiding model drafts. Escape from a native
+  aggregate dirty/pending guard before hiding model drafts. Escape from a webpage
   model dialog must not invoke the enclosing supplier editor's dismissal handler.
   Model query results, failure notices and retries stay with their request's
   supplier; a shared manager response must not populate another group's import
@@ -738,12 +738,21 @@ The projection carries an opaque process instance ID, completeness flag and aggr
   imports and configured-model updates expose catalog-read retry only in their
   owning supplier, without another configuration write or another group's draft
   discard. A prior configured save must not produce a second import-error alert.
-- Native dialogs intercept Escape at keydown, prevent its browser default and
-  call the same guarded close handler used by Cancel/backdrop. Retain `cancel`
-  handling as a fallback, but do not rely on `cancel.preventDefault()` alone:
-  repeated native close requests can emit a non-cancelable event and bypass a
-  rejected close. Browser coverage must include pending save, failed save,
-  Keep editing, repeated Escape, retained draft and final discard/focus return.
+- Model dialogs use shadcn/Radix webpage modal composition with controlled open
+  state. Escape and outside dismissal request the parent's guarded close; a
+  rejected pending or dirty close leaves the modal mounted. Radix owns focus
+  trapping and dismissal. Retain the application's visible return trigger or
+  supplier fallback. Authentication suspension removes the portal while keeping
+  the model draft, and close autofocus must not enter a hidden or inert workspace.
+  Browser coverage includes pending save, failed save, Keep editing, repeated
+  Escape, retained draft, final discard/focus return and reconnection. Do not add
+  HTMLDialogElement/showModal/cancel handling or native-menu/HID harnesses.
+  When a model transaction or read-only transition disables its focused
+  control, the model owner moves focus to the existing modal Content before the
+  next Tab. Keep this handoff in the business state transition; Radix retains
+  keyboard containment. Held validation and PUT coverage must check forward and
+  reverse traversal while fields and footer actions are disabled, with focus
+  inside the visible modal and never on a disabled control or outside guard.
 - Use progressive disclosure for dense operational detail: summarize the
   selected live session and known recorded outcome first, then keep source
   evidence and provider observations available through accessible controls.
@@ -808,7 +817,7 @@ The projection carries an opaque process instance ID, completeness flag and aggr
 `AppShell` presents only the connection page while access is unresolved or a
 key is required. Initial admission does not mount dashboard panels. After a later
 401, retain the existing workspace and drafts while hiding it and making it
-inert. Suspend native dialogs, restore them after successful reconnection and
+inert. Suspend webpage dialog portals, restore them after successful reconnection and
 skip inert focus-restoration targets. Presentational connection controls reuse
 the existing palette and UI primitives; they do not own API or storage logic.
 
@@ -862,6 +871,39 @@ tests also cover retained drafts, cancelled hidden work and GET-only recovery.
 After a default-model revision conflict, Save/Clear remain blocked until a fresh
 configuration read succeeds; changing the selection or failing that read cannot
 restore write admission.
+
+### Supplier loading and import review ownership
+
+`ProviderView` renders `providers.empty` only when `manager.configuration`
+exists, `manager.loading` is false, no read-owned error is present, and the
+projected supplier list is empty. An unresolved initial read, a failed read and
+a held retry must keep their loading/error state without also declaring an empty
+configured catalog. A successful empty read enables the normal Add action.
+
+`ProviderModels` tracks the matching `sourceResponse` and `evidence` actually
+applied inside its existing guarded synchronization microtask. Import review
+belongs to that evidence and its configuration generation. Authentication may
+clear `queryRequest` through `cancelQuery(true)` while retaining the same
+evidence; clearing that handle alone preserves `confirmed`, selected candidates
+and manual draft values. A newly applied matching result, an owned query error
+or a changed evidence version clears confirmation and requires another review.
+Foreign-owner replies cannot certify this supplier. Selection, field edits,
+batch changes and successful import keep their existing confirmation resets.
+
+| Transition | Review and write behavior |
+| --- | --- |
+| Validation or write401, then reauthenticate with the same evidence | Checked review, selection and manual values remain; no automatic write |
+| Explicit query returns new matching evidence | Review clears; retain the intended draft and require confirmation before import |
+| Owned query fails or configuration revision changes | Review clears; retain selection/manual values and use explicit recovery |
+| Another supplier returns metadata | Preserve this supplier's reviewed manual draft; do not certify foreign or unknown data |
+
+Required browser assertions cover held initial read,503,held retry and successful
+empty read with zero writes. Preserve both original post-401 `.toBeChecked()`
+assertions, alpha/beta selection, manual price19 and exact validation/PUT counts.
+Supplementary recovery must first assert retained same-evidence review, then
+deliberately obtain new evidence and assert reconfirmation. A blanket
+`setConfirmed(false)` on every `queryRequest` change loses reviewed work during
+authentication; reset when matching evidence or its applicability changes.
 
 Use portable per-test output paths for screenshots and private evidence. For
 computed button contrast, wait for active color transitions to finish and assert

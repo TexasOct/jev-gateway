@@ -31,6 +31,10 @@ Use [current delivery status](acceptance-contexts.md#current-delivery-status) as
 
 No outstanding PRD row or confirmed review defect; browser failures receive cause-specific fixes rather than deleted assertions. Secrets stay synthetic in fixtures/screenshots. Public metadata retrieval may be inspected read-only; tests mock sources and never generate upstream completions. Preserve pre-existing edits even when they overlap integration files.
 
+## Web Dialog update
+
+The user's explicit removal request supersedes native Dialog implementation assertions. Remove HTMLDialogElement/showModal/cancel handling, native-menu/HID drivers and the standalone native Dialog harness. Replace the modal with shadcn/Radix webpage composition, retain parent-owned pending/dirty decisions and authentication activity ownership, and migrate active business tests to role/visibility/focus/request assertions. Preserve unrelated canvas pointer, native color, browser confirm and beforeunload behavior. Historical native failures remain records; they do not require new HID execution. Verify lint, application/browser TypeScript, unit tests, fresh build and affected browser business cases before the independent affected-source rechecks. The wider component replacement plan waits until business acceptance has priority.
+
 # Independent acceptance ownership
 
 | Task | Fresh acceptance context | Required record |

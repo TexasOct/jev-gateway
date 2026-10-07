@@ -141,7 +141,7 @@ for (const [index, presets] of templateGroups.entries()) {
       await expect(page.getByRole("combobox", { name: preset.kind === "llm" ? en.pmType : en.pmProtocol, exact: true })).toHaveValue(preset.type ?? preset.protocol!);
       await expect(page.getByLabel(en.pmEndpoint, { exact: true })).toHaveValue(preset.api_base ?? "");
       const reference = await capturedReference(page);
-      if (["vertex_ai", "bedrock"].includes(preset.type ?? "")) expect(reference).toBeNull();
+      if (!needsPrimaryCredential(preset)) expect(reference).toBeNull();
       else expect(reference).not.toBeNull();
       if (preset.kind === "llm") {
         await expect(page.getByLabel(en.pmNativeEndpoint)).toBeChecked({ checked: preset.api_base === null });

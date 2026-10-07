@@ -370,7 +370,7 @@ export function ProviderView({ manager, t }: Props) {
       className="mx-auto grid w-full min-w-0 max-w-3xl gap-4 text-ink"
       aria-label={t("spConnections")}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !manager.pending && !(event.target instanceof Element && event.target.closest("dialog"))) {
+        if (event.key === "Escape" && !event.defaultPrevented && !manager.pending && !document.querySelector('[role="dialog"][aria-modal="true"][data-state="open"]')) {
           event.preventDefault();
           leave();
         }
@@ -805,7 +805,7 @@ export function ProviderView({ manager, t }: Props) {
               </section>
             ))}
           </div>
-          {!profiles.length && (
+          {config && !manager.loading && (manager.errorOwner !== "read" || operationError === null) && !profiles.length && (
             <p className="m-0 text-sm text-ink-muted">
               {t("noConfiguredProviders")}
             </p>

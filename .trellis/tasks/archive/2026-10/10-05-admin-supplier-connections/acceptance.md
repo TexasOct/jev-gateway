@@ -217,3 +217,40 @@ Integrity: before this append every one of 2,542 final-candidate tracked files m
 Harness limitations are explicit. The first final live launch discovered archived spec copies and failed collection; archive exclusion corrects only test discovery. Primary/required-cloud extensions first used wrong locale keys; their failed runs and old sources remain, and corrected cases pass. The standalone cloud reporter's fixed filename replaced its earlier success JSON/output directory; the original command/log and source remain, the final JSON is candidate-specific, and future runs use an attempt prefix. This supporting nine-case pass does not replace any failed acceptance evidence.
 
 SP1/SP3/SP4 and IA3/IA4 remain REWORK. SP5/IA2 checks pass. SP2's exercised identity/reference checks and IA5's exercised guards pass, but their linked failed rows prevent an unqualified requirement signoff. The supplier task has no final PASS while S1-S4/O1 remain.
+
+
+## 当前工作源码业务验收（2026-10-07）
+
+本轮结论：**REWORK**。原始 45 行为 **44 PASS / 1 REWORK（U04）/ 0 OPEN**。SP1–SP5、IA2、IA4 通过本轮业务验收；IA3、IA5 因网页 Dialog 的 pending 焦点问题不能关闭。以上是附加的当前工作源码结论，前文各候选、原生 Dialog、旧失败和历史判定保留原样。
+
+独立上下文继续使用 Session `01a111c1-38ef-7690-879c-e47206c59eb8`，沿用原 planner/successor 的 lineage。基于 HEAD `55d71f0d74c4951ac6bad94d250bb120b8775df0` 的真实工作文件，依次冻结业务基线、Radix 网页 Dialog 和初始焦点修复三个私有快照；最终快照为 `.trellis/.runtime/admin-experience/business-current-source/suppliers/run-20261007-001341`。依赖为物理副本，static 由私有源码重新构建。父会话的 Dialog、依赖、AppShell、ProviderView 和测试交付均是有意的源码边界；更广的 shadcn 迁移未执行。当前产品及测试与最终快照一致，原 index 未改变。
+
+网页焦点发现使用 WEB1、WEB2 编号，原 successor R1–R5 和原45行ID保留原含义。WEB1 为重新认证时目标模型移除后，保留的只读 Dialog 焦点落在 body；原失败保留，父修复后原分支已通过。当前 WEB2 为 validation POST pending、字段及 footer action 禁用后按 Tab，焦点落在可见 modal 外的隐藏 `data-radix-focus-guard`。英文、中文均失败，默认5秒 observable polling 仍不能恢复。它违反 U04 的 modal 焦点限制，相关 dirty/pending 事务保护、零重复写入和草稿保留分别通过。修复归共享 Dialog / 模型工作区实现者；tester 未修改产品。
+
+最终源码的受影响公开范围为 **8 files / 101 cases，101 PASS**；完整公开 collection 为 **40 files / 403 cases**，没有执行默认 native 私有套件，也没有把 collection skipped 状态当成 runtime skip。独立焦点补充为6 PASS、2 FAIL，WEB2 定向复查2 FAIL。最终真实合成 gateway 的5项 canonical/事务恢复/401业务全部 PASS，16项网页 Dialog geometry、4项长错误状态 contrast、4项 settled footer contrast 通过。首业务快照另执行42个预设及真实凭证/文件场景、31项probe/cloud geometry和305项范围内后端检查；详见报告的精确计数与重放说明。
+
+首公开范围 **16 files / 214 cases：211 PASS、2 FAIL、1 SKIP** 保持原始结果。Ollama 必须存在 primary reference 的旧断言与匿名本地契约不符；native fixture 缺配置的历史构建失败随用户要求的替换退役；installed-wheel 默认配置测试因缺 admission 环境仍记 SKIP。实际源码网关空配置首次接入另行通过。父全后端/Pyright/packaging 仅为支持证据，不计入本独立执行数，不声称完整403项公开套件或发布门槛通过。
+
+所有凭证和网关 home 均为合成私有数据，上游仅 loopback 合成列表，没有真实生成、评估、云授权验证或 operator 写入。39个本地 SVG 的 source/manifest/emitted bytes、固定 DeepSeek 原图与 Lobe 许可证、CSP 及双主题/双语320px图片取证齐全。原生 implementation/HID fixtures 在当前源码已删除；本轮不再要求 HTMLDialogElement、`:modal`、`open` 或 OS-select 驱动。自有服务、端口和 startup marker 的清理记录于 runtime cleanup receipt。
+
+交付：
+
+- [当前业务报告](research/acceptance-current-business/report.md)
+- [原45行当前证据台账](research/acceptance-current-business/original-row-current-evidence.md) 与 [JSON](research/acceptance-current-business/original-row-current-evidence.json)
+- [浏览器逐case计数](research/acceptance-current-business/browser-case-accounting.json)
+- [源码/index完整性](research/acceptance-current-business/source-integrity.json)
+- [精确复现命令与环境](research/acceptance-current-business/reproduce.md)
+
+本轮未提交、暂存、重置、归档或操作任务生命周期。WEB2 修复后需在此相同独立验收上下文冻结修复源码，复查两个 pending Tab/Shift+Tab case 与原有401、readonly、dirty/反复 Escape、关闭焦点/fallback断言。当前没有整体 PASS 或最终发布批准。
+
+## Fresh independent pending-focus successor
+
+Current Supplier business acceptance: **PASS, 45 original rows passed, 0 REWORK, 0 OPEN**. WEB2 closes through fresh independent execution; IA3 and IA5 close for this business scope. The historical REWORK reports and failed WEB2 cases above remain unchanged. This is a fresh successor after context `61db8223-16ea-4aa` was removed and resumption rejected; it does not claim to be the preceding acceptance session.
+
+The actual working source was frozen in `.trellis/.runtime/admin-experience/business-current-source/suppliers/run-20261007-pending-successor`. All 401 manifest entries and the three historical snapshots were individually compared. Against the predecessor's final run, only ModelDialog and its strengthened public regression differ. Supplier/backend/manager/ModelFields/credential/asset bytes and installed dependency code remain unchanged. The private build passed; Radix is `1.2.0`, all 39 SVGs match emitted bytes, and the index stayed unchanged. A concurrent parent README documentation update is captured separately; executable and frozen source remain unchanged.
+
+Fresh executions total **71 PASS across 11 spec files, 0 skips/flaky/retries**: unchanged original English/Chinese WEB2 with default polling, 37 affected public cases, 30 predecessor focus/geometry/contrast cases and two stronger pending-direction cases. The latter use native pointer Save and record 35 Tab plus 35 Shift+Tab presses during each held validation POST and PUT, with every field and footer action disabled. Original removed-model/normal401, readonly, dirty/pending repeated Escape/backdrop, draft/payload, canonical identity and visible fallback predicates pass. English held-POST and Chinese held-PUT narrow dark screenshots were opened and inspected.
+
+The 44 earlier passed rows are explicitly reused only after source/dependency comparison, retaining their historical execution origins and exact original predicates. Eleven affected rows also link to fresh executions. Historical real gateway/file/CSP/backend evidence is not attributed to the new HTTP fixture runs. No duplicate full backend/public suite, physical/HID claim, product/public-test edit, lifecycle change, commit or operator action occurred. Owned listeners and all 19 recorded ports closed normally.
+
+The additive report is [current-pending-recheck.md](research/acceptance-current-business/current-pending-recheck.md). The preserved original-row register is [current-45row-pending-ledger.md](research/acceptance-current-business/current-45row-pending-ledger.md) and [JSON](research/acceptance-current-business/current-45row-pending-ledger.json). Raw receipts, case ledgers, static/source/dependency comparisons and cleanup evidence are under the new private run. Parent `0.1.3` publication, installation and remaining public gates retain their separate owners; this child gives no release approval.

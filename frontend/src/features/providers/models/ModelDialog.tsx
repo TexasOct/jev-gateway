@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { useLocale } from "@/shared/i18n";
 import { Dialog } from "@/shared/ui/Dialog";
@@ -17,6 +17,18 @@ export function ModelDialog({ identity, canonicalId, connectionLabel, initial, e
   const [discard, setDiscard] = useState(false);
   const [restore, setRestore] = useState(false);
   const [restoreFields, setRestoreFields] = useState<string[]>([]);
+  const fields = useRef<HTMLFieldSetElement>(null);
+  useLayoutEffect(() => {
+    if (!pending && !readOnly) return;
+    const modal = fields.current?.closest<HTMLElement>('[role="dialog"][aria-modal="true"]');
+    if (!modal) return;
+    const focused = document.activeElement;
+    // A save locks its focused button as well as the fields. Give Radix a
+    // stable focus target before the next keyboard traversal.
+    if (focused === document.body || (focused instanceof HTMLElement && modal.contains(focused) && focused.matches(":disabled"))) {
+      modal.focus({ preventScroll: true });
+    }
+  }, [pending, readOnly]);
   const [observedEvidenceVersion, setObservedEvidenceVersion] = useState(evidenceVersion);
   if (observedEvidenceVersion !== evidenceVersion) {
     setObservedEvidenceVersion(evidenceVersion);
@@ -42,7 +54,7 @@ export function ModelDialog({ identity, canonicalId, connectionLabel, initial, e
   </>}>
     {readOnly && <p role="status" className="text-sm">{t("mmUnavailableDraft")}</p>}
     {onReload && readOnly && <Button variant="outline" disabled={pending} onClick={onReload}>{t("pmReload")}</Button>}
-    <fieldset disabled={pending || readOnly} className="m-0 grid min-w-0 gap-5 border-0 p-0">
+    <fieldset ref={fields} disabled={pending || readOnly} className="m-0 grid min-w-0 gap-5 border-0 p-0">
       {error != null && <p role="alert" className="m-0 text-sm">{t(error === 409 ? "mmConflictSave" : "pmError")}</p>}
       {error === 409 && onReload && <Button variant="outline" disabled={pending} onClick={onReload}>{t("pmReload")}</Button>}
       {(queryError != null || (draft.evidence && metadataSourceFailed(draft.evidence))) && <p role="alert" className="m-0 text-sm">{t("mmMetadataFailed")}</p>}

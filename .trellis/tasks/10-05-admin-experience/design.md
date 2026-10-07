@@ -20,7 +20,7 @@ Native cloud setup also needs direct transport credential entry. Extend LLM `ups
 
 The contract worktree owns `frontend/src/shared/api/types.ts` and `client.ts`. The supplier worktree consumes the connection-test types/API and may leave compilation to integration if that contract is absent in its isolated base. The model worktree owns `ModelManagementView`, `ProviderModels`, `ModelFields`, pure draft helpers, configuration manager additions and the reusable Dialog. The parent wires a distinct models navigation destination and passes the selected supplier context.
 
-Dialog uses native modal semantics with controlled open state, Escape/outside close callbacks, focus restoration, a scrollable content body and a persistent footer. Parents own draft/discard decisions; failed writes leave the draft intact. Navigation guards aggregate active settings, supplier, model and workflow dirty state. No new frontend framework or remote asset dependency is introduced.
+Dialog uses shadcn/Radix modal composition rendered inside the webpage. Controlled open state routes Escape and outside-close requests through the parent's existing pending/draft guard. Radix owns the focus trap and dismissal mechanics; the application retains a visible return target or supplier fallback and suspends the portal during authentication loss. Keep the scrollable content body and persistent footer. Parents own draft/discard decisions; failed writes leave the draft intact. Navigation guards aggregate active settings, supplier, model and workflow dirty state. Use the focused Radix Dialog dependency with the existing palette, local assets and CSP. No remote runtime resource is introduced.
 
 # Parallel ownership
 

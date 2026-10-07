@@ -1,0 +1,42 @@
+{
+  "id": "admin-model-workspace",
+  "name": "admin-model-workspace",
+  "title": "模型管理导入与统一弹窗",
+  "description": "Add task-focused model management, automatic batch metadata preview and unified accessible model dialogs.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-05",
+  "completedAt": "2026-10-07",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-05-admin-experience",
+  "relatedFiles": [],
+  "notes": "Archived on user request after independent acceptance and parent verification closed all 38 original Models business requirements. Application finalizer, browser descendant shutdown, parent integration, installation and release remain open under 10-05-admin-experience. Final repair commit is pending; archive does not commit product changes.",
+  "meta": {
+    "closure": {
+      "disposition": "completed_business_scope",
+      "previous_status": "in_progress",
+      "acceptance_complete": true,
+      "acceptance_scope": "Original 38 Models business requirements only; parent lifecycle, installation and release excluded",
+      "evidence": [
+        "research/acceptance-current-business/status-404-recheck-report.md",
+        ".trellis/tasks/10-05-admin-experience/research/models-status-404-parent-verification.md"
+      ],
+      "archived_on_request": true,
+      "implementation_base_commit": "55d71f0d74c4951ac6bad94d250bb120b8775df0",
+      "accepted_source_digest": "33aebc929f6740e2194a50477120ad60b7cf1133983e34a908c5684f394ab768",
+      "final_commit_pending": true,
+      "remaining_owner": "10-05-admin-experience"
+    }
+  }
+}

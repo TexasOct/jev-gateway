@@ -50,7 +50,7 @@ test("whole App retains simultaneous Settings drafts and scopes failed writes", 
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }))).not.toContain("synthetic-unsaved-gateway-key");
 });
 
-test("native model dialog suspends for login and reopens with its failed draft", async ({ page, context }, testInfo) => {
+test("web model dialog suspends for login and reopens with its failed draft", async ({ page, context }, testInfo) => {
   const state = fixture();
   await installProviderFixture(context, state);
   await page.goto("/dashboard/");
@@ -61,7 +61,8 @@ test("native model dialog suspends for login and reopens with its failed draft",
   await dialog.getByLabel("Display name", { exact: true }).fill("Retained model name");
   state.rejectWrite = 401;
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(0);
+  await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("modal-suspended-login.png") });
   await reconnect(page);
   await expect(dialog).toBeVisible();

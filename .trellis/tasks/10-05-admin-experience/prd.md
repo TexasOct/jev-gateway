@@ -54,6 +54,7 @@ Five independent worktrees own Settings, Canvas, Suppliers, Model contracts and 
 
 # Compatibility invariants
 
+- Model editors use a modal rendered inside the webpage. The user explicitly removed the HTML native Dialog and its native-menu/HID implementation tests from the current scope. Keep business coverage for dirty consent, pending-write blocking, failed-save retention, keyboard/focus, authentication suspension and narrow-screen actions. The wider shadcn/ui control migration and its separate plan remain deferred.
 - Gateway and supplier secrets stay write-only and memory-only in the browser. Locale remains the only persisted browser preference.
 - Gateway initialization, configured-key write guards, atomic baseline writes and conflict/recovery semantics remain effective.
 - Existing catalogs without new optional fields retain their current runtime behavior. Model edits preserve qualified identities and routing references.

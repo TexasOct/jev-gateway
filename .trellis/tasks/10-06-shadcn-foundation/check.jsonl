@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Build, isolated verification and package quality standards."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Verify theme/API/storage/CSS compatibility."}
+{"file":".trellis/tasks/10-06-shadcn-ui-adoption/research/adoption-audit.md","reason":"CLI provenance and baseline constraints for foundation acceptance."}

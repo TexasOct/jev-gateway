@@ -1,6 +1,6 @@
 # Shared dashboard controls
 
-These project-owned components are adapted from shadcn/ui's `new-york-v4`
+Button, Card and Separator are adapted from shadcn/ui's `new-york-v4`
 registry source, retrieved on 2026-09-27:
 
 - https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/button.tsx
@@ -12,7 +12,8 @@ The copyright notice and license are retained in `LICENSE.shadcn.md`.
 We hand-added this small set because CLI initialization rewrites the CSS entry
 and adds aliases. This app already has Tailwind v4, a dynamic palette, and a
 single TypeScript config. No CLI, `components.json`, shadcn runtime,
-icon package, animation package, portal, or remote resource is required.
+icon package, animation package, or remote resource is required. Dialog uses
+Radix's browser portal as described below.
 
 ## Adoption
 
@@ -21,7 +22,8 @@ Variant classes are exported separately from `src/shared/ui/button-variants`
 to keep React Refresh component modules clean. `cn` in `src/shared/ui/utils`
 merges conditional Tailwind classes.
 Feature owners adopt these controls through their existing props and handlers;
-these modules do not load data or own editor, auth, locale, or theme state.
+the base controls do not load data or own editor, auth, locale, or theme state.
+Dialog's workspace and return-focus adapter is described below.
 
 ```tsx
 import { Button } from "@/shared/ui/button";
@@ -51,11 +53,46 @@ Card exports Header, Title, Description, Action, Content, and Footer slots.
 It supplies no landmark or heading role; callers choose the heading level.
 Separator defaults to decorative/horizontal. Set `decorative={false}` for a
 semantic separator; use `orientation="vertical"` with a bounded parent height.
-None of these components changes focus trapping, Escape handling, scrolling,
-canvas coordinates, or disclosure state. Keep native details/summary where used.
+Button, Card and Separator do not change focus trapping, Escape handling,
+scrolling, canvas coordinates, or disclosure state. Keep native details/summary where used.
 State-specific presentation classes may identify an element for tests or behavior;
 provide its visual difference with Tailwind variants or data attributes rather than
 relying on a class with no matching CSS rule.
+
+## Dialog
+
+`@/shared/ui/Dialog` adapts the [new-york-v4 Dialog composition](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/dialog.tsx)
+with the focused `@radix-ui/react-dialog` package at version `1.2.0`. Its
+public props remain `title`, `children`, `footer`, `onClose`, and optional
+`fallbackFocusRef`. Radix Root, Portal, Overlay, Content and Title provide a
+browser DOM modal, focus containment, Escape and outside dismissal. There is
+no extra close button; every dismissal request reaches the caller's `onClose`.
+The caller retains the draft and decides when to unmount the editor, so a
+pending write or dirty-discard choice keeps the modal open.
+
+`onOpenAutoFocus` starts focus on Content. After reconnect, an incoming catalog
+can disable a retained editor's fields; starting on Content keeps focus in the
+modal during that transition. Radix still owns Tab/Shift+Tab containment.
+
+ModelDialog also moves focus to Content when its pending/read-only transition
+disables the currently focused control. This runs with the business lock's
+layout update, so Radix's next keyboard traversal starts from an enabled modal
+target. It adds no keyboard listener or separate focus trap.
+
+The portal mounts under `document.body` only while `useWorkspaceActive()` is
+true. Authentication suspension removes it while the feature owner retains
+its draft. Existing Edit buttons are outside the Radix Trigger composition;
+the adapter captures the initiating button before autofocus and uses
+`onCloseAutoFocus` to restore it after an accepted close. Disconnected,
+disabled, hidden or inert targets are excluded; the caller's visible fallback
+receives focus when the initiating button is gone. Suspension and a resumed
+portal suppress obsolete return-focus work.
+
+Content uses the existing panel palette, an accessible title, no description
+reference, `max-w-3xl`, a `90dvh` height bound, a scrolling body and a wrapping
+footer. The overlay and content sit above the shared header. The [Radix Dialog
+documentation](https://www.radix-ui.com/primitives/docs/components/dialog)
+describes the controlled Root and autofocus callbacks used here.
 
 ## Styling boundary
 
@@ -78,6 +115,7 @@ virtual-list geometry belongs in feature JSX utilities; their semantic hooks rem
 available for measurement and testing.
 
 Runtime dependencies are `class-variance-authority`, `clsx`, `tailwind-merge`,
-`@radix-ui/react-slot`, and `@radix-ui/react-separator`. Targeted Radix packages
+`@radix-ui/react-slot`, `@radix-ui/react-separator`, and
+`@radix-ui/react-dialog`. Targeted Radix packages
 avoid installing the full primitive collection. No new browser storage is used.
 The existing `/dashboard/` base, package output path and gateway CSP stay intact.

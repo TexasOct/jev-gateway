@@ -36,7 +36,7 @@ for (const raw of ["existing", "vendor/family/model"]) test(`model evidence and 
   expect(state.metadataEvidence).toEqual(captured);
 });
 
-for (const readOnly of [false, true]) test(`native root and unknown focus stay contained in both Tab directions, readonly ${readOnly}`, async ({ page, context }) => {
+for (const readOnly of [false, true]) test(`model editor inspection and guarded keyboard close preserve focus, readonly ${readOnly}`, async ({ page, context }) => {
   const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [] };
   state.configuration.write_available = !readOnly;
   await installProviderFixture(context, state);
@@ -45,15 +45,27 @@ for (const readOnly of [false, true]) test(`native root and unknown focus stay c
   const trigger = configuredModelEdit(page, "fixture", "existing");
   await trigger.click();
   const dialog = page.getByRole("dialog");
-  for (const direction of ["Tab", "Shift+Tab"]) {
-    await dialog.evaluate((element) => (element as HTMLDialogElement).focus());
-    for (let i = 0; i < 35; i++) {
-      await page.keyboard.press(direction);
-      expect(await dialog.evaluate((element) => element.matches(":modal") && element.contains(document.activeElement) && !document.activeElement?.matches(":disabled"))).toBe(true);
-    }
-    await dialog.getByRole("heading", { level: 2 }).evaluate((element) => { (element as HTMLElement).tabIndex = -1; (element as HTMLElement).focus(); });
-    await page.keyboard.press(direction);
-    expect(await dialog.evaluate((element) => element.contains(document.activeElement) && document.activeElement !== element.querySelector("h2"))).toBe(true);
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(page.locator("dialog")).toHaveCount(0);
+  const name = dialog.getByLabel("Display name", { exact: true });
+  if (readOnly) {
+    await expect(name).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement) && !document.activeElement?.matches(":disabled"))).toBe(true);
+  } else {
+    await expect(name).toBeEnabled();
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  }
+  for (let step = 0; step < 35; step++) {
+    await page.keyboard.press("Tab");
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement) && !document.activeElement?.matches(":disabled"))).toBe(true);
+  }
+  for (let step = 0; step < 35; step++) {
+    await page.keyboard.press("Shift+Tab");
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement) && !document.activeElement?.matches(":disabled"))).toBe(true);
   }
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required gates and isolated browser execution."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Real pointer/scroll, occlusion, history and virtualization checks."}
+{"file":".trellis/tasks/10-06-shadcn-ui-adoption/research/component-migration-map.md","reason":"Operational geometry and responsive evidence matrix."}

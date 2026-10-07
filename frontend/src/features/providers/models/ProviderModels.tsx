@@ -26,6 +26,7 @@ export function ProviderModels({ providerId, selector, manager, t, candidate = f
   const [reviewVersion, setReviewVersion] = useState(manager.evidenceVersion);
   const [queryTargets, setQueryTargets] = useState<string[]>([]);
   const fallbackFocusRef = useRef<HTMLInputElement>(null);
+  const appliedEvidence = useRef<{ response: ProviderManagement["sourceResponse"]; evidence: ProviderManagement["evidence"] } | null>(null);
   const sourceMatches = manager.sourceResponse != null && manager.sourceResponse.configurationGeneration === manager.configurationGeneration && JSON.stringify(manager.sourceResponse.selector) === JSON.stringify(selector);
   const queryOwned = manager.queryRequest != null && manager.queryRequest.configurationGeneration === manager.configurationGeneration && JSON.stringify(manager.queryRequest.selector) === JSON.stringify(selector);
   const queryError = queryOwned ? manager.queryError : null;
@@ -36,6 +37,8 @@ export function ProviderModels({ providerId, selector, manager, t, candidate = f
     let current = true;
     void Promise.resolve().then(() => {
       if (!current) return;
+      const newEvidence = sourceMatches && (appliedEvidence.current?.response !== manager.sourceResponse || appliedEvidence.current?.evidence !== manager.evidence);
+      if (sourceMatches) appliedEvidence.current = { response: manager.sourceResponse, evidence: manager.evidence };
       setDrafts((previous) => {
         const next = Object.fromEntries(Object.entries(previous).map(([id, draft]) => {
           if (reviewVersion === manager.evidenceVersion) return [id, draft];
@@ -59,7 +62,7 @@ export function ProviderModels({ providerId, selector, manager, t, candidate = f
       });
       if (discovery) setManualItems((previous) => [...new Map([...previous, ...discovery.items].map((item) => [item.upstream_model, item])).values()]);
       setReviewVersion(manager.evidenceVersion);
-      if (sourceMatches || queryError !== null || reviewVersion !== manager.evidenceVersion) setConfirmed(false);
+      if (newEvidence || queryError !== null || reviewVersion !== manager.evidenceVersion) setConfirmed(false);
     });
     return () => { current = false; };
   }, [manager.evidence, manager.evidenceVersion, manager.sourceResponse, manager.queryRequest, queryError, manager.lastQueryMode, queryTargets, reviewVersion, discovery, sourceMatches]);

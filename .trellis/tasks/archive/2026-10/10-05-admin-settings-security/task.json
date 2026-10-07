@@ -1,0 +1,36 @@
+{
+  "id": "admin-settings-security",
+  "name": "admin-settings-security",
+  "title": "通用设置与访问安全",
+  "description": "Move the write-only gateway credential to Settings with dirty-state, error and auth feedback.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-05",
+  "completedAt": "2026-10-07",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "55d71f0d74c4951ac6bad94d250bb120b8775df0",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-05-admin-experience",
+  "relatedFiles": [],
+  "notes": "Archived after Settings/security child business acceptance PASS on 9a476c6 and current main inspection showing no separate Settings product delta beyond shared Dialog/model work. Parent integration, final current-source acceptance limits, installed/public gates and release remain with 10-05-admin-experience.",
+  "meta": {
+    "closure": {
+      "disposition": "completed_business_scope_no_settings_delta_on_main",
+      "previous_status": "in_progress",
+      "acceptance_complete": true,
+      "acceptance_scope": "Settings/security child business scope only; no parent release approval",
+      "evidence": "acceptance.md Final affected recheck of 9a476c6; current-status.md original business CLOSED; current branch diff has no AccessSecurity/GatewayCredentialForm product delta",
+      "archived_on_request": true,
+      "current_branch_delta": "No standalone Settings product files changed; current product deltas are shared Dialog/model surfaces."
+    }
+  }
+}

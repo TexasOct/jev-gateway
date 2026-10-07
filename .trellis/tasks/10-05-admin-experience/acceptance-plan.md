@@ -8,7 +8,11 @@
 
 后续用户补充了前端 Provider 源码整理与全部修改完成后发布 0.1.3。父 PRD 增加 OR1、RL1，目前共 33 条；原计划及断言保留，以下补充纳入最终父验收。用户已授权提交和发布，不需要再次申请发布许可。
 
-本轮已读：父 `prd.md`、`design.md`、`implement.md`、`research/current-state.md`、`task.json`、`check.jsonl`；五个子任务各自的 PRD、设计、执行计划、任务记录和检查清单；`.trellis/workflow.md`；backend 的 index、directory-structure、dashboard-routing-config、provider-configuration、credential-configuration、provider-identities、quality-guidelines、initialization、error-handling、logging-guidelines、cli-lifecycle；cross-layer-thinking-guide。另核对了 frontend package scripts、Vite/Playwright 配置、构建脚本、Pyright 配置、现有测试文件清单和 `docs/admin-experience.md`。文字按 `humanizer` 技能整理，质量检查方法参考 `trellis-check`，执行范围以本次授权为准。
+当前验收还须应用父 PRD 的最新布局指令：导航为 Monitoring、Strategy workflow、Suppliers、Settings；每个供应商连接下直接显示自己的模型，Edit 打开统一模型 Dialog，发现和批量导入留在该供应商下。用户已取消独立 Models 导航和额外模型详情入口要求。下方原计划中的五个导航、open-models 页面回调及第三详情入口保留为历史记录；最终 IA1、ME1、X1 和相关 U08 验收按最新供应商内联布局核对身份、字段、草稿、焦点与保存链路。
+
+本次续接源码为 `55d71f0d74c4951ac6bad94d250bb120b8775df0` 加待验收的 Dialog Escape 修复，仓库位于 `/Users/texas/Workspace/jev-gateway`。最终报告须区分历史通过记录、本轮实际执行和仍未验证的条目；具体交付状态统一维护在 `acceptance-contexts.md`。
+
+本轮已读：父 `prd.md`、`design.md`、`implement.md`、`research/current-state.md`、`task.json`、`check.jsonl`；五个子任务各自的 PRD、设计、执行计划、任务记录和检查清单；`.trellis/workflow.md`；backend 的 index、directory-structure、dashboard-routing-config、provider-configuration、credential-configuration、provider-identities、quality-guidelines、initialization、error-handling、logging-guidelines、cli-lifecycle；cross-layer-thinking-guide。另核对了 frontend package scripts、Vite/Playwright 配置、现有测试文件清单和 `docs/admin-experience.md`。文字按 `humanizer` 技能整理，质量检查方法参考 `trellis-check`，执行范围以本次授权为准。
 
 本轮唯一允许写入的文件是本文。没有产品、测试、公共配置、静态资产、任务生命周期、journal、spec 或提交操作。后续验收也不替实施方修产品代码；缺陷返回实施方，修复后由原独立验收上下文复查。
 
@@ -20,7 +24,7 @@
 | `10-05-admin-workflow-canvas` | `accept-canvas`；该目录 `acceptance.md` | WF1-WF6、画布的 IA3-IA5 | 检查报告与原生手势记录；验证共享导航、配置重挂载、布局和策略边界 |
 | `10-05-admin-supplier-connections` | `accept-suppliers`；该目录 `acceptance.md` | SP1-SP5、供应商的 IA2-IA5 | 检查报告与复查记录；验证模型入口、凭证变更和模型草稿联动 |
 | `10-05-admin-model-contracts` | `accept-contracts`；该目录 `acceptance.md` | SP4、MI3-MI5、ME3 的后端/API 契约与兼容 | 检查真实 HTTP/事务/路由证据；追踪最终 UI 的字段映射 |
-| `10-05-admin-model-workspace` | `accept-models`；该目录 `acceptance.md` | MI1-MI5、ME1-ME4、模型的 IA3-IA5 | 检查报告与复查记录；验证统一 Dialog、供应商上下文和整个保存链路 |
+| [10-05-admin-model-workspace](../archive/2026-10/10-05-admin-model-workspace/acceptance.md) | `accept-models`；归档目录 `acceptance.md` | MI1-MI5、ME1-ME4、模型的 IA3-IA5 | 检查报告与复查记录；验证统一 Dialog、供应商上下文和整个保存链路 |
 | `10-05-admin-experience` | 本父验收上下文；父目录 `acceptance.md` | IA1-IA5、DV1-DV3、所有跨子任务契约与全系统检查 | 独立阅读最终代码、运行集成检查并给父结论 |
 
 父上下文必须与六个实施/main 上下文及五个子验收上下文分别独立。报告记录实际上下文标识和负责角色；标签本身不能证明独立性。五个子报告各自保留需求审计、命令、证据、问题、结论和复查轮次。父报告不能替代缺失的子报告，也不能把实施方自测改称独立验收。

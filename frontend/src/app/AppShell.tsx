@@ -148,7 +148,7 @@ export function AppShell({
     if (needsKey && document.activeElement instanceof HTMLElement && document.activeElement.closest(".app-shell")) savedFocus.current = document.activeElement;
     const frame = requestAnimationFrame(() => {
       if (needsKey) document.querySelector<HTMLInputElement>("#gateway-api-key")?.focus();
-      else if (!document.querySelector("dialog[open]")) {
+      else if (!document.querySelector('[role="dialog"][aria-modal="true"][data-state="open"]')) {
         if (savedFocus.current?.isConnected) savedFocus.current.focus();
         if (!document.activeElement?.closest(".app-shell")) document.querySelector<HTMLButtonElement>("[data-dashboard-view-nav] button[aria-pressed='true']")?.focus();
         savedFocus.current = null;

@@ -94,7 +94,7 @@ test("pending model transaction locks supplier filtering and navigation and reta
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => state.writes.length).toBe(1);
   await expect(page.getByLabel("Search instances", { exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Decision providers", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Decision providers", exact: true, includeHidden: true })).toBeDisabled();
   await expect(page.locator("[data-dashboard-view-nav] button:enabled")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();

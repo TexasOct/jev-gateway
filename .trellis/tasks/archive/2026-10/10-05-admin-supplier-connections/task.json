@@ -1,0 +1,35 @@
+{
+  "id": "admin-supplier-connections",
+  "name": "admin-supplier-connections",
+  "title": "供应商连接与凭证体验",
+  "description": "Simplify supplier setup, automate stable IDs/references, retain credentials and add accurate connection tests.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-05",
+  "completedAt": "2026-10-07",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "55d71f0d74c4951ac6bad94d250bb120b8775df0",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-05-admin-experience",
+  "relatedFiles": [],
+  "notes": "Archived after fresh independent Supplier business acceptance PASS: 45 original rows passed, 0 REWORK, 0 OPEN. Parent integration, release, installed/public gates remain with 10-05-admin-experience.",
+  "meta": {
+    "closure": {
+      "disposition": "completed_business_scope",
+      "previous_status": "in_progress",
+      "acceptance_complete": true,
+      "acceptance_scope": "Supplier child business scope only; no parent release approval",
+      "evidence": "acceptance.md Fresh independent pending-focus successor; current-pending-recheck.md; current-45row-pending-ledger.md",
+      "archived_on_request": true
+    }
+  }
+}

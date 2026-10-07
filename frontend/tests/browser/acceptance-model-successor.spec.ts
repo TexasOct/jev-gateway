@@ -37,7 +37,7 @@ test("independent filtered selection preserves hidden choices and clear selectio
   expect(state.writes).toEqual([]);
 });
 
-for (const width of [320, 1280]) test(`independent native modal wheel footer ${width}`, async ({ page, context }, info) => {
+for (const width of [320, 1280]) test(`independent web modal wheel footer ${width}`, async ({ page, context }, info) => {
   await page.setViewportSize({ width, height: 640 });
   const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [] };
   state.configuration.models[0]!.routing_overlay_fields = [];
@@ -47,7 +47,9 @@ for (const width of [320, 1280]) test(`independent native modal wheel footer ${w
   const trigger = configuredModelEdit(page, "fixture", "existing");
   await trigger.click();
   const dialog = page.getByRole("dialog");
-  expect(await dialog.evaluate(el => el instanceof HTMLDialogElement && el.open && el.matches(":modal"))).toBe(true);
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(page.locator("dialog")).toHaveCount(0);
   await page.mouse.move(width / 2, 320);
   await page.mouse.wheel(0, 1800);
   const save = dialog.getByRole("button", { name: "Save", exact: true });
@@ -60,7 +62,7 @@ for (const width of [320, 1280]) test(`independent native modal wheel footer ${w
   const focusSteps: unknown[] = [];
   for (let i = 0; i < 35; i++) {
     await page.keyboard.press("Shift+Tab");
-    const step = await page.evaluate(() => ({ tag: document.activeElement?.tagName, html: document.activeElement?.outerHTML.slice(0, 500), modal: document.querySelector("dialog")?.contains(document.activeElement) }));
+    const step = await page.evaluate(() => ({ tag: document.activeElement?.tagName, html: document.activeElement?.outerHTML.slice(0, 500), modal: document.querySelector('[role="dialog"][aria-modal="true"]')?.contains(document.activeElement) }));
     focusSteps.push(step);
     await info.attach("reverse-focus.json", { body: JSON.stringify(focusSteps), contentType: "application/json" });
     expect(step.modal).toBe(true);
