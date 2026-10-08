@@ -477,6 +477,112 @@ finally { if (current()) setBusy(false); }
 setReadRetry((value) => value + 1);
 ```
 
+## Scenario: policy commitment and configuration-read recovery
+
+### 1. Scope / Trigger
+
+Use when a policy apply/reset succeeds but its confirming configuration read fails,
+or an apply/reset response is lost. The editor must distinguish a confirmed server write
+from a confirmed rendered configuration. Keep policy recovery separate from layout
+read/write recovery and authentication admission.
+
+### 2. Signatures
+
+```typescript
+// App.tsx; existing editor callers supply their operation owner.
+reloadConfiguration(current: () => boolean): Promise<void>
+// RoutingEditor.tsx callback and component-local recovery action.
+onReloaded(current: () => boolean): Promise<void>
+retryPolicyRead(): void
+```
+
+`reloadConfiguration` awaits `api.configuration()` directly and propagates its
+failure. It checks `current()` before installing the response and before subsequent
+monitoring/setup work. `App.run()` retains its existing catch-and-resolve behavior;
+its resolved promise cannot certify a configuration read.
+
+### 3. Contracts
+
+Apply remains `POST /v1/routing/configuration/validate`, explicit review, then one
+`PUT /v1/routing/configuration`. Reset remains an explicitly confirmed `DELETE`.
+Recovery repeats `GET /v1/routing/configuration`; it does not replay validation,
+PUT or DELETE. No request fields, endpoints, environment keys or storage change.
+
+The editor retains the current draft and raw inputs while read recovery is unresolved.
+Its pending boundary blocks navigation, edits, review, reset and discard; only the
+owned read retry is admitted. A lost apply/reset response has an unknown outcome and also
+requires a read before another mutation. Ordinary `ApiError` apply failures retain
+the review/draft/history for explicit retry under the backend rollback contract.
+
+An owned successful read restores the rendered server snapshot and clears recovery,
+selection, inspector, unfinished inputs and history. A retry clears its prior read
+error at admission; a later monitoring/setup error remains owned by root handling.
+Do this for the same hash as well as a
+changed hash. A successful apply collapses review; a confirmed reset preserves the
+information drawer's disclosure, including an uncertain reset confirmed by GET.
+Known reset `ApiError` failures retain the draft/history and allow a legitimate
+explicit DELETE retry. A non-`ApiError` DELETE failure enters `reset-unknown` and
+blocks policy/layout mutation until GET confirms the current snapshot; it must not
+report overlay removal or replay DELETE. Suspension invalidates old read owners. A
+keyboard-focused reset/review action must remain exposed in the narrow footer's
+horizontal scroll area before Enter can admit the operation. Verify native Tab
+focus, hit/bounds, request admission and rendered completion separately. A stale
+401 test must let the old read chain finally reject; a changed-credential GET
+retry that succeeds proves completion isolation, not obsolete error delivery. An old
+completion after reconnection cannot replace the new configuration, draft or busy
+state and cannot emit an unauthorized callback.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| PUT succeeded, confirming GET fails or fails again | Truthful saved/read-pending status; retain draft/raw inputs; GET retry only |
+| Apply/reset response lost, server committed or did not commit | Unknown-outcome status; block another mutation until GET confirms the server snapshot |
+| Ordinary apply error before commitment | Keep review and history; explicit retry may validate/apply again |
+| DELETE succeeded, confirming GET fails | Reset/read-pending status; retain local draft until explicit GET recovery |
+| Confirmed read has the existing hash | Restore the server draft and clear history/selection; keep reset disclosure |
+| GET returns 401 or metadata causes suspension during GET | Retain local work; reconnect through root admission; ignore the old completion |
+
+### 5. Good/Base/Bad Cases
+
+Good: one PUT commits the edited instructions and fallback; two GETs fail; a third
+GET confirms that exact snapshot without another PUT. Base: save or reset reads
+successfully and renders the confirmed snapshot. Bad: treating `await run(load)` as
+proof of a successful read, enabling review again after commitment, or collapsing
+the baseline preview during a same-hash reset recovery.
+
+### 6. Tests Required
+
+`canvas-policy-recovery.spec.ts` asserts held/duplicate writes, exact payload/raw
+input, repeat read failure, GET-only recovery, committed/uncommitted lost-response
+snapshots, read/metadata 401 suspension, old completion rejection, ordinary apply
+retry, and save/reset/hash/history boundaries. Check rendered nodes and the actual
+`.workflow-info` element; a receipt flag or nonexistent hidden selector is insufficient.
+
+`canvas-gesture-boundaries.spec.ts` holds native node/connection capture through
+inspector edits, undo/redo, discard and hash refresh. Assert released capture,
+exact remapped layout and selection, no stale writes and a fresh validation payload.
+History cancels held gestures before restoring its checkpoint. Discard skips a
+layout PUT when baseline and current layout are equal.
+
+`canvas-keyboard-departure.spec.ts` uses native Tab, typeahead, Delete, history and
+Enter for edit/review/save, visible focus and dirty/saved/layout-only departure.
+Native focus traversal can legitimately persist a changed viewport. Capture the
+departure request/layout baseline after navigation receives focus and layout work
+settles, then assert no additional mutation from cancel or departure. Locale is
+fixture setup. Preserve model-dialog dirty input, Keep editing and final visible
+trigger focus in `canvas-model-handoff-repair.spec.ts`.
+
+These are current-source regressions. Report their disposition separately from
+sealed historical program execution or untested state combinations.
+
+### 7. Wrong vs Correct
+
+Wrong: a swallowed GET failure resolves `onReloaded`, or retry calls `save()` and
+replays an already committed overlay. Correct: propagate the owned configuration
+read failure, retain recovery state, and use a guarded GET-only retry before
+restoring the confirmed rendered snapshot.
+
 ## Scenario: strategy canvas outputs and connection editing
 
 ### 1. Scope / Trigger

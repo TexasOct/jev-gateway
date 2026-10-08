@@ -15,6 +15,7 @@ import type { RoutingActivityPayload } from "@/shared/api/types";
 import type { useMonitoringData } from "./hooks/useMonitoringData";
 import { ProviderView } from "@/features/providers/suppliers/ProviderView";
 import type { ProviderManagement } from "@/features/providers/shared/useProviderManagement";
+import { CanvasModelEditor } from "@/features/providers/models/CanvasModelEditor";
 import { ConnectionPage } from "./ConnectionPage";
 import { GlobalDefaultModel } from "@/features/settings/GlobalDefaultModel";
 import { AccessSecurity } from "@/features/settings/AccessSecurity";
@@ -53,6 +54,9 @@ type Props = {
   onSetup?: (event: FormEvent<HTMLFormElement>) => void;
   onRetrySetup?: () => void;
   providerManagement?: ProviderManagement;
+  canvasModel?: { provider: string; upstream: string } | null;
+  onOpenCanvasModel?: (identity: { provider: string; upstream: string }) => boolean;
+  onCloseCanvasModel?: () => void;
   onStrategyDirtyChange?: (dirty: boolean) => void;
   onStrategyPendingChange?: (pending: boolean) => void;
   onUnauthorized?: () => void;
@@ -77,12 +81,12 @@ type Props = {
   onRefresh: () => void;
   onConnect: (event: FormEvent<HTMLFormElement>) => void;
   onKeyDraftChange: (value: string) => void;
-  onReloadConfiguration: () => Promise<void>;
+  onReloadConfiguration: (current: () => boolean) => Promise<void>;
   onError: (error: string | null) => void;
   onRetryMonitoring: () => void;
 };
 
-function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized"> & { configuration: ConfigurationPayload }) {
+function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized, onOpenModel }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized" | "onOpenCanvasModel"> & { configuration: ConfigurationPayload; onOpenModel?: (identity: { provider: string; upstream: string }) => boolean }) {
   const [informationOpen, setInformationOpen] = useState(false);
   return <RoutingEditor
     key={configuration.config_hash}
@@ -95,6 +99,7 @@ function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError
     onDirtyChange={onStrategyDirtyChange}
     onPendingChange={onStrategyPendingChange}
     onUnauthorized={onUnauthorized}
+    onOpenModel={onOpenModel}
   />;
 }
 
@@ -107,6 +112,9 @@ export function AppShell({
   onSetup,
   onRetrySetup,
   providerManagement,
+  canvasModel = null,
+  onOpenCanvasModel,
+  onCloseCanvasModel,
   onStrategyDirtyChange,
   onStrategyPendingChange,
   onUnauthorized,
@@ -229,6 +237,16 @@ export function AppShell({
           data-dashboard-view-nav
           className="col-span-2 row-start-2 flex w-fit max-w-full min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:thin] rounded-lg border border-outline bg-panel-muted p-1 lg:col-span-1 lg:row-start-1"
           aria-label={t("views")}
+          onFocusCapture={(event) => {
+            const nav = event.currentTarget, target = event.target;
+            requestAnimationFrame(() => {
+              if (!nav.isConnected || document.activeElement !== target) return;
+              const bounds = nav.getBoundingClientRect(), button = target.getBoundingClientRect();
+              // Keep the focused destination and its ring inside this scrolling nav.
+              if (button.left < bounds.left + 5) nav.scrollLeft += button.left - bounds.left - 5;
+              else if (button.right > bounds.right - 5) nav.scrollLeft += button.right - bounds.right + 5;
+            });
+          }}
         >
           {(
             [
@@ -378,10 +396,12 @@ export function AppShell({
             onStrategyDirtyChange={onStrategyDirtyChange}
             onStrategyPendingChange={onStrategyPendingChange}
             onUnauthorized={onUnauthorized}
+            onOpenModel={onOpenCanvasModel}
           />
         )}
       </main>
     </div>
+    {canvasModel && providerManagement && <CanvasModelEditor key={`${canvasModel.provider}::${canvasModel.upstream}`} request={canvasModel} manager={providerManagement} t={t} onClose={() => onCloseCanvasModel?.()} />}
     </WorkspaceActivity.Provider>
     </>
   );

@@ -52,8 +52,8 @@ import { selectionCaption } from "./model/selection";
 interface EditorProps {
   config: ConfigurationPayload;
   error?: string | null;
-  onReloaded: () => Promise<void>;
-  onError: (message: string) => void;
+  onReloaded: (current: () => boolean) => Promise<void>;
+  onError: (message: string | null) => void;
   informationOpen?: boolean;
   onInformationOpenChange?: (open: boolean) => void;
   /** True for policy drafts, unfinished add/rename inputs, and unsaved layout work (drag,
@@ -62,6 +62,8 @@ interface EditorProps {
   onDirtyChange?: (dirty: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
   onUnauthorized?: () => void;
+  /** Open the shared model editor Dialog for a canvas model node's exact identity. */
+  onOpenModel?: (identity: { provider: string; upstream: string }) => boolean;
 }
 
 const POOL_ID = "pool";
@@ -317,7 +319,7 @@ function DropZone({
   );
 }
 
-export default function RoutingEditor({ config, error, onReloaded, onError, informationOpen, onInformationOpenChange, onDirtyChange, onPendingChange, onUnauthorized }: EditorProps) {
+export default function RoutingEditor({ config, error, onReloaded, onError, informationOpen, onInformationOpenChange, onDirtyChange, onPendingChange, onUnauthorized, onOpenModel }: EditorProps) {
   const active = useWorkspaceActive();
   const requestAnimationFrame = useWorkspaceFrames(active);
   const activeRef = useRef(active);
@@ -351,6 +353,8 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const [layoutDirty, setLayoutDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [policyRecovery, setPolicyRecovery] = useState<"applied" | "reset" | "unknown" | "reset-unknown" | null>(null);
+  const [readConfirmed, setReadConfirmed] = useState(false);
   const operation = useRef(0);
   useEffect(() => {
     if (active) return;
@@ -480,13 +484,28 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   const dirty = diff.changed || pendingFields || layoutDirty;
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
-  useEffect(() => { onPendingChange?.(busy || layoutDirty); }, [busy, layoutDirty, onPendingChange]);
+  useEffect(() => { onPendingChange?.(busy || layoutDirty || policyRecovery !== null); }, [busy, layoutDirty, policyRecovery, onPendingChange]);
   useEffect(() => () => { onPendingChange?.(false); }, [onPendingChange]);
   const incompleteNodes = incompleteLabels(draft, config);
   const incomplete = incompleteNodes.length > 0;
   const questionErrors = invalidQuestions(draft);
   const writeDisabled = !active || !config.write_available;
-  const editDisabled = writeDisabled || busy || review !== null || resetReview;
+  const editDisabled = writeDisabled || busy || policyRecovery !== null || review !== null || resetReview;
+  useEffect(() => {
+    if (!readConfirmed) return;
+    const generation = activityGeneration.current;
+    queueMicrotask(() => {
+      if (!activeRef.current || generation !== activityGeneration.current) return;
+      // Same-hash reads also confirm the server snapshot (for an unknown write outcome).
+      setDraft(draftFromConfiguration(config));
+      setHistoryBoundary(value => value + 1);
+      setPolicyRecovery(null); setReadConfirmed(false); setReview(null); setResetReview(false);
+      setNewQuestion(""); setNewRuleQuestion(""); setNewRuleCriterion(""); setNewRuleLabel("");
+      setNewCriteria({}); setQuestionNames({}); setCriterionNames({});
+      setSelectedNode(""); setSelectedNodes([]); setInspectorOpen(false);
+      if (policyRecovery !== "reset" && policyRecovery !== "reset-unknown") setInfoOpen(false);
+    });
+  }, [readConfirmed, config, policyRecovery, setInfoOpen]);
   const edges = workflowEdges(draft, config);
   const addableQuestions = Object.entries(draft.questions).filter(([, question]) => Object.keys(question.criteria).length > 0);
   const addableLabels = config.labels.filter((label) => label.resolution === "tag" ||
@@ -553,7 +572,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
   );
 
   const startReview = useCallback(() => {
-    if (writeDisabled || busy || layoutDirty || pendingFields || !diff.changed || incompleteLabels(draft, config).length || invalidQuestions(draft).length) return;
+    if (writeDisabled || busy || policyRecovery !== null || layoutDirty || pendingFields || !diff.changed || incompleteLabels(draft, config).length || invalidQuestions(draft).length) return;
     setBusy(true);
     setServerWarnings([]);
     const payload = toOverlayPayload(draft, config);
@@ -575,54 +594,83 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
         if (current()) setBusy(false);
       }
     })();
-  }, [writeDisabled, busy, layoutDirty, pendingFields, diff.changed, draft, config, t, tr, reportFailure, openDrawerAt]);
+  }, [writeDisabled, busy, policyRecovery, layoutDirty, pendingFields, diff.changed, draft, config, t, tr, reportFailure, openDrawerAt]);
 
   const save = useCallback(() => {
-    if (review === null || busy || layoutDirty || writeDisabled || (review.warnings.length > 0 && !acknowledged)) return;
+    if (review === null || busy || policyRecovery !== null || layoutDirty || writeDisabled || (review.warnings.length > 0 && !acknowledged)) return;
     setBusy(true);
+    onError(null);
     const generation = activityGeneration.current;
     const owner = ++operation.current;
     const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
     void (async () => {
+      let committed = false;
       try {
         const response = await api.applyConfiguration(review.payload);
         if (!current()) return;
+        committed = true;
+        setPolicyRecovery("applied");
         setServerWarnings(response.warnings.map((warning) => tr("validationWarning", { code: warning.code, message: warning.message })));
         setNotice(t("routingApplied"));
-        setHistoryBoundary((value) => value + 1);
         setReview(null);
         setInfoOpen(false);
-        await onReloaded();
+        await onReloaded(current);
+        if (current()) setReadConfirmed(true);
       } catch (caught) {
-        if (current()) reportFailure(caught);
+        if (current()) {
+          if (!committed && !(caught instanceof ApiError)) { setPolicyRecovery("unknown"); setReview(null); }
+          reportFailure(caught);
+        }
       } finally {
         if (current()) setBusy(false);
       }
     })();
-  }, [review, busy, layoutDirty, writeDisabled, acknowledged, reportFailure, onReloaded, t, tr, setInfoOpen]);
+  }, [review, busy, policyRecovery, layoutDirty, writeDisabled, acknowledged, reportFailure, onReloaded, onError, t, tr, setInfoOpen]);
+
+  const retryPolicyRead = useCallback(() => {
+    if (!activeRef.current || busy || policyRecovery === null) return;
+    setBusy(true); onError(null);
+    const generation = activityGeneration.current, owner = ++operation.current;
+    const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
+    void (async () => {
+      try { await onReloaded(current); if (current()) setReadConfirmed(true); }
+      catch (caught) { if (current()) reportFailure(caught); }
+      finally { if (current()) setBusy(false); }
+    })();
+  }, [busy, policyRecovery, onReloaded, onError, reportFailure]);
 
   const reset = useCallback(() => {
-    if (writeDisabled || busy || layoutDirty || !resetReview) return;
+    if (writeDisabled || busy || policyRecovery !== null || layoutDirty || !resetReview) return;
     setBusy(true);
+    onError(null);
     const generation = activityGeneration.current;
     const owner = ++operation.current;
     const current = () => activeRef.current && generation === activityGeneration.current && owner === operation.current;
     void (async () => {
+      let confirmed = false;
       try {
         await api.resetConfiguration();
         if (!current()) return;
+        confirmed = true;
+        setPolicyRecovery("reset");
         setResetReview(false);
         setNotice(t("overlayRemoved"));
-        setHistoryBoundary((value) => value + 1);
         setServerWarnings([]);
-        await onReloaded();
+        await onReloaded(current);
+        if (current()) setReadConfirmed(true);
       } catch (caught) {
-        if (current()) reportFailure(caught);
+        if (current()) {
+          if (!confirmed && !(caught instanceof ApiError)) {
+            setPolicyRecovery("reset-unknown");
+            setResetReview(false);
+          }
+          reportFailure(caught);
+        }
       } finally {
         if (current()) setBusy(false);
       }
     })();
-  }, [reportFailure, onReloaded, t, writeDisabled, busy, layoutDirty, resetReview]);
+  }, [reportFailure, onReloaded, onError, t, writeDisabled, busy, policyRecovery, layoutDirty, resetReview]);
 
   const heading = <>
       {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
@@ -637,15 +685,16 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
           </details>
         </div>
         <span className="workspace-status max-w-full rounded-md border border-outline bg-panel-muted px-2 py-1 text-xs text-ink-muted [overflow-wrap:anywhere]" role="status" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
-          {busy ? t(review || resetReview ? "canvasApplyingPolicy" : "canvasValidatingPolicy") : pendingFields ? t("canvasIncompleteState") : incomplete || questionErrors.length > 0 ? t("canvasInvalidState") : review ? t("reviewChanges") : diff.changed ? t("pendingChanges") : t("noPendingChanges")}
+          {policyRecovery !== null ? t(busy ? "routingReadingConfiguration" : policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown") : busy ? t(review || resetReview ? "canvasApplyingPolicy" : "canvasValidatingPolicy") : pendingFields ? t("canvasIncompleteState") : incomplete || questionErrors.length > 0 ? t("canvasInvalidState") : review ? t("reviewChanges") : diff.changed ? t("pendingChanges") : t("noPendingChanges")}
         </span>
       </header>
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
+      {policyRecovery !== null && <div className="notice warn" role="status"><span>{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
       {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <button type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</button></div>}
       {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <button type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</button>{reason === "type" && <button type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</button>}</div>)}
       {config.overlay.error === null ? null : (
-        <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <button type="button" disabled={writeDisabled || busy || layoutDirty || review !== null} onClick={() => { setResetReview(true); openDrawerAt("review"); }}>{t("resetBaseline")}</button></div>
+        <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <button type="button" disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || review !== null} onClick={() => { setResetReview(true); openDrawerAt("review"); }}>{t("resetBaseline")}</button></div>
       )}
       {writeDisabled ? (
         <div className="notice warn">
@@ -678,6 +727,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
                onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onError={onError} topology={topology}
                onUnauthorized={onUnauthorized}
               inspectorOpen={inspectorOpen} onAnchor={setAnchor} revealNode={revealNode} onReveal={selectEditorNode}
+              onOpenModel={onOpenModel}
               onDraggingChange={setNodeDragging}
               onLayoutDirtyChange={setLayoutDirty}
               historyBoundary={historyBoundary}
@@ -896,8 +946,11 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
       {resetReview ? <div className="notice warn" role="status">{t("resetReviewPrompt")}</div> : null}
       </div>
       </div>
-      <div className="workflow-toolbar flex flex-wrap items-center gap-2 border-outline bg-panel p-2 max-[900px]:col-start-1 max-[900px]:row-start-3 max-[900px]:border-t max-[600px]:col-start-2 max-[600px]:row-start-1 max-[600px]:flex-nowrap max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:overscroll-x-contain max-[600px]:gap-[0.35rem] max-[600px]:min-h-12 max-[600px]:p-[0.25rem_0.45rem] max-[600px]:border-t-0 max-[600px]:border-l max-[600px]:[touch-action:pan-x] max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap">
-        {review === null ? <Button className={primaryButtonClass} type="button" onClick={startReview} disabled={writeDisabled || busy || layoutDirty || pendingFields || resetReview || !diff.changed || incomplete || questionErrors.length > 0}>{t("reviewChanges")}</Button> : <><Button className={primaryButtonClass} type="button" onClick={save} disabled={writeDisabled || busy || layoutDirty || incomplete || questionErrors.length > 0 || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setReview(null)} disabled={busy}>{t("backToEditing")}</Button></>}
+      <div onFocusCapture={(event) => {
+        const target = event.target;
+        if (target instanceof HTMLButtonElement) target.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }} className="workflow-toolbar flex flex-wrap items-center gap-2 border-outline bg-panel p-2 max-[900px]:col-start-1 max-[900px]:row-start-3 max-[900px]:border-t max-[600px]:col-start-2 max-[600px]:row-start-1 max-[600px]:flex-nowrap max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:overscroll-x-contain max-[600px]:gap-[0.35rem] max-[600px]:min-h-12 max-[600px]:p-[0.25rem_0.45rem] max-[600px]:border-t-0 max-[600px]:border-l max-[600px]:[touch-action:pan-x] max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap max-[600px]:[scrollbar-width:thin] max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:whitespace-nowrap">
+        {review === null ? <Button className={primaryButtonClass} type="button" onClick={startReview} disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || !diff.changed || incomplete || questionErrors.length > 0}>{t("reviewChanges")}</Button> : <><Button className={primaryButtonClass} type="button" onClick={save} disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || incomplete || questionErrors.length > 0 || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setReview(null)} disabled={busy}>{t("backToEditing")}</Button></>}
         <Button variant="outline"
           className={actionButtonClass}
           type="button"
@@ -911,11 +964,11 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
             setNotice(null);
             setReview(null);
           }}
-          disabled={writeDisabled || busy || review !== null || !dirty}
+          disabled={writeDisabled || busy || policyRecovery !== null || review !== null || !dirty}
         >
           {t("cancel")}
         </Button>
-        {resetReview ? <><Button variant="outline" className={actionButtonClass} type="button" onClick={reset} disabled={writeDisabled || busy || layoutDirty}>{t("confirmReset")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</Button></> : <Button variant="outline" className={actionButtonClass} type="button" onClick={() => { setResetReview(true); openDrawerAt("review"); }} disabled={writeDisabled || busy || layoutDirty || review !== null || !config.overlay.applied}>{t("resetBaseline")}</Button>}
+        {resetReview ? <><Button variant="outline" className={actionButtonClass} type="button" onClick={reset} disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty}>{t("confirmReset")}</Button><Button variant="outline" className={actionButtonClass} type="button" onClick={() => setResetReview(false)} disabled={busy}>{t("backToEditing")}</Button></> : <Button variant="outline" className={actionButtonClass} type="button" onClick={() => { setResetReview(true); openDrawerAt("review"); }} disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || review !== null || !config.overlay.applied}>{t("resetBaseline")}</Button>}
       </div>
       </section>
       </>}

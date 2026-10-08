@@ -19,7 +19,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | [Directory structure](./directory-structure.md) | Module ownership, extension points, imports, and naming | Complete |
 | [Decision providers](./decision-providers.md) | Decision config, protocol adapters, compatibility, failover, and validation | Complete |
 | [Database guidelines](./database-guidelines.md) | SQLite schema, writer queue, migrations, and retention | Complete |
-| [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes, assets, and packaging | Complete |
+| [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes and read recovery, canvas ownership, assets, and packaging | Complete |
 | [Provider configuration](./provider-configuration.md) | Provider transactions, discovery network boundaries, metadata suggestions, and confirmed imports | Implementation contract |
 | [Credential configuration](./credential-configuration.md) | Write-only Dashboard initialization, JSON credential sources, auth boundaries and protected transactions | Implementation contract |
 | [Provider identities and presets](./provider-identities.md) | Independent icon selection, shared supplier templates, cloud setup and asset provenance | Implementation contract |

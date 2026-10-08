@@ -45,6 +45,9 @@ interface Props {
   onLayoutDirtyChange?: (dirty: boolean) => void;
   revealNode: { id: string; serial: number } | null;
   onReveal: (id: string) => void;
+  /** Open the shared model editor Dialog for the model node's exact identity.
+   * Returns true when the node was a model node the parent owns. */
+  onOpenModel?: (identity: { provider: string; upstream: string }) => boolean;
   inspectorOpen: boolean;
   topology: { serial: number; mutation: RuleLayoutMutation } | null;
 }
@@ -61,7 +64,7 @@ const reasonKeys = { context: "canvasReason_context", stale: "canvasReason_stale
 function connectionReasonText(t: ReturnType<typeof useTranslation>["t"], reason: ConnectionReason) { return t(reasonKeys[reason]); }
 // The measured toolbar keeps its stable class hook; ordinary presentation is utility-styled.
 
-export default function RoutingCanvas({ heading, children, draft, config, disabled, selected, selection, onSelect, onSelection, onDraft, canAddRule, historyBoundary = 0, discardBoundary = 0, onAnchor, onDraggingChange, onLayoutDirtyChange, inspectorOpen, revealNode, onReveal, topology, onUnauthorized }: Props) {
+export default function RoutingCanvas({ heading, children, draft, config, disabled, selected, selection, onSelect, onSelection, onDraft, canAddRule, historyBoundary = 0, discardBoundary = 0, onAnchor, onDraggingChange, onLayoutDirtyChange, inspectorOpen, revealNode, onReveal, onOpenModel, topology, onUnauthorized }: Props) {
   const active = useWorkspaceActive();
   const requestAnimationFrame = useWorkspaceFrames(active);
   const activeRef = useRef(active);
@@ -120,7 +123,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const originY = useRef(0);
   const restoringViewport = useRef(false);
   const viewportRestoreFrame = useRef<number | null>(null);
-  const dragNode = useRef<{ pointerId: number; target: HTMLButtonElement; id: string; x: number; y: number; zoom: number; scroll: Position; width: number; height: number; start: Record<string, Position>; layout: CanvasLayout; moved: boolean; changed: boolean } | null>(null);
+  const dragNode = useRef<{ pointerId: number; target: HTMLButtonElement; id: string; draft: RoutingDraft; x: number; y: number; zoom: number; scroll: Position; width: number; height: number; start: Record<string, Position>; layout: CanvasLayout; moved: boolean; changed: boolean } | null>(null);
   const dragScrollLock = useRef<Position | null>(null);
   const draggingChangeRef = useRef(onDraggingChange);
   const dragEndFrame = useRef<number | null>(null);
@@ -317,8 +320,18 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
   const boardHeight = Math.max(BOARD_HEIGHT, ...Object.entries(positions).map(([id, at]) => at.y + dimensions[id]!.height + 29));
   const canEdit = active && loaded && !disabled;
   const canConnect = canEdit && tool === "select";
+  const persistRef = useRef<(next: CanvasLayout) => void>(() => undefined);
+  const clearConnectionGesture = useCallback(() => {
+    const gesture = dragEdge.current;
+    dragEdge.current = null;
+    const origin = connectionOrigin.current;
+    if (gesture && origin?.hasPointerCapture(gesture.pointerId)) origin.releasePointerCapture(gesture.pointerId);
+    connectionDraft.current = null;
+    setActiveConnection(null); setIntentDraft(null); setEdgePointer(null); setKeyboardTarget("");
+    setHoverTarget(""); setPointerCandidate("");
+  }, []);
 
-  const clearNodeGesture = (cancel: boolean) => {
+  const clearNodeGesture = useCallback((cancel: boolean) => {
     const drag = dragNode.current;
     if (!drag) return null;
     if (surface.current) holdNodeScroll(surface.current);
@@ -333,7 +346,25 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     setDragPosition(null);
     if (drag.moved) draggingChangeRef.current?.(false);
     return drag;
-  };
+  }, []);
+  useLayoutEffect(() => {
+    if (dragEdge.current && dragEdge.current.draft !== draft) {
+      clearConnectionGesture();
+      queueMicrotask(() => { if (activeRef.current) setFeedback(t("canvasReason_stale")); });
+    }
+    const drag = dragNode.current;
+    if (!drag || drag.draft === draft) return;
+    // A slot can now identify a different rule. Cancel capture before topology remaps it.
+    clearNodeGesture(true);
+    layoutRef.current = drag.layout;
+    const generation = activityGeneration.current;
+    queueMicrotask(() => {
+      if (!aliveRef.current || !activeRef.current || generation !== activityGeneration.current) return;
+      setLayout(drag.layout);
+      if (layoutWrites.current.pending || JSON.stringify(drag.layout) !== JSON.stringify(savedLayout.current)) persistRef.current(layoutRef.current);
+      else setLayoutSaving(false);
+    });
+  }, [draft, clearNodeGesture, clearConnectionGesture, t]);
   const rollbackLayout = () => {
     if (scrollTimer.current) { clearTimeout(scrollTimer.current); scrollTimer.current = null; }
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
@@ -345,7 +376,6 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     setLayoutSaving(layoutWrites.current.pending);
     restoreViewport(savedLayout.current.viewport);
   };
-  const persistRef = useRef<(next: CanvasLayout) => void>(() => undefined);
   const persist = (next: CanvasLayout) => {
     if (!canEdit || !activeRef.current || !trustedLayout.current) return;
     const generation = activityGeneration.current;
@@ -382,9 +412,10 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       discardBoundaryRef.current = discardBoundary;
       if (baselineNodes.current) {
         const next = { ...layoutRef.current, nodes: baselineNodes.current };
+        const changed = JSON.stringify(next) !== JSON.stringify(layoutRef.current);
         layoutRef.current = next;
         const generation = activityGeneration.current;
-        queueMicrotask(() => { if (aliveRef.current && activeRef.current && generation === activityGeneration.current) { setLayout(next); persistRef.current(next); } });
+        if (changed) queueMicrotask(() => { if (aliveRef.current && activeRef.current && generation === activityGeneration.current) { setLayout(next); persistRef.current(next); } });
       }
     }
     const snapshot = { draft, nodes: layoutRef.current.nodes, selected, selection };
@@ -423,11 +454,13 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     return () => { document.removeEventListener("pointerdown", dismiss, true); document.removeEventListener("keydown", escape, true); window.removeEventListener("resize", boundMenu); window.visualViewport?.removeEventListener("resize", boundMenu); window.visualViewport?.removeEventListener("scroll", boundMenu); };
   }, [active, menu]);
   const travelHistory = (redo: boolean) => {
-    if (!canEdit || dragNode.current || dragEdge.current) return;
+    if (!canEdit) return;
+    const drag = clearNodeGesture(true);
+    if (drag) { layoutRef.current = drag.layout; setLayout(drag.layout); setLayoutSaving(layoutWrites.current.pending); }
+    clearConnectionGesture(); setMenu(null);
     const snapshot = redo ? history.current.redo() : history.current.undo();
     if (!snapshot) return;
     restoringHistory.current = true;
-    cancelConnection(); setMenu(null);
     const next = { ...layoutRef.current, nodes: snapshot.nodes };
     layoutRef.current = next; setLayout(next); persist(next);
     onDraft(snapshot.draft);
@@ -450,18 +483,13 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (!canEdit || !menu) return;
     const created = createEditableNode(draft, config, kind);
     if (!created) return;
-    if (kind === "question") {
-      onDraft(created.draft);
-      onSelect("questions", true); onReveal("questions");
-    } else {
-      if (!canAddRule) return;
-      const id = created.id;
-      const at = { x: Math.round(Math.max(0, Math.min(9700, menu.point.x))), y: Math.round(Math.max(0, Math.min(9700, menu.point.y))) };
-      if (!Object.hasOwn(layoutRef.current.nodes, id) && Object.keys(layoutRef.current.nodes).length >= 256) { setFeedback(t("canvasLayoutFull")); return; }
-      const nextLayout = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, [id]: at } };
-      layoutRef.current = nextLayout; setLayout(nextLayout); persist(nextLayout);
-      onDraft(created.draft); onSelect(id, true); onReveal(id);
-    }
+    if (kind === "rule" && !canAddRule) return;
+    const id = created.id;
+    const at = { x: Math.round(Math.max(0, Math.min(9700, menu.point.x))), y: Math.round(Math.max(0, Math.min(9700, menu.point.y))) };
+    if (!Object.hasOwn(layoutRef.current.nodes, id) && Object.keys(layoutRef.current.nodes).length >= 256) { setFeedback(t("canvasLayoutFull")); return; }
+    const nextLayout = { ...layoutRef.current, nodes: { ...layoutRef.current.nodes, [id]: at } };
+    layoutRef.current = nextLayout; setLayout(nextLayout); persist(nextLayout);
+    onDraft(created.draft); onSelect(id, true); onReveal(id);
     setMenu(null);
   };
   const deleteNode = (id: string) => {
@@ -507,7 +535,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (event.shiftKey) { suppressClick.current = true; toggleSelection(id); return; }
     const additions = ids.filter((item) => !Object.hasOwn(layoutRef.current.nodes, item)).length;
     if (Object.keys(layoutRef.current.nodes).length + additions > 256) { setLayoutError(t("canvasLayoutFull")); return; }
-    dragNode.current = { pointerId: event.pointerId, target: event.currentTarget, id, x: event.clientX, y: event.clientY, zoom: zoomRef.current,
+    dragNode.current = { pointerId: event.pointerId, target: event.currentTarget, id, draft, x: event.clientX, y: event.clientY, zoom: zoomRef.current,
       scroll: { x: surface.current?.scrollLeft ?? 0, y: surface.current?.scrollTop ?? 0 },
       width: boardWidth, height: boardHeight, start: Object.fromEntries(ids.map((item) => [item, positions[item]!])),
       layout: layoutRef.current, moved: false, changed: false };
@@ -628,11 +656,8 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     }
   };
   const cancelConnection = () => {
-    setActiveConnection(null); setEdgePointer(null); setKeyboardTarget("");
-    const gesture = dragEdge.current;
-    dragEdge.current = null; setHoverTarget(""); setPointerCandidate("");
+    clearConnectionGesture();
     const origin = connectionOrigin.current;
-    if (gesture && origin?.hasPointerCapture(gesture.pointerId)) origin.releasePointerCapture(gesture.pointerId);
     const box = origin?.getBoundingClientRect();
     const free = surface.current && canvasAvailableRect(surface.current);
     if (origin?.isConnected && box && free && box.left >= free.left && box.right <= free.right && box.top >= free.top && box.bottom <= free.bottom) origin.focus({ preventScroll: true });
@@ -676,6 +701,16 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     if (activeIntent && canEdit) { applyIntent(activeIntent, id); return; }
     if (selection.length) onSelection([]);
     onSelect(id, focusInspector);
+  };
+  // A model node opens the one shared model editor Dialog for its exact
+  // provider/upstream identity. The canvas resolves the identity from the
+  // configuration; the shell owns the Dialog and its write boundary.
+  const openModelNode = (id: string, trigger?: HTMLElement | null) => {
+    if (!id.startsWith("model::") || !onOpenModel) return false;
+    const model = config.models.find((item) => `model::${item.id}` === id);
+    if (!model) return false;
+    trigger?.focus({ preventScroll: true });
+    return onOpenModel({ provider: model.provider, upstream: model.upstream_model });
   };
   const toggleSelection = (id: string) => {
     const current = (selection.length ? selection : selected ? [selected] : []).filter((item) => Object.hasOwn(positions, item));
@@ -803,7 +838,7 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
       const index = items.indexOf(document.activeElement as HTMLButtonElement);
       items[event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
     }}>
-      {menu.node ? <><button role="menuitem" type="button" onClick={() => { onReveal(menu.node!); setMenu(null); }}>{t("canvasOpenDetails")}</button><button role="menuitem" type="button" disabled={!canEdit || !menu.node.startsWith("rule-")} onClick={() => deleteNode(menu.node!)}>{t("remove")}</button>{!menu.node.startsWith("rule-") && <p className="p-2 text-xs text-ink-muted">{t("canvasProtectedNode")}</p>}</> : menu.edge ? <><button role="menuitem" type="button" onClick={(event) => { openConnection({ kind: "reconnect", edge: menu.edge! }, event.currentTarget); setMenu(null); }}>{t("canvasReconnect")}</button><button role="menuitem" type="button" disabled={!canEdit || !!classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason} onClick={() => { removeEdge(menu.edge!); setMenu(null); }}>{t("canvasDisconnect")}</button>{(() => { const reason = classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason; return reason ? <p className="p-2 text-xs text-ink-muted">{connectionReasonText(t, reason)}</p> : null; })()}</> : <><span className="px-2 py-1 text-xs text-ink-muted">{t("canvasAddNode")}</span><button role="menuitem" type="button" disabled={!canEdit || !canAddRule} onClick={() => addNode("rule")}>{t("addRule")}</button><button role="menuitem" type="button" disabled={!canEdit} onClick={() => addNode("question")}>{t("canvasAddQuestion")}</button><p className="px-2 text-xs text-ink-muted">{t("canvasQuestionEntry")}</p></>}
+      {menu.node ? <><button role="menuitem" type="button" onClick={() => { if (!openModelNode(menu.node!)) onReveal(menu.node!); setMenu(null); }}>{menu.node.startsWith("model::") ? t("canvasOpenModel") : t("canvasOpenDetails")}</button><button role="menuitem" type="button" disabled={!canEdit || !menu.node.startsWith("rule-")} onClick={() => deleteNode(menu.node!)}>{t("remove")}</button>{!menu.node.startsWith("rule-") && <p className="p-2 text-xs text-ink-muted">{t("canvasProtectedNode")}</p>}</> : menu.edge ? <><button role="menuitem" type="button" onClick={(event) => { openConnection({ kind: "reconnect", edge: menu.edge! }, event.currentTarget); setMenu(null); }}>{t("canvasReconnect")}</button><button role="menuitem" type="button" disabled={!canEdit || !!classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason} onClick={() => { removeEdge(menu.edge!); setMenu(null); }}>{t("canvasDisconnect")}</button>{(() => { const reason = classifyConnection(draft, config, { kind: "remove", edge: menu.edge }, menu.edge.to).reason; return reason ? <p className="p-2 text-xs text-ink-muted">{connectionReasonText(t, reason)}</p> : null; })()}</> : <><span className="px-2 py-1 text-xs text-ink-muted">{t("canvasAddNode")}</span><button role="menuitem" type="button" disabled={!canEdit || !canAddRule} onClick={() => addNode("rule")}>{t("addRule")}</button><button role="menuitem" type="button" disabled={!canEdit} onClick={() => addNode("question")}>{t("canvasAddQuestion")}</button><p className="px-2 text-xs text-ink-muted">{t("canvasQuestionEntry")}</p></>}
     </div>}
     <div className="workspace-chrome absolute left-3 right-3 top-3 z-[9] pointer-events-none [&>*]:pointer-events-auto" data-canvas-occlusion="top">
     {heading}
@@ -826,7 +861,16 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     {fitMode && <div className="meta" role="status">{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</div>}
     </div>
     <div className="canvas-frame absolute inset-0 min-w-0">
-    <div className="canvas-tools absolute bottom-3 left-3 z-[7] flex w-[calc(100%-24px)] flex-wrap items-center justify-center gap-[0.3rem] overflow-auto rounded-lg border border-outline bg-panel p-[0.35rem] shadow-[0_4px_16px_color-mix(in_srgb,var(--text)_12%,transparent)] max-[600px]:bottom-2 max-[600px]:left-2 max-[600px]:w-[calc(100%-16px)] max-[600px]:min-h-12 max-[600px]:flex-nowrap max-[600px]:justify-start max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:gap-[0.2rem] max-[600px]:p-[0.2rem] max-[600px]:[scrollbar-width:thin] max-[600px]:[touch-action:pan-x] max-[600px]:[&>button]:h-10 max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:min-w-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:px-[0.35rem] max-[600px]:[&>button]:text-base max-[600px]:[&>div]:flex-none max-[600px]:[&_button]:whitespace-nowrap]" data-canvas-occlusion="bottom" ref={toolbarRef} role="toolbar" aria-label={t("canvasTools")} onKeyDown={(event) => {
+    <div className="canvas-tools absolute bottom-3 left-3 z-[7] flex w-[calc(100%-24px)] flex-wrap items-center justify-center gap-[0.3rem] overflow-auto rounded-lg border border-outline bg-panel p-[0.35rem] shadow-[0_4px_16px_color-mix(in_srgb,var(--text)_12%,transparent)] max-[600px]:bottom-2 max-[600px]:left-2 max-[600px]:w-[calc(100%-16px)] max-[600px]:min-h-12 max-[600px]:flex-nowrap max-[600px]:justify-start max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:gap-[0.2rem] max-[600px]:p-[0.2rem] max-[600px]:[scrollbar-width:thin] max-[600px]:[touch-action:pan-x] max-[600px]:[&>button]:h-10 max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:min-w-10 max-[600px]:[&>button]:flex-none max-[600px]:[&>button]:px-[0.35rem] max-[600px]:[&>button]:text-base max-[600px]:[&>div]:flex-none max-[600px]:[&_button]:whitespace-nowrap]" data-canvas-occlusion="bottom" ref={toolbarRef} role="toolbar" aria-label={t("canvasTools")} onFocusCapture={(event) => {
+      const toolbar = event.currentTarget, target = event.target;
+      requestAnimationFrame(() => {
+        if (!activeRef.current || document.activeElement !== target) return;
+        const bounds = toolbar.getBoundingClientRect(), button = target.getBoundingClientRect();
+        // Reveal the whole control and focus ring without scrolling the canvas or page.
+        if (button.left < bounds.left + 5) toolbar.scrollLeft += button.left - bounds.left - 5;
+        else if (button.right > bounds.right - 5) toolbar.scrollLeft += button.right - bounds.right + 5;
+      });
+    }} onKeyDown={(event) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -904,11 +948,11 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
           onContextMenu={(event) => openMenu(event, id)}
           className={`routing-canvas-node absolute block w-[190px] overflow-hidden p-0 text-left [touch-action:none] cursor-grab text-ink [--canvas-node-accent:var(--text-muted)] [background:color-mix(in_srgb,var(--canvas-node-accent)_5%,var(--surface))] [border:1px_solid_color-mix(in_srgb,var(--canvas-node-accent)_45%,var(--border))] [border-inline-start:3px_solid_var(--canvas-node-accent)] [box-shadow:0_3px_14px_color-mix(in_srgb,var(--text)_10%,transparent)] rounded-lg data-[node-kind=questions]:[--canvas-node-accent:var(--accent)] data-[node-kind=questions]:rounded-xl data-[node-kind=rule]:[--canvas-node-accent:var(--good)] data-[node-kind=rule]:rounded data-[node-kind=fallback]:[--canvas-node-accent:var(--warn)] data-[node-kind=fallback]:[border-style:dashed] data-[node-kind=fallback]:[border-inline-start-style:solid] data-[node-kind=label]:[--canvas-node-accent:var(--accent)] data-[node-kind=label]:[border-inline-start-style:double] data-[node-kind=label]:[border-radius:0.75rem_0.25rem_0.25rem_0.75rem] data-[node-kind=model]:[border-inline-start-width:1px] data-[node-kind=model]:[border-inline-end:3px_solid_var(--canvas-node-accent)] data-[node-kind=model]:rounded hover:not-disabled:[background:color-mix(in_srgb,var(--canvas-node-accent)_9%,var(--surface))] hover:not-disabled:[border-color:var(--canvas-node-accent)] focus-visible:outline-[3px] focus-visible:outline-text focus-visible:outline-offset-1 ${tool === "pan" ? "cursor-grab" : ""}${selection.length > 1 ? selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : "" : selected === id || selection.includes(id) ? " selected outline-[3px] outline-primary outline-offset-0" : ""}${intent && classifyConnection(draft, config, intent, id).reason === null ? " compatible [outline:3px_dashed_var(--accent)] outline-offset-0" : intent && hoverTarget === id ? " incompatible opacity-[0.68]" : ""}${draggingNodes.includes(id) ? " dragging z-[4] cursor-grabbing [box-shadow:0_6px_18px_color-mix(in_srgb,var(--text)_22%,transparent)] animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate] motion-reduce:animate-none" : ""}${!canEdit ? " read-only cursor-default shadow-none" : ""}`}
           data-dragging={draggingNodes.includes(id) || undefined}
-          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: dimensions[id]!.height, borderColor: nodeState(id) === "invalid" || nodeState(id) === "incomplete" ? "var(--warn)" : undefined }}
-          onDoubleClick={() => onReveal(id)}
+          style={{ left: positions[id]?.x ?? 0, top: positions[id]?.y ?? 0, width: NODE_CARD_WIDTH, height: dimensions[id]!.height, zIndex: draggingNodes.includes(id) ? 4 : selected === id || selection.includes(id) ? 2 : 1, borderColor: nodeState(id) === "invalid" || nodeState(id) === "incomplete" ? "var(--warn)" : undefined }}
+          onDoubleClick={(event) => { if (!openModelNode(id, event.currentTarget)) onReveal(id); }}
           title={`${text} · ${id}`}
           aria-label={text}
-          onClick={(event) => { if (event.detail === 0 && event.shiftKey) return; selectNode(id, event.detail === 0); }} onPointerDown={(event) => { if (tool === "select" && !activeIntent) startNode(event, id); }}
+          onClick={(event) => { if (event.detail === 0 && event.shiftKey) return; if (event.detail === 0 && id.startsWith("model::")) { if (openModelNode(id, event.currentTarget)) { selectNode(id, false); return; } } selectNode(id, event.detail === 0); }} onPointerDown={(event) => { if (tool === "select" && !activeIntent) startNode(event, id); }}
           onPointerMove={dragNodeMove} onPointerUp={(event) => stopNode(event.pointerId)} onPointerCancel={(event) => stopNode(event.pointerId, true)}
           onLostPointerCapture={(event) => stopNode(event.pointerId, true)}
           onKeyDown={(event) => {
@@ -931,14 +975,16 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
         {nodes.map(({ id, text }) => {
           const rows = outputs[id] ?? [], at = positions[id]!;
           const input = nodeCardCenter("left", rows.length);
-          return <div key={`ports-${id}`} className={`pointer-events-none absolute ${draggingNodes.includes(id) ? "z-[5]" : "z-[2]"}`} style={{ left: at.x, top: at.y }}>
+          // Labels stay below card surfaces; handles keep their own interactive layer.
+          return <div key={`ports-${id}`} className="pointer-events-none absolute" style={{ left: at.x, top: at.y }}>
             {id !== "questions" && <span className="absolute w-7 whitespace-nowrap text-right text-[9px] leading-3 text-ink-muted" style={{ left: -42, top: input.y - 6 }}>{t("canvasInput")}</span>}
-            {id !== "questions" && <button type="button" data-canvas-input={id} className="absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary bg-panel p-0 [pointer-events:auto] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" style={{ left: -9, top: input.y - 9 }} aria-label={`${t("canvasInput")}: ${text}`} title={`${t("canvasInput")}: ${text}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => { if (intent) applyIntent(intent, id); else selectNode(id); }}>‹</button>}
+            {id !== "questions" && <button type="button" data-canvas-input={id} className="absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary bg-panel p-0 [pointer-events:auto] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" style={{ left: -9, top: input.y - 9, zIndex: draggingNodes.includes(id) ? 5 : 2 }} aria-label={`${t("canvasInput")}: ${text}`} title={`${t("canvasInput")}: ${text}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => { if (intent) applyIntent(intent, id); else selectNode(id); }}>‹</button>}
             {rows.map((output, index) => { const port = nodeCardPorts(rows.length)[index]!; if (output.kind === "default") return null; return <button key={output.id} type="button" data-canvas-output={output.id} data-output-node={id} data-output-kind={output.kind} data-output-connected={!!output.edge}
               className={`canvas-edge-handle absolute flex size-[18px] min-h-0 items-center justify-center rounded-full border-2 border-primary p-0 text-[11px] [pointer-events:auto] [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${output.edge ? "bg-primary text-primary-foreground" : "bg-panel text-primary"}`}
-              style={{ left: port.x - 9, top: port.y - 9 }} aria-label={`${t("canvasOutput")}: ${text} · ${outputName(output)}`} title={`${t("canvasOutput")}: ${outputName(output)}`}
+              style={{ left: port.x - 9, top: port.y - 9, zIndex: draggingNodes.includes(id) ? 5 : 2 }} aria-label={`${t("canvasOutput")}: ${text} · ${outputName(output)}`} title={`${t("canvasOutput")}: ${outputName(output)}`}
+              onContextMenu={(event) => { if (output.edge) openMenu(event, undefined, output.edge); else { event.preventDefault(); event.stopPropagation(); openConnection(output.intent, event.currentTarget, { from: id, output }); } }}
               onClick={(event) => { if (event.detail === 0) openConnection(output.intent, event.currentTarget, { from: id, output }); }}
-              onPointerDown={(event) => { event.stopPropagation(); if (tool !== "select") return; if (!canConnect) { openConnection(output.intent, event.currentTarget, { from: id, output }); return; } event.preventDefault(); event.currentTarget.focus({ preventScroll: true }); event.currentTarget.setPointerCapture(event.pointerId); connectionDraft.current = draft; connectionOrigin.current = event.currentTarget; dragEdge.current = { intent: output.intent, visual: { from: id, output }, draft, start: { x: event.clientX, y: event.clientY }, moved: false, pointerId: event.pointerId }; setActiveConnection(null); }}
+              onPointerDown={(event) => { event.stopPropagation(); if (event.button !== 0 || tool !== "select") return; if (!canConnect) { openConnection(output.intent, event.currentTarget, { from: id, output }); return; } event.preventDefault(); event.currentTarget.focus({ preventScroll: true }); event.currentTarget.setPointerCapture(event.pointerId); connectionDraft.current = draft; connectionOrigin.current = event.currentTarget; dragEdge.current = { intent: output.intent, visual: { from: id, output }, draft, start: { x: event.clientX, y: event.clientY }, moved: false, pointerId: event.pointerId }; setActiveConnection(null); }}
               onPointerMove={(event) => { const active = dragEdge.current; if (!active || !event.currentTarget.hasPointerCapture(event.pointerId)) return; active.moved ||= crossedDragThreshold(active.start, { x: event.clientX, y: event.clientY }); if (!active.moved) return; setEdgePointer(pointerOnBoard(event)); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-canvas-node], [data-canvas-input]"); const targetId = target?.getAttribute("data-canvas-node") ?? target?.getAttribute("data-canvas-input") ?? ""; setHoverTarget(targetId); setPointerCandidate(targetId); }}
               onPointerUp={finishEdge} onPointerCancel={cancelConnection} onLostPointerCapture={() => { if (dragEdge.current) cancelConnection(); }}>
               {output.kind === "add" ? "+" : "›"}
@@ -951,9 +997,9 @@ export default function RoutingCanvas({ heading, children, draft, config, disabl
     </div>
     </div>
     {children(<>
-    <div className="canvas-context-actions flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-ink shadow-[0_5px_16px_color-mix(in_srgb,var(--text)_10%,transparent)]" role="status">{selectedEdge ? <span>{t("canvasPolicyEdit")}</span> : dragPosition || selectedCount || selected ? <span className="canvas-layout-state" data-layout-only="true">{t("canvasLayoutOnly")}</span> : null}<span>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : selectedCount ? t("canvasSelectedCount").replace("{count}", String(selectedCount)) : nodes.find((node) => node.id === selected)?.text ?? t("canvasLayoutOnly")}</span>{selected && !inspectorOpen && tool === "select" && <button type="button" onClick={() => onReveal(selected)}>{t("canvasOpenDetails")}</button>}{selectedEdge && <button type="button" disabled={!canConnect} onClick={(event) => openConnection({ kind: "reconnect", edge: selectedEdge }, event.currentTarget)}>{t("canvasReconnect")}</button>}{fitMode && <span>{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</span>}</div>
+    <div className="canvas-context-actions flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-ink shadow-[0_5px_16px_color-mix(in_srgb,var(--text)_10%,transparent)]" role="status">{selectedEdge ? <span>{t("canvasPolicyEdit")}</span> : dragPosition || selectedCount || selected ? <span className="canvas-layout-state" data-layout-only="true">{t("canvasLayoutOnly")}</span> : null}<span>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : selectedCount ? t("canvasSelectedCount").replace("{count}", String(selectedCount)) : nodes.find((node) => node.id === selected)?.text ?? t("canvasLayoutOnly")}</span>{selected && !inspectorOpen && tool === "select" && <button type="button" onClick={(event) => { if (!openModelNode(selected, event.currentTarget)) onReveal(selected); }}>{selected.startsWith("model::") ? t("canvasOpenModel") : t("canvasOpenDetails")}</button>}{selectedEdge && <button type="button" disabled={!canConnect} onClick={(event) => openConnection({ kind: "reconnect", edge: selectedEdge }, event.currentTarget)}>{t("canvasReconnect")}</button>}{fitMode && <span>{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</span>}</div>
     <details className="my-2 rounded-lg border border-outline bg-panel p-3 text-ink border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] text-sm font-medium text-ink-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">{t("canvasHelpTitle")}</summary><p className="mt-2 text-xs text-ink-muted">{t("canvasHelp")}</p></details>
-    <div className="grid gap-2 text-sm text-ink"><details className="rounded-lg border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] font-medium focus-visible:outline-2 focus-visible:outline-primary">{t("canvasNodeList")}</summary><ul className="mt-2 space-y-1">{nodes.map((node) => <li key={node.id}><button className="min-h-9 rounded-md px-2 text-left text-ink hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={() => onReveal(node.id)}>{node.text}</button></li>)}</ul></details>
+    <div className="grid gap-2 text-sm text-ink"><details className="rounded-lg border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] font-medium focus-visible:outline-2 focus-visible:outline-primary">{t("canvasNodeList")}</summary><ul className="mt-2 space-y-1">{nodes.map((node) => <li key={node.id}><button className="min-h-9 rounded-md px-2 text-left text-ink hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={(event) => { if (!openModelNode(node.id, event.currentTarget)) onReveal(node.id); }}>{node.text}</button></li>)}</ul></details>
     <details className="rounded-lg border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]"><summary className="cursor-pointer font-[620] font-medium focus-visible:outline-2 focus-visible:outline-primary">{t("canvasEdgeList")}</summary><ol className="mt-2 space-y-2">{edges.map((edge) => <li key={`${edge.from}-${edge.kind}-${edge.to}`}>
       <span>{edgeDescription(edge)}</span>{" "}<button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-primary" type="button" onClick={(event) => openConnection({ kind: "reconnect", edge }, event.currentTarget)}>{t("canvasSelectConnection")}</button>
     </li>)}</ol>

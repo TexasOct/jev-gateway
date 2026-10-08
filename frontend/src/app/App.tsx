@@ -18,6 +18,7 @@ import { hasUnsavedChanges } from "@/shared/navigation/unsaved-changes";
 export default function App() {
   const { locale, setLocale, t, formatDateTime } = useLocale();
   const [view, setView] = useState<View>("monitoring");
+  const [canvasModel, setCanvasModel] = useState<{ provider: string; upstream: string } | null>(null);
   const [strategyDirty, setStrategyDirty] = useState(false);
   const [strategyPending, setStrategyPending] = useState(false);
   const [needsKey, setNeedsKey] = useState(true);
@@ -146,20 +147,30 @@ export default function App() {
     selected,
   ]);
 
-  const reloadConfiguration = useCallback(async () => {
+  const reloadConfiguration = useCallback(async (current: () => boolean) => {
+    // A configuration read belongs to the editor operation that admitted it.
+    // Propagate its failure; a committed policy must never be replayed to retry a read.
+    const next = await api.configuration();
+    if (!current()) return;
+    setConfiguration(next);
     await run(async () => {
-      await loadConfiguration();
-      await loadMonitoring();
-      await loadSetup();
+      try {
+        if (current()) await loadMonitoring();
+        if (current()) await loadSetup();
+      } catch (caught) {
+        if (current()) throw caught;
+      }
     });
-  }, [loadConfiguration, loadMonitoring, loadSetup, run]);
+  }, [loadMonitoring, loadSetup, run]);
   const refreshProviderCatalog = useCallback(async () => {
     await loadConfiguration();
     await loadMonitoring();
     await loadSetup();
   }, [loadConfiguration, loadMonitoring, loadSetup]);
   const managementView = view === "providers" || view === "settings";
-  const providerManagement = useProviderManagement(managementView && !needsKey, onUnauthorized, refreshProviderCatalog);
+  // The shared model editor Dialog can also open from a workflow canvas model
+  // node, so the configuration manager stays active while that request exists.
+  const providerManagement = useProviderManagement((managementView || canvasModel !== null) && !needsKey, onUnauthorized, refreshProviderCatalog);
   const providerNavigationGuard = providerManagement.navigationGuardRef;
   const cancelProviderQuery = providerManagement.cancelQuery;
 
@@ -261,6 +272,9 @@ export default function App() {
       onSetup={submitSetup}
       onRetrySetup={() => void validateConnection()}
       providerManagement={providerManagement}
+      canvasModel={canvasModel}
+      onOpenCanvasModel={(identity) => { setCanvasModel(identity); return true; }}
+      onCloseCanvasModel={() => setCanvasModel(null)}
       onStrategyDirtyChange={setStrategyDirty}
       onStrategyPendingChange={setStrategyPending}
       onUnauthorized={onUnauthorized}
