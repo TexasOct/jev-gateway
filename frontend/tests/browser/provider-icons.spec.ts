@@ -4,7 +4,7 @@ import type { ProviderFixtureState } from "../fixtures/provider-management";
 import type { BrowserContext, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-const sources = JSON.parse(readFileSync(new URL("../../src/features/providers/assets/sources.json", import.meta.url), "utf8")) as { deepseek: { sha256: string }; icons: Record<string, { sha256: string }> };
+const sources = JSON.parse(readFileSync(new URL("../../src/features/providers/assets/sources.json", import.meta.url), "utf8")) as { icons: Record<string, { sha256: string }> };
 
 const csp = "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 function fixture(): ProviderFixtureState { return { configuration: providerFixture(), writes: [], validations: [], selectors: [] }; }
@@ -154,7 +154,7 @@ test("all packaged SVGs load as same-origin files under gateway CSP and preserve
   page.on("console", (message) => { if (message.text().includes("Content Security Policy")) violations.push(message.text()); });
   await open(page); await edit(page);
   const images = picker(page).locator('div[aria-label="Brand icon library"] img');
-  await expect(images).toHaveCount(Object.keys(sources.icons).length + 1);
+  await expect(images).toHaveCount(Object.keys(sources.icons).length);
   await expect.poll(() => images.evaluateAll((elements) => elements.every((element) => (element as HTMLImageElement).naturalWidth > 0))).toBe(true);
   const assets = await images.evaluateAll((elements) => elements.map((element) => {
     const image = element as HTMLImageElement; const rect = image.getBoundingClientRect();
@@ -169,11 +169,11 @@ test("all packaged SVGs load as same-origin files under gateway CSP and preserve
     if (new URL(asset.src).pathname.includes("kimi")) expect(asset.filter).toContain("drop-shadow");
     const filename = new URL(asset.src).pathname.split("/").at(-1)!;
     const id = filename.slice(0, filename.indexOf("-"));
-    const expectedHash = id === "deepseek" ? sources.deepseek.sha256 : sources.icons[id]!.sha256;
+    const expectedHash = sources.icons[id]!.sha256;
     const emitted = readFileSync(new URL(`../../../jev_gateway/static/assets/${filename}`, import.meta.url));
     expect(createHash("sha256").update(emitted).digest("hex"), id).toBe(expectedHash);
   }
-  expect(new Set(assets.map((asset) => asset.src)).size).toBe(Object.keys(sources.icons).length + 1);
+  expect(new Set(assets.map((asset) => asset.src)).size).toBe(Object.keys(sources.icons).length);
   expect(violations).toEqual([]);
   await picker(page).getByLabel("Search icons by brand, alias or model name").fill("azure_openai");
   await expect(picker(page).getByRole("button", { name: "Microsoft Azure", exact: true })).toBeVisible();

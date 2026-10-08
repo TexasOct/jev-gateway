@@ -43,12 +43,24 @@ sticky boolean so choosing another image works after a load failure. Generated
 SVG asset URLs must be same-origin files; force no inlining because gateway CSP
 uses `img-src 'self'` and excludes `data:`.
 
-Artwork uses pinned SVG source bytes with per-file SHA-256, a supplier
-reference and license evidence. DeepSeek retains the original whale path and color,
-removes the wordmark and clips, and uses symbol-only bounds. Record both the
-original source hash and derived file hash with the extraction steps. Retain DeepSeek's original repository attribution
-and the MIT notice for Lobe Icons. Distinguish collection artwork from an official
-vendor distribution. No runtime CDN or new CSS/CSP/storage boundary is added.
+All supplier brand artwork uses unmodified local SVGs from the pinned Lobe Icons
+community collection. `assets/sources.json` stores the collection commit,
+`asset_source_prefix`, MIT license evidence, and each `icons.<id>` record's
+`original_file`, supplier reference and SHA-256. The registry projects every
+source URL as the prefix plus `original_file` and uses the collection license.
+The current 39 images use commit `82e641b4fece9d1028a127149af9ded00df5ac0c`.
+Generic Lucide controls and initials retain their separate rendering.
+
+DeepSeek uses that collection's exact `deepseek-color.svg` bytes, with a `0 0 24 24`
+viewBox, accessible title and one blue whale path (`#4D6BFE`), without a wordmark.
+Its SHA-256 is `deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439`.
+Preserve source bytes, proportions and white backing in both schemes. Keep the
+Lobe MIT notice in active credits and both locale descriptions. Historical
+DeepSeek derivation/license records may remain preserved; they do not describe
+the delivered collection artwork. Supplier references identify brands and do
+not establish official distribution or endorsement. Artwork changes preserve
+registry IDs/aliases, explicit selections, provider/model identity and transport.
+No runtime CDN or new CSS/CSP/storage boundary is added.
 
 ## 4. Validation and error matrix
 
@@ -80,6 +92,13 @@ parameter projection. Browser tests cover both kinds, independent selection,
 cancel/reset/save/re-edit, image failure recovery, packaged images under the
 gateway CSP, visible focus and 320px/390px/desktop in both locales and schemes.
 Check built wheel asset parity, source hashes, SVG safety and retained licenses.
+Assert the registry, manifest and local/emitted SVG sets are identical, including
+DeepSeek in the shared collection. Check exact DeepSeek source-byte/hash/license
+parity and symbol-only structure, plus byte preservation for unchanged artwork.
+Browser checks retain image failure recovery, identity and credential operation
+assertions when a provenance source changes. A fixture-applied gateway CSP proves
+that browser loading scope; installed-wheel and actual backend checks separately
+prove packaging and production delivery.
 
 ## 7. Wrong vs correct
 

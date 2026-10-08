@@ -46,14 +46,14 @@ const entries: Array<[string, string, string[]]> = [
 ];
 
 export const brandIcons: BrandIcon[] = entries.map(([id, label, aliases]) => {
-  const record = id === "deepseek" ? sources.deepseek : sources.icons[id as keyof typeof sources.icons];
+  const record = sources.icons[id as keyof typeof sources.icons];
   return {
     id, label, aliases, url: images[`../assets/${id}.svg`]!,
-    source: "source" in record ? record.source : sources.collection.asset_source_prefix + record.original_file,
+    source: sources.collection.asset_source_prefix + record.original_file,
     officialReference: record.official_reference, sha256: record.sha256,
-    originalFile: "file" in record ? record.file : record.original_file,
-    license: "license" in record ? record.license : sources.collection.license,
-    usage: "usage" in record ? record.usage : sources.collection.usage,
+    originalFile: record.original_file,
+    license: sources.collection.license,
+    usage: sources.collection.usage,
   };
 });
 export const genericIcons = ["initials", "server", "cloud", "circuit", "globe"] as const;

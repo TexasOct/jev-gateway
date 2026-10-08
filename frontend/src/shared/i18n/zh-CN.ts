@@ -135,7 +135,7 @@ export const zhCN = {
   pmSourceUnknown: "来源值未知。",
   pmReference: "仅作参考：尚未核实适用于此实际服务提供方。",
   pmAssetSources: "供应商品牌资源与署名",
-  pmAssetUsage: "DeepSeek 使用从固定版本官方仓库徽标中提取的独立图形，已移除文字。其他图标来自采用 MIT 许可的 Lobe Icons 社区图标集，保持原样。品牌标识用于识别供应商，不表示官方背书。",
+  pmAssetUsage: "所有供应商品牌图标均来自固定版本、采用 MIT 许可的 Lobe Icons 社区图标集，保持原样。DeepSeek 使用不含文字的鲸鱼图形。品牌标识用于识别供应商，不表示官方背书。",
   pmAssetCoverage: "Lobe Icons 是社区图标集。下方供应商链接用于说明品牌来源，不表示这些社区图形由供应商官方发布。",
   pmAssetCollection: "Lobe Icons 图标集：来源与 MIT 许可",
   pmAssetReference: "供应商品牌参考",

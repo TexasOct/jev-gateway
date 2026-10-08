@@ -135,7 +135,7 @@ export const en = {
   pmSourceUnknown: "Source value is unknown.",
   pmReference: "Reference only: not verified for this serving provider.",
   pmAssetSources: "Supplier artwork and attribution",
-  pmAssetUsage: "DeepSeek uses the symbol extracted from its pinned official repository logo, with the wordmark removed. Other icons are unchanged artwork from the MIT-licensed Lobe Icons community collection. Brand marks identify suppliers and do not imply endorsement.",
+  pmAssetUsage: "All supplier brand icons use unchanged artwork from the pinned, MIT-licensed Lobe Icons community collection. DeepSeek uses the whale symbol without a wordmark. Brand marks identify suppliers and do not imply endorsement.",
   pmAssetCoverage: "Lobe Icons is a community collection. Supplier references below identify the brands; they do not establish official distribution of the collection artwork.",
   pmAssetCollection: "Lobe Icons collection: source and MIT license",
   pmAssetReference: "Supplier reference",

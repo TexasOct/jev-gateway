@@ -1,29 +1,27 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import artwork from "../assets/deepseek.svg?raw";
-import license from "../assets/LICENSE-deepseek.txt?raw";
 import sources from "../assets/sources.json";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { brandIcons } from "../shared/icons";
 
 describe("bundled supplier identities", () => {
-  it("ships the pinned official DeepSeek symbol with derivation and attribution", () => {
-    expect(createHash("sha256").update(artwork).digest("hex")).toBe(sources.deepseek.sha256);
-    expect(sources.deepseek.source).toMatch(/^https:\/\/raw.githubusercontent.com\/deepseek-ai\//);
-    expect(license).toContain("Copyright (c) 2023 DeepSeek");
+  it("ships the unchanged pinned Lobe DeepSeek whale symbol", () => {
+    expect(createHash("sha256").update(artwork).digest("hex")).toBe(sources.icons.deepseek.sha256);
+    expect(sources.icons.deepseek.original_file).toBe("deepseek-color.svg");
     expect(artwork).not.toMatch(/<script|<foreignObject|\shref=|\son\w+=/i);
-    expect(artwork).toContain('viewBox="0 0 56.24 41.3594"');
+    expect(artwork).toContain('viewBox="0 0 24 24"');
+    expect(artwork).toContain('fill="#4D6BFE"');
     expect(artwork.match(/<path\b/g)).toHaveLength(1);
     expect(artwork).not.toMatch(/<text|<g|clipPath/);
-    expect(sources.deepseek.original_sha256).toBe("ac13bdc805820c46bf0faf053aa5d31f72b051794abfe1dd72a682f09de2966b");
-    expect(sources.deepseek.derivation).toContain("removed the wordmark");
+    expect(sources.icons.deepseek.sha256).toBe("deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439");
   });
   it("packages every registry image unchanged with pinned collection provenance", () => {
     const directory = fileURLToPath(new URL("../assets/", import.meta.url));
     const files = readdirSync(directory).filter((file) => file.endsWith(".svg")).sort();
     expect(files).toEqual(brandIcons.map((icon) => `${icon.id}.svg`).sort());
-    expect(Object.keys(sources.icons).sort()).toEqual(brandIcons.filter((icon) => icon.id !== "deepseek").map((icon) => icon.id).sort());
+    expect(Object.keys(sources.icons).sort()).toEqual(brandIcons.map((icon) => icon.id).sort());
     expect(sources.collection.asset_source_prefix).toContain("82e641b4fece9d1028a127149af9ded00df5ac0c");
     for (const [id, record] of Object.entries(sources.icons)) {
       const svg = readFileSync(`${directory}/${id}.svg`, "utf8");

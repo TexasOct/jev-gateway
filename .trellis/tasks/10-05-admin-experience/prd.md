@@ -46,6 +46,10 @@ The original development request authorizes implementation and verification. App
 
 # Task map
 
+## Latest icon1 direction
+
+The user adds icon1: all supplier/platform brand artwork uses `https://github.com/lobehub/lobe-icons`. The current 38 Lobe images keep their pinned source; DeepSeek switches from the earlier official-derived image to the same collection's symbol-only SVG. Accurate credits, MIT attribution and source/hash records accompany the images. Existing icon IDs/aliases, saved selection, local packaging and CSP remain effective. The icon1 child owns the scoped change and a separate independent acceptance context; this later source direction supersedes earlier asset-byte/source preservation only for the required icon1 delta. Final integration/package/release acceptance includes it.
+
 ## Latest supplier-owned model entry
 
 The user's latest direction supersedes the separate Models navigation in IA1 and earlier layout plans. The Dashboard has Monitoring, Strategy workflow, Suppliers and Settings destinations. Each saved LLM supplier lists its own configured models directly beneath its connection row. A model row needs only an Edit button, which opens the shared model editor Dialog bound to that exact provider/model identity. Discovery and batch import remain under that supplier, with progressive disclosure for the dense import controls. Preserve canonical identities, confirmation, metadata and atomic-save contracts. Protect dirty drafts on close, filtering, supplier editing or kind changes; block departure during writes; restore focus to the model Edit button or a visible supplier fallback. Decision-only rows do not expose LLM model management. Regenerate current web renders after the change. No separate model detail entry or supplier-model-list modal is required by the latest instruction.

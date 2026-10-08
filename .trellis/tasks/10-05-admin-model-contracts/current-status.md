@@ -1,4 +1,80 @@
-更新时间：2026-10-07T16:17:11Z。生命周期仍为 `in_progress`；业务验收未关闭，15项继承PASS / 43项OPEN。
+当前状态：2026-10-08。生命周期仍为 `in_progress`；当前源码38项具名PASS。
+
+原M10-M13已由fresh owner完成并获父级接受，36原生完整IDs和两套143输入/执行时副本核对，十一runtime/model/SQLite关联有效，完整工作树Pyright零发现。当前产品/旧测试未变，114前批输入仍一致；原795聚合不提升。详见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-metadata-tail-parent-acceptance.md)。继承十五项及combined null、M9 UI恢复/X/T3实际消费者、完整验收与发布保持其范围。父级新增icon1执行，不替代剩余业务验收。
+
+以下保留14:56Z及更早快照。
+
+更新时间：2026-10-08T14:56Z。生命周期仍为 `in_progress`；当前源码34项具名PASS，D1-D5均已接受。
+
+独立owner的65项完整选择通过，原39项包含其中；父级核对原生IDs/JUnit、55源码hash/mode和13证据绑定，接受D1-D3。旧十个测试函数不变，fixture仅增可选复制覆盖参数。D2最终非空fallback的不可达性由源码说明，实际扩大/放宽/default/失败路径各有执行证据，没有mock内部选择来制造覆盖。见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-disabled-gaps-parent-acceptance.md)。继承十五项未知重合及combined null保持。
+
+保存114源码及338证据文件后，fresh owner `b9d412f2-089f-4041-8138-504f7ecae2ae` 在原Contracts工作树补原M10-M13；编排 `b6b21c35-38c2-4c31-92bf-48e16cf0acfc` 于14:56:18.455Z启动。只复用适用于当前源码的普通执行证据，历史p/i/z或撤销126结果不提升为当前通过。实际Dialog/消费者、其余行、完整验收、整合/安装/提交/发布仍开放。
+
+以下保留13:44Z及更早快照。
+
+更新时间：2026-10-08T13:44Z。生命周期仍为 `in_progress`；当前源码31项具名PASS，M6/M7/M8及D4/D5已接受。
+
+fresh owner `64c28be7-52dd-4ef9-8cbe-bac01b324945` 仅补D1完整管理记录保留、D2窄池外enabled选择和D3仅禁用成员标签池。114当前源码和23条本批证据在接续前保存，原39项与修正Pyright保留，不混为新结果。编排 `23ea45b1-e40d-4389-9f45-345f75af4fb5` 同协议接续，无提交/发布。原继承15与未知重合/封存控制/实际Dialog与消费者仍保持各自范围。
+
+后续disabled批次已交付：39项原生/JUnit与55源码绑定一致，113旧输入未改，完整Pyright修复临时目录后通过，exit2失败保留。父级接受D4/D5，当前具名PASS为31，D1完整记录保留/D2扩大候选池/D3仅禁用成员标签池待有限补充。见[父级复核](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-disabled-parent-review.md)；子agent全D1-D5 PASS原报告保留其提案范围，不替代完整行验收。
+
+第八轮独立review `b353d4c9-6f2a-4265-8c94-00e11523e04e` 按原要求确认三项，795不同nodeids/完整313旧集合、完整Pyright及109旧源码hash/mode保留核对通过。见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-eighth-parent-acceptance.md)。继承15项具体ID未知，combined unique计数继续null。新fresh owner `a8fd2a75-4584-4225-be26-dd587f1be3fc` 在原工作树执行D1-D5禁用模型的真实管理/路由/session/重开行为，113当前输入已保存；不重跑未变1940 suite或历史126/110控制。实际Dialog/消费者、完整独立验收与整合/安装/发布仍开放。
+
+以下保留10:23Z及更早快照。
+
+更新时间：2026-10-08T10:23Z。生命周期仍为 `in_progress`；当前源码二十六项具名PASS保持，M6/M7/M8待第八轮独立oracle验收。
+
+第八轮 `d75c87a7-13a3-4b95-af9d-464e2fb64ade` 已完整交付，process terminal观察、harness checked。报告保留修复前12FAIL/8PASS，最终795不同nodeids通过（含原313项wave7及20项新增），完整工作树Pyright通过。父级已重算两个113文件绑定与日志hash、795完整PASSED集合及313项旧集合，均匹配；源码/oracle独立复核与109旧绑定/94证据的父级完整保留核对仍待完成。报告见[第八轮交付](../../.runtime/admin-experience/parallel-business-acceptance-20261008/deliveries/contracts-eighth.md)。已授权用正确工作树完整Pyright作为类型检查依据，LSP十项missing-import和十一项辅助finding原文及旧行归因保留。未据交付新增三项PASS；第七轮failed settlement、继承聚合未知重合、真实Dialog/消费者与最终整合/安装/发布要求保持。
+
+以下保留09:48Z及更早快照。
+
+更新时间：2026-10-08T09:48Z。生命周期仍为 `in_progress`；当前源码二十六项具名PASS，新增M1/M2/M3/M4/M5；M6/M7/M8仍REWORK。
+
+完整独立review `3ea598d5-a621-4f9e-b9a5-5e8b0f17f106` 已交付，父级[逐条处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-seventh-parent-acceptance.md)接受五项。M6嵌套未知condition被丢弃而无marker，M8合法effort顺序导致suggestion/envelope差异或假conflict，均需保留运行复现后修复；M7当前helper缺直接runtime/SQLite provenance相等及canonical association持久化证明，没有已证产品丢失。第七轮313通过及failed settlement分别保留，writer“八项全PASS”提案未全部接受。父级保存112源码/规范/原manifest和空tracked diff后，同协议原上下文后继 `d75c87a7-13a3-4b95-af9d-464e2fb64ade` 已启动M6-M8限定修复/补证；原七份测试/失败保持。继承十五项及未知重合继续独立，实际Dialog/消费者/最终整合与发布仍开放。
+
+以下保留09:27Z及更早快照。
+
+更新时间：2026-10-08T09:27Z。生命周期仍为 `in_progress`；当前源码二十一项具名PASS保持，M1-M8待完整独立oracle复核。
+
+第七轮 `bb66a35c-aece-4ee3-b6a4-b9a18923712e` 的process terminal已观察，状态failed，错误为 `Upstream HTTP/2 stream failed`，harness acceptance rejected，理由为 `Structured acceptance report not found`。实际保存的完整报告已取回；父级复算313个不同PASSED nodeids与回执集合、两个110文件绑定和日志hash、109旧源码/82旧证据及LiteLLM实际安装版本/备份hash，均匹配。源码/规范无产品修复，初始253通过、扩展312通过/一项fixture失败仍保留。详见[最新父级核对](../../.runtime/admin-experience/parallel-business-acceptance-20261008/latest-parent-verification.md)。限定M1-M8独立只读复核已启动，不重跑未变化用例；具名ledger暂不增加，failed settlement独立保留。继承十五项和未知重合、真实Dialog/消费者/整合/安装/发布要求不变。
+
+以下保留08:09Z及更早快照。
+
+更新时间：2026-10-08T08:09Z。生命周期仍为 `in_progress`；当前源码二十一项具名PASS为T1/T5/T6/T7/T8/T9/T10/T11/T12/F1/F2/F3/F4/F5/E1/E2/E3/E4/E5/E6/C2，完整任务未关闭。
+
+第六轮 `f7fae5d2-67e2-46bd-8d61-ce4e8f9dc40b` 已完成，独立源码/oracle与父级回执复核接受F1/F4/E3/E5/E6。260个不同nodeids通过，日志/回执集合一致，两个最终回执各109个文件绑定及日志hash匹配；108个旧源码和70份旧证据由父级复算，均未变化。初始两项fixture失败与一次类型检查失败保留，最终Pyright无错误；没有产品修复或新规范。详见[第六轮接受记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-sixth-parent-acceptance.md)。下一轮补M1-M8来源、匹配、单位、条件报价与provenance。当前具名集合与继承聚合分别保留，不盲加；UI/消费者/整合仍开放。
+
+以下保留06:47Z及更早快照。
+
+更新时间：2026-10-08T06:47Z。生命周期仍为 `in_progress`；当前源码具名PASS为T1/T5/T6/T7/T8/T9/T10/T11/T12/F2/F3/F5/E1/E2/E4/C2，完整任务未关闭。
+
+第五轮 `7ef031b8-7990-47a9-9ba8-d9b206b8a075` 已交付，独立源码/oracle和父级回执复核接受F2/F3/F5/E1/E2/E4。424个不同nodeids全部通过，日志/回执集合一致，两个最终回执各108个文件绑定由父级重算并全部匹配，Pyright无错误。新增437行值域回归，没有产品修复或新规范；分支/HEAD/空index核对通过，源码与报告仍未暂存。详见[第五轮接受记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-fifth-parent-acceptance.md)。当前十六项具名处置与继承十五项聚合分别保留，不叠加未知重合。下一轮补F1/F4/E3/E5/E6，UI/消费者/整合与发布继续开放。原限制和失败证据不变。
+
+以下保留22:10Z及更早快照。
+
+更新时间：2026-10-07T22:10Z。生命周期仍为 `in_progress`；当前源码具名PASS为T1/T5/T6/T7/T8/T9/T10/T11/T12/C2，完整任务未关闭。
+
+第四轮 `15b6db12-436d-4421-893a-f90b3dacf0cf` 已交付并经原oracle独立只读及父级回执复核，接受T7/T10/T11/T12/C2。49个不同nodeids全部通过，两个最终回执各107个文件绑定匹配，Pyright无错误，分支/HEAD/index核对通过。空index不等于worktree clean：新增测试与报告仍未暂存。详见[第四轮父级接受记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-fourth-parent-acceptance.md)。T12/C2共享断言不重复计执行数量；T11不替代完整F/E值域。下一轮补F2/F3/F5/E1/E2/E4。十项当前源码具名处置和原继承验收分别保留，聚合去重仍待具体继承ID或全量当前证据；历史封存状态不变。
+
+以下保留21:47Z及更早快照。
+
+更新时间：2026-10-07T21:47Z。生命周期仍为 `in_progress`；当前源码具名PASS为T1/T5/T6/T8/T9，完整任务未关闭。
+
+第三轮 `f12f070e-e783-43d0-90a4-80c75d43db09` 已交付并经独立只读及父级回执复核，接受T5/T9业务证据。12项新回归全部通过，pytest/Pyright两个回执各106个当前文件绑定匹配，分支/HEAD/index核对通过；没有新产品缺陷或runtime修复。详见[第三轮父级接受记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-third-parent-acceptance.md)。原15项继承PASS的具体ID清单未恢复，旧58行map没有逐行PASS/OPEN字段；先记录这五项明确处置，不直接将旧15与新增项相加成20，以免重计。继承验收保持，具名处置见[当前记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-current-business-dispositions.json)。下一轮继续T7/T10/T11/T12实际后端谓词，真实Dialog/跨消费者要求仍待整合；三份新测试留在Contracts分支未暂存。
+
+以下保留21:31Z及更早快照；18/40是当时的聚合记录。
+
+更新时间：2026-10-07T21:31Z。生命周期仍为 `in_progress`；当时记录业务18项PASS / 40项OPEN，其中15项继承、T1/T6/T8三项由本轮当前源码证据关闭。
+
+独立worktree第二轮 `907c703f-985c-4bd2-b851-0a67ffee313c` 已交付，新增13项真实live-state回归；最终定点23项和五项verbose publication回归通过，Pyright无错误。父级已完整读取报告、另行按原acceptance-plan复核T1/T6/T8，并核对三个执行回执的当前源码绑定，接受三项业务PASS。T3仍缺实际Dialog提交，T9仍缺未完成恢复日志期间的健康chat；下一轮补T5版本冲突与T9。详见[父级接受记录](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-second-parent-acceptance.md)及[第二轮报告](../../.runtime/admin-experience/parallel-business-acceptance-20261008/deliveries/contracts-second.md)。产品源码无新修复，两份新测试留在Contracts分支未暂存；历史原报告与126程序执行状态、撤销准入、110控制UNRUN均保留。
+
+以下为历史快照；其中15/43及pending只表示当时状态。
+
+后继`8c87efdc-7d51-4d8`已交付37060-byte followup，真实terminal17:47:30.808Z；58IDs/原顺序、两版原文和worktree仅两份untracked报告均核对。F5/M13及有限性分工已补正，映射中的省略节点/旧harness仍未完全证实。父级已对B07的392源绑定逐条比较：391hash一致，唯一差异是dialog-regression.ts检查点EOF单LF删除；392mode一致，52后端/180前端产品/55后端测试全匹配。不能继续用旧handoff的SQLite OPEN替代fresh已接受25join/B07证据，具体X1/T3/X5/X6复用范围仍按原谓词判断。计划有两个不存在node、错误D4整文件命令、85静态参数规模与报告数字不符、未绑定uv/env/owner及失败保存缺口，未放行。见[后继复核](../10-05-admin-experience/worktree-first-delivery-review.md)。没有产品patch或新测试/PASS；两次126撤销/no third、110UNRUN、native initiator未知保留，停止重复文档代理派发。
+
+Contracts业务worktree第一版已交付，只有untracked报告，没有产品改动或新测试。[父级复核](../10-05-admin-experience/worktree-first-delivery-review.md)确认六历史问题有源码处理，同时纠正quality函数描述、F5已有raw/runtime规范及回归、M13已有reference持久化及断言、Models B07真实browser/API/file/SQLite证据范围。旧候选44/3/7/2/2仍属历史；第一版未提供当前58行映射，不能替代正式处置。后继补精确映射与具体有限执行计划，第一版原文保存。原句柄已不可resume；新派发以runtime回执为准。两次126撤销/no third、native initiator未知和全部110控制UNRUN不变。
+
+以下内容保留16:17:11Z及更早快照；旧pending与旧index措辞只适用于当时。检查点已为2ace03a，Brokera67 handle不可用且无完成verdict，不冒称仍在线。
 
 [原业务范围复核](../10-05-admin-experience/research/contracts-canvas-original-scope-assessment-1.md)已完成。原58行要求包含实际UI完整记录提交、API、持久化及reload的一致性，先核对已完成Models/Suppliers证据能否复用，再补未证明谓词。43项OPEN不等于43项未实现；只读需求代理引用的六类历史缺陷未核对后续修复，不能直接列成当前必须改代码的六项。revision12十个D4失败仍为provider fixture遗漏，后续session断言未执行；native initiator缺口及两次撤销/no third不变。工具范围收敛是建议，未认可acquisition方案、执行控制或关闭业务。
 
