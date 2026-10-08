@@ -1,4 +1,6 @@
-当前状态：2026-10-08，M10-M13与问题坐标限定收口，icon1执行中。
+当前状态：2026-10-08，M10-M13与问题坐标限定收口，icon1独立验收并整合完成。
+
+Icon1 IC1-IC5独立通过；8个前端文件已整合main，来源规范与双语MIT署名同步。主工作树6个单元/27个浏览器、类型/lint/新构建/新鲜度及42文件/39 SVG源码wheel检查通过。见[处置](../../.runtime/icon1/parent-disposition.md)。最终提交/archive随父级gate，已安装0.1.3/其余Contracts20原行、完整Canvas/Parent33及发布继续开放。以下运行状态为历史快照。
 
 父级接受Contracts原M10-M13，当前具名PASS为38；36完整原生IDs、两套143源码/执行时副本、十一runtime/model/SQLite关联及完整Pyright已核对，114前批输入不变。详见[元数据处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-metadata-tail-parent-acceptance.md)。继承十五项及未知重合仍独立。
 

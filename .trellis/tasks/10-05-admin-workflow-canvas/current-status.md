@@ -1,5 +1,11 @@
 当前状态：2026-10-08。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
 
+模型节点→共享模型 Dialog 交接已补上缺失的 owner 路径（新增 `CanvasModelEditor.tsx` 并接入 RoutingCanvas/RoutingEditor/AppShell/App，tracked diff 8 文件/320 增/69 删）：独立验收以私有变异 bundle 做反证，交接谓词转红而非模型内联路径保持绿色，未采信实现者结论。同时接受 C07、C08、C10、C12 与 WF4 合并草稿+布局历史边界；父级复跑两新 spec 15/15 通过，bundle 哈希与独立报告一致，index 为空。见[本批处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-remaining-rows-parent-acceptance.md)。C09、C11、C13-C18、C20-C25、几何/对比、原 48/49 与全部 UNRUN 保持开放；完整剩余行枚举属于 Canvas 收口。
+
+以下保留前一快照。
+
+当前状态：2026-10-08。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
+
 问题组显式创建坐标已有最小addNode修复，保留六个红空间案例及原断言字节。实现82/26浏览器、402前端单元和编译/lint/build为支持证据；另一fresh owner独立82项通过并重算62空间记录。父级核对312副本/模式、82原生报告和零重试/跳过/flaky，接受该选择内C01-C06/WF1与一次创建undo/redo；完整WF4/C07-C25、模型节点Dialog、持久化整合/设备主题矩阵及发布继续开放。见[处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-question-parent-acceptance.md)。
 
 60秒外层中断/已核实私有服务SIGTERM，以及额外DOM原点探针的cwd和递归副本发现两次基础设施失败分别保留；后者零案例执行，不算通过。完整后代退出与旧重置归因仍未闭合。编排b6b21c35和三个child均已完成。父级新增icon1在另一个工作树执行，不改本批源码或证据。
