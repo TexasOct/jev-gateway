@@ -15,7 +15,7 @@ from typing import Any, Callable, Mapping, TypeGuard
 from urllib.parse import urlsplit
 
 from .discovery_network import DiscoveryNetworkError, JsonResponse, safe_get_json
-from .reasoning import EFFORT_LADDER
+from .reasoning import EFFORT_LADDER, ladder_from_list
 
 SOURCE_LIMIT = 16 * 1024 * 1024
 CACHE_TTL = 6 * 60 * 60
@@ -64,7 +64,18 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 def _levels(value: Any) -> list[str] | None:
     if not isinstance(value, list) or len(value) > 16 or any(not isinstance(v, str) or v not in _EFFORTS for v in value):
         return None
-    return list(dict.fromkeys(value))
+    return list(value)
+
+
+def _automatic_metadata_value(name: str, value: Any) -> Any:
+    """Normalize automatic effort facts while retaining original source evidence."""
+    if name != "reasoning_effort" or value is None:
+        return value
+    try:
+        return list(ladder_from_list(value, "metadata reasoning effort"))
+    except (TypeError, ValueError):
+        # Vendor/null declarations remain raw evidence, not an automatic ladder.
+        return None
 
 
 def _empty_fields() -> dict[str, Any]:
@@ -146,14 +157,23 @@ def _price_details(cost: Mapping[str, Any], *, multiplier: float, source: str) -
                     if any(name not in known for name in row):
                         projected["unrecognized_conditions"] = True
                     condition = _mapping(row.get("condition"))
-                    projected["condition_fields"] = sorted(k for k in condition if k in {"context", "context_length", "time", "start_time", "end_time"})
+                    condition_names = {"context", "context_length", "time", "start_time", "end_time"}
+                    if ("condition" in row and not isinstance(row["condition"], dict)) or set(condition) - condition_names:
+                        projected["unrecognized_conditions"] = True
+                    projected["condition_fields"] = sorted(k for k in condition if k in condition_names)
                     for k in ("context_length", "context"):
-                        if k in condition and _number(condition[k]) is not None:
-                            projected[k] = _number(condition[k])
+                        if k in condition:
+                            number = _number(condition[k])
+                            if number is None:
+                                projected["unrecognized_conditions"] = True
+                            else:
+                                projected[k] = number
                     for k in ("time", "start_time", "end_time"):
                         value = condition.get(k)
                         if isinstance(value, str) and re.fullmatch(r"[0-9T:Z+./\- ]{1,64}", value):
                             projected[k] = value
+                        elif k in condition:
+                            projected["unrecognized_conditions"] = True
                 conditions.append(projected)
             details[key] = conditions
     if not cost.get("tiers") and isinstance(cost.get("context_over_200k"), dict):
@@ -300,8 +320,9 @@ def _merge_candidates(sources: list[dict[str, Any]], warnings: list[str]) -> dic
             warnings.append("reference_only")
             continue
         for path, evidence in source["fields"].items():
-            if evidence["value"] is not None:
-                candidates.setdefault(path, []).append(evidence["value"])
+            value = _automatic_metadata_value(path, evidence["value"])
+            if value is not None:
+                candidates.setdefault(path, []).append(value)
     for path, values in candidates.items():
         if any(value != values[0] for value in values[1:]):
             warnings.append("metadata_conflict")

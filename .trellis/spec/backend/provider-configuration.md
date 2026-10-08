@@ -219,7 +219,12 @@ source has at most 16 entries; runtime accepts its seven legal tokens and uses
 canonical duplicate handling. Non-null known/confirmed effort fields use that
 same canonical order and deduplication in a copied envelope. Compare confirmed
 efforts after normalizing runtime capabilities, and persist both canonical
-values together. Preserve raw source order, duplicate/vendor/null entries,
+values together. Automatic effort suggestions and source-value comparisons use
+the same ladder before deciding agreement or conflict. For example, native
+`["low", "high"]` and public `["high", "low", "high"]` agree on the automatic
+value `["low", "high"]`; their original source lists remain unchanged. A null or
+vendor declaration supplies no automatic ladder, while an explicit empty list
+is a known empty ladder. Preserve raw source order, duplicate/vendor/null entries,
 references, ownership and dates. Check the original 262,144-byte envelope before
 projection; canonicalization cannot admit an oversized original record. Source
 text, paths, units and raw effort strings reject both C0 controls and DEL.
@@ -304,7 +309,11 @@ channel and endpoint before a native retail source can supply automatic prices.
 
 Models.dev costs are already USD/million tokens. OpenRouter and LiteLLM per-token
 costs require multiplication by one million. Keep conditional/cache/tier evidence
-for review. Retrieval time, source-declared update time, and verification time have
+for review. An OpenRouter override with an unknown or unrepresentable nested
+condition retains `unrecognized_conditions: true`, including when all top-level
+keys are recognized. Preserve safe recognized conditions and omit arbitrary raw
+condition content. Conditional rates never become unconditional base quotes.
+Retrieval time, source-declared update time, and verification time have
 different meanings. Limit public responses to 16 MiB and cached suggestions to
 six hours, with bounded refresh/concurrency behavior and explicit stale state.
 Source failure cannot gate chat serving or overwrite confirmed model values.

@@ -16,6 +16,7 @@ from litellm import provider_list
 from jev_gateway.catalog import Catalog, catalog_from_document, provider_from_dict, model_metadata, _metadata_number, _finite_number
 from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
 from jev_gateway.credentials import credential_snapshot, env_update, credential_path, credential_update, read_credential_bytes, validate_secret, validate_reference
+from jev_gateway.model_metadata import _automatic_metadata_value
 from jev_gateway.provider_presets import provider_presets
 from jev_gateway.reasoning import ladder_from_list
 from jev_gateway.routing_overlay import merge_overlay, overlay_path, read_models_document, read_overlay
@@ -51,12 +52,14 @@ def metadata_envelope(candidate: Mapping[str, Any]) -> dict[str, Any]:
                 continue
             references.setdefault(name, []).append(identifier)
             if source.get("applicable") is not False and evidence.get("value") is not None:
-                values.setdefault(name, []).append(evidence["value"])
+                value = _automatic_metadata_value(name, evidence["value"])
+                if value is not None:
+                    values.setdefault(name, []).append(value)
     fields = {}
     for name in allowed:
         field_values = values.get(name, [])
         conflict = bool(field_values) and any(v != field_values[0] for v in field_values[1:])
-        value = None if conflict else candidate.get("fields", {}).get(name)
+        value = None if conflict else _automatic_metadata_value(name, candidate.get("fields", {}).get(name))
         fields[name] = {"status": "conflict" if conflict else "known" if value is not None else "unknown", "value": value, "source_ids": references.get(name, [])}
     return model_metadata({"version": 1, "sources": sources, "fields": fields})
 

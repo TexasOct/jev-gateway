@@ -1,3 +1,19 @@
+当前状态：2026-10-09。生命周期仍为 `in_progress`；当前源码**58/58 全部具名PASS**。
+
+收尾批次（工作流 `b66ab3e7`）接受 X1、T3、C1、C3-C10。X1/T3 的真实浏览器腿已建立：内置构建的前端驱动真实模型 Dialog 并提交真实 `update_model`，抓取请求体后经真实 ASGI/owner/catalog/磁盘/reload/重启复现同字段值。父级在最终字节上复跑：闭包模块54项、捕获重放2项、真实浏览器2项均通过，bundle `index.html` 哈希一致。
+
+独立验收另发现三项证据记录问题（非产品缺陷）：实现者 at-execution manifest 对四个文件已过期；C9 用例标题声称的 DNS 容量实际只断言信号量（行为本身由探针证实正确）；C6 严格布尔 opt-in 位于 API 边界而非 `validate_target` 原语。见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-closing-rows-parent-acceptance.md)。
+
+继承十五项行 ID 仍不可恢复，combined 唯一 PASS/OPEN 总数继续为 null；原受限控制保持撤销。58行计划已全部收口，但任务归档仍需父级整合提交与最终验收。
+
+以下保留前一快照。
+
+当前状态：2026-10-08。生命周期仍为 `in_progress`；当前源码47项具名PASS。
+
+剩余原合同行中X2-X7、T2、T4、M9已由fresh owner完成并获父级接受（38→47）：真实ASGI/文件/SQLite下UI草稿→ProviderMutation→validate/PUT→磁盘/reload/重启的同字段值、扁平建议字段映射、发现/元数据形状与来源归一、连接测试请求响应、validate与PUT的revision/applied与仅GET重试、文档/类型/HTTP/持久化对齐、含斜杠upstream身份保护、overlay边界与手动/恢复自动证据。独立验收另跑30项并全量3155项通过，Pyright零发现，57项父级复跑通过；仅新增 `tests/test_model_contracts_remaining_rows.py`，无产品修复。见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-remaining-rows-parent-acceptance.md)。X1与T3仅后端/契约腿通过，浏览器驱动腿仍开放，不计入接受集；继承十五项及combined null保持。M9 UI恢复/X/T3实际消费者、完整验收与发布继续开放。
+
+以下保留前一快照。
+
 当前状态：2026-10-08。生命周期仍为 `in_progress`；当前源码38项具名PASS。
 
 原M10-M13已由fresh owner完成并获父级接受，36原生完整IDs和两套143输入/执行时副本核对，十一runtime/model/SQLite关联有效，完整工作树Pyright零发现。当前产品/旧测试未变，114前批输入仍一致；原795聚合不提升。详见[父级处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-metadata-tail-parent-acceptance.md)。继承十五项及combined null、M9 UI恢复/X/T3实际消费者、完整验收与发布保持其范围。父级新增icon1执行，不替代剩余业务验收。
