@@ -1,3 +1,9 @@
+当前状态：2026-10-09。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
+
+父级已将本 worktree 的 canvas 改动整合进 main（提交 `1b45ec1`）：26 文件直接应用，`en.ts`/`zh-CN.ts` 与 icon1 做三方合并，无冲突且键数对齐 605/605。main 关口：Pyright 零发现、pytest3209通过/2跳过、lint0错误/4警告、单测402、应用与浏览器类型exit0、构建与新鲜度通过、canvas 套件 workers=1 下254/254、真实后端 X1/T3 各2项。高负载下 workers2/3（及负载峰值时workers1）会偶发窄屏超时，失败用例串行重跑均通过且在源 canvas worktree 同样复现，属环境争用而非回归；机器负载约29/14核，主要来自无关的 rustc/Zed/模拟器。剩余行 C20-C25 与 WF6；编排 `ded47ed3-0073-4ad8-98c5-107e00954745` 先推进 C09/C11/C13/C14/C15/C16/C17/C18 与 WF2/WF3/WF5。
+
+以下保留前一快照。
+
 当前状态：2026-10-08。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
 
 模型节点→共享模型 Dialog 交接已补上缺失的 owner 路径（新增 `CanvasModelEditor.tsx` 并接入 RoutingCanvas/RoutingEditor/AppShell/App，tracked diff 8 文件/320 增/69 删）：独立验收以私有变异 bundle 做反证，交接谓词转红而非模型内联路径保持绿色，未采信实现者结论。同时接受 C07、C08、C10、C12 与 WF4 合并草稿+布局历史边界；父级复跑两新 spec 15/15 通过，bundle 哈希与独立报告一致，index 为空。见[本批处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-remaining-rows-parent-acceptance.md)。C09、C11、C13-C18、C20-C25、几何/对比、原 48/49 与全部 UNRUN 保持开放；完整剩余行枚举属于 Canvas 收口。
