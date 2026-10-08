@@ -6,7 +6,7 @@ Icon1 IC1-IC5独立通过；8个前端文件已整合main，来源规范与双�
 
 问题组坐标实现后，另一fresh上下文独立82/82通过，312执行时副本/模式与原生报告核对，62空间记录无不一致。父级接受该选择内C01-C06/WF1与创建历史checkpoint；完整Canvas/WF4仍REWORK。两次额外DOM原点探针均在测试前失败并保留，未作为通过依据。见[Canvas处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-question-parent-acceptance.md)。编排b6b21c35及三个child均已完成。
 
-用户新增[icon1](../10-08-icon1/prd.md)：供应商品牌图标统一Lobe Icons。计划/上下文已记录并激活，在独立worktree `jev-gateway-icon1` / `work/icon1` 按实现→fresh独立验收执行；新编排 `5cb665d2-9700-4941-a6de-5268c2f10a9a` 运行中。现有38张Lobe图像保持，DeepSeek改用同源无文字symbol；来源/署名/双语说明随之统一。实际Dialog/其余原矩阵、Parent33、整合/安装/最终提交/0.1.3发布继续开放。
+用户新增[icon1](../archive/2026-10/10-08-icon1/prd.md)：供应商品牌图标统一Lobe Icons。计划/上下文已记录并激活，在独立worktree `jev-gateway-icon1` / `work/icon1` 按实现→fresh独立验收执行；新编排 `5cb665d2-9700-4941-a6de-5268c2f10a9a` 运行中。现有38张Lobe图像保持，DeepSeek改用同源无文字symbol；来源/署名/双语说明随之统一。实际Dialog/其余原矩阵、Parent33、整合/安装/最终提交/0.1.3发布继续开放。
 
 以下保留14:56Z及更早快照。
 

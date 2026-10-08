@@ -2,9 +2,11 @@
 
 ## Current delivery status
 
+2026-10-09归档：Contracts 与 icon1 已完成实现、独立验收、规范同步与任务范围提交，并归档到 `archive/2026-10/`。父级当前只剩 Canvas 子任务。Contracts 提交 `83f6eaf`，icon1 提交 `c89e6eb`，记录提交 `569fbc6`，归档提交 `43a325b` 与 `cc7b701`；工作树干净。main 上 Contracts 关口：Pyright 零发现、pytest3209通过/2跳过、lint0错误/4既有警告、单测402通过、应用与浏览器类型exit0、构建与bundle新鲜度通过、真实浏览器X1/T3 2/2通过。子任务归档不代表整项完成：Canvas 剩余行、两者的整合后的安装验证与0.1.3发布仍开放。以下为历史快照。
+
 Icon1 update: IC1-IC5 accepted after fresh independent6-unit/27-browser execution and source/byte/license inspection. Eight frontend files are integrated into main, identity specs synchronized, and integrated6-unit/27-browser/types/lint/build/freshness plus42-static-file/39-SVG source-wheel parity passed. See [icon1 disposition](../../.runtime/icon1/parent-disposition.md). Final commit/archive/installed0.1.3 remain at the parent gate. Contracts named38 and full Canvas/Parent33 scope remain unchanged. Earlier snapshots follow.
 
-2026-10-08当前：Contracts原M10-M13接受，具名PASS为38；[36项/143输入/完整Pyright处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-metadata-tail-parent-acceptance.md)保留继承未知重合。问题坐标修复已有fresh独立82项和62空间记录，[父级接受该选择内创建/菜单谓词](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-question-parent-acceptance.md)，完整Canvas/WF4仍REWORK，额外原点探针两次测试前基础设施失败保留。b6b21c35及三个child已完成。新增[icon1](../10-08-icon1/prd.md)在独立work/icon1执行，编排 `5cb665d2-9700-4941-a6de-5268c2f10a9a` 实现后fresh验收；所有供应商品牌图标统一Lobe来源并保留无文字DeepSeek。实际Dialog/其他原矩阵/Parent33/整合/安装/提交/0.1.3继续开放。以下为历史快照。
+2026-10-08当前：Contracts原M10-M13接受，具名PASS为38；[36项/143输入/完整Pyright处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-metadata-tail-parent-acceptance.md)保留继承未知重合。问题坐标修复已有fresh独立82项和62空间记录，[父级接受该选择内创建/菜单谓词](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-question-parent-acceptance.md)，完整Canvas/WF4仍REWORK，额外原点探针两次测试前基础设施失败保留。b6b21c35及三个child已完成。新增[icon1](../archive/2026-10/10-08-icon1/prd.md)在独立work/icon1执行，编排 `5cb665d2-9700-4941-a6de-5268c2f10a9a` 实现后fresh验收；所有供应商品牌图标统一Lobe来源并保留无文字DeepSeek。实际Dialog/其他原矩阵/Parent33/整合/安装/提交/0.1.3继续开放。以下为历史快照。
 
 2026-10-08T14:56Z：父级接受D1-D3，Contracts当前具名PASS为34。65原生/JUnit结果、55源码及13证据绑定一致，原39项保留；继承十五项和未知重合继续独立。Canvas最终55项通过报告已取回，上一child超时仍保留；312输入/337依赖/474产物匹配，已测菜单与后续手势子谓词接受，C02/C03问题组坐标和完整Canvas仍REWORK。详见[Contracts处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/contracts-disabled-gaps-parent-acceptance.md)及[Canvas处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-creation-recovered-parent-disposition.md)。114/232源码和本批证据保存后，新编排 `b6b21c35-38c2-4c31-92bf-48e16cf0acfc` 在原worktree运行：Canvas实现后单独fresh验收，Contracts仅补M10-M13。原失败/UNRUN、消费者/Parent33/整合/安装/提交/发布继续保留；以下为历史快照。
 
@@ -48,8 +50,8 @@ disabled批次后：39完整原生/JUnit结果及55当前/113旧输入绑定已�
 | [Suppliers](../archive/2026-10/10-05-admin-supplier-connections/current-status.md) | 子任务 completed/已归档，原45行业务范围 CLOSED，pending/auth/焦点问题已完成独立复核。 | 最终整合、安装与发布检查。 |
 | [Models](../archive/2026-10/10-05-admin-model-workspace/current-status.md) | 子任务 completed/已归档，原38项业务范围 CLOSED，fresh4/4通过；历史31/1与原400断言失败保留。 | 应用 finalizer、浏览器后代退出和父级/发布检查。 |
 | [Canvas](../10-05-admin-workflow-canvas/current-status.md) | 完整REWORK；模型节点→共享Dialog交接与C07/C08/C10/C12/WF4已独立通过并父级复跑15/15，bundle哈希一致。 | C09、C11、C13-C18、C20-C25、几何/对比、原48/49、后代退出及历史UNRUN保持。 |
-| [Contracts](../10-05-admin-model-contracts/current-status.md) | **58/58 具名PASS**；收尾批次接受X1/T3/C1/C3-C10，父级终字节复跑闭包54+重放2+真实浏览器2均通过，bundle哈希一致。 | 继承十五项行ID不可恢复故combined null；原126/110UNRUN；任务归档待父级整合提交与最终验收。 |
-| [icon1](../10-08-icon1/current-status.md) | IC1-IC5独立通过；8文件已整合main，规范/署名同步，6单元/27浏览器及42文件/39 SVG源码wheel一致。 | 随父级最终提交/finish-work；已安装0.1.3与完整发布继续开放。 |
+| [Contracts](../archive/2026-10/10-05-admin-model-contracts/current-status.md) | **58/58 具名PASS**；收尾批次接受X1/T3/C1/C3-C10，父级终字节复跑闭包54+重放2+真实浏览器2均通过，bundle哈希一致；已归档 `archive/2026-10`。 | 继承十五项行ID不可恢复故combined null；原126/110UNRUN。 |
+| [icon1](../archive/2026-10/10-08-icon1/current-status.md) | IC1-IC5独立通过；8文件已整合main，规范/署名同步，6单元/27浏览器及42文件/39 SVG源码wheel一致；已归档 `archive/2026-10`。 | 已安装0.1.3与完整发布继续开放。 |
 | 父级整合与0.1.3发布 | Parent33仍 OPEN / MISSING_INDEPENDENT；最终修复未提交，0.1.3未发布。 | 原33项独立验收、lifecycle/native、最终frontend/fullbrowser、两套credential fixtures、相同wheel的Ubuntu/macOS安装与public installer/release资产检查。 |
 
 | 工作线 | 当前状态 | 下一步 |
