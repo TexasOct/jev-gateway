@@ -1,3 +1,11 @@
+当前状态：2026-10-09（第三轮进行中）。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
+
+状态/响应/密度/键盘批次（编排 `3fa74f4a-1524-43aa-a5da-cdd9a6c4f3af`）两子项完成，本轮无产品改动：接受 C20、C21、C22、C23、C24（已执行子句）、C25、WF6。C22 十六组合与 C23 卡片尺寸由两侧各自测量，小字对比度由两个独立方法测得 7.248:1（亮）/8.072:1（暗），此前 UNMEASURED 的小字对比度项就此关闭；每状态徽标/连线对比度与显式回缩序列仍开放。新 spec 28 例，父级复跑 28/28 通过。见[本批处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-state-parent-acceptance.md)。
+
+实现方发现的真实缺口：配置读取失败时 `AppShell.tsx` 虽已渲染错误卡，但 `configuration === null` 分支只显示 `t(loading)`，没有显式重试动作，不满足 IA4 与 C24。父级读源确认后派出窄修复轮次 `dff91cda-21f1-48f6-8c1d-b21443bfa9f4`（实现+独立验收）：有 error 时给出解释与可见重试，无 error 时保持原加载展示。该轮收口后一次性整合 lane 增量并归档。
+
+以下保留前一快照。
+
 当前状态：2026-10-09（第二批进行中）。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
 
 交互与检查器批次（编排 `ded47ed3-0073-4ad8-98c5-107e00954745`）两子项完成：接受 C09、C11、C13、C14、C15、C16、C17（适用子句）、C18 与 WF2/WF3/WF5。本轮唯一产品改动是 `RoutingEditor.tsx` 的 +7/−2：`updateMembership` 被拒时区分“显式列表目标”与“标签池最后成员”并给出真实原因；`canvasReason_lastMember` 两个语言包本已存在。新 spec 7 例，父级复跑 7/7 通过，私有端口释放。见[本批处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-interaction-parent-acceptance.md)。注意 C17 仅对适用子句通过：本版本没有原始高级JSON workflow 面。
