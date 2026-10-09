@@ -144,6 +144,18 @@ export function AppShell({
   onRetryMonitoring,
 }: Props) {
   const savedFocus = useRef<HTMLElement | null>(null);
+  // A failed initial configuration read leaves the strategy view with no workspace.
+  // The read retry is owned here so the shell can re-admit it through the existing owner path.
+  const [configurationRetryPending, setConfigurationRetryPending] = useState(false);
+  const retryConfigurationRead = () => {
+    if (configurationRetryPending) return;
+    setConfigurationRetryPending(true);
+    onError(null);
+    // Shell-level retry has no competing editor operation, so the admit predicate is always true.
+    void onReloadConfiguration(() => true)
+      .catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
+      .finally(() => setConfigurationRetryPending(false));
+  };
   useEffect(() => {
     // A native disabled submit/probe button may blur before its 401 arrives.
     const remember = (event: FocusEvent) => {
@@ -380,6 +392,14 @@ export function AppShell({
           </section>
         ) : view === "providers" ? (
           providerManagement ? <ProviderView manager={providerManagement} t={t} /> : <p role="status">{t("authRequired")}</p>
+        ) : configuration === null && error !== null ? (
+          <Card className="min-w-0 p-4">
+            <h2 className="mb-2 text-sm font-semibold">{t("configuration")}</h2>
+            <p className="m-0 text-ink-muted [overflow-wrap:anywhere]">{t("routingReadFailed")}</p>
+            <Button className="mt-3" type="button" disabled={configurationRetryPending} onClick={retryConfigurationRead}>
+              {t("routingRetryRead")}
+            </Button>
+          </Card>
         ) : configuration === null ? (
           <Card className="min-w-0 p-4">
             <h2 className="mb-2 text-sm font-semibold">{t("configuration")}</h2>

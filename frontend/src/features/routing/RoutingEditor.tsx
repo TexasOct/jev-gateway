@@ -532,8 +532,13 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
 
   const updateMembership = (modelId: string, tag: string, member: boolean) => {
     const next = changeLabelMembership(draft, config, modelId, tag, member);
-    if (next === null) onError(t("canvasInvalidConnection"));
-    else setDraft(next);
+    if (next !== null) { setDraft(next); return; }
+    // A refused edit is either an inert explicit-list target or the last resolved
+    // member of a tag pool. Explain the actual restriction instead of a generic one.
+    const label = config.labels.find((item) => item.tag === tag);
+    const lastMember = !member && label?.resolution === "tag" && draft.models[modelId]?.tags.includes(tag) === true
+      && labelMembers(draft, config, label).length <= 1;
+    onError(t(lastMember ? "canvasReason_lastMember" : "canvasInvalidConnection"));
   };
 
   const onDragEnd = useCallback(

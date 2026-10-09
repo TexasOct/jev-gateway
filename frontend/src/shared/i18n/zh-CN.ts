@@ -520,6 +520,7 @@ export const zhCN = {
   routingWriteUnknown: "无法确认保存结果。请先读取当前配置核实结果，再重新提交；本地草稿已保留。",
   routingReadingConfiguration: "正在读取当前配置…",
   routingRetryRead: "重试读取配置",
+  routingReadFailed: "无法读取配置。请重试读取以打开策略工作区。",
   overlayRemoved: "配置覆盖已移除，已恢复基线配置。",
   questionDefinitions: "问题定义",
   questionName: "问题名称",

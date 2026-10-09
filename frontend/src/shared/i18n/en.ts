@@ -520,6 +520,7 @@ export const en = {
   routingWriteUnknown: "The save outcome is unknown. Read the current configuration to verify it before submitting again; your local draft is retained.",
   routingReadingConfiguration: "Reading the current configuration…",
   routingRetryRead: "Retry configuration read",
+  routingReadFailed: "The configuration could not be loaded. Retry the read to open the strategy workspace.",
   overlayRemoved: "Overlay removed. The baseline file is active again.",
   questionDefinitions: "Question definitions",
   questionName: "Question name",
