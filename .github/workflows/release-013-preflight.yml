@@ -1,0 +1,151 @@
+name: Release 0.1.3 hosted preflight
+
+on:
+  push:
+    branches:
+      - work/release-013-preflight-acdad8c
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-digest: ${{ steps.assets.outputs.artifact-digest }}
+    env:
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: acdad8c77e16afd3b62b697519c75e6e229adf20
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
+      - uses: astral-sh/setup-uv@v5
+      - name: Source gates and single release build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/preflight-evidence"
+          exec > >(tee "$RUNNER_TEMP/preflight-evidence/build.log") 2>&1
+          trap 'result=$?; echo "$result" > "$RUNNER_TEMP/preflight-evidence/build.exit"' EXIT
+          npm install --global npm@11.16.0
+          node --version
+          npm --version
+          test "$(node --version)" = v22.23.3
+          test "$(npm --version)" = 11.16.0
+          test "$(git rev-parse HEAD)" = acdad8c77e16afd3b62b697519c75e6e229adf20
+          echo "workflow_head=${{ github.sha }} source_sha=$(git rev-parse HEAD)"
+          echo '560c9c7c00b4f17f6bd1f1976468711b09af1ab8a86ef6cea2d9ad5c8ab178f9  .trellis/spec/backend/provider-configuration.md' | sha256sum --check
+          python scripts/validate-release.py v0.1.3
+          npm --prefix frontend install
+          npm --prefix frontend run lint
+          npm --prefix frontend run test
+          npm --prefix frontend run build
+          scripts/build-frontend.sh --check
+          uv lock --check
+          uv sync --locked --all-groups
+          uv run --locked pytest -q
+          uvx pyright
+          scripts/build-frontend.sh --check
+          git diff --exit-code
+          uv build --out-dir dist
+          python scripts/validate-release.py v0.1.3 dist
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          assets = ['install.sh', 'install.sh.sha256', 'jev_gateway-0.1.3-py3-none-any.whl', 'jev_gateway-0.1.3-py3-none-any.whl.sha256']
+          manifest = {'source_sha': 'acdad8c77e16afd3b62b697519c75e6e229adf20', 'workflow_head': '${{ github.sha }}', 'version': '0.1.3', 'assets': {name: hashlib.sha256((Path('dist') / name).read_bytes()).hexdigest() for name in assets}}
+          (Path(os.environ['RUNNER_TEMP']) / 'preflight-evidence/provenance.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        id: assets
+        with:
+          name: release-013-preflight-assets
+          path: |
+            dist/install.sh
+            dist/install.sh.sha256
+            dist/jev_gateway-0.1.3-py3-none-any.whl
+            dist/jev_gateway-0.1.3-py3-none-any.whl.sha256
+          if-no-files-found: error
+      - name: Record artifact envelope digest
+        run: echo '${{ steps.assets.outputs.artifact-digest }}' > "$RUNNER_TEMP/preflight-evidence/artifact-digest.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preflight-build-evidence
+          path: ${{ runner.temp }}/preflight-evidence
+          if-no-files-found: error
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: acdad8c77e16afd3b62b697519c75e6e229adf20
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-013-preflight-assets
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: preflight-build-evidence
+          path: build-evidence
+      - name: Verify provenance and run original local wheel smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/preflight-evidence"
+          exec > >(tee "$RUNNER_TEMP/preflight-evidence/smoke.log") 2>&1
+          trap 'result=$?; echo "$result" > "$RUNNER_TEMP/preflight-evidence/smoke.exit"' EXIT
+          test "$(git rev-parse HEAD)" = acdad8c77e16afd3b62b697519c75e6e229adf20
+          python scripts/validate-release.py v0.1.3
+          python - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          manifest = json.loads(Path('build-evidence/provenance.json').read_text())
+          assert manifest['source_sha'] == 'acdad8c77e16afd3b62b697519c75e6e229adf20'
+          assert manifest['workflow_head'] == '${{ github.sha }}'
+          assert manifest['version'] == '0.1.3'
+          assert Path('build-evidence/artifact-digest.txt').read_text().strip() == '${{ needs.build.outputs.artifact-digest }}'
+          expected = {'install.sh', 'install.sh.sha256', 'jev_gateway-0.1.3-py3-none-any.whl', 'jev_gateway-0.1.3-py3-none-any.whl.sha256'}
+          assert set(manifest['assets']) == expected
+          assert {p.name for p in Path('dist').iterdir()} == expected
+          for name, digest in manifest['assets'].items():
+              assert hashlib.sha256((Path('dist') / name).read_bytes()).hexdigest() == digest
+          for name in ('install.sh', 'jev_gateway-0.1.3-py3-none-any.whl'):
+              assert (Path('dist') / (name + '.sha256')).read_text() == manifest['assets'][name] + '  ' + name + '\n'
+          import re
+          assert re.findall(rb'^RELEASE_TAG=(.*)$', Path('dist/install.sh').read_bytes(), re.MULTILINE) == [b'v0.1.3']
+          with zipfile.ZipFile('dist/jev_gateway-0.1.3-py3-none-any.whl') as wheel:
+              metadata = wheel.read('jev_gateway-0.1.3.dist-info/METADATA').decode()
+              assert 'Name: jev-gateway\n' in metadata and 'Version: 0.1.3\n' in metadata
+          print(json.dumps(manifest, indent=2))
+          PY
+          python scripts/smoke-installed-release.py --wheel "$PWD/dist/jev_gateway-0.1.3-py3-none-any.whl" --version 0.1.3 --work-dir "$RUNNER_TEMP/jev installed smoke"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preflight-smoke-evidence-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/preflight-evidence
+            ${{ runner.temp }}/jev installed smoke
+            build-evidence
+          include-hidden-files: true
+          if-no-files-found: error
