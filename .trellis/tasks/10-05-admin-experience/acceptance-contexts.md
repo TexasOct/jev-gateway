@@ -2,7 +2,9 @@
 
 ## Current delivery status
 
-2026-10-09：版本元数据已为 0.1.3，原源码/产品 PASS 保持。受用户批准的托管预检 [37956818406](https://github.com/TexasOct/jev-gateway/actions/runs/37956818406) 经原发布上下文独立接受为 HOSTED_PREFLIGHT_PASS：完整 402 单测、3209 后端/2 optional skips、Pyright/build/lock/原 tracked-diff 通过；最终同一 wheel 的 Ubuntu/macOS smoke 各 169 个有序检查，三个原生 exit 0。见[保存的独立报告](../../.runtime/admin-experience/final-release-20261009/hosted-preflight-pass-20261009/independent-pass.md)。已按“验证→squash→发版”完成签名 squash `08d99b0`，与接受分支文件树一致。RL1 仍 OPEN，下一步标签自身构建/两平台/发布、公开资产与安装器、完整已安装浏览器/后端验收。
+2026-10-09：稳定 [0.1.3](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.3) 已发布，原源码/产品 PASS 保持。签名 squash `08d99b0` 后的正式发布源码及签名标签仍为 `4d56e43`；main 新增已独立准入的安装验收脚本与规范，签名提交 `ce1263f`，产品包和发布标签保持原输入。[正式标签运行 37967881650](https://github.com/TexasOct/jev-gateway/actions/runs/37967881650) 的源码/锁定依赖/402 单测/3209 后端及 2 optional skips/Pyright/新鲜度/源码漂移/最终构建通过；两平台同一 wheel 各 169 个有序检查。原独立发布上下文返回 FINAL_TAG_AND_PUBLIC_ASSETS_PASS，见[保存的报告与证据](../../.runtime/admin-experience/final-release-20261009/final-tag-public-assets-pass-20261009/independent-pass.md)。最终 wheel `135f91895bd726622b752aed75734d8eba985b12f0345ea63f0013b86a07dff0` 与该运行的公开四项资产逐字节相等；Release `408181634` 的稳定/latest 查询及签名标签指向均已核对。预检 `37956818406`、产品源码 `acdad8c`/工作流事件 `a5e3ed9` 及其 `98cf` wheel 保持各自原范围，不能代替正式标签输入或最终公开制品。
+
+RL1 仍 OPEN：公开安装器生命周期及完整已安装浏览器/后端验收尚未执行。原独立发布上下文恢复为 `298b24ca`，对独立工作树的完整 15 文件返回 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION，见[保存的准入报告](../../.runtime/admin-experience/final-release-20261009/public-preparation-admitted-20261009/independent-admission.md)。六项准备缺陷关闭，静态 33 个负向探针及两套类型检查通过，完整补丁和签名提交字节已核对。接续默认 main 工作流注册/精确 SHA 验证及两平台托管执行，646 应用/24 补充/61 of 64 后端与源代码 655/3209、source-only 九项和封存 UNRUN 均分开。公开字节和准备准入不替代实际安装来源、无源码 finder、完整 RECORD/新增文件/依赖来源及重装后校验。引用缺失、截断读取、HTTP/2、阶段模型返工、ContextMode I/O、原预检/诊断失败均保存；本机严格监督缺口未关闭，`.pth` 方案未实现，操作员安装未改动。以下为历史快照。
 
 原 37949640426 的 18 libc 字段漂移失败及全部诊断/工具失败保留；产品源码 `acdad8c` 与工作流事件 head `a5e3ed9` 分开。托管普通清理已获准，本机严格身份/监听监督缺口仍未获准执行，`.pth` 方案未实现，操作员安装未改动。655/655 源码浏览器及历史封存 UNRUN 范围保持独立。以下为历史快照。
 
