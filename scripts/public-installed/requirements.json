@@ -1,0 +1,22 @@
+{
+  "status": "PREPARATION_ONLY_RUNTIME_UNRUN",
+  "signed_source": "4d56e438e2f817115e65f9c47519f9adc62d41c1",
+  "requirements": [
+    {"ids": ["RL1"], "cases": ["producer/tag/public/latest four-asset byte identity", "original-public-installer-smoke", "initial and all three original smoke installations attest full parity", "public-repeat-install", "listener-cleanup"], "owners": ["driver.py", "observe_uv.py", "provenance.py", "scripts/smoke-installed-release.py"], "limits": "Independent acceptance must inspect hosted native results; publication alone does not close installed acceptance."},
+    {"ids": ["IA1", "IA2", "IA3", "IA4", "IA5"], "files": ["supplier-models.spec.ts", "responsive.spec.ts", "select-controls.spec.ts", "auth-workspace.spec.ts", "dialog-escape-rework.spec.ts", "shell-retry-ownership.spec.ts"], "limits": "Installed assets with synthetic API fixtures; real file transactions are separately covered below."},
+    {"ids": ["GS1", "GS2", "GS3"], "files": ["credential-configuration.spec.ts", "credential-default-install.spec.ts", "credential-live-server.spec.ts", "successor-settings-acceptance.spec.ts", "tests/test_credential_live_server.py", "tests/test_setup.py"], "limits": "Both required real credential fixture modes are admitted; generated completion data stays local and synthetic."},
+    {"ids": ["WF1", "WF2", "WF3", "WF4", "WF5", "WF6"], "files": ["canvas-workflow-actions.spec.ts", "canvas-creation-menu-business.spec.ts", "canvas-connections.spec.ts", "canvas-policy-recovery.spec.ts", "canvas-tail-rework.spec.ts", "canvas-residual-wave4.spec.ts", "canvas-keyboard-departure.spec.ts", "canvas-gesture-boundaries.spec.ts", "canvas-visual-acceptance.spec.ts", "tests/test_gateway.py", "tests/test_routing_overlay.py", "tests/test_canvas_layout.py"], "limits": "All active canvas browser files are retained, including files beyond this representative requirement index. Synthetic browser policy requests and real installed ASGI/file tests remain separate."},
+    {"ids": ["SP1", "SP2", "SP3", "SP4", "SP5"], "files": ["supplier-connections.spec.ts", "supplier-cloud-workspace.spec.ts", "supplier-tail-rework.spec.ts", "provider-presets.spec.ts", "provider-icons.spec.ts", "tests/test_connection_diagnostics.py", "tests/test_provider_config.py", "tests/test_credentials.py"], "additional_cases": "24 installed native primary/AWS/Vertex credential cases: 3 kinds x 2 locales x 2 widths x 2 schemes; actual PUT/file/mode/socket assertions, held validation and PUT, raw-draft restoration, native Select All/Backspace and no deleted value in payload."},
+    {"ids": ["MI1", "MI2", "MI3", "MI4", "MI5", "ME1", "ME2", "ME3", "ME4"], "files": ["model-workspace.spec.ts", "model-dialog-rework.spec.ts", "model-ownership.spec.ts", "model-tail-rework.spec.ts", "real-backend-contracts.spec.ts", "tests/test_browser_capture_replay.py", "tests/test_model_contracts_remaining_rows.py", "tests/test_model_transaction_publication.py", "tests/test_model_revision_and_recovery_chat.py"], "limits": "Original X1/T3 captured bodies replay through installed Python with both optional source controls actually admitted after browser capture. Source TS/docs are test oracles, not installed asset provenance."},
+    {"ids": ["DV1", "DV2", "DV3", "OR1"], "cases": ["adapters-and-scope.json", "backend-collection.json", "backend-results.json", "scope-results.json", "browser/report.json", "browser/native-report.json", "manifest.json"], "limits": "This writer prepares supporting evidence. Parent owns review/commit/dispatch and the independent context owns acceptance. Historical controls are never replayed or reclassified."}
+  ],
+  "scope": {
+    "source_reference_only": {"backend_passed": 3209, "optional_skips": 2, "browser_union": 655},
+    "installed_backend": "Derive exact parameterized node IDs from actual hosted collection after the three source-only file exclusions; never equate with the source total.",
+    "installed_application_browsers": 646,
+    "installed_additional_native_credentials": 24,
+    "source_only_standalone_cloud": {"cases": 9, "status": "UNRUN"},
+    "sealed_historical": {"counts": [126, 110, 9, 18], "status": "UNRUN"},
+    "source_only_backend_files": ["tests/test_release_validation.py", "tests/test_install_local_script.py", "tests/test_install_script.py"]
+  }
+}

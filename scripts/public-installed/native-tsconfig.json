@@ -1,0 +1,4 @@
+{
+  "extends": "./tests/tsconfig.json",
+  "include": ["tests/installed-specific/**/*.ts", "native.config.ts", "installed.config.ts"]
+}

@@ -398,3 +398,104 @@ not replace Node 22/Linux installation. Preserve failed attempts separately.
 Wrong: accept green tests after npm has rewritten the tracked lock. Correct:
 pin the compatible writer before every inherited npm path and require the
 unchanged tracked-source gate to pass before building the final assets.
+
+## Scenario: public installed business acceptance
+
+### 1. Scope / Trigger
+
+Use when verifying the published stable 0.1.3 installer, installed package and
+Dashboard business flows. The preparation commit and published product commit
+are separate inputs. Static preparation approval permits hosted execution;
+installed acceptance requires inspected runtime evidence from both OS owners.
+
+### 2. Signatures
+
+`.github/workflows/public-installed-013.yml` accepts `tag`, `expected_source`
+and `producer_run`. It checks out preparation and signed product source into
+separate directories. The portable owner is:
+
+```sh
+python preparation/scripts/public-installed/driver.py \
+  --source "$GITHUB_WORKSPACE/signed-source" \
+  --work-dir "$RUNNER_TEMP/public installed acceptance-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+  --tag v0.1.3 \
+  --expected-source 4d56e438e2f817115e65f9c47519f9adc62d41c1 \
+  --producer-run 37967881650
+```
+
+The driver requires an ordinary hosted runner and a fresh owned directory under
+`RUNNER_TEMP`. Local preparation may run `static_check.py` and pure boundary
+probes; it must not run the installer or product under this hosted authority.
+
+### 3. Contracts
+
+Register a newly introduced `workflow_dispatch` file on default `main` before
+dispatching a supported preparation ref. Verify the committed helper bytes and
+remote SHA. Preserve the signed product tag and use its actual final public
+wheel; a preparation build cannot substitute for that artifact.
+
+Before installation, verify the producer attempt and jobs, tag object/source,
+stable release/latest identity, service artifact digest, downloaded ZIP bytes,
+four public asset identities and complete bytes, and SHA sidecars. API envelope
+agreement does not replace byte verification. Isolate tool, executable, state,
+cache, Python, runtime and temporary directories; credentials remain synthetic.
+
+`observe_uv.py` forwards unchanged installer arguments and joins the actual
+wheel input to installed `direct_url` metadata before temporary input cleanup.
+Every successful install/reinstall requires Python 3.12, `sys.prefix`, distribution
+and module-origin checks, no source/editable finder, complete package/static and
+license parity, full installed RECORD and dependency origins within the owned
+resolved prefix. Classify and hash installer additions, entry points and
+source-bound bytecode. Do not author `.pth` files or waive unrecorded/escaped
+files. Wheel members, total RECORD rows and hashed rows are separate counts:
+the final 0.1.3 wheel has 100 members/100 rows/99 hashed rows, including one
+unhashed RECORD self-row; 94 product files include 42 static files.
+
+`adapt.py` changes only documented interpreter/template/static/helper/PATH
+loading seams. Exact reversal and original assertion AST/text remain required.
+Helpers contain no source `jev_gateway`; installed Python and guarded listing
+fixtures own actual persistence. Bind collected identities to executed phase
+reports. Only the original X1/T3 missing-capture cases may skip before browser
+capture, with the exact reason and `setup=passed`, `call=skipped`,
+`teardown=passed`. Require precisely these phases, native exit 0 and the same
+two identities replayed with all phases passed and zero skips after capture.
+Count call reports and passed calls separately.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Public/latest, source, artifact or service digest differs | Fail before installation; retain actual receipts |
+| Wheel total is confused with hashed rows | Fail the provenance check; preserve the measured inventory |
+| Installed addition/dependency escapes the prefix or lacks classification | Fail; retain complete rows and paths without weakening parity |
+| Native replacement is deleted or validation fails | Preserve exact credentials, reference maps and file modes; retain the draft behavior assertions |
+| Unexpected skip, phase, identity or replay skip | Fail the business gate; retain native exit and complete phase reports |
+| Preparation/static checks pass | Permit hosted verification only; keep installed acceptance open |
+
+### 5. Good/Base/Bad Cases
+
+Good: both runners execute the verified public installer, retain all five
+installation/reinstallation receipts and original lifecycle assertions, then
+inspect actual installed backend/browser and capture replay results. Base:
+source checks remain supporting evidence with their original counts. Bad:
+accepting a synthetic setup-phase skip for a test that calls `pytest.skip` in
+its body, or claiming installed parity from version output alone.
+
+### 6. Tests Required
+
+Require the original application browser identities and separate native
+credential supplement, actual selected backend collection/execution sets,
+both hosted type gates, exact capture replay, file/database/credential modes
+and references, screenshots/traces and owned cleanup receipts. Keep the
+source-only cloud component owner and frozen historical controls distinct.
+Pure probes must cover authentic call-phase admission, fake setup skips,
+missing/duplicate/extra phases, wrong identities/reasons, provenance escapes,
+unrecorded additions, count/membership errors and service-digest mismatch.
+Preserve every failed attempt; static probes cannot certify actual uv layout.
+
+### 7. Wrong vs Correct
+
+Wrong: require 99 total RECORD rows because 99 entries have hashes, or permit
+only setup skips because a synthetic fixture omitted the call report.
+Correct: validate the actual archive's complete membership and self-row, then
+model the original tests' real phase history with exact identity/reason guards.
