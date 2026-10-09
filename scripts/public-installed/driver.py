@@ -80,6 +80,28 @@ def backend_gate(report: dict, collected: list[str], replay: bool = False) -> di
             "passed_nodeids": passed, "skipped_count": len(skipped), "skips": skipped}
 
 
+def observation_receipt(operation: str, pid: int | None, identity: float | None, commands: list[dict], error: BaseException) -> dict:
+    try:
+        message = str(error)
+    except BaseException:
+        message = "exception message unavailable"
+    return {"operation": operation, "pid": pid, "create_time": identity,
+            "type": type(error).__name__, "message": message, "observed_at_monotonic": time.monotonic(),
+            "commands_snapshot": [{key: item.get(key) for key in ("pid", "create_time", "label", "argv", "cwd", "native_exit")}
+                                  for item in commands]}
+
+
+def reconcile_observations(errors: list[dict], closures: list[dict]) -> list[dict]:
+    results = []
+    for error in errors:
+        matching = [item for item in closures if error["create_time"] is not None
+                    and item["pid"] == error["pid"] and item.get("create_time") == error["create_time"]
+                    and item.get("native_exit") is not None and item.get("closure_source") == "retained-Popen.poll"]
+        results.append({"error": error, "resolution": "owned-native-exit" if len(matching) == 1 else "unresolved",
+                        "closure": matching[0] if len(matching) == 1 else None})
+    return results
+
+
 class NativeCommands:
     """Record native exits and clean only processes with retained PID identities."""
 
@@ -92,26 +114,62 @@ class NativeCommands:
         self.owned: dict[int, float] = {}
         self.listeners: set[int] = set()
         self.observation_errors: list[dict] = []
+        self.observer_state = {"started": False, "completed": False, "failed": False, "failure": None}
         self.lock = threading.Lock()
         self.done = threading.Event()
         self.thread = threading.Thread(target=self.observe, daemon=True)
         self.thread.start()
 
     def observe(self) -> None:
-        while not self.done.wait(0.1):
-            processes = self.psutil.Process().children(recursive=True)
-            for process in processes:
+        previous = getattr(self, "observer_state", None)
+        assert previous is None or not previous["failed"], "failed observer cannot restart"
+        state = {"started": True, "completed": False, "failed": False, "failure": None}
+        self.observer_state = state
+        operation = "done.wait"
+        pid = os.getpid()
+        identity = None
+        try:
+            while True:
+                operation = "done.wait"
+                if self.done.wait(0.1):
+                    state["completed"] = True
+                    return
+                operation = "children(recursive=True)"
+                pid = os.getpid()
+                identity = None
                 try:
-                    identity = process.create_time()
-                    with self.lock:
-                        self.owned[process.pid] = identity
-                    for connection in process.net_connections(kind="tcp"):
-                        if connection.status == "LISTEN" and connection.laddr.ip in ("127.0.0.1", "::1"):
-                            self.listeners.add(connection.laddr.port)
-                except self.psutil.NoSuchProcess:
+                    processes = self.psutil.Process().children(recursive=True)
+                except self.psutil.AccessDenied as error:
+                    self.observation_errors.append(observation_receipt(operation, pid, None, self.commands, error))
                     continue
-                except self.psutil.AccessDenied:
-                    self.observation_errors.append({"pid": process.pid, "type": "AccessDenied"})
+                for process in processes:
+                    identity = None
+                    operation = "process.pid"
+                    pid = None
+                    pid = process.pid
+                    operation = "create_time"
+                    try:
+                        identity = process.create_time()
+                        with self.lock:
+                            self.owned[pid] = identity
+                        operation = "net_connections(kind=tcp)"
+                        for connection in process.net_connections(kind="tcp"):
+                            if connection.status == "LISTEN" and connection.laddr.ip in ("127.0.0.1", "::1"):
+                                self.listeners.add(connection.laddr.port)
+                    except self.psutil.NoSuchProcess:
+                        continue
+                    except self.psutil.AccessDenied as error:
+                        self.observation_errors.append(observation_receipt(operation, pid, identity, self.commands, error))
+        except BaseException as error:
+            state["completed"] = False
+            state["failed"] = True
+            state["failure"] = observation_receipt(operation, pid, identity, self.commands, error)
+            if hasattr(self, "evidence"):
+                try:
+                    (self.evidence / "observer-state.json").write_text(json.dumps(state, indent=2) + "\n")
+                except Exception as persistence_error:
+                    state["persistence_error"] = {"type": type(persistence_error).__name__, "message": str(persistence_error)}
+            raise
 
     def launch(self, argv: list[str], cwd: Path, env: dict[str, str], label: str) -> tuple[subprocess.Popen, dict]:
         index = len(self.commands) + 1
@@ -126,9 +184,14 @@ class NativeCommands:
         try:
             with self.lock:
                 self.owned[process.pid] = self.psutil.Process(process.pid).create_time()
+                record["create_time"] = self.owned[process.pid]
         except self.psutil.NoSuchProcess:
             # Fast inspection commands may already have exited; wait() still owns their result.
             pass
+        except self.psutil.AccessDenied as error:
+            self.observation_errors.append(observation_receipt("launch.create_time", process.pid, None, self.commands, error))
+            self.flush()
+            raise
         self.flush()
         return process, record
 
@@ -156,17 +219,25 @@ class NativeCommands:
             identities = dict(self.owned)
         live = []
         for pid, created in identities.items():
+            operation = "cleanup.create_time"
+            observed_identity = None
             try:
                 process = self.psutil.Process(pid)
-                if process.create_time() != created:
+                observed_identity = process.create_time()
+                if observed_identity != created:
                     records.append({"pid": pid, "state": "identity_changed_no_signal"})
                     continue
+                operation = "cleanup.status"
                 if process.status() == self.psutil.STATUS_ZOMBIE:
                     continue
                 live.append(process)
+                operation = "cleanup.terminate"
                 process.terminate()
             except self.psutil.NoSuchProcess:
                 continue
+            except self.psutil.AccessDenied as error:
+                self.observation_errors.append(observation_receipt(operation, pid, observed_identity, self.commands, error))
+                raise
         def survivors(items: list) -> list:
             for child, receipt in self.processes:
                 native = child.poll()
@@ -174,11 +245,17 @@ class NativeCommands:
                     receipt["native_exit"] = native
             result = []
             for process in items:
+                operation = "cleanup.is_running"
                 try:
-                    if process.is_running() and process.status() != self.psutil.STATUS_ZOMBIE:
-                        result.append(process)
+                    if process.is_running():
+                        operation = "cleanup.survivor_status"
+                        if process.status() != self.psutil.STATUS_ZOMBIE:
+                            result.append(process)
                 except self.psutil.NoSuchProcess:
                     pass
+                except self.psutil.AccessDenied as error:
+                    self.observation_errors.append(observation_receipt(operation, process.pid, None, self.commands, error))
+                    raise
             return result
 
         deadline = time.monotonic() + 10
@@ -187,11 +264,18 @@ class NativeCommands:
             time.sleep(0.1)
             alive = survivors(alive)
         for process in alive:
+            operation = "cleanup.kill_identity"
+            observed_identity = None
             try:
-                assert process.create_time() == identities[process.pid]
+                observed_identity = process.create_time()
+                assert observed_identity == identities[process.pid]
+                operation = "cleanup.kill"
                 process.kill()
             except self.psutil.NoSuchProcess:
                 pass
+            except self.psutil.AccessDenied as error:
+                self.observation_errors.append(observation_receipt(operation, process.pid, observed_identity, self.commands, error))
+                raise
         deadline = time.monotonic() + 5
         remaining = survivors(alive)
         while remaining and time.monotonic() < deadline:
@@ -204,12 +288,27 @@ class NativeCommands:
         assert not records, records
 
     def close(self) -> None:
-        self.cleanup()
+        cleanup_error = None
+        try:
+            self.cleanup()
+        except Exception as error:
+            cleanup_error = error
         self.done.set()
-        self.thread.join(timeout=2)
+        join_error = None
+        try:
+            self.thread.join(timeout=2)
+        except Exception as error:
+            join_error = observation_receipt("thread.join", os.getpid(), None, self.commands, error)
+        thread_alive = self.thread.is_alive()
+        observer_state = getattr(self, "observer_state", {"started": False, "completed": False, "failed": False, "failure": None})
+        closures = []
         for child, record in self.processes:
+            native = child.poll()
             if record["native_exit"] is None:
-                record["native_exit"] = child.poll()
+                record["native_exit"] = native
+            if native is not None:
+                closures.append({"pid": child.pid, "create_time": record.get("create_time"),
+                    "native_exit": native, "label": record["label"], "closure_source": "retained-Popen.poll"})
         still_listening = []
         for port in self.listeners:
             with socket.socket() as probe:
@@ -217,10 +316,23 @@ class NativeCommands:
                 if probe.connect_ex(("127.0.0.1", port)) == 0:
                     still_listening.append(port)
         (self.evidence / "listener-cleanup.json").write_text(json.dumps({"observed_ports": sorted(self.listeners), "still_listening": still_listening}) + "\n")
+        reconciliation = reconcile_observations(self.observation_errors, closures)
         (self.evidence / "owned-processes.json").write_text(json.dumps({"pid_create_time": self.owned,
-            "observation_errors": self.observation_errors, "sampling_interval_seconds": 0.1}, indent=2) + "\n")
+            "observation_errors": self.observation_errors, "observation_reconciliation": reconciliation,
+            "observer_state": observer_state, "observer_join_error": join_error, "observer_thread_alive": thread_alive,
+            "native_closures": closures, "cleanup_error": None if cleanup_error is None else {
+                "type": type(cleanup_error).__name__, "message": str(cleanup_error)},
+            "sampling_interval_seconds": 0.1}, indent=2) + "\n")
+        if cleanup_error is not None:
+            raise cleanup_error
         assert not still_listening, still_listening
-        assert not self.observation_errors, self.observation_errors
+        assert join_error is None, join_error
+        assert thread_alive is False, "observation thread did not close"
+        assert (isinstance(observer_state, dict) and observer_state.get("started") is True
+                and observer_state.get("completed") is True and observer_state.get("failed") is False
+                and observer_state.get("failure", "not-recorded") is None), "observer did not complete successfully"
+        unresolved = [item for item in reconciliation if item["resolution"] == "unresolved"]
+        assert not unresolved, unresolved
 
 
 def api(commands: NativeCommands, endpoint: str, outside: Path, env: dict[str, str], label: str) -> dict:
@@ -407,7 +519,8 @@ def main() -> int:
         check(len(list(evidence.glob("install-*-origin.json"))) == 4, "initial and all three original smoke installations attest full parity")
         commands.run([real_uv, "pip", "install", "--python", str(python), "pytest==9.1.1"], outside, env, "installed-test-dependency")
         commands.run([str(python), "-I", str(Path(__file__).with_name("provenance.py")), "--wheel", str(wheel), "--prefix", str(prefix),
-                      "--forbid", str(source), "--forbid", str(prep), "--output", str(evidence / "test-dependency-origin.json")], outside, env, "test-dependency-full-origin")
+                      "--forbid", str(source), "--forbid", str(prep), "--wheel-ctime-ns", str(json.loads(origins[0].read_text())["wheel_ctime_ns"]),
+                      "--output", str(evidence / "test-dependency-origin.json")], outside, env, "test-dependency-full-origin")
         env.update(PUBLIC_ACCEPT_PYTHON=str(python), PUBLIC_ACCEPT_PACKAGE=str(package), PUBLIC_ACCEPT_HELPER=str(helper),
                    JEV_REAL_BACKEND_RECORD_DIR=str(evidence / "real-backend"))
         Path(env["JEV_REAL_BACKEND_RECORD_DIR"]).mkdir()
