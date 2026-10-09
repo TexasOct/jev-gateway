@@ -1,4 +1,10 @@
-当前状态：2026-10-09，父级当前源码/产品独立验收 PASS；RL1 的提交、0.1.3 隔离安装与发布继续执行。
+当前状态：2026-10-09，源码/产品独立 PASS，版本元数据已提交为 0.1.3；受批准托管范围的完整预检独立 PASS。用户要求“验证ok后squash到main分支然后再进行发版”，已完成签名 squash `08d99b0`，文件树与已验收分支一致。RL1 保持 OPEN，接续标签工作流、公开资产/安装器和已安装浏览器/后端验收。
+
+[托管预检 37956818406](https://github.com/TexasOct/jev-gateway/actions/runs/37956818406) 在 npm 修正后实际通过原源码漂移检查、402 单测、3209 后端/2 optional replay skips、Pyright、构建和最终制品验证。Ubuntu/macOS 使用同一 wheel，各 169 个有序检查，构建与两套 smoke 原生 exit 0。独立上下文 `9720a607-416a-4175-bb46-e2d9fee45e0d` 返回限域 HOSTED_PREFLIGHT_PASS；[完整报告与证据](../../.runtime/admin-experience/final-release-20261009/hosted-preflight-pass-20261009/independent-pass.md)保留实际范围及清理限制。源码为 `acdad8c`，工作流事件提交为 `a5e3ed9`，两者不混用。655/655 源码浏览器证据仍独立。
+
+原预检 37949640426 的 npm 10 删除 18 个 libc 字段失败、诊断的六个私有 WASI 增量及工具失败均保留。本机 managed Python 3.12 的严格监督缺口未被托管 PASS 关闭；未运行本机安装或新监督机制，也未升级操作员安装。以下保留旧状态快照，旧版本与待办措辞只适用于其记录时点。
+
+历史状态：2026-10-09，父级当前源码/产品独立验收 PASS；RL1 的提交、0.1.3 隔离安装与发布继续执行。
 
 独立上下文 `e97f5ef1-bfb5-45f1-ac7c-f4735897a4b8` 的完整执行为 646 preview + 9 cloud，全 655 项通过、零跳过/重试，两套真实合成凭据均启用。原 654/1 的响应登记失序已通过同步登记完整回调、核对两个 401 admission 并等待 body/append 修复；原数量与全部 busy/draft/read/write/layout 断言保持并实际通过。父级核对九个应用/测试 hash 与当前 main 一致；当前 42 文件 bundle/wheel 一致，861 输入无漂移。见[当前源码验收](acceptance.md)。复用的 3209 后端/2 optional replay skips、402 单测、Pyright、类型/lint/build/lock/package 保持各自原生回执范围；当前 X1/T3 新捕获另有两项实际 ASGI 重放通过，不叠加成新的完整后端统计。
 

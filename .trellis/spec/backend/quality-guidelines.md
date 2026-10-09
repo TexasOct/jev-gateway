@@ -339,3 +339,62 @@ Two limits of the config are known and accepted:
 - Network-free ASGI tests: `tests/test_gateway.py`
 - Real SQLite behavior tests: `tests/test_records.py`
 - Static analysis scope: `pyrightconfig.json`
+
+## Scenario: release toolchain and lock applicability
+
+### 1. Scope / Trigger
+
+Use when changing hosted frontend installation or release source verification.
+Linux optional native records retain their `libc` applicability in the committed
+lock. An older npm writer can remove it even when the build and tests pass.
+
+### 2. Signatures
+
+The hosted build selects Node `22.23.3`, then runs these commands before any
+frontend installation or inherited fixture build:
+
+```sh
+npm install --global npm@11.16.0
+test "$(node --version)" = v22.23.3
+test "$(npm --version)" = 11.16.0
+npm --prefix frontend install
+```
+
+### 3. Contracts
+
+Preflight and tag builds use the same asserted toolchain. npm 11.16.0 preserves
+`libc`; older writers before 11.11.0 omit it from shrinkwrap serialization.
+Keep package membership, versions, resolved URLs, integrity and platform fields.
+Use `npm install` for the existing optional-binding contract. Global npm setup
+belongs to ephemeral hosted runners and does not authorize an operator upgrade.
+The hosted workflow sets `LITELLM_LOCAL_MODEL_COST_MAP: 'True'` so LiteLLM imports
+use bundled pricing data. Upstream calls still require the existing test mocks.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Actual Node/npm differs from the pin | Fail before frontend installation |
+| Installation or a fixture changes tracked source | Preserve the complete diff; fail the source gate |
+| Build or either same-wheel OS smoke fails | Do not publish from that attempt |
+| Local diagnostic adds optional WASI records | Retain that difference; do not substitute its lock into CI |
+
+### 5. Good/Base/Bad Cases
+
+Good: the pinned writer retains glibc/musl fields and the original tracked-diff
+gate passes. Base: Docker keeps its independent Node 24 Alpine build. Bad:
+deleting applicability, restoring the lock after installation, or accepting a
+derived private fixed-point lock as proof of the original hosted source.
+
+### 6. Tests Required
+
+Inspect actual version assertions, the complete source gate and final artifact
+validator. Both OS smoke jobs must consume the same final wheel and retain
+native exits and ordered check evidence. A Node 24/Darwin serializer probe does
+not replace Node 22/Linux installation. Preserve failed attempts separately.
+
+### 7. Wrong vs Correct
+
+Wrong: accept green tests after npm has rewritten the tracked lock. Correct:
+pin the compatible writer before every inherited npm path and require the
+unchanged tracked-source gate to pass before building the final assets.

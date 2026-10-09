@@ -2,6 +2,10 @@
 
 ## Current delivery status
 
+2026-10-09：版本元数据已为 0.1.3，原源码/产品 PASS 保持。受用户批准的托管预检 [37956818406](https://github.com/TexasOct/jev-gateway/actions/runs/37956818406) 经原发布上下文独立接受为 HOSTED_PREFLIGHT_PASS：完整 402 单测、3209 后端/2 optional skips、Pyright/build/lock/原 tracked-diff 通过；最终同一 wheel 的 Ubuntu/macOS smoke 各 169 个有序检查，三个原生 exit 0。见[保存的独立报告](../../.runtime/admin-experience/final-release-20261009/hosted-preflight-pass-20261009/independent-pass.md)。已按“验证→squash→发版”完成签名 squash `08d99b0`，与接受分支文件树一致。RL1 仍 OPEN，下一步标签自身构建/两平台/发布、公开资产与安装器、完整已安装浏览器/后端验收。
+
+原 37949640426 的 18 libc 字段漂移失败及全部诊断/工具失败保留；产品源码 `acdad8c` 与工作流事件 head `a5e3ed9` 分开。托管普通清理已获准，本机严格身份/监听监督缺口仍未获准执行，`.pth` 方案未实现，操作员安装未改动。655/655 源码浏览器及历史封存 UNRUN 范围保持独立。以下为历史快照。
+
 2026-10-09 当前源码/产品独立 PASS：原父级上下文 `e97f5ef1-bfb5-45f1-ac7c-f4735897a4b8` 完整 655/655（646 preview + 9 cloud）、零跳过/重试，两套真实合成凭据与最后 obsolete401 全部通过。父级已核对九个应用/测试指纹、原生回执和当前范围，见[当前源码验收](acceptance.md)。原响应 recorder 的完整 body/append 同步已关闭当前 654/1 缺口；原 633/22、654/1 及历史未知归因/丢失/早期未封存限制保留。任务继续 `in_progress`，源码版本仍0.1.2；下一步规范/已验收改动提交、0.1.3元数据、隔离安装、同wheel两平台、public installer和稳定发布。以下均为历史快照。
 
 2026-10-09父级返工：Shell当前401与旧200/503/401异步隔离经独立13项复核PASS；C20真实持有验证、C21已保存策略/持有布局组合、C23回缩及采样徽标/连线对比度经独立4项与数值复算PASS。main整合后的24项、402单测、类型/lint/构建/新鲜度原生exit0。见[返工处置](final-parent-rework.md)。WF6实际ASGI/文件/新engine回读限域通过；完整父级/安装/发布仍开放。原290/1和48/49未归因，高负载不能证明环境原因；原失败、丢失产物、封存UNRUN均保留。以下为历史快照，归档与“收口”不建立完整PASS。

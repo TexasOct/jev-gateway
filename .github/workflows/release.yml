@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -37,8 +40,12 @@ jobs:
           npm --prefix frontend run test
           scripts/build-frontend.sh
           scripts/build-frontend.sh --check
-          uv run pytest -q
+          uv lock --check
+          uv sync --locked --all-groups
+          uv run --locked pytest -q
           uvx pyright
+          scripts/build-frontend.sh --check
+          git diff --exit-code
           uv build --out-dir dist
           python scripts/validate-release.py "${GITHUB_REF_NAME}" dist
       - name: Locate release wheel
