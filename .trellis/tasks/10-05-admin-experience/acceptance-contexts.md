@@ -2,6 +2,8 @@
 
 ## Current delivery status
 
+失败留证及类型声明修正已签名提交并推送为 `16d9d55b6535d3d8f1a58660f32e828e8d6a2fce`，最终十五文件指纹、六文件提交范围、候选静态检查和签名核对通过。整合后 LSP 关闭三处新增错误，保留十五处既有夹具诊断。[新托管运行 38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1 已启动，准备 SHA `16d9d55`，产品/标签/公开 wheel/生产运行保持原输入；原独立验收上下文已接续，编排 `b83bce03-6d6f-4839-9ea0-25f8a0c0d002`。完整安装验收及 RL1 仍 OPEN，历史两次实际失败、未知重装原因和未匹配的后代退出记录保留。
+
 2026-10-09：稳定 [0.1.3](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.3) 已发布，原源码/产品 PASS 保持。签名 squash `08d99b0` 后的正式发布源码及签名标签仍为 `4d56e43`；main 新增已独立准入的安装验收脚本与规范，签名提交 `ce1263f`，产品包和发布标签保持原输入。[正式标签运行 37967881650](https://github.com/TexasOct/jev-gateway/actions/runs/37967881650) 的源码/锁定依赖/402 单测/3209 后端及 2 optional skips/Pyright/新鲜度/源码漂移/最终构建通过；两平台同一 wheel 各 169 个有序检查。原独立发布上下文返回 FINAL_TAG_AND_PUBLIC_ASSETS_PASS，见[保存的报告与证据](../../.runtime/admin-experience/final-release-20261009/final-tag-public-assets-pass-20261009/independent-pass.md)。最终 wheel `135f91895bd726622b752aed75734d8eba985b12f0345ea63f0013b86a07dff0` 与该运行的公开四项资产逐字节相等；Release `408181634` 的稳定/latest 查询及签名标签指向均已核对。预检 `37956818406`、产品源码 `acdad8c`/工作流事件 `a5e3ed9` 及其 `98cf` wheel 保持各自原范围，不能代替正式标签输入或最终公开制品。
 
 RL1 仍 OPEN：[公开安装验收运行 37985815672](https://github.com/TexasOct/jev-gateway/actions/runs/37985815672) attempt 1 使用准备提交 `df48801`，两平台实际失败。原独立发布上下文 `6976aa6f` 返回 REWORK，见[完整报告及保留证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-failure-37985815672-20261009/independent-rework.md)。公开输入字节通过；uv `0.13.0` 完成安装后，验证器拒绝实际新增的 `uv_cache.json`，两平台安装/来源检查命令均 exit 1、零完整来源回执。Ubuntu 另有两个 `AccessDenied` 进程观察错误，清理关口仍失败。尚未执行后续生命周期、重装、后端、646 应用浏览器、24 凭据补充及 X1/T3 捕获重放。父级已逐项核对并复制 98 项证据记录和清单文件；原实现上下文接续限定脚本修复，再由原独立发布上下文复核。
