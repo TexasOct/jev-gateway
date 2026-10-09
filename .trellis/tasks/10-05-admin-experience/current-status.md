@@ -6,7 +6,9 @@
 
 六文件修正初次交付见[实现报告及证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-repair-delivery-20261009/implementation.md)。父级核对 218 项证据绑定及全部 15 文件。独立上下文 `43bbf3eb` 返回 REWORK，见[完整复核与复现](../../.runtime/admin-experience/final-release-20261009/public-runtime-helper-review-rework-20261009/independent-rework.md)：根目录符号链接绕过和异常观察线程被误判完成两个阻断缺陷，以及枚举先于限量的限制。父级保存并核对 1475 项独立证据。原实现上下文已接续限定修复，完成后由同一验收上下文复核；固定 uv 源码及此前静态检查保持准备范围。尚无新提交、托管执行或安装 PASS。
 
-后续边界修正已独立准入，原上下文 `1ab897b8` 返回 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION，见[完整报告](../../.runtime/admin-experience/final-release-20261009/public-runtime-boundary-admitted-20261009/independent-admission.md)。父级核对 1622 项文件/符号链接绑定，六个最终改动已原样整合，规范同步。两个阻断问题及枚举限制关闭于准备范围；原失败、旧复现脚本 exit 1 和各批静态/独立纯数据结果保留。接续签名提交及新的托管执行，实际安装、完整业务和 RL1 仍 OPEN。上段为修正前记录。
+后续边界修正已独立准入，原上下文 `1ab897b8` 返回 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION，见[完整报告](../../.runtime/admin-experience/final-release-20261009/public-runtime-boundary-admitted-20261009/independent-admission.md)。父级核对 1622 项文件/符号链接绑定，六个最终改动和规范已原样整合并签名提交 `1078f8b`，远端核对一致。两个阻断问题及枚举限制关闭于准备范围；原失败、旧复现脚本 exit 1 和各批静态/独立纯数据结果保留。
+
+[新运行 37995710573](https://github.com/TexasOct/jev-gateway/actions/runs/37995710573) attempt 1 已启动，准备 SHA `1078f8bd95208b50f901d10335c535385824d3ae`；产品 `4d56e43`、签名标签及公开 wheel 保持原输入。原独立验收上下文接续监测和实际证据检查。派发 native 0、精确运行查询通过；初次列表未找到运行后的父级 AssertionError 原样保留，无重复派发。见[提交/派发回执](../../.runtime/admin-experience/final-release-20261009/public-runtime-helper-commit-20261009/dispatch-reconciliation.md)。实际安装、完整业务和 RL1 仍 OPEN，上段初次 REWORK 为修正前记录。
 
 此前完整 15 文件的 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION、六项准备缺陷关闭、33 个静态负向探针及两套类型检查检查仍为准备范围，见[独立准入报告](../../.runtime/admin-experience/final-release-20261009/public-preparation-admitted-20261009/independent-admission.md)。本次实际 uv 布局和清理问题尚未关闭；既有引用、读取、HTTP/2、阶段模型、ContextMode I/O 等失败保留。本机严格监督缺口、未实现的 `.pth` 方案及历史 UNRUN 保持，操作员安装未改动。以下为既有预检和历史快照。
 
