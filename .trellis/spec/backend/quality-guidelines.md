@@ -438,6 +438,7 @@ NativeCommands.close() -> None
 retain_smoke(smoke: Path, evidence: Path, bindings: dict) -> dict
 run_original_smoke(commands, argv: list[str], outside: Path, env: dict,
                    smoke: Path, evidence: Path, bindings: dict) -> None
+prepare(source: Path, target: Path, package: Path, python: Path, evidence: Path) -> dict
 ```
 
 ### 3. Contracts
@@ -525,6 +526,13 @@ rule until genuine owner receipts exist.
 
 `adapt.py` changes only documented interpreter/template/static/helper/PATH
 loading seams. Exact reversal and original assertion AST/text remain required.
+The private smoke's headless PATH inventory is exactly `uv`, `sh`, `ps`, `uname`,
+`curl`, `python3`, `mktemp`, `rm`, `grep`. The original four tools remain; the
+five installer tools support repeat installation after PATH is narrowed. The
+verified public installer needs grep for embedded-tag validation, curl/python3
+for asset verification and mktemp/rm for its temporary workspace. Shell builtins
+require no added executable. Keep the original no-Node assertion and prove that
+reversing this tuple restores the entire signed source smoke byte for byte.
 Helpers contain no source `jev_gateway`; installed Python and guarded listing
 fixtures own actual persistence. Bind collected identities to executed phase
 reports. Only the original X1/T3 missing-capture cases may skip before browser
@@ -546,6 +554,7 @@ Count call reports and passed calls separately.
 | Observer is dead without successful completion, or has fatal/join/cleanup failure | Fail cleanup even if owned command exits are known; persist lifecycle and context |
 | Observation identity is unknown or lacks one exact native closure | Keep the error unresolved and fail cleanup |
 | Original smoke fails, times out or cannot launch | Attempt bounded sanitized retention; preserve its primary exception and actual or unknown exit |
+| Narrowed repeat-install PATH lacks grep | Preserve native failure and tag-validation log; repair only the evidenced adapter tool inventory |
 | Retention has missing evidence, unsafe paths/types, invalid context or budget/copy/receipt error | Mark incomplete; preserve separate diagnostics and reject native success |
 | Observed parent PID, outer command exit or server disappearance lacks a descendant Popen closure | Keep the descendant observation unresolved |
 | Native replacement is deleted or validation fails | Preserve exact credentials, reference maps and file modes; retain the draft behavior assertions |
@@ -571,6 +580,10 @@ diagnostics are retained before the native failure propagates. Base: a successfu
 smoke requires complete diagnostics as well as its original assertions. Bad:
 copying nested evidence only after a required command returns successfully, or
 claiming preservation from a single failure-time snapshot.
+
+Good: both repeat installs retain the nine evidenced tools while the original
+no-Node check remains. Bad: interpret `grep: not found` followed by the installer's
+invalid-tag message as evidence that the verified public release tag is invalid.
 
 ### 6. Tests Required
 
@@ -603,6 +616,14 @@ incomplete retention must fail native success. Parent-exit, PID reuse, missing
 birth, null exit, unrelated and duplicate closure probes stay unresolved. Keep
 initial failed reviewer fixtures separate from corrected passing probes.
 
+Inspect the complete verified public installer for the headless release path's
+executable requirements. A pure AST check requires the exact nine-tool tuple,
+the unchanged no-Node assertion and corresponding installer source fragments.
+Mutation probes reject missing grep, added node, added bash and a removed guard;
+the exact tuple passes. Retain six adapter reversals and full smoke byte parity.
+Fresh parent LSP compares changed Python files with existing fixture diagnostics;
+static preparation cannot establish repeat installation or hosted type success.
+
 ### 7. Wrong vs Correct
 
 Wrong: require 99 total RECORD rows because 99 entries have hashes, or permit
@@ -619,3 +640,7 @@ while retaining fatal failures independently of native process exits.
 Wrong: execute a required nested command, then copy its logs after it returns.
 Correct: attempt bounded sanitized retention in `finally`, record retention
 failure separately and propagate the original native exception unchanged.
+
+Wrong: restore the ordinary system PATH to make repeat installation work, or
+remove the no-Node assertion. Correct: preserve the narrow evidenced inventory
+and add grep in the existing exact, reversible smoke adapter.

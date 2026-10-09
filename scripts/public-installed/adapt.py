@@ -72,7 +72,7 @@ def prepare(source: Path, target: Path, package: Path, python: Path, evidence: P
     replace("frontend/tests/browser/real-backend-contracts.spec.ts", [
         ('resolve(repoRoot(), ".venv", "bin", "python")', 'process.env.PUBLIC_ACCEPT_PYTHON!', 1)])
     shutil.copy2(source / "scripts/smoke-installed-release.py", target / "smoke.py")
-    replace("smoke.py", [("('uv', 'sh', 'ps', 'uname')", "('uv', 'sh', 'ps', 'uname', 'curl', 'python3', 'mktemp', 'rm')", 1)])
+    replace("smoke.py", [("('uv', 'sh', 'ps', 'uname')", "('uv', 'sh', 'ps', 'uname', 'curl', 'python3', 'mktemp', 'rm', 'grep')", 1)])
     scope = []
     for path in sorted((target / "tests").glob("test_*.py")):
         original = source / "tests" / path.name

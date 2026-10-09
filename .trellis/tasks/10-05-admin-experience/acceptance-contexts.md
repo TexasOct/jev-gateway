@@ -2,7 +2,11 @@
 
 ## Current delivery status
 
-失败留证及类型声明修正已签名提交并推送为 `16d9d55b6535d3d8f1a58660f32e828e8d6a2fce`，最终十五文件指纹、六文件提交范围、候选静态检查和签名核对通过。整合后 LSP 关闭三处新增错误，保留十五处既有夹具诊断。[新托管运行 38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1 已启动，准备 SHA `16d9d55`，产品/标签/公开 wheel/生产运行保持原输入；原独立验收上下文已接续，编排 `b83bce03-6d6f-4839-9ea0-25f8a0c0d002`。完整安装验收及 RL1 仍 OPEN，历史两次实际失败、未知重装原因和未匹配的后代退出记录保留。
+headless 工具清单修正已由原独立上下文 `215558e4` 准入，见[完整复核](../../.runtime/admin-experience/final-release-20261009/public-headless-installer-tools-delivery-20261009/independent-admission.md)。三个文件仅涉及加入 `grep`、静态回归和说明；十二个文件保持原字节，六项适配和整份 smoke 均可反向还原，无 Node 检查保留，独立静态及五项变异检查通过。父级核对 691 项独立及 820 项实现证据，整合后十五文件指纹一致；新 LSP 无新增错误，十五处既有夹具诊断保留。规范已同步，继续限定提交与新托管验证；完整安装验收及 RL1 仍 OPEN。
+
+[运行 38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1、准备 SHA `16d9d55` 两平台均在首次重装 native 1、无超时。原独立上下文 `0d32d1cc` 返回 REWORK，见[完整报告和证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-third-failure-38001417376-20261009/independent-rework.md)。本次失败留证和已执行清理通过，真实 command19 日志确认限缩 PATH 漏掉公开安装器第 52 行需要的 `grep`。每平台两个初始完整来源通过，完整生命周期/业务/重装关口尚未到达；父级保存并核对 229 项证据。原实现及独立验收上下文接续限定工具清单修正，编排 `12fe51e7-41cc-4469-9c1a-7bdeb00ca109`。产品、标签、公开 wheel 和生产运行保持原输入；两次早期实际失败、未知重装原因及 PID `2802`/`2817` 的退出缺证保留。完整安装验收及 RL1 仍 OPEN。
+
+已签名提交并推送的留证/类型修正 `16d9d55b6535d3d8f1a58660f32e828e8d6a2fce` 保持其独立准备准入。最终十五文件指纹、六文件提交范围、候选静态检查和签名核对通过；整合后 LSP 关闭三处新增错误，保留十五处既有夹具诊断。
 
 2026-10-09：稳定 [0.1.3](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.3) 已发布，原源码/产品 PASS 保持。签名 squash `08d99b0` 后的正式发布源码及签名标签仍为 `4d56e43`；main 新增已独立准入的安装验收脚本与规范，签名提交 `ce1263f`，产品包和发布标签保持原输入。[正式标签运行 37967881650](https://github.com/TexasOct/jev-gateway/actions/runs/37967881650) 的源码/锁定依赖/402 单测/3209 后端及 2 optional skips/Pyright/新鲜度/源码漂移/最终构建通过；两平台同一 wheel 各 169 个有序检查。原独立发布上下文返回 FINAL_TAG_AND_PUBLIC_ASSETS_PASS，见[保存的报告与证据](../../.runtime/admin-experience/final-release-20261009/final-tag-public-assets-pass-20261009/independent-pass.md)。最终 wheel `135f91895bd726622b752aed75734d8eba985b12f0345ea63f0013b86a07dff0` 与该运行的公开四项资产逐字节相等；Release `408181634` 的稳定/latest 查询及签名标签指向均已核对。预检 `37956818406`、产品源码 `acdad8c`/工作流事件 `a5e3ed9` 及其 `98cf` wheel 保持各自原范围，不能代替正式标签输入或最终公开制品。
 

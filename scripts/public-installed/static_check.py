@@ -780,6 +780,20 @@ def main() -> int:
                 if "expect(" in line or "test(" in line:
                     assert line in after.read_text(), line
     checks.append("All six adapters match exact source fragments, preserve assertion AST/text, and reverse to original hashes")
+    smoke_text = (target / "smoke.py").read_text()
+    headless_inventory = next(node.iter for node in ast.walk(ast.parse(smoke_text))
+                     if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
+                     and isinstance(node.iter, ast.Tuple))
+    tools = ast.literal_eval(headless_inventory)
+    assert tools == ("uv", "sh", "ps", "uname", "curl", "python3", "mktemp", "rm", "grep")
+    assert "node" not in tools
+    guard = "check(shutil.which('node', path=env['PATH']) is None, 'headless CLI and server have no Node.js on PATH')"
+    assert guard in smoke_text and guard in (root / "scripts/smoke-installed-release.py").read_text()
+    installer = (root / "scripts/install.sh").read_text()
+    for fragment in ("grep -Eq '^v", "$(uname -s)", "command -v curl", "command -v python3",
+                     "work=$(mktemp -d", "trap 'rm -rf", '"$uv_bin" tool install'):
+        assert fragment in installer, fragment
+    checks.append("Headless inventory retains all nine evidenced smoke/installer tools and the unchanged no-Node guard")
     original_server = root / "tests/fixtures/real-gateway/server.py"
     assert original_server.read_bytes() == (target / "tests/fixtures/real-gateway/server.py").read_bytes()
     assert hashlib.sha256((root / "frontend/tests/fixtures/real-backend.ts").read_bytes()).hexdigest() == "888c40d63d49e7d675b886489b51a6d0f1626c8b1616458a0179d0f55e1e0d0b"

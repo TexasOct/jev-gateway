@@ -1,4 +1,8 @@
-最新进度：失败留证及类型声明修正已签名提交并推送为 `16d9d55b6535d3d8f1a58660f32e828e8d6a2fce`。最终十五个脚本/工作流指纹、六文件提交范围、新候选静态检查和签名均已核对；三处新增 LSP 错误关闭，十五处既有夹具诊断保留。[新运行 38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1 使用准备提交 `16d9d55`，原发布输入保持，已接续原独立验收上下文，编排 `b83bce03-6d6f-4839-9ea0-25f8a0c0d002`。两个历史实际失败和未知重装原因保留，完整安装验收及 RL1 仍 OPEN。
+最新进度：headless 工具清单修正已由原独立上下文 `215558e4` 准入，见[完整复核](../../.runtime/admin-experience/final-release-20261009/public-headless-installer-tools-delivery-20261009/independent-admission.md)。只在原清单加入 `grep`，三个文件改动、十二文件不变；原 smoke 字节反向还原、六项适配、无 Node 检查、独立静态检查及五项变异探针通过。父级保存并核对 691 项独立及 820 项实现证据，整合十五文件指纹一致；新 LSP 无新增错误，保留十五处既有夹具诊断。规范已同步，继续限定提交及新托管验证。完整安装验收及 RL1 仍 OPEN。
+
+前次实际运行：[38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1、准备 SHA `16d9d55` 两平台首次重装均 native 1、无超时。原独立上下文 `0d32d1cc` 返回 REWORK，见[完整报告及证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-third-failure-38001417376-20261009/independent-rework.md)。失败留证和本次已执行清理通过，真实日志确认限缩 PATH 缺少安装器第 52 行所需的 `grep`；每平台仅两个初始完整来源通过，后续业务尚未运行。全部 229 项证据保留。产品、标签、公开 wheel 和生产运行保持原输入；此前未知重装原因及 PID `2802`/`2817` 的退出缺证保留。
+
+已提交的失败留证及类型修正为签名提交 `16d9d55b6535d3d8f1a58660f32e828e8d6a2fce`，最终十五文件指纹、六文件范围、候选静态检查和签名均已核对。三处新增 LSP 错误关闭，十五处既有夹具诊断保留。
 
 当前状态：2026-10-09，源码/产品独立 PASS，稳定 [0.1.3](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.3) 已发布。签名 squash `08d99b0` 后的正式发布源码及签名标签仍为 `4d56e43`；main 新增安装验收脚本与规范，签名提交 `ce1263f`，产品包和发布标签保持原输入。正式标签工作流、两平台同一 wheel 和公开四项资产字节校验均独立 PASS。RL1 保持 OPEN，剩余公开安装器及完整已安装浏览器/后端验收。
 
