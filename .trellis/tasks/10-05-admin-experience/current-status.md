@@ -1,3 +1,13 @@
+当前状态：2026-10-09，三个子任务全部归档，父级进入最终验收与发布阶段。
+
+Settings、Suppliers、Models、Contracts、icon1、Canvas 六项子任务均已完成实现、独立验收、规范同步与任务范围提交，并归档到 `archive/2026-10/`；`task.py list` 显示父任务已无活跃子任务（6/6）。工作树干净。
+
+主分支关口（最终整合态）：Pyright 零发现；pytest 3209 通过 / 2 跳过；前端 lint 0 错误 / 4 既有警告；单测 402 通过；应用与浏览器 TypeScript exit 0；构建与 bundle 新鲜度通过；canvas 浏览器套件 workers=1 下 290 通过 / 1 窄屏 pending 偶发（串行重跑 10/10）；真实后端 X1/T3 2 项通过。高负载下窄屏偶发已多次验证为环境争用，机器负载约 15-29 / 14 核。
+
+接受范围的具名保留：Contracts 58/58 具名行，继承十五项行 ID 仍不可恢复故 combined 唯一总数为 null；Canvas 全部原行 C01-C25 与 WF1-WF6 按已执行子句接受，小字对比度由两个独立方法测得 7.248:1（亮）/ 8.072:1（暗）并关闭此前 UNMEASURED 项。仍开放具名子句：C20 持有验证屏障、C21 单一组合、C23 逐状态徽标/连线对比度与显式回缩、C24 会话中段专用 401、C25 真实设备触摸、WF6 真实磁盘/ASGI 持久化。
+
+父级剩余工作：最终逐需求审计、定义零的隔离安装验证（`scripts/smoke-installed-release.py` 与 `scripts/validate-release.py`）、版本元数据与发布流程校验，然后提交与稳定 0.1.3 发布。工作树干完成时仅存在两个孤立 `vite preview` 进程，属于 `jev-llmroute-test` 与其他 pi 临时目录，未处置。以下为历史快照。
+
 当前状态：2026-10-08，M10-M13与问题坐标限定收口，icon1独立验收并整合完成。
 
 Icon1 IC1-IC5独立通过；8个前端文件已整合main，来源规范与双语MIT署名同步。主工作树6个单元/27个浏览器、类型/lint/新构建/新鲜度及42文件/39 SVG源码wheel检查通过。见[处置](../../.runtime/icon1/parent-disposition.md)。最终提交/archive随父级gate，已安装0.1.3/其余Contracts20原行、完整Canvas/Parent33及发布继续开放。以下运行状态为历史快照。
