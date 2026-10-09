@@ -2,6 +2,10 @@
 
 ## Current delivery status
 
+2026-10-09 当前源码/产品独立 PASS：原父级上下文 `e97f5ef1-bfb5-45f1-ac7c-f4735897a4b8` 完整 655/655（646 preview + 9 cloud）、零跳过/重试，两套真实合成凭据与最后 obsolete401 全部通过。父级已核对九个应用/测试指纹、原生回执和当前范围，见[当前源码验收](acceptance.md)。原响应 recorder 的完整 body/append 同步已关闭当前 654/1 缺口；原 633/22、654/1 及历史未知归因/丢失/早期未封存限制保留。任务继续 `in_progress`，源码版本仍0.1.2；下一步规范/已验收改动提交、0.1.3元数据、隔离安装、同wheel两平台、public installer和稳定发布。以下均为历史快照。
+
+2026-10-09父级返工：Shell当前401与旧200/503/401异步隔离经独立13项复核PASS；C20真实持有验证、C21已保存策略/持有布局组合、C23回缩及采样徽标/连线对比度经独立4项与数值复算PASS。main整合后的24项、402单测、类型/lint/构建/新鲜度原生exit0。见[返工处置](final-parent-rework.md)。WF6实际ASGI/文件/新engine回读限域通过；完整父级/安装/发布仍开放。原290/1和48/49未归因，高负载不能证明环境原因；原失败、丢失产物、封存UNRUN均保留。以下为历史快照，归档与“收口”不建立完整PASS。
+
 2026-10-09收口：Canvas 已完成实现、独立验收、规范同步与任务范围提交，并归档到 `archive/2026-10/`，父任务现在没有活跃子任务。Canvas 相关提交：`1b45ec1`（模型节点→共享 Dialog）、`e383091`/`535113c`（批次记录）、`a18ee81`（失败配置读取说明与重试）、`5b62465`（归档）。整理合并在 main 上的关口：Pyright 零发现、pytest3209通过/2跳过、lint0错误/4警告、单测402、应用与浏览器类型exit0、构建与新鲜度通过、canvas 套件 workers=1 下290通过/1窄屏pending偶发（串行重跑10/10通过）。接受范围：全部原行 C01-C25 与 WF1-WF6 按已执行子句接受；小字对比度由两个独立方法测得 7.248:1（亮）/8.072:1（暗），此前 UNMEASURED 项关闭。仍开放的具名子句：C20 持有验证屏障、C21 单一组合、C23 每状态徽标/连线对比度与显式回缩、C24 会话中段专用401、C25 真实设备触摸、WF6 真实磁盘/ASGI 持久化。父级剩余：最终需求审计、隔离安装验证与稳定 0.1.3 发布。以下为历史快照。
 
 2026-10-09归档：Contracts 与 icon1 已完成实现、独立验收、规范同步与任务范围提交，并归档到 `archive/2026-10/`。父级当前只剩 Canvas 子任务。Contracts 提交 `83f6eaf`，icon1 提交 `c89e6eb`，记录提交 `569fbc6`，归档提交 `43a325b` 与 `cc7b701`；工作树干净。main 上 Contracts 关口：Pyright 零发现、pytest3209通过/2跳过、lint0错误/4既有警告、单测402通过、应用与浏览器类型exit0、构建与bundle新鲜度通过、真实浏览器X1/T3 2/2通过。子任务归档不代表整项完成：Canvas 剩余行、两者的整合后的安装验证与0.1.3发布仍开放。以下为历史快照。
@@ -51,10 +55,10 @@ disabled批次后：39完整原生/JUnit结果及55当前/113旧输入绑定已�
 | [Settings](../archive/2026-10/10-05-admin-settings-security/current-status.md) | 子任务 completed/已归档，原业务范围 CLOSED，S01-S15 / GS1-GS3 已独立验收并经父级核对。 | OS/device、应用 finalizer、安装与发布检查仍由父任务承接。 |
 | [Suppliers](../archive/2026-10/10-05-admin-supplier-connections/current-status.md) | 子任务 completed/已归档，原45行业务范围 CLOSED，pending/auth/焦点问题已完成独立复核。 | 最终整合、安装与发布检查。 |
 | [Models](../archive/2026-10/10-05-admin-model-workspace/current-status.md) | 子任务 completed/已归档，原38项业务范围 CLOSED，fresh4/4通过；历史31/1与原400断言失败保留。 | 应用 finalizer、浏览器后代退出和父级/发布检查。 |
-| [Canvas](../archive/2026-10/10-05-admin-workflow-canvas/current-status.md) | 完整REWORK收口：C01-C25与WF1-WF6按已执行子句接受，含模型节点→共享Dialog交接、删除/接线/历史/状态/响应/密度/键盘与失败配置重试；小字对比度达标并关闭UNMEASURED；已归档 `archive/2026-10`。 | 具名开放子句：C20持有验证、C21单一组合、C23逐状态对比度与回缩、C24会话中段401、C25真实设备触摸、WF6真实磁盘持久化；原48/49诊断与全部UNRUN保持。 |
+| [Canvas](../archive/2026-10/10-05-admin-workflow-canvas/current-status.md) | 已归档；原子句支持加C20/C21/C23独立4项、C24修复独立13项与WF6实际ASGI回读已接受各自范围，见[处置](final-parent-rework.md)。 | 父级完整关口/安装/发布；历史290/1与48/49未归因及全部封存UNRUN保持；物理触摸/HID排除。 |
 | [Contracts](../archive/2026-10/10-05-admin-model-contracts/current-status.md) | **58/58 具名PASS**；收尾批次接受X1/T3/C1/C3-C10，父级终字节复跑闭包54+重放2+真实浏览器2均通过，bundle哈希一致；已归档 `archive/2026-10`。 | 继承十五项行ID不可恢复故combined null；原126/110UNRUN。 |
 | [icon1](../archive/2026-10/10-08-icon1/current-status.md) | IC1-IC5独立通过；8文件已整合main，规范/署名同步，6单元/27浏览器及42文件/39 SVG源码wheel一致；已归档 `archive/2026-10`。 | 已安装0.1.3与完整发布继续开放。 |
-| 父级整合与0.1.3发布 | Parent33仍 OPEN / MISSING_INDEPENDENT；最终修复未提交，0.1.3未发布。 | 原33项独立验收、lifecycle/native、最终frontend/fullbrowser、两套credential fixtures、相同wheel的Ubuntu/macOS安装与public installer/release资产检查。 |
+| 父级整合与0.1.3发布 | 当前源码/产品独立PASS，33项中当前源码谓词按执行范围接受；RL1发布OPEN。完整655/655与两套credential fixtures通过，原回执及复用关口范围见[验收](acceptance.md)。 | 提交、0.1.3版本元数据、隔离安装、相同wheel的Ubuntu/macOS与public installer/release资产检查；历史失败如实保留。 |
 
 | 工作线 | 当前状态 | 下一步 |
 | --- | --- | --- |

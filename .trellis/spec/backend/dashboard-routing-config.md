@@ -484,13 +484,17 @@ setReadRetry((value) => value + 1);
 Use when a policy apply/reset succeeds but its confirming configuration read fails,
 or an apply/reset response is lost. The editor must distinguish a confirmed server write
 from a confirmed rendered configuration. Keep policy recovery separate from layout
-read/write recovery and authentication admission.
+read/write recovery and authentication admission. The initial shell configuration
+read uses the same ownership rules when no strategy workspace can be rendered.
 
 ### 2. Signatures
 
 ```typescript
 // App.tsx; existing editor callers supply their operation owner.
 reloadConfiguration(current: () => boolean): Promise<void>
+run(work: () => Promise<void>, current?: () => boolean): Promise<void>
+// AppShell.tsx; initial configuration read recovery.
+retryConfigurationRead(): void
 // RoutingEditor.tsx callback and component-local recovery action.
 onReloaded(current: () => boolean): Promise<void>
 retryPolicyRead(): void
@@ -499,7 +503,9 @@ retryPolicyRead(): void
 `reloadConfiguration` awaits `api.configuration()` directly and propagates its
 failure. It checks `current()` before installing the response and before subsequent
 monitoring/setup work. `App.run()` retains its existing catch-and-resolve behavior;
-its resolved promise cannot certify a configuration read.
+its resolved promise cannot certify a configuration read. Its optional operation
+predicate also guards root feedback clearing and error/401 handling. Configuration
+reload passes the same predicate through the subsequent monitoring/setup work.
 
 ### 3. Contracts
 
@@ -532,6 +538,14 @@ retry that succeeds proves completion isolation, not obsolete error delivery. An
 completion after reconnection cannot replace the new configuration, draft or busy
 state and cannot emit an unauthorized callback.
 
+An initial failed configuration read renders a localized explanation and explicit
+GET retry; absence of an error retains Loading. Shell retry admission uses a
+synchronous busy ref, navigation/authentication generation and operation owner.
+Changing view, suspending authentication or unmounting retires all success, error
+and finalizer callbacks. A current 401 invokes the existing root unauthorized
+handler. An old completion cannot clear a newer retry's pending state or root
+feedback. Keep these markers in component memory; no API or storage field changes.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
@@ -542,6 +556,9 @@ state and cannot emit an unauthorized callback.
 | DELETE succeeded, confirming GET fails | Reset/read-pending status; retain local draft until explicit GET recovery |
 | Confirmed read has the existing hash | Restore the server draft and clear history/selection; keep reset disclosure |
 | GET returns 401 or metadata causes suspension during GET | Retain local work; reconnect through root admission; ignore the old completion |
+| Initial configuration GET fails | Explain failure and offer explicit GET retry; no policy mutation |
+| Current shell retry GET returns 401 | Suspend through existing root authentication handling |
+| Retired shell retry resolves/rejects after navigation or reconnect | No configuration installation, feedback, unauthorized callback or busy finalization |
 
 ### 5. Good/Base/Bad Cases
 
@@ -576,12 +593,126 @@ trigger focus in `canvas-model-handoff-repair.spec.ts`.
 These are current-source regressions. Report their disposition separately from
 sealed historical program execution or untested state combinations.
 
+`shell-retry-ownership.spec.ts` checks current 401, old 200/503/401 after reconnect,
+old completions while a newer retry is held, rapid native admission and repeated
+read failure. Synchronize on delivered responses before asserting zero retired
+feedback. Diagnostic probes that require defect text to appear are preserved as
+red observations; corrected regressions retain the effective business predicates.
+
+`canvas-final-focused.spec.ts` checks a genuinely held validation POST, exact raw
+draft retention, saved policy combined with held layout-only persistence, native
+criterion growth and shrink-back, and rendered badge/wire contrast in both schemes.
+Verify actual request admission before pending assertions. Compare screenshot
+backdrops with computed wire paint and record the sampled states; a small-text
+measurement cannot certify every badge or wire. Fresh output directories preserve
+each attempt's screenshots and traces.
+
 ### 7. Wrong vs Correct
 
 Wrong: a swallowed GET failure resolves `onReloaded`, or retry calls `save()` and
 replays an already committed overlay. Correct: propagate the owned configuration
 read failure, retain recovery state, and use a guarded GET-only retry before
 restoring the confirmed rendered snapshot.
+
+Wrong: shell retry passes `() => true` and unconditionally writes errors/finalizes
+pending state. Correct: guard every continuation with the captured activity and
+operation owner, and route a current 401 through the root unauthorized handler.
+
+## Scenario: complete browser owners and response recorder completion
+
+### 1. Scope / Trigger
+
+Use when changing the browser command, standalone fixture ownership, native
+keyboard readiness or asynchronous response assertions. A network response and
+its test-side JSON recorder have separate completion boundaries.
+
+### 2. Signatures
+
+`npm --prefix frontend run test:browser` builds, type-checks, runs preview through
+`frontend/playwright.config.ts`, then runs the standalone cloud fixture through
+`frontend/tests/browser/supplier-cloud.config.ts`. The preview owner excludes
+only `supplier-cloud.spec.ts`; `supplier-cloud-workspace.spec.ts` stays in preview.
+The cloud owner serves its existing HTML harness through Vite dev.
+
+### 3. Contracts
+
+Run both owners after browser admission, even if preview fails, and fail the
+aggregate if either owner fails. Build/type failure stops before browser admission.
+Compare original collection identities with the disjoint owner union and actual
+executed identities. Use file/title/project identity; shifted source lines are
+not new cases. Complete acceptance enables both synthetic credential modes with
+`JEV_CREDENTIAL_LIVE_URL`/`JEV_CREDENTIAL_LIVE_HOME` and
+`JEV_CREDENTIAL_DEFAULT_URL`/`JEV_CREDENTIAL_DEFAULT_HOME`.
+
+Preserve each owner's workers, deadlines and retries. Approved private configs
+may omit webServer lifecycle while equivalent individually owned strict-port
+servers supply preview/dev semantics. Native receipts and cleanup remain separate
+from the test aggregate; a successful controller cannot mask a failed suite.
+
+Synchronously register a promise for every matching response callback. Its
+completion includes the awaited JSON read and ledger append. Before asserting
+recorded bodies, verify the expected admissions and join their promises.
+`waitForResponse()`, `response.finished()` and browser animation frames alone do
+not join asynchronous Node response listeners. Match the exact configuration
+path so a held validation operation remains independent of the recorder barrier.
+
+Native keyboard helpers may combine browser frames, bounded native disabled-state
+completion and focus observation. They must retain enabled/focused/focus-visible,
+hit-testing, bounds and business assertions, actual Tab/ShiftTab/Enter, traversal
+caps and case deadlines. Reject detached or permanently disabled targets; an
+observation must not focus or click the target.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required evidence |
+| --- | --- |
+| Preview fails, cloud passes | Both native results retained; aggregate fails |
+| Wrong owner, missing/duplicate case or disabled real fixture | Complete gate remains unverified |
+| Both responses arrive, one recorder body is pending | Ledger assertion waits for callback completion |
+| Zero/one response admitted where two are required | Exact admission assertion fails before joining |
+| Target remains disabled or detaches | Readiness rejects within the existing bounds |
+
+### 5. Good/Base/Bad Cases
+
+Good: two retired 401 callbacks arrive in either order; both bodies append before
+the exact count and newer-owner assertions run. Base: callbacks already completed
+and joining adds no work. Bad: treating headers or two animation frames as proof
+that the response ledger is complete, or counting focused reruns as a full gate.
+
+### 6. Tests Required
+
+`canvas-residual-wave4.spec.ts` preserves exactly two admitted/recorded 401s,
+absence of obsolete Connect/alert feedback, newer validation busy state, one
+DELETE/no PUT, exact read count, raw draft and saved layout. Deferred-body probes
+must fail the original snapshot and hold the corrected join until both appends,
+including reverse completion order and zero/one admission. Preserve JSON rejection
+handling and unrelated-path filtering. Such probes support actual browser cases.
+
+Runner checks cover success, either/both owner failures and build/type admission
+failure. Record unchanged active case identities and both real credential modes.
+Keyboard probes cover pending native/fieldset disablement, permanent disablement,
+detachment and focus truth without removing the final browser oracles. A passing
+timing rerun does not establish the cause of a historical deadline failure.
+
+### 7. Wrong vs Correct
+
+Wrong: inspect an async response ledger immediately after the final network
+response, or join an unchecked empty promise list. Correct:
+
+```typescript
+const admitted: { status: number; done: Promise<void> }[] = [];
+page.on("response", (response) => {
+  if (new URL(response.url()).pathname !== path) return;
+  const done = response.json().catch(() => null).then((body) => {
+    responses.push({ status: response.status(), body });
+  });
+  admitted.push({ status: response.status(), done });
+});
+// After the expected native responses have arrived:
+expect(admitted.filter((entry) => entry.status === 401)).toHaveLength(2);
+await Promise.all(admitted.map((entry) => entry.done));
+expect(responses.filter((entry) => entry.status === 401)).toHaveLength(2);
+```
 
 ## Scenario: strategy canvas outputs and connection editing
 
