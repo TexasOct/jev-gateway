@@ -1,3 +1,11 @@
+当前状态：2026-10-09（第二批进行中）。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
+
+交互与检查器批次（编排 `ded47ed3-0073-4ad8-98c5-107e00954745`）两子项完成：接受 C09、C11、C13、C14、C15、C16、C17（适用子句）、C18 与 WF2/WF3/WF5。本轮唯一产品改动是 `RoutingEditor.tsx` 的 +7/−2：`updateMembership` 被拒时区分“显式列表目标”与“标签池最后成员”并给出真实原因；`canvasReason_lastMember` 两个语言包本已存在。新 spec 7 例，父级复跑 7/7 通过，私有端口释放。见[本批处置](../../.runtime/admin-experience/parallel-business-acceptance-20261008/canvas-interaction-parent-acceptance.md)。注意 C17 仅对适用子句通过：本版本没有原始高级JSON workflow 面。
+
+剩余行 C20-C25 与 WF6 已由编排 `3fa74f4a-1524-43aa-a5da-cdd9a6c4f3af` 推进（C22 十六组合、C23 密度/4.5:1对比、C25 纯键盘与触碰显式添加）。上一轮 lane 增量尚未整合入 main，待剩余行稳定后一次性整合，避免对同文件反复三方合并。
+
+以下保留前一快照。
+
 当前状态：2026-10-09。生命周期仍为 `in_progress`；完整Canvas仍为 `REWORK`。
 
 父级已将本 worktree 的 canvas 改动整合进 main（提交 `1b45ec1`）：26 文件直接应用，`en.ts`/`zh-CN.ts` 与 icon1 做三方合并，无冲突且键数对齐 605/605。main 关口：Pyright 零发现、pytest3209通过/2跳过、lint0错误/4警告、单测402、应用与浏览器类型exit0、构建与新鲜度通过、canvas 套件 workers=1 下254/254、真实后端 X1/T3 各2项。高负载下 workers2/3（及负载峰值时workers1）会偶发窄屏超时，失败用例串行重跑均通过且在源 canvas worktree 同样复现，属环境争用而非回归；机器负载约29/14核，主要来自无关的 rustc/Zed/模拟器。剩余行 C20-C25 与 WF6；编排 `ded47ed3-0073-4ad8-98c5-107e00954745` 先推进 C09/C11/C13/C14/C15/C16/C17/C18 与 WF2/WF3/WF5。
