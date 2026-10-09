@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from typing import cast
 
 
 def negative_probes(output: Path) -> list[str]:
@@ -517,6 +518,232 @@ def boundary_probes(output: Path) -> list[dict]:
     return results
 
 
+def smoke_diagnostic_probes(output: Path) -> list[dict]:
+    """Exercise the actual driver retention seam with files and fake commands only."""
+    import driver
+    from unittest import mock
+    import types
+    results = []
+    base = output / "smoke-diagnostic-synthetic"
+    base.mkdir()
+    extra_secret = "synthetic-store-key-密"
+    def setup(label):
+        root = base / label
+        smoke = root / "original smoke"
+        logs = smoke / "evidence"
+        logs.mkdir(parents=True)
+        home = smoke / ("run-" + "0" * 32) / "runtime home with spaces"
+        (home / "logs/nested").mkdir(parents=True)
+        (home / "run").mkdir()
+        (home / "credentials.json").write_text(json.dumps({"version": 1, "values": {"KEY": extra_secret}}))
+        (home / "credentials.json").chmod(0o600)
+        (home / ".env").write_text("KEY=synthetic-dotenv-value\n")
+        (home / "run/gateway.pid").write_text(json.dumps({"pid": 77, "token": "synthetic-pid-token"}))
+        (home / "models.json").write_text(json.dumps({"notes": extra_secret, "api_key": "synthetic-inline-model-key"}))
+        state = home.parent / "state/jev-gateway/install.json"
+        state.parent.mkdir(parents=True)
+        state.write_text(json.dumps({"runtime_dir": str(home)}))
+        (home / "jev-records.sqlite3").write_bytes(b"synthetic binary database " + extra_secret.encode())
+        (home / "logs/nested/gateway.log").write_text("synthetic-pid-token synthetic-dotenv-value " + extra_secret)
+        (logs / "19-command.log").write_text("FAIL repeat command 19 exit 1 " + driver.SMOKE_SECRETS[0] + " " + extra_secret)
+        (logs / "checks.json").write_text(json.dumps({"success": False, "installer_sha256": driver.ASSETS["install.sh"][2]}))
+        (logs / "nested").mkdir()
+        (logs / "nested/18-command.log").write_text("owned nested log")
+        evidence = root / "evidence"
+        evidence.mkdir()
+        return root, smoke, evidence
+    class Commands:
+        def __init__(self, status, timed_out=False):
+            self.commands = []
+            self.status = status
+            self.timed_out = timed_out
+            self.failure = RuntimeError(f"original-public-installer-smoke: native exit {status}, timeout {timed_out}")
+        def run(self, argv, outside, env, label, timeout):
+            assert timeout == 1800 and label == "original-public-installer-smoke"
+            self.commands.append({"argv": argv, "label": label, "pid": 77, "create_time": 3.0,
+                                  "native_exit": self.status, "timed_out": self.timed_out})
+            if self.status != 0 or self.timed_out:
+                raise self.failure
+            return self.status
+    def run(label, status, timed_out=False, patch=None):
+        root, smoke, evidence = setup(label)
+        commands = Commands(status, timed_out)
+        if patch:
+            patch(smoke, evidence)
+        bindings = {"source": driver.SOURCE, "hosted_run": "synthetic", "attempt": "1"}
+        error = None
+        try:
+            driver.run_original_smoke(commands, ["synthetic-smoke", "unchanged-argument"], root, {}, smoke, evidence, bindings)
+        except RuntimeError as caught:
+            error = caught
+        if status != 0 or timed_out:
+            assert error is commands.failure, "retention masked native primary exception"
+        receipt = json.loads((evidence / "original-smoke-retention.json").read_text())
+        assert receipt["bindings"]["primary_command"]["native_exit"] == status
+        assert receipt["bindings"]["primary_command"]["timed_out"] is timed_out
+        results.append({"case": label, "native_exit": status, "timed_out": timed_out,
+                        "retention_complete": receipt["complete"], "errors": receipt["errors"], "missing": receipt["missing"],
+                        "primary_preserved": error is commands.failure if error else None})
+        return smoke, evidence, receipt, error
+    for label, status, timeout in [("native-failure", 1, False), ("native-success", 0, False), ("native-timeout", -15, True)]:
+        smoke, evidence, receipt, error = run(label, status, timeout)
+        assert receipt["complete"] and (error is None if status == 0 else error is not None)
+        copied = (evidence / "original-smoke/19-command.log").read_text()
+        assert "FAIL repeat command 19 exit 1" in copied and "[redacted]" in copied
+        for path in (evidence / "original-smoke").rglob("*"):
+            if path.is_file():
+                content = path.read_text()
+                assert extra_secret not in content and json.dumps(extra_secret)[1:-1] not in content
+                assert all(value not in content for value in (*driver.SMOKE_SECRETS, "synthetic-dotenv-value", "synthetic-pid-token", "synthetic-inline-model-key"))
+        assert (evidence / "original-smoke/nested/18-command.log").read_text() == "owned nested log"
+        assert not list((evidence / "original-smoke").rglob("credentials.json"))
+        assert not list((evidence / "original-smoke").rglob("jev-records.sqlite3"))
+        cred = next(row for row in receipt["files"] if row["source"].endswith("credentials.json"))
+        assert cred["disposition"] == "metadata-only" and cred["source_mode"] == "0o600"
+        assert cred["source_sha256"] == hashlib.sha256((smoke / cred["source"]).read_bytes()).hexdigest()
+        state = next(row for row in receipt["files"] if row["source"].endswith("state/jev-gateway/install.json"))
+        assert state["disposition"] == "metadata-only"
+    _, evidence, receipt, error = run("missing-checks", 1, patch=lambda smoke, evidence: (smoke / "evidence/checks.json").unlink())
+    assert not receipt["complete"] and "evidence/checks.json" in receipt["missing"]
+    assert (evidence / "original-smoke/19-command.log").exists()
+    _, _, receipt, error = run("missing-repeat-log", 0, patch=lambda smoke, evidence: (smoke / "evidence/19-command.log").unlink())
+    assert not receipt["complete"] and error is not None
+    _, _, receipt, _ = run("missing-source-evidence", 1, patch=lambda smoke, evidence: shutil.rmtree(smoke / "evidence"))
+    assert not receipt["complete"] and receipt["errors"]
+    def alias(smoke, evidence):
+        moved = smoke / "foreign-evidence"
+        (smoke / "evidence").rename(moved)
+        (smoke / "evidence").symlink_to(moved, target_is_directory=True)
+    _, evidence, receipt, _ = run("root-alias", 1, patch=alias)
+    assert not receipt["complete"] and not (evidence / "original-smoke/19-command.log").exists()
+    def intermediate(smoke, evidence):
+        moved = smoke / "foreign-nested"
+        (smoke / "evidence/nested").rename(moved)
+        (smoke / "evidence/nested").symlink_to(moved, target_is_directory=True)
+    _, _, receipt, _ = run("intermediate-alias", 1, patch=intermediate)
+    assert not receipt["complete"] and receipt["errors"]
+    original_open = Path.open
+    def fail_copy(path, mode="r", *args, **kwargs):
+        if mode == "xb" and path.name == "19-command.log":
+            raise OSError("synthetic copy failure")
+        return original_open(path, mode, *args, **kwargs)
+    with mock.patch.object(Path, "open", fail_copy):
+        _, evidence, receipt, _ = run("copy-failure", 1)
+    assert not receipt["complete"] and receipt["errors"] and (evidence / "original-smoke-retention-error.json").exists()
+    def oversize(smoke, evidence):
+        with (smoke / "evidence/19-command.log").open("wb") as stream:
+            stream.truncate(10 * 1024 * 1024 + 1)
+    _, _, receipt, _ = run("file-bound", 1, patch=oversize)
+    assert not receipt["complete"] and receipt["errors"]
+    # Instrument the bounded traversal without constructing a large tree.
+    root, smoke, evidence = setup("entry-bound")
+    actual = driver.metadata_entries
+    def too_many(directory, prefix):
+        if directory == smoke / "evidence":
+            for _ in range(513):
+                yield directory / "19-command.log"
+        else:
+            yield from actual(directory, prefix)
+    with mock.patch.object(driver, "metadata_entries", too_many):
+        receipt = driver.retain_smoke(smoke, evidence, {})
+    assert not receipt["complete"] and len(receipt["files"]) <= 513
+    results.append({"case": "combined entry bound", "result": "rejected", "retention_complete": receipt["complete"]})
+    root, smoke, evidence = setup("total-bound")
+    large = smoke / "evidence/large.log"
+    with large.open("wb") as stream:
+        stream.truncate(8 * 1024 * 1024)
+    def repeated_large(directory, prefix):
+        if directory == smoke / "evidence":
+            for _ in range(5):
+                yield large
+        else:
+            yield from actual(directory, prefix)
+    with mock.patch.object(driver, "metadata_entries", repeated_large):
+        receipt = driver.retain_smoke(smoke, evidence, {})
+    assert not receipt["complete"] and receipt["read_bytes"] <= 32 * 1024 * 1024
+    results.append({"case": "combined byte/read bound", "result": "rejected", "read_bytes": receipt["read_bytes"]})
+    # A retention-receipt write failure must retain the exact primary exception in memory.
+    root, smoke, evidence = setup("receipt-write-failure")
+    commands = Commands(1)
+    def fail_receipt(path, mode="r", *args, **kwargs):
+        if "w" in mode and path.name == "original-smoke-retention.json":
+            raise OSError("synthetic receipt failure")
+        return original_open(path, mode, *args, **kwargs)
+    with mock.patch.object(Path, "open", fail_receipt):
+        try:
+            driver.run_original_smoke(commands, ["synthetic"], root, {}, smoke, evidence, {})
+        except RuntimeError as error:
+            assert error is commands.failure
+        else:
+            raise AssertionError("lost original failure")
+    assert (evidence / "original-smoke-retention-error.json").exists()
+    results.append({"case": "retention receipt write failure", "result": "primary preserved/fallback receipt"})
+    root, smoke, evidence = setup("unsupported-file-type")
+    original_lstat = Path.lstat
+    def nonregular(path, *args, **kwargs):
+        info = original_lstat(path, *args, **kwargs)
+        if path == smoke / "evidence/19-command.log":
+            import stat
+            return types.SimpleNamespace(st_mode=stat.S_IFIFO | 0o600, st_size=info.st_size,
+                                         st_mtime_ns=info.st_mtime_ns, st_ctime_ns=info.st_ctime_ns)
+        return info
+    with mock.patch.object(Path, "lstat", nonregular):
+        receipt = driver.retain_smoke(smoke, evidence, {})
+    assert not receipt["complete"] and not (evidence / "original-smoke/19-command.log").exists()
+    results.append({"case": "nonregular type before read", "result": "rejected"})
+    root, smoke, evidence = setup("launch-error-no-exit")
+    failure = OSError("synthetic launch error")
+    class NoLaunch:
+        commands = [{"label": "previous-command", "native_exit": 0}]
+        def run(self, *args, **kwargs): raise failure
+    try:
+        driver.run_original_smoke(NoLaunch(), ["synthetic"], root, {}, smoke, evidence, {})
+    except OSError as caught:
+        assert caught is failure
+    else:
+        raise AssertionError("lost launch error")
+    receipt = json.loads((evidence / "original-smoke-retention.json").read_text())
+    assert receipt["bindings"]["primary_command"] is None
+    results.append({"case": "launch error leaves native exit unknown", "result": "primary preserved; previous exit excluded"})
+    error = {"pid": 77, "create_time": 3.0}
+    closure = {"pid": 77, "create_time": 3.0, "native_exit": 0, "closure_source": "retained-Popen.poll"}
+    assert driver.reconcile_observations([error], [closure])[0]["resolution"] == "owned-native-exit"
+    for label, closures in [
+        ("PID reuse", [dict(closure, create_time=4.0)]), ("wrong birth", [dict(closure, create_time=2.0)]),
+        ("missing birth", [dict(closure, create_time=None)]), ("null exit", [dict(closure, native_exit=None)]),
+        ("unrelated closure", [dict(closure, pid=78)]), ("duplicate closure", [closure, dict(closure)]),
+        ("parent exit is insufficient", [dict(closure, pid=76)]), ("no nested closure", [])]:
+        assert driver.reconcile_observations([error], closures)[0]["resolution"] == "unresolved"
+        results.append({"case": label, "result": "unresolved"})
+    import threading
+    class Denied(Exception): pass
+    class Gone(Exception): pass
+    class Done:
+        calls = 0
+        def wait(self, delay):
+            self.calls += 1
+            return self.calls > 1
+    class Child:
+        pid = 77
+        def create_time(self): return 3.0
+        def ppid(self): return 76
+        def net_connections(self, **kwargs): raise Denied("synthetic TCP denial")
+    class Root:
+        def children(self, **kwargs): return [Child()]
+    observed = types.SimpleNamespace(done=Done(), psutil=types.SimpleNamespace(Process=Root, AccessDenied=Denied, NoSuchProcess=Gone),
+        commands=[], owned={}, lock=threading.Lock(), listeners=set(), observation_errors=[])
+    driver.NativeCommands.observe(cast(driver.NativeCommands, observed))
+    diagnostic = next(iter(observed.process_diagnostics.values()))
+    assert diagnostic["observed_ppid"] == 76 and diagnostic["native_exit"] is None
+    assert observed.observation_errors[0]["operation"] == "net_connections(kind=tcp)"
+    assert driver.reconcile_observations(observed.observation_errors, [dict(closure, pid=76)])[0]["resolution"] == "unresolved"
+    results.append({"case": "observed parent diagnostic without exit inference", "result": "unresolved TCP error retained"})
+    # The existing boundary group calls the real observe/close methods and still rejects fatal/unknown states.
+    (output / "smoke-diagnostic-probes.json").write_text(json.dumps({"mode": "pure fake commands/files; no runtime/threads/scans/signals",
+        "results": results, "observer_failure_coverage": "prior25 boundary probes retained"}, indent=2) + "\n")
+    return results
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
@@ -570,6 +797,8 @@ def main() -> int:
     checks.append(f"{len(repair_checks)} pure runtime-repair metadata/observer/observation checks passed")
     boundary_checks = boundary_probes(output)
     checks.append(f"{len(boundary_checks)} focused metadata/traversal/observer boundary checks passed")
+    smoke_checks = smoke_diagnostic_probes(output)
+    checks.append(f"{len(smoke_checks)} pure smoke retention/strict closure checks passed")
     command_results = []
     commands = [["sh", "-n", str(root / "scripts/install.sh")],
                 *[["node", "--check", str(path)] for path in paths if path.suffix == ".ts"],

@@ -435,6 +435,9 @@ capture_diagnostics(location: Path, prefix: Path, output: Path) -> dict
 uv_cache_metadata(data: bytes, wheel_ctime_ns: int | None) -> dict
 NativeCommands.observe() -> None
 NativeCommands.close() -> None
+retain_smoke(smoke: Path, evidence: Path, bindings: dict) -> dict
+run_original_smoke(commands, argv: list[str], outside: Path, env: dict,
+                   smoke: Path, evidence: Path, bindings: dict) -> None
 ```
 
 ### 3. Contracts
@@ -491,6 +494,35 @@ unknown, join, cleanup, unresolved-observation and surviving-listener failures.
 A process exit cannot clear a failed observer. These hosted contracts do not
 authorize local installation or change strict local custody.
 
+The original smoke invocation keeps its arguments, required-success rule and
+1800-second deadline. `run_original_smoke` attempts `retain_smoke` in `finally`
+before propagating a native failure, timeout or launch error. Bind retention to
+the actual command record and preparation/source/run/input identities. A launch
+error without a new record leaves the exit unknown; an earlier command's exit
+cannot fill it. Retention errors have separate receipts and stderr, while the
+original native exception remains primary. Incomplete retention also rejects a
+successful smoke.
+
+Retain nested checks, command 19 and text logs beneath uploaded
+`evidence/original-smoke/`. Traverse only owned smoke evidence, runtime homes and
+the specified install-state file, using the component guard and lazy budgets:
+512 combined entries, 10 MiB per file/read and 32 MiB total. Check regular-file
+type and source stat identity around reads. Record source hashes, sizes, modes
+and times separately from sanitized-copy hashes and sizes. Sanitize synthetic
+smoke secrets, collected credential/dotenv/PID/model values and JSON-escaped
+forms. Credentials, database bytes, PID/install state and other runtime files
+provide hash/stat diagnostics only. Missing sources, checks or repeat logs,
+aliases, malformed sanitization context and budget/copy errors leave completion
+false. A failure-time snapshot does not prove preservation across a repeat
+installation, and a later attempt cannot supply an earlier attempt's missing
+logs or establish whether uv executed.
+
+Observed parent PID is diagnostic context only. It supplies no parent birth,
+argv or native exit. The driver does not retain the installed CLI's detached
+server Popen handle; status, stop, disappearance and the outer smoke's exit
+cannot reconcile that descendant's observation. Keep the exact native-closure
+rule until genuine owner receipts exist.
+
 `adapt.py` changes only documented interpreter/template/static/helper/PATH
 loading seams. Exact reversal and original assertion AST/text remain required.
 Helpers contain no source `jev_gateway`; installed Python and guarded listing
@@ -513,6 +545,9 @@ Count call reports and passed calls separately.
 | Metadata traversal/read/byte budget is exceeded | Stop traversal and reject completion; retain owned RECORD and partial evidence |
 | Observer is dead without successful completion, or has fatal/join/cleanup failure | Fail cleanup even if owned command exits are known; persist lifecycle and context |
 | Observation identity is unknown or lacks one exact native closure | Keep the error unresolved and fail cleanup |
+| Original smoke fails, times out or cannot launch | Attempt bounded sanitized retention; preserve its primary exception and actual or unknown exit |
+| Retention has missing evidence, unsafe paths/types, invalid context or budget/copy/receipt error | Mark incomplete; preserve separate diagnostics and reject native success |
+| Observed parent PID, outer command exit or server disappearance lacks a descendant Popen closure | Keep the descendant observation unresolved |
 | Native replacement is deleted or validation fails | Preserve exact credentials, reference maps and file modes; retain the draft behavior assertions |
 | Unexpected skip, phase, identity or replay skip | Fail the business gate; retain native exit and complete phase reports |
 | Preparation/static checks pass | Permit hosted verification only; keep installed acceptance open |
@@ -530,6 +565,12 @@ Good: an installer succeeds but attestation fails, so the receipt retains uv
 exit 0, probe/overall exit 1, raw metadata and no complete origin. Bad: following
 a dist-info directory alias, or accepting a dead observation thread whose
 exception was never recorded.
+
+Good: command 19 fails and its sanitized log, checks and bounded runtime
+diagnostics are retained before the native failure propagates. Base: a successful
+smoke requires complete diagnostics as well as its original assertions. Bad:
+copying nested evidence only after a required command returns successfully, or
+claiming preservation from a single failure-time snapshot.
 
 ### 6. Tests Required
 
@@ -553,6 +594,15 @@ and join failure states with fake objects. Fatal failure must still reject after
 an exact native closure reconciles an ordinary observation. Preserve old admission
 probes and their failures separately from repaired rejection checks.
 
+Exercise the actual retention seam with fake commands and owned synthetic files:
+native success/failure/timeout, launch failure without a new command record,
+missing checks/repeat log, malformed context, escaped secrets, sensitive-file
+exclusion, source/copy modes and hashes, aliases/types and each read budget.
+Copy and receipt-write failures must preserve the same primary exception;
+incomplete retention must fail native success. Parent-exit, PID reuse, missing
+birth, null exit, unrelated and duplicate closure probes stay unresolved. Keep
+initial failed reviewer fixtures separate from corrected passing probes.
+
 ### 7. Wrong vs Correct
 
 Wrong: require 99 total RECORD rows because 99 entries have hashes, or permit
@@ -565,3 +615,7 @@ applying the limit, or equate `thread.is_alive() == False` with successful
 observation. Correct: validate every owned component before reading or descent,
 use bounded lazy traversal, and require explicit successful observer completion
 while retaining fatal failures independently of native process exits.
+
+Wrong: execute a required nested command, then copy its logs after it returns.
+Correct: attempt bounded sanitized retention in `finally`, record retention
+failure separately and propagate the original native exception unchanged.

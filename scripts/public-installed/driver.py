@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -19,6 +20,7 @@ import uuid
 import zipfile
 
 from adapt import prepare
+from provenance import metadata_entries, owned_metadata_path
 
 
 SOURCE = "4d56e438e2f817115e65f9c47519f9adc62d41c1"
@@ -102,6 +104,197 @@ def reconcile_observations(errors: list[dict], closures: list[dict]) -> list[dic
     return results
 
 
+SMOKE_SECRETS = ("fake-smoke-gateway-key", "fake-smoke-provider-key", "fake-smoke-rotated-gateway-key")
+
+
+def retain_smoke(smoke: Path, evidence: Path, bindings: dict) -> dict:
+    """Retain bounded sanitized smoke evidence and owned runtime persistence diagnostics."""
+    target = evidence / "original-smoke"
+    receipt = {"complete": False, "bindings": bindings, "files": [], "errors": [],
+               "missing": [], "limits": {"entries": 512, "file_bytes": 10 * 1024 * 1024, "total_bytes": 32 * 1024 * 1024}}
+    total = 0
+    enumerated = 0
+    operation = "ownership/setup"
+    secrets: set[str] = set(SMOKE_SECRETS)
+    staged = []
+    def tick():
+        nonlocal enumerated
+        enumerated += 1
+        assert enumerated <= 512, "smoke combined enumeration bound"
+    def read(path):
+        nonlocal total
+        assert len(staged) < 512, "smoke diagnostic entry bound"
+        owned_metadata_path(path, smoke.parent)
+        info = path.lstat()
+        assert stat.S_ISREG(info.st_mode), "smoke diagnostic must be a regular file"
+        assert info.st_size <= receipt["limits"]["file_bytes"], "smoke diagnostic file bound"
+        assert total + info.st_size <= receipt["limits"]["total_bytes"], "smoke diagnostic total bound"
+        with path.open("rb") as stream:
+            data = stream.read(receipt["limits"]["file_bytes"] + 1)
+        assert len(data) == info.st_size, "smoke diagnostic changed during read"
+        after = path.lstat()
+        assert (after.st_mode, after.st_size, after.st_ino, after.st_dev, after.st_mtime_ns, after.st_ctime_ns) == (
+            info.st_mode, info.st_size, info.st_ino, info.st_dev, info.st_mtime_ns, info.st_ctime_ns), "smoke diagnostic stat changed during read"
+        total += len(data)
+        entry = {"source": str(path.relative_to(smoke)), "source_mode": oct(info.st_mode & 0o777),
+                 "source_size": len(data), "source_sha256": hashlib.sha256(data).hexdigest(),
+                 "source_mtime_ns": info.st_mtime_ns, "source_ctime_ns": info.st_ctime_ns}
+        receipt["files"].append(entry)
+        return data, entry
+    def collect(path, output, content):
+        data, entry = read(path)
+        staged.append((output, data, entry, content))
+        return data
+    try:
+        owned_metadata_path(evidence, evidence.parent)
+        target.mkdir(mode=0o700)
+        owned_metadata_path(smoke, smoke.parent)
+        # Only runtime home is traversed; tools, interpreters, caches and databases are never opened as databases.
+        with os.scandir(smoke) as children:
+            runs = []
+            for index, child in enumerate(children):
+                tick()
+                assert index < 512, "smoke run enumeration bound"
+                if child.name.startswith("run-"):
+                    assert len(child.name) == 36 and all(c in "0123456789abcdef" for c in child.name[4:]), "unexpected smoke run name"
+                    run = Path(child.path)
+                    owned_metadata_path(run, smoke.parent)
+                    assert run.is_dir(), "smoke run must be a directory"
+                    runs.append(run)
+        if not runs:
+            receipt["missing"].append("owned runtime run directory")
+        operation = "runtime inventory/sanitization context"
+        for run in runs:
+            home = run / "runtime home with spaces"
+            if not home.exists():
+                receipt["missing"].append(str(home.relative_to(smoke)))
+                continue
+            entries = metadata_entries(home, smoke.parent)
+            try:
+                for path in entries:
+                    tick()
+                    if path.is_dir():
+                        continue
+                    relative = str(path.relative_to(home))
+                    text = relative in ("models.json", "models.json.bak") or relative.startswith("logs/")
+                    data = collect(path, Path("runtime") / run.name / relative, text)
+                    if relative in ("credentials.json", "credentials.json.backup"):
+                        doc = json.loads(data)
+                        assert isinstance(doc.get("values"), dict), "invalid runtime credential document"
+                        assert all(isinstance(value, str) for value in doc["values"].values()), "invalid runtime credential values"
+                        secrets.update(value for value in doc["values"].values() if value)
+                    elif relative in (".env", ".env.backup"):
+                        for line in data.decode().splitlines():
+                            if line.strip() and not line.lstrip().startswith("#") and "=" in line:
+                                value = line.split("=", 1)[1].strip().strip("\"'")
+                                if value:
+                                    secrets.add(value)
+                    elif relative == "run/gateway.pid":
+                        token = json.loads(data).get("token")
+                        if isinstance(token, str) and token:
+                            secrets.add(token)
+                    elif relative in ("models.json", "models.json.bak"):
+                        pending = [json.loads(data)]
+                        visited = 0
+                        while pending:
+                            node = pending.pop()
+                            visited += 1
+                            assert visited <= 4096, "runtime JSON diagnostic object bound"
+                            if isinstance(node, dict):
+                                for key, value in node.items():
+                                    if isinstance(value, str) and value and (key.lower() in {
+                                        "api_key", "secret", "password", "token", "authorization",
+                                        "access_key_id", "secret_access_key", "session_token"}):
+                                        secrets.add(value)
+                                    elif isinstance(value, (dict, list)):
+                                        assert len(pending) < 4096, "runtime JSON pending object bound"
+                                        pending.append(value)
+                            elif isinstance(node, list):
+                                assert len(pending) + len(node) <= 4096, "runtime JSON pending object bound"
+                                pending.extend(node)
+            finally:
+                entries.close()
+            install_state = run / "state/jev-gateway/install.json"
+            tick()
+            if install_state.exists() or install_state.is_symlink():
+                collect(install_state, Path("runtime") / run.name / "install-state.json", False)
+            else:
+                receipt["files"].append({"source": str(install_state.relative_to(smoke)), "disposition": "absent-at-snapshot"})
+        source_evidence = smoke / "evidence"
+        operation = "original evidence inventory"
+        owned_metadata_path(source_evidence, smoke.parent)
+        entries = metadata_entries(source_evidence, smoke.parent)
+        try:
+            for path in entries:
+                tick()
+                if path.is_dir():
+                    continue
+                collect(path, path.relative_to(source_evidence), True)
+        finally:
+            entries.close()
+        for name in ("checks.json", "19-command.log"):
+            if not any(str(output) == name for output, *_ in staged):
+                receipt["missing"].append("evidence/" + name)
+        assert len(secrets) <= 1024 and sum(len(value) for value in secrets) <= 1024 * 1024, "smoke sanitization context bound"
+        replacements = sorted(secrets | {json.dumps(value, ensure_ascii=True)[1:-1] for value in secrets}, key=len, reverse=True)
+        operation = "sanitized evidence/runtime copy"
+        for output, data, entry, content in staged:
+            entry["disposition"] = "metadata-only"
+            if content:
+                text = data.decode("utf-8")
+                for value in replacements:
+                    text = text.replace(value, "[redacted]")
+                saved = text.encode()
+                dest = target / output
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                owned_metadata_path(dest.parent, evidence.parent)
+                with dest.open("xb") as stream:
+                    stream.write(saved)
+                dest.chmod(int(entry["source_mode"], 8))
+                entry.update(disposition="sanitized-text", retained_path=str(dest.relative_to(evidence)),
+                             retained_size=len(saved), retained_sha256=hashlib.sha256(saved).hexdigest())
+        receipt["complete"] = not receipt["missing"]
+    except Exception as error:
+        # Do not serialize arbitrary source text in an error message.
+        receipt["errors"].append({"type": type(error).__name__, "operation": operation,
+            "errno": error.errno if isinstance(error, OSError) else None,
+            "bound_detail": error.args[0] if isinstance(error, AssertionError) and len(error.args) == 1
+                and isinstance(error.args[0], str) else None})
+    receipt["read_bytes"] = total
+    receipt["enumerated_entries"] = enumerated
+    (evidence / "original-smoke-retention.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return receipt
+
+
+def run_original_smoke(commands, argv: list[str], outside: Path, env: dict, smoke: Path, evidence: Path, bindings: dict) -> None:
+    """Keep native failure/timeout primary while attempting retention on every outcome."""
+    start = len(commands.commands)
+    primary = None
+    try:
+        commands.run(argv, outside, env, "original-public-installer-smoke", timeout=1800)
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        records = commands.commands[start:]
+        binding = dict(bindings, primary_command=records[-1] if len(records) == 1 else None,
+                       primary_failure_type=None if primary is None else type(primary).__name__)
+        try:
+            receipt = retain_smoke(smoke, evidence, binding)
+            if not receipt["complete"]:
+                raise RuntimeError("original smoke diagnostics incomplete; see original-smoke-retention.json")
+        except Exception as retention_error:
+            # A native failure keeps its original exception and exact retained command record.
+            print("original smoke retention error: " + type(retention_error).__name__, file=sys.stderr)
+            try:
+                (evidence / "original-smoke-retention-error.json").write_text(json.dumps({
+                    "complete": False, "bindings": binding, "retention_error_type": type(retention_error).__name__}) + "\n")
+            except Exception as persistence_error:
+                print("original smoke retention error receipt unavailable: " + type(persistence_error).__name__, file=sys.stderr)
+            if primary is None:
+                raise
+
+
 class NativeCommands:
     """Record native exits and clean only processes with retained PID identities."""
 
@@ -114,6 +307,7 @@ class NativeCommands:
         self.owned: dict[int, float] = {}
         self.listeners: set[int] = set()
         self.observation_errors: list[dict] = []
+        self.process_diagnostics: dict = {}
         self.observer_state = {"started": False, "completed": False, "failed": False, "failure": None}
         self.lock = threading.Lock()
         self.done = threading.Event()
@@ -152,6 +346,18 @@ class NativeCommands:
                         identity = process.create_time()
                         with self.lock:
                             self.owned[pid] = identity
+                        operation = "diagnostic.ppid"
+                        parent = getattr(process, "ppid", None)
+                        parent_pid = parent() if parent is not None else None
+                        diagnostics = getattr(self, "process_diagnostics", {})
+                        key = f"{pid}:{identity}"
+                        if key in diagnostics or len(diagnostics) < 512:
+                            diagnostics[key] = {"pid": pid, "create_time": identity, "observed_ppid": parent_pid,
+                                                "observed_at_monotonic": time.monotonic(), "native_exit": None,
+                                                "scope": "observed parent PID only; no argv/parent identity/native closure inference"}
+                        else:
+                            self.process_diagnostics_truncated = True
+                        self.process_diagnostics = diagnostics
                         operation = "net_connections(kind=tcp)"
                         for connection in process.net_connections(kind="tcp"):
                             if connection.status == "LISTEN" and connection.laddr.ip in ("127.0.0.1", "::1"):
@@ -320,6 +526,8 @@ class NativeCommands:
         (self.evidence / "owned-processes.json").write_text(json.dumps({"pid_create_time": self.owned,
             "observation_errors": self.observation_errors, "observation_reconciliation": reconciliation,
             "observer_state": observer_state, "observer_join_error": join_error, "observer_thread_alive": thread_alive,
+            "process_diagnostics": list(getattr(self, "process_diagnostics", {}).values()),
+            "process_diagnostics_truncated": getattr(self, "process_diagnostics_truncated", False),
             "native_closures": closures, "cleanup_error": None if cleanup_error is None else {
                 "type": type(cleanup_error).__name__, "message": str(cleanup_error)},
             "sampling_interval_seconds": 0.1}, indent=2) + "\n")
@@ -512,10 +720,12 @@ def main() -> int:
         package = Path(json.loads(origins[0].read_text())["module_origin"]).parent
         helper = work / "test-helper"
         scope = prepare(source, helper, package, python, evidence)
-        commands.run([sys.executable, str(helper / "smoke.py"), "--wheel", str(wheel), "--version", "0.1.3", "--installer", str(files / "install.sh"), "--work-dir", str(work / "original smoke")], outside, env, "original-public-installer-smoke", timeout=1800)
-        smoke = json.loads((work / "original smoke/evidence/checks.json").read_text())
+        run_original_smoke(commands, [sys.executable, str(helper / "smoke.py"), "--wheel", str(wheel), "--version", "0.1.3", "--installer", str(files / "install.sh"), "--work-dir", str(work / "original smoke")], outside, env, work / "original smoke", evidence,
+                           {"source": SOURCE, "tag": "v0.1.3", "producer_run": RUN, "preparation_head": preparation_head,
+                            "wheel_sha256": ASSETS[wheel.name][2], "installer_sha256": ASSETS["install.sh"][2],
+                            "hosted_run": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT")})
+        smoke = json.loads((evidence / "original-smoke/checks.json").read_text())
         check(smoke["success"] and smoke["installer_sha256"] == ASSETS["install.sh"][2], "original public installer smoke native success")
-        shutil.copytree(work / "original smoke/evidence", evidence / "original-smoke")
         check(len(list(evidence.glob("install-*-origin.json"))) == 4, "initial and all three original smoke installations attest full parity")
         commands.run([real_uv, "pip", "install", "--python", str(python), "pytest==9.1.1"], outside, env, "installed-test-dependency")
         commands.run([str(python), "-I", str(Path(__file__).with_name("provenance.py")), "--wheel", str(wheel), "--prefix", str(prefix),

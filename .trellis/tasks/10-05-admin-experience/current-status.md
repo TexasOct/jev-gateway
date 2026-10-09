@@ -8,7 +8,11 @@
 
 后续边界修正已独立准入，原上下文 `1ab897b8` 返回 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION，见[完整报告](../../.runtime/admin-experience/final-release-20261009/public-runtime-boundary-admitted-20261009/independent-admission.md)。父级核对 1622 项文件/符号链接绑定，六个最终改动和规范已原样整合并签名提交 `1078f8b`，远端核对一致。两个阻断问题及枚举限制关闭于准备范围；原失败、旧复现脚本 exit 1 和各批静态/独立纯数据结果保留。
 
-[新运行 37995710573](https://github.com/TexasOct/jev-gateway/actions/runs/37995710573) attempt 1 已启动，准备 SHA `1078f8bd95208b50f901d10335c535385824d3ae`；产品 `4d56e43`、签名标签及公开 wheel 保持原输入。原独立验收上下文接续监测和实际证据检查。派发 native 0、精确运行查询通过；初次列表未找到运行后的父级 AssertionError 原样保留，无重复派发。见[提交/派发回执](../../.runtime/admin-experience/final-release-20261009/public-runtime-helper-commit-20261009/dispatch-reconciliation.md)。实际安装、完整业务和 RL1 仍 OPEN，上段初次 REWORK 为修正前记录。
+[运行 37995710573](https://github.com/TexasOct/jev-gateway/actions/runs/37995710573) attempt 1、准备 SHA `1078f8bd95208b50f901d10335c535385824d3ae` 已结束，两平台首次重复安装均 native 1、无超时。原验收上下文 `2d8ef1ad` 返回 REWORK，见[完整报告与证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-second-failure-37995710573-20261009/independent-rework.md)。每平台两次初始安装的完整来源检查通过，但失败重装的详细日志和输入回执缺失，原因仍未知。已确认驱动在复制嵌套 smoke 证据前抛出异常；Ubuntu PID `2802`、`2817` 的 TCP 观察缺少匹配的原生退出记录，清理仍失败。父级保存并核对全部 179 项证据，原实现上下文接续修复失败留证和嵌套命令记录，随后由原验收上下文复核；编排 `c116c516-c16f-4457-9a6c-81ff35001106`。产品 `4d56e43`、签名标签、公开 wheel 和生产运行 `37967881650` 保持原输入。此前[派发/查询回执](../../.runtime/admin-experience/final-release-20261009/public-runtime-helper-commit-20261009/dispatch-reconciliation.md)及两个实际失败运行保留；后续安装来源、完整业务、重装和 RL1 仍 OPEN。
+
+失败留证修正已独立准入，原上下文 `d4790ebe` 返回 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION，见[完整报告](../../.runtime/admin-experience/final-release-20261009/public-smoke-diagnostics-admitted-20261009/independent-admission.md)。三文件改动/十二文件不变，父级核对 824 项独立及 1496 项实现证据；原生失败、超时与留证错误分别保留。新增 24 个纯数据检查和独立 17 个探针保持诊断范围。未补得真实后代退出证明，未知重装原因及两次实际失败保留；下一步提交诊断改动，用原公开制品执行新托管检查，完整安装业务及 RL1 仍 OPEN。
+
+类型声明修正已由原独立上下文 `16149c1c` 准入，见[完整报告](../../.runtime/admin-experience/final-release-20261009/public-smoke-types-admitted-20261009/independent-admission.md)。父级核对 699 项独立及 305 项实现证据，整合两个文件的声明改动；另外十三个文件保持原字节。新 LSP 复查消除三处新增错误，保留 `static_check.py` 的十五处既有夹具诊断，不声明整文件类型通过。最终候选继续静态检查、限定提交及新托管诊断；历史重装原因和后代退出记录仍未知，安装验收及 RL1 仍 OPEN。
 
 此前完整 15 文件的 PREPARATION_REVIEWED_FOR_HOSTED_EXECUTION、六项准备缺陷关闭、33 个静态负向探针及两套类型检查检查仍为准备范围，见[独立准入报告](../../.runtime/admin-experience/final-release-20261009/public-preparation-admitted-20261009/independent-admission.md)。本次实际 uv 布局和清理问题尚未关闭；既有引用、读取、HTTP/2、阶段模型、ContextMode I/O 等失败保留。本机严格监督缺口、未实现的 `.pth` 方案及历史 UNRUN 保持，操作员安装未改动。以下为既有预检和历史快照。
 
