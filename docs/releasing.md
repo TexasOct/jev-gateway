@@ -23,8 +23,17 @@ wheels include those assets and do not need Node.js. Docker builds its own
 frontend in a Node stage before creating the wheel.
 
 For release validation, use Python 3.12+, uv, and Node.js with npm.
-The workflow uses Python 3.12 and Node.js 22. From a fresh
-checkout, run:
+The release and 0.1.3 preflight build jobs use Python 3.12, Node.js 22.23.3
+and npm 11.16.0. Each ephemeral hosted build runner installs that exact npm
+version before the first frontend install, reports both versions and rejects
+a version mismatch. The same npm executable remains on PATH for subsequent
+build helpers and pytest subprocesses. npm 10.9.9 can omit native dependency
+`libc` metadata when serializing the lock; npm 11.16.0 retains it. Frontend
+installation still uses `npm install` for platform bindings. The preflight's
+lock and tracked-diff checks remain required; toolchain pinning does not waive
+installation drift. Docker retains its independent Node 24 Alpine build.
+This hosted setup does not instruct an operator installation upgrade.
+From a fresh checkout, run:
 
 ```sh
 git clone https://github.com/TexasOct/jev-gateway.git
@@ -110,8 +119,9 @@ reinstall behavior, configuration preservation and uninstall preservation.
 2. Set `project.version` in `pyproject.toml`, complete the local checks above,
    and review the release commit before creating and pushing its matching tag.
    Pushing that tag starts publication.
-3. The workflow checks out the tag, installs Python 3.12 and Node.js 22, and
-   validates the tag/version match. It installs frontend dependencies, runs
+3. The workflow checks out the tag, installs Python 3.12 and Node.js 22.23.3,
+   sets up npm 11.16.0 on the ephemeral build runner and validates the
+   tag/version match. It installs frontend dependencies, runs
    frontend lint/tests, builds the dashboard, and checks freshness before the
    Python tests, Pyright, and `uv build --out-dir dist`. The validator creates
    the stamped installer and both sidecars after checking the wheel.
