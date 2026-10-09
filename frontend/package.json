@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run src",
-    "test:browser": "npm run build && tsc -p tests/tsconfig.json && playwright test -c playwright.config.ts"
+    "test:browser": "npm run build && tsc -p tests/tsconfig.json && sh -c 'playwright test -c playwright.config.ts; preview_status=$?; playwright test -c tests/browser/supplier-cloud.config.ts; cloud_status=$?; test \"$preview_status\" -eq 0 && test \"$cloud_status\" -eq 0'"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

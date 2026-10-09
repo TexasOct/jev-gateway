@@ -12,6 +12,7 @@ const origin = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./tests/browser",
   testMatch: "**/*.spec.ts",
+  testIgnore: "**/supplier-cloud.spec.ts",
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,

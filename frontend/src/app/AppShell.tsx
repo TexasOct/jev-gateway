@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { WorkspaceActivity } from "@/shared/navigation/workspace-activity";
+import { ApiError } from "@/shared/api/client";
 import { RefreshCw } from "lucide-react";
 import type { ConfigurationPayload, SetupStatus } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
@@ -147,14 +148,36 @@ export function AppShell({
   // A failed initial configuration read leaves the strategy view with no workspace.
   // The read retry is owned here so the shell can re-admit it through the existing owner path.
   const [configurationRetryPending, setConfigurationRetryPending] = useState(false);
+  const retryActivity = useRef(0);
+  const retryOperation = useRef(0);
+  const retryBusy = useRef(false);
+  useLayoutEffect(() => {
+    const generation = ++retryActivity.current;
+    retryBusy.current = false;
+    void Promise.resolve().then(() => {
+      if (generation === retryActivity.current) setConfigurationRetryPending(false);
+    });
+    return () => { retryActivity.current = generation + 1; };
+  }, [needsKey, view]);
   const retryConfigurationRead = () => {
-    if (configurationRetryPending) return;
+    if (needsKey || view !== "strategy" || retryBusy.current) return;
+    const generation = retryActivity.current;
+    const owner = ++retryOperation.current;
+    const current = () => generation === retryActivity.current && owner === retryOperation.current;
+    retryBusy.current = true;
     setConfigurationRetryPending(true);
     onError(null);
-    // Shell-level retry has no competing editor operation, so the admit predicate is always true.
-    void onReloadConfiguration(() => true)
-      .catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
-      .finally(() => setConfigurationRetryPending(false));
+    void onReloadConfiguration(current)
+      .catch((caught) => {
+        if (!current()) return;
+        if (caught instanceof ApiError && caught.status === 401) onUnauthorized?.();
+        else onError(caught instanceof Error ? caught.message : String(caught));
+      })
+      .finally(() => {
+        if (!current()) return;
+        retryBusy.current = false;
+        setConfigurationRetryPending(false);
+      });
   };
   useEffect(() => {
     // A native disabled submit/probe button may blur before its 401 arrives.

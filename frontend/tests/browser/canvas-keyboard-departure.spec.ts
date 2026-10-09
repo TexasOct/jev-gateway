@@ -9,9 +9,20 @@ async function tabTo(page: Page, target: Locator) {
   await expect(target).toBeEnabled();
   const reverse = await target.evaluate(el => document.activeElement !== document.body && !!(el.compareDocumentPosition(document.activeElement!) & Node.DOCUMENT_POSITION_FOLLOWING));
   for (let count = 0; count < 180; count++) {
+    // Native focus scrolling can admit a debounced layout PUT and disable navigation.
+    // Observe its completion in the browser before running the enabled assertion.
+    const focused = await target.evaluate(async el => {
+      const started = performance.now();
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      while (el.matches(":disabled")) {
+        if (performance.now() - started >= 5_000) throw new Error("Tab traversal target stayed disabled");
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      }
+      if (!el.isConnected) throw new Error("Tab traversal target was detached");
+      return el === document.activeElement;
+    });
     await expect(target).toBeEnabled();
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    if (await target.evaluate(el => el === document.activeElement)) break;
+    if (focused) break;
     await page.keyboard.press(reverse ? "Shift+Tab" : "Tab");
   }
   await expect(target).toBeFocused();

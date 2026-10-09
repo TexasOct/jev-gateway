@@ -57,12 +57,14 @@ export default function App() {
     stopRoutingActivity(true);
   }, [stopRoutingActivity]);
   const run = useCallback(
-    async (work: () => Promise<void>) => {
+    async (work: () => Promise<void>, current: () => boolean = () => true) => {
       try {
         await work();
+        if (!current()) return;
         setError(null);
         setConnectionErrorKey(null);
       } catch (caught) {
+        if (!current()) return;
         if (caught instanceof ApiError && caught.status === 401) {
           onUnauthorized();
           setError(t("authRequired"));
@@ -160,7 +162,7 @@ export default function App() {
       } catch (caught) {
         if (current()) throw caught;
       }
-    });
+    }, current);
   }, [loadMonitoring, loadSetup, run]);
   const refreshProviderCatalog = useCallback(async () => {
     await loadConfiguration();

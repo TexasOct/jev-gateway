@@ -4,6 +4,9 @@ import { installProviderFixture, providerFixture } from "../fixtures/provider-ma
 import type { ProviderFixtureState } from "../fixtures/provider-management";
 import type { MetadataItem } from "../../src/shared/api/types";
 import type { Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import sources from "../../src/features/providers/assets/sources.json" with { type: "json" };
+import { en } from "../../src/shared/i18n/en";
 
 function fixture(): ProviderFixtureState { return { configuration: providerFixture(), writes: [], validations: [], selectors: [] }; }
 async function open(page: Page) {
@@ -466,7 +469,14 @@ test("verified DeepSeek artwork loads locally, preserves proportions and retains
   expect(geometry.width / geometry.height).toBeCloseTo(geometry.ratio, 1);
   expect(new URL(geometry.src).pathname).toMatch(/^\/dashboard\/assets\/deepseek.*\.svg$/);
   await page.getByText("Supplier artwork and attribution", { exact: true }).click();
-  await expect(page.getByText("Copyright (c) 2023 DeepSeek", { exact: false })).toBeVisible();
+  const credits = page.locator("details").filter({ has: page.getByText(en.pmAssetSources, { exact: true }) });
+  await expect(credits.getByText(en.pmAssetUsage, { exact: true })).toBeVisible();
+  await expect(credits.locator("pre")).toHaveText(readFileSync(new URL("../../src/features/providers/assets/LICENSE-lobe-icons.txt", import.meta.url), "utf8"));
+  await expect(credits.getByRole("link", { name: en.pmAssetCollection, exact: true })).toHaveAttribute("href", sources.collection.source);
+  await expect(credits.getByRole("link", { name: "MIT", exact: true })).toHaveAttribute("href", sources.collection.license_source);
+  const deepseek = credits.locator("li").filter({ hasText: /^DeepSeek:/ });
+  await expect(deepseek.getByRole("link", { name: en.pmAssetOriginal, exact: true })).toHaveAttribute("href", sources.collection.asset_source_prefix + sources.icons.deepseek.original_file);
+  await expect(deepseek.getByRole("link", { name: en.pmAssetReference, exact: true })).toHaveAttribute("href", sources.icons.deepseek.official_reference);
 });
 
 test("metadata retry remains a metadata operation and batch values need an explicit null decision", async ({ page, context }) => {
