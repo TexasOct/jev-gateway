@@ -2,6 +2,10 @@
 
 ## Current delivery status
 
+第四次实际运行 `38032903813` attempt 1 经 fresh reviewer `d7e8a9db` 完整复核为 REWORK，见[报告](../../.runtime/admin-experience/final-release-20261009/public-runtime-fourth-failure-38032903813-20261010/independent-rework.md)。父级保存并核对 361 个证据文件、28,977,409 字节、模式及无祖先链接，完整报告 18,879 字节/SHA `8708dc23131708c0443ca3327c096edc21742a3661e9eecbcdc63913d19ee25e`。两平台原 smoke/重复安装、四个安装来源及依赖后来源、首轮后端 3104 通过调用/两项条件 skip、原浏览器类型检查通过；不能代替尚未运行的第五来源、646 应用/24 补充、补充类型、真实捕获及同 ID 无 skip 重放。命令 026 浏览器收集因 `provider-presets.spec.ts` 未适配安装解释器而失败，Ubuntu 七条 TCP 观察另缺原生闭合回执；macOS 仅已达部分清理通过。具体来源及历史范围分开，安装/RL1 OPEN。
+
+原 writer 无可恢复句柄/确切路径，明确 fresh 实现后继在原协议/私有工作树下修复实际加载缺口并追溯真实拥有者；复核接续 `d7e8a9db`，编排 `276fcc2c-e04b-4c45-90c7-de0b0f779c11`。真实拥有者回执不可得时保留阻塞；不改公开产品，不删观察/弱化门禁，不凭端口消失或外层退出填原生证明。独立准备复核前不再托管执行。
+
 用户明确要求本机安装最新版后，父级使用校验过的公开安装器完成 `0.1.2 → 0.1.3` 普通操作员升级，native 0。恢复 wheel 与旧安装产品一致，工具环境/配置/凭据/一致 SQLite 备份已保存；目标基础/覆盖配置通过，安装后 94 个产品文件、42 个静态资源及五个元数据文件与公开 wheel 逐字节一致，八个原运行文件字节/模式及 SQLite 完整性/表计数保留。入口恢复，原停止状态保留，见[具体验证](../../.runtime/admin-experience/operator-install-013-i0kao5bp/installation-verified.json)。本机成功不替代完整两平台生命周期/业务/重放验收，也不关闭原严格监督/封存历史。
 
 headless 修正签名提交 `36eed501057109203347c878b9036a9a9321cab5` 已在环境账户/TLS 恢复后重新核对并推送，原失败回执保留。[新运行 38032903813](https://github.com/TexasOct/jev-gateway/actions/runs/38032903813) attempt 1 的准备 SHA 是 `36eed50`，固定产品/标签/公开 wheel/生产运行保持。原句柄及确切目录被清理，编排 `155e96dd` 在持久化子会话前失败，未形成验收结果；父级保存失败和两份状态补丁，并以原角色/模型/工具/工作树协议启动明确标注的 fresh 后继 `e94de196-a1e9-4d18-9d55-e2e63ab3f723`，不重复派发。见[恢复记录](../../.runtime/admin-experience/final-release-20261009/public-headless-installer-tools-commit-20261009/fourth-context-recovery.md)。完整安装验收及 RL1 仍 OPEN，三个早期实际失败及未知/退出缺证保持各自原范围。
