@@ -16,12 +16,15 @@ function manager() {
   return { configuration, pending: false, loading: false, error: null, navigationGuardRef: { current: null } } as ProviderManagement;
 }
 describe("supplier workspace ownership", () => {
-  it("embeds configured models and disclosed discovery under their supplier", () => {
+  it("shows only the supplier summary and editing entries in the list", () => {
     const html = renderToStaticMarkup(<ProviderView manager={manager()} t={(key) => en[key]} />);
     expect(html).toContain("Supplier connections");
     expect(html).toContain("Configured models: 0");
-    expect(html).toContain("Discover and import models");
-    expect(html).toContain("Fetch upstream models");
+    expect(html).not.toContain("Discover and import models");
+    expect(html).not.toContain("Fetch upstream models");
+    expect(html).not.toContain("Search configured models");
+    expect(html).not.toContain("data-provider-models");
+    expect(html).toContain('data-provider-edit="fixture"');
     expect(html).not.toContain("Gateway access key");
     expect(html).not.toContain("FIXTURE_GATEWAY_KEY");
     expect(html).not.toContain("FIXTURE_KEY");

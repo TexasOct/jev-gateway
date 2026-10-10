@@ -12,6 +12,16 @@ export async function openProviderModels(page: Page, providerId: string, { local
   const suppliers = page.locator("[data-dashboard-view-nav]").getByRole("button", { name: locale === "en" ? "Suppliers" : "供应商", exact: true });
   if (await suppliers.getAttribute("aria-pressed") !== "true") await suppliers.click();
   const group = providerModelGroup(page, providerId);
+  if (!await group.isVisible()) {
+    const current = page.locator(`[data-provider-editor=${JSON.stringify(providerId)}]`);
+    if (!await current.isVisible()) {
+      if (await page.locator("[data-provider-editor]").isVisible()) {
+        await page.getByRole("button", { name: locale === "en" ? "Cancel" : "取消", exact: true }).first().click();
+      }
+      await page.locator(`[data-provider-edit=${JSON.stringify(providerId)}][data-provider-kind="llm"]`).click();
+    }
+    await page.getByRole("button", { name: locale === "en" ? "Model settings" : "模型配置", exact: true }).click();
+  }
   await expect(group).toBeVisible();
   if (importModels) {
     const summary = group.locator("summary").filter({ hasText: locale === "en" ? /^Discover and import models$/ : /^发现与导入模型$/ });

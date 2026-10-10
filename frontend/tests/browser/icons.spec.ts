@@ -64,7 +64,7 @@ for (const { width, locale, font } of scenarios) {
       const toolbar = page.getByRole("toolbar", { name: words.canvasTools });
       const tool = (name: string) => toolbar.getByRole("button", { name, exact: true });
       for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasZoomOut, words.canvasZoomIn,
-        words.canvasPanLeft, words.canvasPanRight, words.canvasPanUp, words.canvasPanDown]) {
+        words.canvasLayoutTools]) {
         const button = tool(name);
         await expectDecorativeIcon(button, name);
         await expect(button).toHaveCSS("width", "40px");
@@ -90,14 +90,15 @@ for (const { width, locale, font } of scenarios) {
       await expect(toolbar.locator("output")).toHaveText("100%");
       const canvas = page.locator(".routing-canvas-scroll");
       for (const [forward, backward, axis] of [
-        [words.canvasPanRight, words.canvasPanLeft, "scrollLeft"],
-        [words.canvasPanDown, words.canvasPanUp, "scrollTop"],
+        ["ArrowRight", "ArrowLeft", "scrollLeft"],
+        ["ArrowDown", "ArrowUp", "scrollTop"],
       ] as const) {
+        await canvas.focus();
         const before = await canvas.evaluate((element, key) => element[key], axis);
-        await tool(forward).click();
+        await page.keyboard.press(forward);
         await expect.poll(() => canvas.evaluate((element, key) => element[key], axis)).toBeGreaterThan(before);
         const after = await canvas.evaluate((element, key) => element[key], axis);
-        await tool(backward).click();
+        await page.keyboard.press(backward);
         await expect.poll(() => canvas.evaluate((element, key) => element[key], axis)).toBeLessThan(after);
       }
 

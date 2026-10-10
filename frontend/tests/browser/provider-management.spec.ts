@@ -189,13 +189,13 @@ for (const edit of ["action", "password"] as const) {
     await dialog.getByLabel("Input price (USD / million tokens)").fill("9");
     await savePreview(page);
     page.once("dialog", (prompt) => prompt.dismiss());
-    await page.locator('[data-provider-edit="fixture"][data-provider-kind="llm"]').click();
+    await page.getByRole("button", { name: "Connection settings", exact: true }).click();
     await expect(page.getByText("1 / 1 selected / visible unconfigured", { exact: true })).toBeVisible();
     const retained = await editModel(page);
     await expect(retained.getByLabel("Input price (USD / million tokens)")).toHaveValue("9");
     await discardModel(page);
     page.once("dialog", (prompt) => prompt.accept());
-    await page.locator('[data-provider-edit="fixture"][data-provider-kind="llm"]').click();
+    await page.getByRole("button", { name: "Connection settings", exact: true }).click();
     await page.getByLabel("Credential action").selectOption("set");
     await page.getByLabel("New provider credential", { exact: true }).fill("synthetic-original");
     await page.getByRole("button", { name: "Test connection", exact: true }).click();
@@ -320,7 +320,8 @@ test("provider editing preserves ID, clears secrets, and sends the shared contra
   await page.getByLabel("New provider credential", { exact: true }).fill("synthetic-provider-secret");
   await expect(page.getByLabel("Allow discovery on private networks", { exact: true })).not.toBeChecked();
   await page.getByRole("button", { name: "Validate and save" }).click();
-  await expect(page.getByRole("heading", { name: "Renamed instance" })).toBeVisible();
+  await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Renamed instance", exact: true })).toBeVisible();
   expect(state.writes[0]!.operations[0]).toMatchObject({ action: "upsert", kind: "llm", provider: { id: "fixture", display_name: "Renamed instance", allow_private_network: false }, credential: { action: "set", value: "synthetic-provider-secret" } });
   for (const field of ["has_api_key", "params", "param_env"]) expect(state.writes[0]!.operations[0]).not.toHaveProperty(`provider.${field}`);
   expect(state.validations[0]).toEqual(state.writes[0]);

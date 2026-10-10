@@ -41,7 +41,7 @@ test("top-level view buttons stay compact on desktop and usable on mobile", asyn
 });
 
 for (const width of [320, 390, 1280, 1920, 2560]) {
-  test(`view containers remain centered and bounded at ${width}px`, async ({ page, mockApi }, testInfo) => {
+  test(`strategy fills the page while other view containers remain bounded at ${width}px`, async ({ page, mockApi }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await openDashboard(page);
     for (const locale of ["en", "zh-CN"] as const) {
@@ -54,7 +54,8 @@ for (const width of [320, 390, 1280, 1920, 2560]) {
         for (const view of [
           { name: words.monitoring, selector: ".monitoring-view", maxWidth: 1280 },
           { name: words.providerModels, selector: '.app-shell[data-view="providers"] main > section', maxWidth: 768 },
-          { name: words.strategyEditor, selector: ".workflow-workspace", maxWidth: 1440 },
+          { name: words.settings, selector: '.app-shell[data-view="settings"] main > section', maxWidth: 768 },
+          { name: words.strategyEditor, selector: ".workflow-workspace", maxWidth: width },
         ]) {
           await page.getByRole("button", { name: view.name, exact: true }).click();
           const container = page.locator(view.selector);
@@ -70,8 +71,21 @@ for (const width of [320, 390, 1280, 1920, 2560]) {
             const canvas = page.locator(".routing-canvas-scroll");
             const canvasBox = await canvas.boundingBox();
             if (!canvasBox) throw new Error("Routing canvas has no measurable bounds");
+            const headerBox = await page.locator(".app-header").boundingBox();
+            if (!headerBox) throw new Error("Dashboard header has no measurable bounds");
+            expect(Math.abs(canvasBox.x)).toBeLessThanOrEqual(2);
+            expect(Math.abs(canvasBox.width - width)).toBeLessThanOrEqual(2);
+            expect(Math.abs(canvasBox.y - headerBox.y - headerBox.height)).toBeLessThanOrEqual(2);
             expect(canvasBox.height).toBeGreaterThan(300);
-            expect(canvasBox.y + canvasBox.height).toBeLessThanOrEqual(902);
+            expect(Math.abs(canvasBox.y + canvasBox.height - 900)).toBeLessThanOrEqual(2);
+            const information = page.getByRole("button", { name: words.canvasInformation, exact: true });
+            await information.click();
+            await expect(page.locator(".workflow-info")).toBeVisible();
+            const expandedBox = await canvas.boundingBox();
+            expect(expandedBox).toEqual(canvasBox);
+            await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+            await information.click();
+            await expect(page.locator(".workflow-info")).toBeHidden();
             if (width >= 1920) {
               const node = canvas.locator('[data-canvas-node="questions"]');
               await node.focus();

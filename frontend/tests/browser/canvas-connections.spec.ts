@@ -228,9 +228,11 @@ test("aligns a selected group and restores its layout without policy writes", as
   setupCatalog(mockApi); mockApi.canvasLayout!.nodes["rule-0"]!.y = 320; await open(page);
   const first = page.locator('[data-canvas-node="questions"]'), second = page.locator('[data-canvas-node="rule-0"]');
   await first.focus(); await first.press("Shift+Enter"); await second.focus(); await second.press("Shift+Enter");
-  await page.getByRole("button", { name: "Align left", exact: true }).click();
+  await page.getByRole("button", { name: "Layout tools", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Align left", exact: true }).click();
   await expect.poll(() => mockApi.canvasLayout?.nodes["rule-0"]?.x).toBe(50);
-  await page.getByRole("button", { name: "Align top", exact: true }).click();
+  await page.getByRole("button", { name: "Layout tools", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Align top", exact: true }).click();
   await expect.poll(() => mockApi.canvasLayout?.nodes["rule-0"]?.y).toBe(80);
   await page.reload();
   await page.getByRole("button", { name: "Strategy workflow", exact: true }).click();
@@ -312,7 +314,8 @@ test("rejects an oversized arrange-all operation visibly without a layout or pol
   mockApi.canvasLayout = { version: 1, nodes: {}, viewport: { x: 0, y: 0 } };
   await open(page);
   const writes = mockApi.requests.filter(({ method }) => method === "PUT").length;
-  await page.getByRole("button", { name: "Arrange all", exact: true }).click();
+  await page.getByRole("button", { name: "Layout tools", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Arrange all", exact: true }).click();
   await expect(page.getByText("Cannot save this arrangement: layout supports 256 nodes, coordinates within 10000 and at most 65536 encoded bytes.", { exact: false })).toBeVisible();
   expect(mockApi.requests.filter(({ method }) => method === "PUT")).toHaveLength(writes);
 });

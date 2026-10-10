@@ -62,7 +62,7 @@ describe("full canvas editor structure", () => {
     const earlier = words.moveRuleEarlier.replace("{index}", "1");
     const later = words.moveRuleLater.replace("{index}", "1");
     for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasAddNode, words.canvasZoomOut, words.canvasZoomIn,
-      words.canvasPanLeft, words.canvasPanRight, words.canvasPanUp, words.canvasPanDown, grip, earlier, later]) {
+      words.canvasLayoutTools, grip, earlier, later]) {
       const button = named(name);
       expect(button).toBeDefined();
       const svg = button.match(/<svg\b[^>]*>.*?<\/svg>/)![0];
@@ -71,6 +71,10 @@ describe("full canvas editor structure", () => {
       expect(svg).toContain('stroke="currentColor"');
       expect(svg).not.toMatch(/<title|aria-label|tabindex/);
     }
+    for (const name of [words.canvasPanLeft, words.canvasPanRight, words.canvasPanUp, words.canvasPanDown]) expect(named(name)).toBeUndefined();
+    expect(named(words.canvasLayoutTools)).toContain('aria-haspopup="menu"');
+    expect(named(words.canvasLayoutTools)).toContain('aria-expanded="false"');
+    expect(buttons.some((button) => button.endsWith(`>${words.canvasArrangeAll}</button>`))).toBe(false);
     expect(named(words.canvasSelectTool)).toContain('aria-pressed="true"');
     expect(named(words.canvasPanTool)).toContain('aria-pressed="false"');
     expect(named(grip)).toContain('aria-roledescription="sortable"');
@@ -159,6 +163,7 @@ describe("full canvas editor structure", () => {
     expect(html).toMatch(/aria-label="Add node"[^>]*disabled=""/);
     expect(html).toMatch(/aria-label="Select nodes \(V\)" aria-pressed="true"/);
     expect(html).toMatch(/class="cursor-grab[^"]*"[^>]*disabled=""/);
-    expect(html).toContain('aria-label="Pan right"');
+    expect(html).toContain('aria-label="Pan canvas (H)"');
+    expect(html).toMatch(/aria-label="Layout tools"[^>]*disabled=""/);
   });
 });

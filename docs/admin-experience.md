@@ -1,6 +1,6 @@
 # Dashboard configuration workflows
 
-The Dashboard provides Monitoring, Strategy workflow, Suppliers and General settings. Models are listed under their supplier connections. Configuration uses the existing installation files and authorization rules. Moving a control does not reset its saved value.
+The Dashboard provides Monitoring, Strategy workflow, Suppliers and General settings. Each supplier's editor contains its model settings. Configuration uses the existing installation files and authorization rules. Moving a control does not reset its saved value.
 
 ## Starting points and required changes
 
@@ -21,7 +21,7 @@ The corresponding baseline sources are `AppShell.tsx`, the provider views and AP
 | Page | User task | Fields and actions |
 | --- | --- | --- |
 | General settings | Configure access to this gateway and console preferences | Gateway access key, language/theme and global default model |
-| Suppliers | Connect the gateway to an upstream service and maintain its models | Supplier/preset, connection method, display name, service address and upstream credentials; a model list under each LLM connection with Edit actions and disclosed discovery/import |
+| Suppliers | Connect the gateway to an upstream service and maintain its models | Supplier summaries and Edit/Delete entries; each LLM supplier's editor has Connection settings and Model settings, including model editing and discovery/import |
 | Strategy workflow | Decide how requests select a model | Questions, ordered rules, fallback and model-pool membership, with a separate canvas layout |
 
 Supplier instance IDs and credential reference names are implementation identifiers. The normal setup flow generates them. Changing a supplier's display name does not rename its model IDs or invalidate strategy references. A supplier brand can have several connections, each with its own name, address and credentials. Advanced compatibility controls retain existing environment and shared-reference setups.
@@ -61,7 +61,9 @@ A connection test belongs to the configuration revision that started it. Loading
 | `unsupported` | `discovery_unsupported` or `listing_unsupported` | The transport or endpoint has no supported listing probe. |
 | `incomplete` | `credential_unconfigured` or `listing_incomplete` | A declared credential is absent, or the listing is partial/invalid. |
 
-Each LLM supplier lists its configured models directly beneath the connection. A model's Edit button opens the shared model Dialog for that exact connection and upstream model. Discovery, metadata reads and connection tests do not save a supplier, credential or model.
+Choose Edit on an LLM supplier, then open Model settings to search its configured models, edit them, or discover and import upstream models. The supplier list shows each connection's summary and configured-model count. New connections and unsaved connection changes must be saved before Model settings becomes available. Switching back to Connection settings or leaving the editor protects unsaved model drafts with a discard prompt. Saved model changes take effect through their own transaction. Decision suppliers retain their connection form and optional model field.
+
+A model's Edit button opens the shared model Dialog for that exact connection and upstream model. Discovery, metadata reads and connection tests do not save a supplier, credential or model.
 
 ## Drafts, permissions and recovery
 
@@ -79,7 +81,7 @@ When a write's outcome is unknown, the console requires a successful configurati
 
 ## Model discovery and import
 
-Open the discovery/import controls under the relevant supplier, fetch its upstream model list, search it and select a batch. Metadata lookup uses the existing Models.dev, OpenRouter, packaged LiteLLM and supported provider-native evidence sources. An ID-only listing does not establish model capabilities or prices.
+Open Model settings in the relevant supplier's editor, expand the discovery/import controls, fetch its upstream model list, search it and select a batch. Metadata lookup uses the existing Models.dev, OpenRouter, packaged LiteLLM and supported provider-native evidence sources. An ID-only listing does not establish model capabilities or prices.
 
 The import preview distinguishes complete matches, missing fields, conflicting evidence, failed retrieval and already configured models. Complete metadata can be reviewed and imported as a batch. A row can open the same model editor used for existing models; batch import does not require a separate dialog confirmation for each row. Existing qualified IDs are skipped during import. Updating an existing record uses its edit action rather than an import that silently overwrites it.
 

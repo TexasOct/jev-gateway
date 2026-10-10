@@ -53,7 +53,8 @@ test("Vertex pasted JSON is canonicalized only in gateway payload; invalid JSON 
   expect(await input.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-text-security"))).toBe("disc");
   await page.getByRole("button", { name: "Test connection", exact: true }).click();
   await expect.poll(() => state.selectors.length).toBe(1); expect(state.selectors[0]).toMatchObject({ transport_credentials: { vertex_credentials: { action: "set", value: JSON.stringify(JSON.parse(original)) } } });
-  await expect(input).toHaveValue(original); await expect(page.getByRole("status")).not.toContainText("(null)");
+  const connectionStatus = page.getByRole("status").filter({ hasText: "Model-list endpoint validated." });
+  await expect(input).toHaveValue(original); await expect(connectionStatus).toBeVisible(); await expect(connectionStatus).not.toContainText("(null)");
   await save(page); await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();
   expect(state.writes[0]!.operations[0]).toMatchObject({ provider: { param_env: { vertex_credentials: "JEV_VERTEX_AI_VERTEX_CREDENTIALS" }, params: { vertex_project: "synthetic-project", vertex_location: "us-central1" } } });
   expect(JSON.stringify(state.configuration)).not.toContain("private_key");

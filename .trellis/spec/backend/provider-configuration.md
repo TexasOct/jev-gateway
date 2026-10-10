@@ -318,6 +318,14 @@ different meanings. Limit public responses to 16 MiB and cached suggestions to
 six hours, with bounded refresh/concurrency behavior and explicit stale state.
 Source failure cannot gate chat serving or overwrite confirmed model values.
 
+The Provider workspace keeps model controls inside the corresponding LLM supplier's
+editor, with Connection settings and Model settings. The supplier list contains
+summaries, configured-model counts and editing/deletion entries. Model settings
+uses the saved supplier ID; a new or dirty connection must be saved before entering
+it. Switching back to Connection settings or leaving protects model drafts with
+the existing discard guard. Read-only connections allow model inspection but no
+writes. Decision providers retain their connection form and optional model field.
+
 The Provider workspace keeps discovery candidates, selection, metadata editing,
 and confirmation distinct. Select-all identifies its visible scope and count.
 Ignore stale responses after switching provider or starting a newer request;

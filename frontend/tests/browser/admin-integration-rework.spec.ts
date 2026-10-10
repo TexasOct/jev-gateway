@@ -75,7 +75,7 @@ for (const origin of ["provider", "model"] as const) {
     await installProviderFixture(context, state);
     await page.goto("/dashboard/");
     await openProviderModels(page, "fixture");
-    if (origin === "provider") await page.locator('[data-provider-edit="fixture"][data-provider-kind="llm"]').click();
+    if (origin === "provider") await page.getByRole("button", { name: "Connection settings", exact: true }).click();
     else await configuredModelEdit(page, "fixture", "existing").click();
     await page.getByRole("button", { name: origin === "provider" ? "Validate and save" : "Save", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();

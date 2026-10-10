@@ -69,9 +69,10 @@ test("native zoom/pan add, input-safe deletion, combined history, review and sav
   const canvas = page.locator(".routing-canvas-scroll");
   await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeEnabled();
   await page.getByRole("button", { name: en.canvasZoomOut, exact: true }).click();
-  await page.getByRole("button", { name: en.canvasPanRight, exact: true }).click();
-  await page.getByRole("button", { name: en.canvasPanDown, exact: true }).click();
   await frames(page);
+  const wheelAt = await blankPoint(page);
+  await page.mouse.move(wheelAt.x, wheelAt.y); await page.mouse.wheel(160, 160);
+  await expect.poll(() => canvas.evaluate((element) => element.scrollLeft > 70 && element.scrollTop > 40)).toBe(true);
   await canvas.focus(); await page.keyboard.press("h");
   const panStart = await blankPoint(page);
   const beforePan = await canvas.evaluate((element) => ({ x: element.scrollLeft, y: element.scrollTop }));
@@ -296,7 +297,10 @@ test("policy review waits for queued layout PUTs and unsent viewport debounce wo
   await expect.poll(() => writes.length).toBe(2);
   await expect(review).toBeEnabled();
   expect(mockApi.canvasLayout.nodes["rule-0"]).toEqual({ x: 390, y: 80 });
-  await page.getByRole("button", { name: en.canvasPanRight, exact: true }).click();
+  const viewportBefore = await page.locator(".routing-canvas-scroll").evaluate((element) => element.scrollLeft);
+  await page.locator(".routing-canvas-scroll").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => page.locator(".routing-canvas-scroll").evaluate((element) => element.scrollLeft)).toBeGreaterThan(viewportBefore);
   await expect(review).toBeDisabled();
   expect(writes).toHaveLength(2);
   await frames(page);

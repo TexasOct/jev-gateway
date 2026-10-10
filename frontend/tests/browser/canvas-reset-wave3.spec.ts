@@ -8,7 +8,15 @@ import { computedContrast, nativeTabTo, fieldVisibility } from "./canvas-wave3-f
 
 const path = "/v1/routing/configuration";
 const layout = { version: 1 as const, nodes: { "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
-async function activate(page: Page, target: Locator, focused?: () => Promise<void>) { await expect(target).toBeEnabled(); await target.focus(); if (focused) await focused(); await page.keyboard.press("Enter"); }
+async function activate(page: Page, target: Locator, focused?: () => Promise<void>) {
+  await expect(target).toBeEnabled();
+  // Finish the drawer/inspector's deferred focus handoff before choosing the Enter target.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await target.focus();
+  if (focused) await focused();
+  await expect(target).toBeFocused();
+  await page.keyboard.press("Enter");
+}
 async function capture(page: Page, info: TestInfo, stage: string, state: unknown) { await writeFile(info.outputPath(stage+".json"),JSON.stringify(state,null,2));await page.screenshot({path:info.outputPath(stage+".png")}); }
 async function open(page: Page, locale: "en"|"zh-CN", width: number, scheme: "light"|"dark") {
   await page.setViewportSize({width,height:900});await page.emulateMedia({colorScheme:scheme,reducedMotion:"reduce"});await page.goto("/dashboard/");

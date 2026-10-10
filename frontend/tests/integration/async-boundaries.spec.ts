@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { installProviderFixture, providerFixture, type ProviderFixtureState } from "../fixtures/provider-management";
+import { openProviderModels, providerModelGroup } from "../fixtures/open-provider-models";
 import type { Page } from "@playwright/test";
 import { activity, providers } from "../fixtures/activity";
 import { sessionsPageOne } from "../fixtures/sessions";
@@ -152,7 +153,7 @@ test("whole App keeps one committed write through a refresh 401 and retries only
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.locator("[data-connection-page]")).toHaveCount(0);
   await expect(page.locator("#settings-default-model")).toHaveValue("fixture/existing");
-  await page.getByRole("button", { name: "Model management", exact: true }).click();
+  await openProviderModels(page, "fixture");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const refreshAlert = page.getByRole("region", { name: "Global default model", exact: true }).getByRole("alert");
@@ -198,8 +199,9 @@ test("operation errors stay with their view while a genuine current catalog read
   fixture.rejectWrite = 500;
   await page.getByRole("button", { name: "Validate and save", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
-  await page.getByRole("button", { name: "Model management", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancel", exact: true }).first().click();
+  await openProviderModels(page, "fixture");
+  await expect(providerModelGroup(page, "fixture").getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Edit model", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("alert")).toHaveCount(0);
   await page.getByRole("dialog").getByLabel("Display name", { exact: true }).fill("Rejected model name");
@@ -208,7 +210,7 @@ test("operation errors stay with their view while a genuine current catalog read
   await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Discard changes", exact: true }).click();
-  await page.getByRole("button", { name: "Suppliers", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).first().click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   fixture.rejectRead = 503;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();

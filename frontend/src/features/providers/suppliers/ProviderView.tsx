@@ -42,6 +42,7 @@ export function ProviderView({ manager, t }: Props) {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [browsing, setBrowsing] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [editingModels, setEditingModels] = useState(false);
   const [credentialAction, setCredentialAction] = useState<
     "keep" | "set" | "clear"
   >("keep");
@@ -96,6 +97,7 @@ export function ProviderView({ manager, t }: Props) {
 
   const discard = () => {
     setEditor(null);
+    setEditingModels(false);
     setSecret("");
     setCredentialAction("keep");
     setTransportDrafts({});
@@ -442,7 +444,34 @@ export function ProviderView({ manager, t }: Props) {
       )}
       {editor ? (
         <>
-          <form
+          <div data-provider-editor={editor.draft.id} className="flex min-w-0 flex-wrap items-center gap-3">
+            <ProviderIdentity provider={editor.draft} t={t} />
+            <p className="m-0 min-w-0 flex-1 break-words text-base font-semibold">
+              {t(editor.original ? "pmEdit" : "pmAdd")}: {editor.draft.display_name || editor.draft.id}
+            </p>
+            <Button className="min-h-11" variant="ghost" disabled={manager.pending || connection.pending} onClick={leave}>
+              {t("pmCancel")}
+            </Button>
+          </div>
+          {kind === "llm" && <>
+            <div className="flex min-w-0 flex-wrap gap-2" aria-label={t("pmEdit")}>
+              <Button className="min-h-11" variant="outline" aria-pressed={!editingModels} disabled={manager.pending || connection.pending} onClick={() => {
+                if (!editingModels || navigationGuardRef.current?.() === false) return;
+                manager.cancelQuery();
+                setEditingModels(false);
+              }}>{t("spConnectionSettings")}</Button>
+              <Button className="min-h-11" variant="outline" aria-pressed={editingModels} disabled={manager.pending || connection.pending || !editor.original || dirty} onClick={() => {
+                if (editingModels) return;
+                connection.reset();
+                manager.cancelQuery();
+                setEditingModels(true);
+              }}>{t("spModelSettings")}</Button>
+            </div>
+            {(!editor.original || dirty) && <p role="status" className="m-0 text-sm text-ink-muted">{t("spSaveConnectionFirst")}</p>}
+          </>}
+          {editingModels && kind === "llm" && editor.original ? (
+            <ModelManagementView key={editor.original.id} manager={manager} t={t} providerId={editor.original.id} embedded />
+          ) : <form
             className="grid min-w-0 gap-4"
             aria-busy={manager.pending || connection.pending}
             onSubmit={(event) => {
@@ -451,7 +480,7 @@ export function ProviderView({ manager, t }: Props) {
             }}
           >
             <fieldset
-              disabled={manager.pending || connection.pending}
+              disabled={disabled || connection.pending}
               className="m-0 grid min-w-0 gap-4 border-0 p-0"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -670,7 +699,7 @@ export function ProviderView({ manager, t }: Props) {
               {connection.result && <p role="status" className="m-0 text-sm text-ink-muted">{t(connection.statusKey!)}{connection.result.status === "success" && connection.result.model_count !== null && ` (${connection.result.model_count})`}</p>}
               {connection.error !== null && <p role="alert" className="m-0 text-sm text-ink-muted">{errorText(connection.error)} {t("spTestRetry")}</p>}
             </fieldset>
-          </form>
+          </form>}
         </>
       ) : browsing ? (
         <>
@@ -780,7 +809,7 @@ export function ProviderView({ manager, t }: Props) {
                     data-provider-kind={kind}
                     className="min-h-11"
                     variant="outline"
-                    disabled={disabled}
+                    disabled={manager.pending || manager.loading}
                     onClick={() => openEditor(profile)}
                   >
                     {t("pmEdit")}
@@ -801,7 +830,6 @@ export function ProviderView({ manager, t }: Props) {
                   </Button>
                 </div>
               </div>
-              {kind === "llm" && <ModelManagementView manager={manager} t={t} providerId={profile.id} embedded />}
               </section>
             ))}
           </div>

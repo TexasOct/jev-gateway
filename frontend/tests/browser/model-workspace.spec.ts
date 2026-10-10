@@ -1,5 +1,6 @@
 import { test, expect } from "../fixtures/provider-browser";
 import { installProviderFixture, providerFixture } from "../fixtures/provider-management";
+import { openProviderModels, providerModelGroup } from "../fixtures/open-provider-models";
 import type { ProviderFixtureState } from "../fixtures/provider-management";
 
 function fixture(): ProviderFixtureState { return { configuration: providerFixture(), writes: [], validations: [], selectors: [] }; }
@@ -7,7 +8,7 @@ async function open(page: import("@playwright/test").Page) {
   await page.goto("/dashboard/");
   await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Fixture provider", exact: true })).toBeVisible();
-  await page.getByRole("region", { name: "Fixture provider", exact: true }).getByText("Discover and import models", { exact: true }).click();
+  await openProviderModels(page, "fixture", { importModels: true });
 }
 
 test("discovery automatically enriches exact IDs and imports a complete batch without item dialogs", async ({ page, context }) => {
@@ -115,16 +116,18 @@ for (const removed of [false, true]) test(`conflict reload retains complete draf
   expect(state.writes).toHaveLength(1);
 });
 
-test("filtering suppliers requires explicit discard and cancels candidate results", async ({ page, context }) => {
+test("leaving supplier model settings requires explicit discard before filtering another supplier", async ({ page, context }) => {
   const state = fixture(); state.configuration.providers.push({ ...state.configuration.providers[0]!, id: "second", display_name: "Second connection" });
   await installProviderFixture(context, state); await open(page);
-  const first = page.getByRole("region", { name: "Fixture provider", exact: true });
+  const first = providerModelGroup(page, "fixture");
   await first.getByRole("button", { name: "Fetch upstream models", exact: true }).click();
   await first.getByRole("button", { name: "Select all visible unconfigured models" }).click();
+  await expect(page.getByLabel("Search instances", { exact: true })).toHaveCount(0);
   page.once("dialog", (dialog) => dialog.dismiss());
-  await page.getByLabel("Search instances", { exact: true }).fill("Second");
+  await page.getByRole("button", { name: "Cancel", exact: true }).first().click();
   await expect(first).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Cancel", exact: true }).first().click();
   await page.getByLabel("Search instances", { exact: true }).fill("Second");
   await expect(first).toHaveCount(0);
   await expect(page.getByText("fixture/alpha", { exact: true })).toHaveCount(0);

@@ -100,8 +100,9 @@ strategies inherit it when a matched tag has no models and report the result as
 Default. Populated tag pools still
 use their normal selection rules.
 
-Use Suppliers to save a connection and its upstream credential, then open Models
-to discover or manually add models, review metadata and import a selected batch.
+Use Suppliers to save a connection and its upstream credential, then choose Edit
+on that supplier and open Model settings to discover or manually add models,
+review metadata and import a selected batch.
 General settings owns the gateway access key. Assign models to strategy pools in
 Strategy workflow. Dashboard saves activate the configuration;
 `jev config reload` also rereads files after manual changes. Until models are

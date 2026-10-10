@@ -327,7 +327,7 @@ export function AppShell({
       <main
         className={
           view === "strategy"
-            ? "mx-auto flex w-full min-h-0 min-w-0 max-w-[1440px] flex-col items-stretch overflow-hidden border-x border-outline p-0"
+            ? "mx-auto flex w-full min-h-0 min-w-0 flex-col items-stretch overflow-hidden border-x border-outline p-0"
             : "mx-auto grid w-full min-w-0 max-w-[1440px] content-start gap-4 px-4 py-5 max-[720px]:gap-3 max-[720px]:p-3 lg:px-6"
         }
       >

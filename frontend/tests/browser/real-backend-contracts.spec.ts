@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test, expect } from "@playwright/test";
+import { openProviderModels } from "../fixtures/open-provider-models";
 import { startRealBackend, connectRealDashboard, gotoSuppliers, bundleAssetSha, repoRoot, guardState, type RealBackend } from "../fixtures/real-backend";
 
 /**
@@ -62,7 +63,7 @@ test("X1 real dialog edit emits the exact update_model body the gateway accepts"
     captureWrites(page, bodies, "/v1/provider-configuration/validate");
     await connectRealDashboard(page, backend);
     await gotoSuppliers(page);
-    const group = page.locator('[data-provider-models="test-provider"]');
+    const group = await openProviderModels(page, "test-provider");
     await expect(group).toBeVisible();
     await group.getByRole("button", { name: "Edit model", exact: true }).click();
     const dialog = page.getByRole("dialog");
@@ -127,7 +128,7 @@ test("T3 real dialog edit preserves baseline membership and overlay bytes", asyn
     captureWrites(page, applied, "/v1/provider-configuration");
     await connectRealDashboard(page, backend);
     await gotoSuppliers(page);
-    const group = page.locator('[data-provider-models="test-provider"]');
+    const group = await openProviderModels(page, "test-provider");
     await group.getByRole("button", { name: "Edit model", exact: true }).click();
     const dialog = page.getByRole("dialog");
     const overlayBefore = readOverlay(backend);
