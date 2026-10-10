@@ -12,6 +12,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import public_accept_native as native
 
 
 def main() -> int:
@@ -23,6 +24,10 @@ def main() -> int:
     args = parser.parse_args()
     assert not (args.helper / "jev_gateway").exists()
     sys.path.insert(0, str(args.helper))
+    native.load_owner(args.state.parent / "evidence/native-owners" / args.mode / "descriptor.json",
+        args.helper / "public_accept_native.py", {
+            "scripts/public-installed/serve.py": Path(__file__),
+            "tests/test_credential_live_server.py": args.helper / "tests/test_credential_live_server.py"})
     import jev_gateway
     assert Path(jev_gateway.__file__).is_relative_to(Path(sys.prefix))
     from tests.test_credential_live_server import free_port, serve_browser_fixture
@@ -46,7 +51,8 @@ def main() -> int:
         (args.home / "models.json").write_text(json.dumps(document) + "\n")
         command = [sys.executable, "-m", "jev_gateway.cli.server", "--home", str(args.home), "--token", "public-installed-default-fixture"]
     with (args.home.parent / (args.mode + "-server.log")).open("wb") as log:
-        child = subprocess.Popen(command, cwd=args.helper, env=env, stdout=log, stderr=log)
+        context = native.site_context(native.current_owner(), "s04")
+        child = native.popen_owned(context, command, cwd=args.helper, env=env, stdout=log, stderr=log)
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             deadline = time.monotonic() + 30
@@ -65,15 +71,21 @@ def main() -> int:
             args.state.write_text(json.dumps({"pid": os.getpid(), "gateway_pid": child.pid, "url": url}) + "\n")
             stop.wait()
         finally:
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait(timeout=5)
+            try:
+                if child.poll() is None:
+                    child.terminate()
+                    try:
+                        child.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=5)
+            finally:
+                native.record_close(context, child, primary=sys.exception())
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    finally:
+        native.finish_owner(native.current_owner())

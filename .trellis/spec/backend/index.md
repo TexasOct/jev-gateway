@@ -27,6 +27,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | [Runtime initialization](./initialization.md) | Strategy-only defaults, local management-key setup and valid incomplete catalogs | Implementation contract |
 | [Error handling](./error-handling.md) | Domain exceptions, OpenAI error envelopes, and degradation | Complete |
 | [Quality guidelines](./quality-guidelines.md) | Types, tests, forbidden patterns, and verification | Complete |
+| [Public installed native-owner preparation](./public-installed-native-owner.md) | Acceptance-tool input/API joins, fixed slots and static/runtime evidence boundaries | Implementation contract |
 | [Logging guidelines](./logging-guidelines.md) | Structured fields, formats, levels, and sensitive data | Complete |
 
 ## Product references

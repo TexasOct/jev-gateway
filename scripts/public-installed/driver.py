@@ -21,6 +21,7 @@ import zipfile
 
 from adapt import prepare
 from provenance import metadata_entries, owned_metadata_path
+import public_accept_native as native
 
 
 SOURCE = "4d56e438e2f817115e65f9c47519f9adc62d41c1"
@@ -98,7 +99,8 @@ def reconcile_observations(errors: list[dict], closures: list[dict]) -> list[dic
     for error in errors:
         matching = [item for item in closures if error["create_time"] is not None
                     and item["pid"] == error["pid"] and item.get("create_time") == error["create_time"]
-                    and item.get("native_exit") is not None and item.get("closure_source") == "retained-Popen.poll"]
+                    and item.get("native_exit") is not None and item.get("closure_source") in
+                    ("retained-Popen.poll", "helper-owned-native-receipt/1")]
         results.append({"error": error, "resolution": "owned-native-exit" if len(matching) == 1 else "unresolved",
                         "closure": matching[0] if len(matching) == 1 else None})
     return results
@@ -304,6 +306,7 @@ class NativeCommands:
         self.evidence = evidence
         self.commands: list[dict] = []
         self.processes: list[tuple[subprocess.Popen, dict]] = []
+        self.native_owners: native.NativeCoordinator | None = None
         self.owned: dict[int, float] = {}
         self.listeners: set[int] = set()
         self.observation_errors: list[dict] = []
@@ -381,6 +384,12 @@ class NativeCommands:
         index = len(self.commands) + 1
         log_path = self.evidence / f"{index:03d}-{label}.log"
         log = log_path.open("wb")
+        if getattr(self, "native_owners", None) is not None:
+            try:
+                self.native_owners.plan(label, argv, cwd, env, index, log)
+            except BaseException:
+                log.close()
+                raise
         process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         log.close()
         record = {"argv": argv, "cwd": str(cwd), "label": label, "pid": process.pid,
@@ -399,6 +408,8 @@ class NativeCommands:
             self.flush()
             raise
         self.flush()
+        if getattr(self, "native_owners", None) is not None:
+            self.native_owners.launched(label, record, process)
         return process, record
 
     def flush(self) -> None:
@@ -521,6 +532,28 @@ class NativeCommands:
                 probe.settimeout(0.3)
                 if probe.connect_ex(("127.0.0.1", port)) == 0:
                     still_listening.append(port)
+        helper_failure = None
+        if getattr(self, "native_owners", None) is not None:
+            try:
+                cleanup_ok = (cleanup_error is None and join_error is None and not thread_alive and not still_listening
+                    and observer_state.get("started") is True and observer_state.get("completed") is True
+                    and observer_state.get("failed") is False and observer_state.get("failure", "not-recorded") is None)
+                facts = self.native_owners.consume(self.commands, cleanup_ok=cleanup_ok)
+                closures.extend(fact.projection() for fact in facts)
+            except Exception as error:
+                helper_failure = {"code": error.args[0] if type(error) is native.ReceiptRejected else "MISSING_CHAIN"}
+        try:
+            owner_coordinator = getattr(self, "native_owners", None)
+            native.write_consumption_result(self.evidence, {
+                "complete": helper_failure is None and owner_coordinator is not None,
+                "runtimes": [] if owner_coordinator is None else [
+                    {"executable_identity": facts.executable_identity, "api": facts.api}
+                    for facts, identities in owner_coordinator.runtime_cache.values()],
+                "failure": helper_failure, "closures": [fact for fact in closures
+                    if fact["closure_source"] == "helper-owned-native-receipt/1"]},
+                native.Ledger(2, 65536) if owner_coordinator is None else owner_coordinator.results)
+        except Exception:
+            helper_failure = {"code": "SUMMARY_PUBLISH"}
         (self.evidence / "listener-cleanup.json").write_text(json.dumps({"observed_ports": sorted(self.listeners), "still_listening": still_listening}) + "\n")
         reconciliation = reconcile_observations(self.observation_errors, closures)
         (self.evidence / "owned-processes.json").write_text(json.dumps({"pid_create_time": self.owned,
@@ -541,6 +574,7 @@ class NativeCommands:
                 and observer_state.get("failure", "not-recorded") is None), "observer did not complete successfully"
         unresolved = [item for item in reconciliation if item["resolution"] == "unresolved"]
         assert not unresolved, unresolved
+        assert helper_failure is None, helper_failure
 
 
 def api(commands: NativeCommands, endpoint: str, outside: Path, env: dict[str, str], label: str) -> dict:
@@ -720,6 +754,25 @@ def main() -> int:
         package = Path(json.loads(origins[0].read_text())["module_origin"]).parent
         helper = work / "test-helper"
         scope = prepare(source, helper, package, python, evidence)
+        sites = list(scope["native_sites"])
+        sites.append({"site_id": "s04", "operation": "Popen", "file": "scripts/public-installed/serve.py",
+            "function": "main", "original_sha": "fedadbee97b2c3d448719e2fbbf7691c7e16a6f6ad4569410060e0d67a135b41",
+            "adapted_sha": digest(Path(__file__).with_name("serve.py")),
+            "call_sha": "abeb49215fc18961140fc5aaeecf325eabb93dac19d6f6eefa13e7d96e177159",
+            "reversal_sha": "fedadbee97b2c3d448719e2fbbf7691c7e16a6f6ad4569410060e0d67a135b41"})
+        sites.sort(key=lambda row: row["site_id"])
+        helper_sha = digest(helper / "public_accept_native.py")
+        source_manifest = hashlib.sha256(native.canonical({"sites": sites, "helper_sha": helper_sha})).hexdigest()
+        capacity = native.static_capacity(source, helper, Path(__file__).parent, sites)
+        (evidence / "native-owner-static-capacity.json").write_text(json.dumps(capacity, indent=2) + "\n")
+        captured_manifest, _ = native.read_source(evidence / "input-manifest.json", evidence, native.Ledger(1, 524288))
+        captured_helper, _ = native.read_source(helper / "public_accept_native.py", helper, native.Ledger(1, 524288))
+        binding = native.preparation_inputs(preparation_head, hashlib.sha256(captured_manifest).hexdigest(), helper_sha, source_manifest,
+            captured=captured_manifest, helper=captured_helper, sites=sites)
+        commands.native_owners = native.NativeCoordinator(work, helper, Path(__file__).parent, sites, binding,
+            {"run_id": os.environ["GITHUB_RUN_ID"], "attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+             "os": os.environ["RUNNER_OS"].lower().replace("linux", "ubuntu").replace("macos", "macos") + "-latest",
+             "invocation_id": uuid.uuid4().hex}, capacity=capacity, capture_bytes=len(captured_manifest), helper_capture=captured_helper)
         run_original_smoke(commands, [sys.executable, str(helper / "smoke.py"), "--wheel", str(wheel), "--version", "0.1.3", "--installer", str(files / "install.sh"), "--work-dir", str(work / "original smoke")], outside, env, work / "original smoke", evidence,
                            {"source": SOURCE, "tag": "v0.1.3", "producer_run": RUN, "preparation_head": preparation_head,
                             "wheel_sha256": ASSETS[wheel.name][2], "installer_sha256": ASSETS["install.sh"][2],
@@ -739,6 +792,8 @@ def main() -> int:
         backend_status = commands.run([str(python), "-I", str(entries), "--helper", str(helper), "--output", str(evidence / "backend-results.json")], outside, env, "installed-backend-business", timeout=1800, required=False)
         backend = json.loads((evidence / "backend-results.json").read_text())
         collection = json.loads((evidence / "backend-collection.json").read_text())
+        commands.native_owners.register_reports("installed-backend-business", backend)
+        commands.native_owners.register_reports("installed-backend-collection", collection)
         check(backend_status == 0 and collection["exitstatus"] == 0, "first backend native exit and collection")
         first_pass = backend_gate(backend, collection["collected"])
         check(True, "first backend executed identities and only exact original capture skips")
@@ -816,6 +871,7 @@ def main() -> int:
         collection = json.loads((evidence / "backend-collection.json").read_text())
         check(backend["collected"] == collection["collected"], "installed backend collection/execution identity parity")
         replay = json.loads((evidence / "browser-capture-replay.json").read_text())
+        commands.native_owners.register_reports("installed-browser-capture-replay", replay)
         check(replay_status == 0, "capture replay native exit")
         replay_summary = backend_gate(replay, sorted(CAPTURE_NODES), replay=True)
         (evidence / "scope-results.json").write_text(json.dumps({"backend_cases": len(backend["collected"]), "backend_native_exit": backend_status,

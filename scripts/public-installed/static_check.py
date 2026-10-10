@@ -796,6 +796,54 @@ def registry_loader_probes(root: Path, target: Path, output: Path) -> list[dict]
     return results
 
 
+def native_preparation_checks(root: Path, target: Path, report: dict, output: Path) -> list[str]:
+    """Focused source integration checks; no target native calls or imports."""
+    import public_accept_native as native
+    results = []
+    assert len(report["adapters"]) == 13
+    assert len(report["native_sites"]) == 13
+    for entry in report["adapters"]:
+        text = (target / entry["file"]).read_text()
+        for change in reversed(entry["replacements"]):
+            assert text.count(change["after"]) == change["count"]
+            text = text.replace(change["after"], change["before"])
+        assert hashlib.sha256(text.encode()).hexdigest() == entry["before_sha256"] == entry["reverse_sha256"]
+    results.append("thirteen complete signed-file reversals")
+    found = []
+    files = {"smoke.py", *(row["file"] for row in report["native_sites"] if row["site_id"] not in ("s01", "s02", "s03"))}
+    for relative in files:
+        tree = ast.parse((target / relative).read_bytes())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("run_owned", "popen_owned"):
+                found.append(node.func.attr)
+    serve = ast.parse(Path(__file__).with_name("serve.py").read_bytes())
+    found.extend(node.func.attr for node in ast.walk(serve) if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute) and node.func.attr in ("run_owned", "popen_owned"))
+    assert found.count("popen_owned") == 5 and found.count("run_owned") == 9
+    results.append("fourteen explicit sites: five Popen and nine run")
+    for row in report["native_sites"]:
+        path = target / ("smoke.py" if row["site_id"] in ("s01", "s02", "s03") else row["file"])
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == row["adapted_sha"]
+    serve_row = dict(site_id="s04",operation="Popen",file="scripts/public-installed/serve.py",function="main",
+        original_sha="fedadbee97b2c3d448719e2fbbf7691c7e16a6f6ad4569410060e0d67a135b41",
+        adapted_sha=hashlib.sha256(Path(__file__).with_name("serve.py").read_bytes()).hexdigest(),
+        call_sha="abeb49215fc18961140fc5aaeecf325eabb93dac19d6f6eefa13e7d96e177159",
+        reversal_sha="fedadbee97b2c3d448719e2fbbf7691c7e16a6f6ad4569410060e0d67a135b41")
+    sites = sorted([*report["native_sites"],serve_row],key=lambda row:row["site_id"])
+    capacity = native.static_capacity(root,target,Path(__file__).parent,sites)
+    (output / "native-static-capacity.json").write_text(json.dumps(capacity,indent=2)+"\n")
+    assert all(count <= native.OWNER_QUOTAS[mode][0] for mode,count in capacity["attempt_bounds"].items())
+    assert capacity["complete"], capacity["limitations"]
+    results.append("source-defined bounds fit; actual runtime compatibility and byte adequacy are checked at use")
+    # No public producer function accepts a caller-provided native exit.
+    helper = ast.parse(Path(__file__).with_name("public_accept_native.py").read_bytes())
+    for node in helper.body:
+        if isinstance(node,ast.FunctionDef) and node.name in ("popen_owned","run_owned","record_close","finish_owner"):
+            assert "native_exit" not in [arg.arg for arg in (*node.args.posonlyargs,*node.args.args,*node.args.kwonlyargs)]
+    results.append("public ownership API has no native exit setter")
+    return results
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
@@ -831,8 +879,10 @@ def main() -> int:
             for line in before.read_text().splitlines():
                 if "expect(" in line or "test(" in line:
                     assert line in after.read_text(), line
-    assert len(report["adapters"]) == 7
-    checks.append("All seven adapters match exact source fragments, preserve assertion AST/text, and reverse to original hashes")
+    assert len(report["adapters"]) == 13
+    checks.append("All thirteen adapters match exact source fragments, preserve assertion AST/text, and reverse to original hashes")
+    native_checks = native_preparation_checks(root, target, report, output)
+    checks.extend(native_checks)
     registry_checks = registry_loader_probes(root, target, output)
     checks.append(f"{len(registry_checks)} signed registry-loader reversal and mutation checks passed")
     smoke_text = (target / "smoke.py").read_text()

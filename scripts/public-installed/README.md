@@ -2,6 +2,118 @@
 
 This directory prepares hosted acceptance of the public v0.1.3 installer and its exact final wheel. Local preparation is static. The independent final tag/public byte verdict is an input; these files do not claim installed runtime success or close RL1.
 
+The native-owner continuation awaits independent review of the narrow policy
+repair. The helper supplies fixed native custody
+slots, a local CPython run/context projection, nonthrowing finalizers, required
+owner summaries and whole-owner typed consumption. Fourteen explicit copied
+creation sites and their original close seams connect the smoke, pytest and
+fixture owners; thirteen complete signed-file reversals retain the original
+assertions, calls and deadlines. Native exceptions and business exits retain
+their own failure gates. Synthetic controls supply no actual closure evidence.
+
+The driver binds actual working helper bytes and copied-source manifests to its
+captured input manifest. Git HEAD describes the available base commit; its tree
+is null when not captured and never stands for modified or untracked files.
+Signed product source, tag and wheel identities remain separate and pinned.
+There are no prospective runtime or preparation approval registries.
+
+The supported runtime contract is CPython 3.12 with the exact supported run-body
+projection. Before launch the harness captures executable stat identity, exact
+patch metadata and guarded subprocess/pathlib source fingerprints. A managed
+layout uses its patchlevel header and stdlib sources without executing an extra
+probe. The worker verifies its actual version, source fingerprints and compiled
+loaded run/context/communicate/poll/wait code before wrapping calls. Unsupported
+or changed APIs and exceeded source budgets still reject. Matching a minor
+version alone supplies no compatibility proof. Binary contents are not read for
+a prospective approval hash.
+
+Sequential admission can retain multiple live owned Popen objects. An allocated
+slot, registry reentrancy, lock contention or a foreign registry thread leaves
+accounting uncertain. Slots never recycle. The independent finding reproduced an
+API lifetime restriction; no failure in the fourteen normal source paths was
+demonstrated. Local type-tool absence and unknown diagnostics are limitations
+for static harness review; the product's hosted type gates remain required.
+Seven historical observations, four unknown creators, the detached true-owner
+gap, full installed acceptance and RL1 remain open.
+
+Each of the seven owners receives its fixed portion of one 96-attempt,
+512-entry/read-admission and 25,690,112-byte allocation. Exhaustion forwards the
+original native call without encoding, registering a handle or emitting a record;
+the entire owner then fails receipt admission. Source files are admitted lazily
+at their explicit call seam and cached within the owner source quota. Complete
+owner consumption happens after original native cleanup and observer join. It
+requires exact descriptor/start/terminal/summary, source, API, launch, phase,
+identity and counter joins. Authenticated helper closures use the separate
+`helper-owned-native-receipt/1` marker; duplicate direct/helper facts remain
+ambiguous. Observer, join, listener, cleanup and unresolved failure predicates
+still apply.
+
+Protocol descriptors and records live beneath the uploaded evidence directory.
+Their keys live in a separate private 0700 directory outside that directory and
+never enter native argv, environment, stdin or logs. Record publication is
+exclusive and immutable, using 0600 files and guarded hard links. The closed
+records contain bounded digests and safe error codes, without raw native call
+data. The original raw observation/log contracts retain their existing scope.
+
+The local run body derives from CPython v3.12.12 `Lib/subprocess.py` under the
+Python Software Foundation License Version 2. Changes replace the local Popen
+context factory, qualify native globals through the retained runtime backend and
+spell the bare exception handler as `except BaseException`. Original native
+context exit owns stream closure and waits; receipt finalization follows it in a
+nonthrowing finally. The following license and copyright notice apply to that
+derived body.
+
+```text
+PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+--------------------------------------------
+
+1. This LICENSE AGREEMENT is between the Python Software Foundation
+("PSF"), and the Individual or Organization ("Licensee") accessing and
+otherwise using this software ("Python") in source or binary form and
+its associated documentation.
+
+2. Subject to the terms and conditions of this License Agreement, PSF hereby
+grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+analyze, test, perform and/or display publicly, prepare derivative works,
+distribute, and otherwise use Python alone or in any derivative version,
+provided, however, that PSF's License Agreement and PSF's notice of copyright,
+i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+All Rights Reserved" are retained in Python alone or in any derivative version
+prepared by Licensee.
+
+3. In the event Licensee prepares a derivative work that is based on
+or incorporates Python or any part thereof, and wants to make
+the derivative work available to others as provided herein, then
+Licensee hereby agrees to include in any such work a brief summary of
+the changes made to Python.
+
+4. PSF is making Python available to Licensee on an "AS IS"
+basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+INFRINGE ANY THIRD PARTY RIGHTS.
+
+5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+6. This License Agreement will automatically terminate upon a material
+breach of its terms and conditions.
+
+7. Nothing in this License Agreement shall be deemed to create any
+relationship of agency, partnership, or joint venture between PSF and
+Licensee.  This License Agreement does not grant permission to use PSF
+trademarks or trade name in a trademark sense to endorse or promote
+products or services of Licensee, or any third party.
+
+8. By copying, installing or otherwise using Python, Licensee
+agrees to be bound by the terms and conditions of this License
+Agreement.
+```
+
 Metadata capture and classification share a component guard. The trusted prefix may retain its platform lexical spelling, but location, dist-info roots and every component beneath that prefix must be free of symlinks before metadata content is read. Traversal uses lazy directory iterators, checks components before descent and stops at the 512-entry bound without collecting an entire tree. The owned RECORD is retained first so later traversal/read failures still leave useful partial evidence.
 
 The hosted observer records started, completed and failed state. Unexpected exceptions retain operation and command context and mark the observer failed. Cleanup requires a successful observer completion as well as thread termination; a fatal or unknown dead-thread state cannot be reconciled by a process exit. Raw process errors and exact native-closure reconciliation remain separate evidence.
@@ -27,7 +139,7 @@ The driver refuses execution outside an ordinary GitHub hosted runner or outside
 
 Installation uses the verified public installer with separate tools, executable, state, cache, Python, runtime, temporary and unrelated working directories. An external uv observer checks each actual wheel input immediately before forwarding the unchanged uv arguments. It joins that path to installed `direct_url.json`, without placing observer data into install state. Every successful install gets a separate installed interpreter receipt: Python 3.12, exact `sys.prefix`, distribution and module locations, import finders, existing `.pth` hashes, all package bytes and set membership, static bytes, metadata/license bytes and all wheel RECORD entries. The 94 package files include 42 static files; there are 52 other package files, 100 wheel file members and 100 wheel RECORD rows, of which 99 carry hashes and one is the unhashed RECORD self-row. Complete installed RECORD rows and actual hashes/sizes are retained, with generated metadata, entrypoints and bytecode classified separately. Unclassified additions, escaped resolved paths and invalid declared hashes/sizes fail acceptance. Dependency distributions and their recorded files must resolve under the owned prefix; receipts retain available direct URLs or explicit absent index origins. No `.pth` file is authored.
 
-The original installer smoke runs from a byte-bound private copy. Its only adapter adds `curl`, `python3`, `mktemp`, `rm` and `grep` to the original `uv`, `sh`, `ps`, `uname` headless PATH inventory. The verified public installer uses grep for embedded-tag validation, curl/python3 for downloaded asset verification, mktemp/rm for its temporary workspace and uv for installation. Both repeat installs need those tools under the narrowed PATH. Node remains absent and all original smoke assertions remain. Each of its three installer calls receives full provenance checks. The separate business installation receives another public reinstall after business tests, with full inventory parity against its first install.
+The original installer smoke runs from a byte-bound private copy. Its loader adapter adds `curl`, `python3`, `mktemp`, `rm` and `grep` to the original `uv`, `sh`, `ps`, `uname` headless PATH inventory. The verified public installer uses grep for embedded-tag validation, curl/python3 for downloaded asset verification, mktemp/rm for its temporary workspace and uv for installation. Both repeat installs need those tools under the narrowed PATH. Node remains absent and all original smoke assertions remain. Each of its three installer calls receives full provenance checks. The separate business installation receives another public reinstall after business tests, with full inventory parity against its first install.
 
 The driver attempts smoke diagnostic retention after every original smoke outcome. Native failure and timeout remain primary. A separate retention receipt binds that command, preparation/source/run/input identities and every bounded source file's actual hash, size and mode. Original `checks.json`, command 19 and nested logs are copied under uploaded `evidence/original-smoke/` with the smoke's existing synthetic-secret redaction plus collected runtime credential/token values. Owned runtime model documents and logs receive the same sanitization. Credentials, dotenv, PID/install state, database bytes and other runtime files contribute bounded hash/stat diagnostics only; their content is not uploaded. An absent install-state file is explicitly recorded at the snapshot. Missing evidence, aliases, unsupported types, budget or copy errors leave completion false. A retention failure also fails a successful native smoke; it cannot replace or convert a native smoke failure. A failure-time file snapshot does not prove preservation across a repeat installation.
 
@@ -37,7 +149,7 @@ Run 37995710573 attempt 1 supplies two completed initial origins per OS and then
 
 `adapt.py` copies active tests into a helper tree containing no `jev_gateway` directory. Installed Python is invoked with `-I` for provenance and pytest entry; pytest entry adds only that helper root. Source templates and the dashboard build fixture target installed templates/static. The real backend TypeScript fixture targets the installed interpreter, captured listing and test-only Python helpers; the SQLite subprocess targets that same interpreter. Its original server, socket/listing guards and tests stay intact. Every replacement has an exact match count, before/after hash and byte-identical reverse oracle. The browser configuration derives from the original configuration and removes the Vite web-server owner while retaining test selection, parallelism, default deadlines, device and retry-zero semantics. It serves the installed gateway assets.
 
-The import-time provider preset registry loader invokes `PUBLIC_ACCEPT_PYTHON` directly with `-I -B -c`. Its copied fixture omits the explicit source-style `VIRTUAL_ENV` override. The original registry body, both socket connection rejection guards, bundled LiteLLM flags, cwd, encoding and browser assertions remain exact. Seven adapters reverse to their complete signed source bytes. Static mutation probes use the real signed fixture and reject source uv loading, a wrong interpreter, missing isolation, source environment restoration, removed network guards, a synthetic registry and changed assertions or identities. These checks establish preparation; actual hosted collection and browser execution remain required.
+The import-time provider preset registry loader invokes `PUBLIC_ACCEPT_PYTHON` directly with `-I -B -c`. Its copied fixture omits the explicit source-style `VIRTUAL_ENV` override. The original registry body, both socket connection rejection guards, bundled LiteLLM flags, cwd, encoding and browser assertions remain exact. The seven original loader/configuration adapters plus six additional signed fixture files yield thirteen complete signed-file reversals. Static mutation probes use the real signed fixture and reject source uv loading, a wrong interpreter, missing isolation, source environment restoration, removed network guards, a synthetic registry and changed assertions or identities. These checks establish preparation; actual hosted collection and browser execution remain required.
 
 The complete original application browser owner must collect and execute the same 646 case identities. Both real credential modes are provided. The nine standalone cloud component cases use a source Vite harness and remain source-only UNRUN. An additional 24-case installed credential owner exercises primary, all three AWS fields and Vertex JSON in both locales, two viewport widths and both schemes. It retains the original captured-listing server and socket guard, seeds synthetic protected credentials, and checks native typing/deletion, pending clearing, raw failure restoration, actual PUT admission, unchanged credential/dotenv bytes and modes, retained model/strategy fields and zero outbound sockets. Its counts stay separate from the original 646 and the source union of 655.
 
