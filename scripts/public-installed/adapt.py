@@ -71,6 +71,11 @@ def prepare(source: Path, target: Path, package: Path, python: Path, evidence: P
          '{ cwd: process.env.PUBLIC_ACCEPT_HELPER!, env: { ...process.env, PYTHONPATH: process.env.PUBLIC_ACCEPT_HELPER!, PYTHONDONTWRITEBYTECODE: "1" } }', 1)])
     replace("frontend/tests/browser/real-backend-contracts.spec.ts", [
         ('resolve(repoRoot(), ".venv", "bin", "python")', 'process.env.PUBLIC_ACCEPT_PYTHON!', 1)])
+    replace("frontend/tests/browser/provider-presets.spec.ts", [
+        ('execFileSync("uv", ["run", "--no-sync", "--offline", "python", "-B", "-c", `',
+         'execFileSync(process.env.PUBLIC_ACCEPT_PYTHON!, ["-I", "-B", "-c", `', 1),
+        ('env: { ...process.env, VIRTUAL_ENV: fileURLToPath(new URL("../../../.venv", import.meta.url)), LITELLM_MODE:',
+         'env: { ...process.env, LITELLM_MODE:', 1)])
     shutil.copy2(source / "scripts/smoke-installed-release.py", target / "smoke.py")
     replace("smoke.py", [("('uv', 'sh', 'ps', 'uname')", "('uv', 'sh', 'ps', 'uname', 'curl', 'python3', 'mktemp', 'rm', 'grep')", 1)])
     scope = []

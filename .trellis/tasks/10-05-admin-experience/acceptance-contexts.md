@@ -2,6 +2,8 @@
 
 ## Current delivery status
 
+加载适配独立结论 `LOADER_PREPARATION_REVIEWED; OWNERSHIP_BLOCKED_DECISION`，见[恢复复核](../../.runtime/admin-experience/final-release-20261009/public-loader-ownership-delivery-20261010/independent-recovered.md)，完整 21,990 字节/SHA `79156bb7b9603c276c3bc9e5102a9f180a96eeb349787c3a447b9727fcf0827f`。父级已核对实现 1079 文件/8 链接和独立 1814 文件/16 链接，整合三个 helper，十二文件保持。七源码完整反向还原、十一 loader/五 headless 变异、原纯探针及 TypeScript 通过；活跃 Python LSP 仅十五处既有夹具错误，无新增，规范已同步。HTTP/2 中断、祖先第四次 REWORK 和当前加载准入分别保留。真实拥有者协议仍未实现，不把组合交付作为无条件托管执行准入；下一步先准备真实 helper Popen 回执及未绑定创建者诊断的明确边界。安装/RL1 OPEN。
+
 第四次实际运行 `38032903813` attempt 1 经 fresh reviewer `d7e8a9db` 完整复核为 REWORK，见[报告](../../.runtime/admin-experience/final-release-20261009/public-runtime-fourth-failure-38032903813-20261010/independent-rework.md)。父级保存并核对 361 个证据文件、28,977,409 字节、模式及无祖先链接，完整报告 18,879 字节/SHA `8708dc23131708c0443ca3327c096edc21742a3661e9eecbcdc63913d19ee25e`。两平台原 smoke/重复安装、四个安装来源及依赖后来源、首轮后端 3104 通过调用/两项条件 skip、原浏览器类型检查通过；不能代替尚未运行的第五来源、646 应用/24 补充、补充类型、真实捕获及同 ID 无 skip 重放。命令 026 浏览器收集因 `provider-presets.spec.ts` 未适配安装解释器而失败，Ubuntu 七条 TCP 观察另缺原生闭合回执；macOS 仅已达部分清理通过。具体来源及历史范围分开，安装/RL1 OPEN。
 
 原 writer 无可恢复句柄/确切路径，明确 fresh 实现后继在原协议/私有工作树下修复实际加载缺口并追溯真实拥有者；复核接续 `d7e8a9db`，编排 `276fcc2c-e04b-4c45-90c7-de0b0f779c11`。真实拥有者回执不可得时保留阻塞；不改公开产品，不删观察/弱化门禁，不凭端口消失或外层退出填原生证明。独立准备复核前不再托管执行。

@@ -744,6 +744,58 @@ def smoke_diagnostic_probes(output: Path) -> list[dict]:
     return results
 
 
+def registry_loader_probes(root: Path, target: Path, output: Path) -> list[dict]:
+    """Check the real signed registry fixture without executing its Python body."""
+    relative = "frontend/tests/browser/provider-presets.spec.ts"
+    before = (root / relative).read_bytes()
+    assert hashlib.sha256(before).hexdigest() == "5af1e06c736cad39d10b51973f629ac8fa776fac7b9596b60c0be40be812fe2d"
+    source = before.decode()
+    old_call = 'execFileSync("uv", ["run", "--no-sync", "--offline", "python", "-B", "-c", `'
+    new_call = 'execFileSync(process.env.PUBLIC_ACCEPT_PYTHON!, ["-I", "-B", "-c", `'
+    old_env = 'VIRTUAL_ENV: fileURLToPath(new URL("../../../.venv", import.meta.url)), '
+    assert source.count(old_call) == source.count(old_env) == 1
+    expected = source.replace(old_call, new_call).replace(old_env, "")
+    def validate(text: str) -> None:
+        assert text == expected, "registry loader differs outside admitted installed seam"
+        assert text.count(new_call) == 1 and old_call not in text and old_env not in text
+        # Full reversal protects the Python body, both socket guards and all TS assertions.
+        reverse = text.replace(new_call, old_call).replace(
+            'env: { ...process.env, LITELLM_MODE:', 'env: { ...process.env, ' + old_env + 'LITELLM_MODE:')
+        assert reverse.encode() == before
+        body = text.split(new_call, 1)[1].split('`], {', 1)[0]
+        assert body == source.split(old_call, 1)[1].split('`], {', 1)[0]
+        ast.parse(body)
+        assert "socket.socket.connect = block_network" in body
+        assert "socket.socket.connect_ex = block_network" in body
+    actual = (target / relative).read_text()
+    validate(actual)
+    results = [{"case": "signed source installed seam/full reversal/body/assertions", "result": "passed"}]
+    mutations = [
+        ("original source uv loader", source),
+        ("wrong interpreter", actual.replace("process.env.PUBLIC_ACCEPT_PYTHON!", '"python"', 1)),
+        ("missing isolated mode", actual.replace('["-I", "-B", "-c", `', '["-B", "-c", `', 1)),
+        ("source VIRTUAL_ENV", actual.replace('env: { ...process.env, ', 'env: { ...process.env, ' + old_env, 1)),
+        ("removed connect rejection", actual.replace("socket.socket.connect = block_network", "")),
+        ("removed connect_ex rejection", actual.replace("socket.socket.connect_ex = block_network", "")),
+        ("synthetic registry", actual.replace("provider_presets()", "[]", 1)),
+        ("removed assertion", actual.replace("expect(reference).toMatch", "expect(reference).not.toMatch", 1)),
+        ("changed collection identity", actual.replace("test(", "test.skip(", 1)),
+        ("changed cwd", actual.replace('cwd: fileURLToPath', 'cwd: String', 1)),
+    ]
+    for label, mutated in mutations:
+        assert mutated != actual, label
+        try:
+            validate(mutated)
+        except AssertionError as error:
+            results.append({"case": label, "result": "rejected", "message": str(error)})
+        else:
+            raise AssertionError("registry loader mutation admitted: " + label)
+    (output / "registry-loader-probes.json").write_text(json.dumps({
+        "source_sha256": hashlib.sha256(before).hexdigest(), "results": results,
+        "mode": "pure signed-byte checks; registry body never executed"}, indent=2) + "\n")
+    return results
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
@@ -779,7 +831,10 @@ def main() -> int:
             for line in before.read_text().splitlines():
                 if "expect(" in line or "test(" in line:
                     assert line in after.read_text(), line
-    checks.append("All six adapters match exact source fragments, preserve assertion AST/text, and reverse to original hashes")
+    assert len(report["adapters"]) == 7
+    checks.append("All seven adapters match exact source fragments, preserve assertion AST/text, and reverse to original hashes")
+    registry_checks = registry_loader_probes(root, target, output)
+    checks.append(f"{len(registry_checks)} signed registry-loader reversal and mutation checks passed")
     smoke_text = (target / "smoke.py").read_text()
     headless_inventory = next(node.iter for node in ast.walk(ast.parse(smoke_text))
                      if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"

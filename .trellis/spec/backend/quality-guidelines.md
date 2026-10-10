@@ -534,7 +534,15 @@ for asset verification and mktemp/rm for its temporary workspace. Shell builtins
 require no added executable. Keep the original no-Node assertion and prove that
 reversing this tuple restores the entire signed source smoke byte for byte.
 Helpers contain no source `jev_gateway`; installed Python and guarded listing
-fixtures own actual persistence. Bind collected identities to executed phase
+fixtures own actual persistence. The copied import-time provider registry loader
+uses `PUBLIC_ACCEPT_PYTHON` directly with `-I -B -c` and omits only its source-style
+`VIRTUAL_ENV` override. The driver sets that variable to the prefix interpreter
+after verifying the initial installed origin. Preserve the full registry Python
+body, both socket connection rejection guards, bundled pricing flags, cwd,
+encoding, TypeScript assertions and identities. Seven adapter files reverse to
+their complete signed source bytes. A failed source uv import does not identify
+the interpreter selected or establish missing installed package bytes.
+Bind collected identities to executed phase
 reports. Only the original X1/T3 missing-capture cases may skip before browser
 capture, with the exact reason and `setup=passed`, `call=skipped`,
 `teardown=passed`. Require precisely these phases, native exit 0 and the same
@@ -555,6 +563,7 @@ Count call reports and passed calls separately.
 | Observation identity is unknown or lacks one exact native closure | Keep the error unresolved and fail cleanup |
 | Original smoke fails, times out or cannot launch | Attempt bounded sanitized retention; preserve its primary exception and actual or unknown exit |
 | Narrowed repeat-install PATH lacks grep | Preserve native failure and tag-validation log; repair only the evidenced adapter tool inventory |
+| Import-time registry loader still chooses a source environment | Preserve failed collection; bind only the reversible loader seam to the verified isolated installed interpreter |
 | Retention has missing evidence, unsafe paths/types, invalid context or budget/copy/receipt error | Mark incomplete; preserve separate diagnostics and reject native success |
 | Observed parent PID, outer command exit or server disappearance lacks a descendant Popen closure | Keep the descendant observation unresolved |
 | Native replacement is deleted or validation fails | Preserve exact credentials, reference maps and file modes; retain the draft behavior assertions |
@@ -584,6 +593,10 @@ claiming preservation from a single failure-time snapshot.
 Good: both repeat installs retain the nine evidenced tools while the original
 no-Node check remains. Bad: interpret `grep: not found` followed by the installer's
 invalid-tag message as evidence that the verified public release tag is invalid.
+
+Good: collection reads the registry with the verified installed interpreter and
+unchanged socket guards. Base: original source tests retain their source loader.
+Bad: replacing the registry result or skipping its assertions to pass collection.
 
 ### 6. Tests Required
 
@@ -620,7 +633,13 @@ Inspect the complete verified public installer for the headless release path's
 executable requirements. A pure AST check requires the exact nine-tool tuple,
 the unchanged no-Node assertion and corresponding installer source fragments.
 Mutation probes reject missing grep, added node, added bash and a removed guard;
-the exact tuple passes. Retain six adapter reversals and full smoke byte parity.
+the exact tuple passes. Retain seven adapter reversals and full smoke byte parity.
+Bind the registry fixture's signed hash and whole adapted bytes. Eleven pure
+outcomes accept the exact seam and reject source uv, wrong interpreter, missing
+isolation, restored source environment, either missing socket guard, synthetic
+registry, changed assertion, changed identity and changed cwd. Parse the original
+Python body without executing it. Hosted collection and execution remain separate
+requirements; preparation and browser TypeScript alone cannot certify them.
 Fresh parent LSP compares changed Python files with existing fixture diagnostics;
 static preparation cannot establish repeat installation or hosted type success.
 
@@ -644,3 +663,8 @@ failure separately and propagate the original native exception unchanged.
 Wrong: restore the ordinary system PATH to make repeat installation work, or
 remove the no-Node assertion. Correct: preserve the narrow evidenced inventory
 and add grep in the existing exact, reversible smoke adapter.
+
+Wrong: let an import-time browser fixture select a nonexistent source `.venv`, or
+replace its registry body to suppress the resulting collection failure. Correct:
+invoke the verified `PUBLIC_ACCEPT_PYTHON` with isolated mode, preserve the body
+and assertions, and reverse the whole copied file to the signed source bytes.
