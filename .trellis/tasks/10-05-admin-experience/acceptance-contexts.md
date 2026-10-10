@@ -2,6 +2,10 @@
 
 ## Current delivery status
 
+用户明确要求本机安装最新版后，父级使用校验过的公开安装器完成 `0.1.2 → 0.1.3` 普通操作员升级，native 0。恢复 wheel 与旧安装产品一致，工具环境/配置/凭据/一致 SQLite 备份已保存；目标基础/覆盖配置通过，安装后 94 个产品文件、42 个静态资源及五个元数据文件与公开 wheel 逐字节一致，八个原运行文件字节/模式及 SQLite 完整性/表计数保留。入口恢复，原停止状态保留，见[具体验证](../../.runtime/admin-experience/operator-install-013-i0kao5bp/installation-verified.json)。本机成功不替代完整两平台生命周期/业务/重放验收，也不关闭原严格监督/封存历史。
+
+headless 修正签名提交 `36eed501057109203347c878b9036a9a9321cab5` 已在环境账户/TLS 恢复后重新核对并推送，原失败回执保留。[新运行 38032903813](https://github.com/TexasOct/jev-gateway/actions/runs/38032903813) attempt 1 的准备 SHA 是 `36eed50`，固定产品/标签/公开 wheel/生产运行保持。原句柄及确切目录被清理，编排 `155e96dd` 在持久化子会话前失败，未形成验收结果；父级保存失败和两份状态补丁，并以原角色/模型/工具/工作树协议启动明确标注的 fresh 后继 `e94de196-a1e9-4d18-9d55-e2e63ab3f723`，不重复派发。见[恢复记录](../../.runtime/admin-experience/final-release-20261009/public-headless-installer-tools-commit-20261009/fourth-context-recovery.md)。完整安装验收及 RL1 仍 OPEN，三个早期实际失败及未知/退出缺证保持各自原范围。
+
 headless 工具清单修正已由原独立上下文 `215558e4` 准入，见[完整复核](../../.runtime/admin-experience/final-release-20261009/public-headless-installer-tools-delivery-20261009/independent-admission.md)。三个文件仅涉及加入 `grep`、静态回归和说明；十二个文件保持原字节，六项适配和整份 smoke 均可反向还原，无 Node 检查保留，独立静态及五项变异检查通过。父级核对 691 项独立及 820 项实现证据，整合后十五文件指纹一致；新 LSP 无新增错误，十五处既有夹具诊断保留。规范已同步，继续限定提交与新托管验证；完整安装验收及 RL1 仍 OPEN。
 
 [运行 38001417376](https://github.com/TexasOct/jev-gateway/actions/runs/38001417376) attempt 1、准备 SHA `16d9d55` 两平台均在首次重装 native 1、无超时。原独立上下文 `0d32d1cc` 返回 REWORK，见[完整报告和证据](../../.runtime/admin-experience/final-release-20261009/public-runtime-third-failure-38001417376-20261009/independent-rework.md)。本次失败留证和已执行清理通过，真实 command19 日志确认限缩 PATH 漏掉公开安装器第 52 行需要的 `grep`。每平台两个初始完整来源通过，完整生命周期/业务/重装关口尚未到达；父级保存并核对 229 项证据。原实现及独立验收上下文接续限定工具清单修正，编排 `12fe51e7-41cc-4469-9c1a-7bdeb00ca109`。产品、标签、公开 wheel 和生产运行保持原输入；两次早期实际失败、未知重装原因及 PID `2802`/`2817` 的退出缺证保留。完整安装验收及 RL1 仍 OPEN。
