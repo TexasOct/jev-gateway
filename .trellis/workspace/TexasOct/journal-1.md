@@ -211,3 +211,24 @@ Delivered independent icon selection, mainstream provider templates and cloud se
 ### Status
 
 [OK] **Completed**
+
+## 2026-10-11: Admin task closure and stable 0.1.4 publication
+
+The operator accepted the preceding verified phase and requested direct
+publication without further local tests. The admin-experience task was archived
+before release submission, with original acceptance and known exceptions kept
+in its archive note. Ten child context file fields were repaired after the move.
+
+Main received the frozen independently reviewed native-owner helper files in
+`1615140`, then version 0.1.4 and archival in `48b042e`. Dependency records stayed
+unchanged. Interrupted browser diagnostic edits remain in the retained private
+release worktree.
+
+Tag `v0.1.4` retains source `48b042ed2f164a7df62950dab61b17c2deb22dce`.
+Workflow `38071055208` completed build, Ubuntu/macOS installed smoke and release
+successfully. The public latest stable release has four assets; unauthenticated
+downloads match published digests and both sidecars. Wheel SHA-256:
+`41afb6fa549441feab30500489e4f3c9b5cdbdeca1921213c8dd3ee95f88d72b`.
+No further local product tests, installer execution or wheel installation ran.
+
+Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.4

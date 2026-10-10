@@ -51,8 +51,33 @@ original identities. New 0.1.4 publication does not retroactively resolve them.
 
 Archival records this operator-directed closure with verification exceptions.
 The task's administrative completed status is distinct from complete fresh
-local acceptance. Publication is pending until the actual tag workflow and
-four public assets are observed; its receipts will be retained separately.
+local acceptance.
+
+## Published stable release
+
+[Stable 0.1.4](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.4) was
+published at `2026-10-10T17:23:48Z` from tag source
+`48b042ed2f164a7df62950dab61b17c2deb22dce`.
+[Workflow 38071055208](https://github.com/TexasOct/jev-gateway/actions/runs/38071055208)
+completed successfully: build, Ubuntu installed smoke, macOS installed smoke
+and publication. The tag is retained at that source; this later documentation
+records the observed outcome.
+
+The release is public, neither draft nor prerelease, and the latest stable
+release returned by GitHub. All four assets were downloaded without credentials:
+install.sh, its SHA-256 file, jev_gateway-0.1.4-py3-none-any.whl and its SHA-256
+file. Published sizes, GitHub digests and both sidecars match the actual bytes.
+The wheel's distribution metadata and package version declare 0.1.4.
+
+Installer SHA-256:
+`c803952520701fb80a3c20a013a86015cfa8586ffeaad740bdf645d372aee914`.
+Public wheel SHA-256:
+`41afb6fa549441feab30500489e4f3c9b5cdbdeca1921213c8dd3ee95f88d72b`.
+This public wheel is separate from the interrupted preparation wheel. The
+publication receipt is retained at
+`.trellis/.runtime/admin-experience/release-014-20261010/direct-publication/publication-receipt.json`.
+No further local product tests, installer execution or wheel installation were
+performed. The existing publication workflow supplied its configured checks.
 
 Ten archived child context entries now point to the moved parent's current-state
 research file. Only their file fields changed; reasons and historical parent
