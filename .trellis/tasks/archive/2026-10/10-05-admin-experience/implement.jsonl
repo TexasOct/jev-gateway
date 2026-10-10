@@ -5,3 +5,5 @@
 {"file": ".trellis/spec/backend/provider-identities.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
 {"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
 {"file": ".trellis/tasks/10-05-admin-experience/research/current-state.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
+{"file": ".trellis/tasks/10-05-admin-experience/research/acceptance-harness-policy-20261010.md", "reason": "Operator-authorized acceptance-harness criteria supersede prospective runtime/preparation approval gates; preserve actual business and cleanup evidence"}
+{"file": ".trellis/tasks/10-05-admin-experience/research/release-014-authority-20261010.md", "reason": "Operator directs completion, task archival, then final submission and stable 0.1.4 publication; preserve historical 0.1.3 bindings"}

@@ -5,3 +5,5 @@
 {"file": ".trellis/spec/backend/provider-identities.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
 {"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
 {"file": ".trellis/tasks/10-05-admin-experience/research/current-state.md", "reason": "Dashboard configuration, privacy, and evidence contract"}
+{"file": ".trellis/tasks/10-05-admin-experience/research/acceptance-harness-policy-20261010.md", "reason": "Review static acceptance harness using captured identities and meaningful pure controls; do not block on empty approval registries or unavailable local type tooling"}
+{"file": ".trellis/tasks/10-05-admin-experience/research/release-014-authority-20261010.md", "reason": "Review scope separates bounded harness readiness from current product acceptance and actual stable 0.1.4 release evidence"}

@@ -47,3 +47,19 @@ The user's explicit removal request supersedes native Dialog implementation asse
 | Parent integration | `accept-integration` | parent `acceptance.md` for IA1-IA5/DV1-DV3 and cross-child integration |
 
 Acceptance contexts start from the recorded source requirements and current integrated code, without inheriting implementer conversations. Rework returns to the implementing owner; subsequent verification resumes the task's acceptance context. A pre-integration review may identify gaps but cannot declare final PASS before the required integrated browser/runtime checks pass.
+
+## Acceptance harness gate adjustment
+
+Apply the authorized [2026-10-10 criteria adjustment](research/acceptance-harness-policy-20261010.md) to the private seven-file helper. Review the frozen integrated candidate for code defects, then replace unusable empty-registry gates with captured identity/source/manifest checks and run affected pure controls. Preserve previous receipts and source hashes. Missing local type tooling is nonblocking for static harness acceptance; product hosted gates remain required. Obtain independent review of the adjusted candidate before integration/spec/commit. Main's unrelated changes remain outside this work.
+
+## Operator-directed 0.1.4 completion
+
+Apply the [0.1.4 publication direction](research/release-014-authority-20261010.md) without relabeling historical 0.1.3 inputs.
+
+- [ ] Independently review the narrow harness repair and integrate only accepted source.
+- [ ] Reconcile current product acceptance against main `1633302d1518c7da7f8136f6bee8e7be9b3578b8` and later scoped changes; complete the required current-source and installed business checks.
+- [ ] Prepare matching 0.1.4 package/version/lock metadata; preserve resolved dependency versions and unrelated work.
+- [ ] Complete documented frontend, Python/type, package and isolated installed verification, plus independent release review; update source-backed specs and final task evidence.
+- [ ] Archive the completed task before remote release submission, preserving original failures and any historical limitations.
+- [ ] Commit and submit the reviewed release source, push the matching v0.1.4 tag, and monitor the existing build and same-wheel OS smoke gates to their actual terminal results.
+- [ ] Verify the published stable release, four asset bytes and sidecars, and the isolated public installer path. Record actual publication evidence and any failures separately.

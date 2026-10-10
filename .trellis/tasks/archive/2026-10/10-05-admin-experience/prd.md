@@ -42,7 +42,7 @@ The original development request authorizes implementation and verification. App
 | DV2 | Browser acceptance covers key editing, native graph add/delete, credential replacement, batch import, metadata failure, manual override and model save. Provide inspectable screenshots/records and honest verification scope. | All / Integration |
 | DV3 | Each child task has its own independent acceptance-agent context, separate from its implementer. That agent manages its requirement audit, execution evidence, verdict and rechecks. The parent has a separate integration-acceptance context. | Acceptance agents |
 | OR1 | Organize frontend Provider source by responsibility, update all imports and source-backed references, and preserve API, credential and model identity contracts. Test the resulting layout against the integrated feature scope. | Integration |
-| RL1 | Complete every modification goal and independent acceptance before the final commits and stable 0.1.3 publication. Verify version metadata, source and installed artifacts, publication workflow and public installer in isolated environments. | Integration / Release |
+| RL1 | Complete every modification goal and independent acceptance, archive the task, then submit and publish stable 0.1.4 as directed by the operator on 2026-10-10. Verify version metadata, source and installed artifacts, publication workflow and public installer in isolated environments. Retain historical 0.1.3 attempts under their original identities. | Integration / Release |
 
 # Task map
 
@@ -69,3 +69,13 @@ Five independent worktrees own Settings, Canvas, Suppliers, Model contracts and 
 # Completion evidence
 
 Acceptance requires inspected code/diffs, targeted regressions, frontend lint/unit/build/browser checks, full pytest, Pyright, bundle freshness and package asset checks. A final requirement audit records evidence for every row above. Implementer tests and main-session checks are supporting evidence; the independent task acceptance agent owns the acceptance verdict.
+
+For the seven-file acceptance harness, the operator's [2026-10-10 criteria adjustment](research/acceptance-harness-policy-20261010.md) applies. Static harness acceptance uses captured runtime/preparation identities and meaningful pure checks; prospective interpreter-binary/commit-tree approval and unavailable local type tooling are not blocking requirements. Product business assertions, credential/origin protection and real owned cleanup remain required. Installed business acceptance and RL1 require their actual execution evidence.
+
+The operator's [0.1.4 completion and publication direction](research/release-014-authority-20261010.md) supersedes the prospective 0.1.3 release target and requires archival before remote publication. Historical 0.1.3 receipts retain their original scope. Final publication requires actual 0.1.4 workflow and public artifact evidence.
+
+The operator subsequently directed publication without further local testing,
+accepting the previous phase's verification. [The archive note](archive-note.md)
+records that decision, retained evidence and verification exceptions. Existing
+publication-workflow checks remain configured; no new local acceptance PASS is
+implied by administrative closure.
