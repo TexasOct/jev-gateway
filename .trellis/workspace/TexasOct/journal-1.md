@@ -229,6 +229,14 @@ Workflow `38071055208` completed build, Ubuntu/macOS installed smoke and release
 successfully. The public latest stable release has four assets; unauthenticated
 downloads match published digests and both sidecars. Wheel SHA-256:
 `41afb6fa549441feab30500489e4f3c9b5cdbdeca1921213c8dd3ee95f88d72b`.
-No further local product tests, installer execution or wheel installation ran.
+No further local product tests, installer execution or wheel installation ran
+before publication.
 
 Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.4
+
+The operator then requested the local upgrade. The verified public installer
+returned native 0, installed `jev 0.1.4` and restarted the previously running
+managed gateway successfully. All 99 wheel files match the release; seven
+configuration files retain bytes/modes, SQLite integrity is valid and all
+original row multiplicities remain present. Protected recovery material is
+retained in local state. No additional acceptance test suites ran.

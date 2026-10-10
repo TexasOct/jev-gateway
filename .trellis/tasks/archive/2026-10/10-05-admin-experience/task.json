@@ -43,7 +43,18 @@
       "release_workflow_run": 38071055208,
       "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.4",
       "published_at": "2026-10-10T17:23:48Z",
-      "wheel_sha256": "41afb6fa549441feab30500489e4f3c9b5cdbdeca1921213c8dd3ee95f88d72b"
+      "wheel_sha256": "41afb6fa549441feab30500489e4f3c9b5cdbdeca1921213c8dd3ee95f88d72b",
+      "operator_local_upgrade": {
+        "version": "0.1.4",
+        "installer_native_exit": 0,
+        "completed_at": "2026-10-10T17:51:30.383563+00:00",
+        "previously_running": true,
+        "running_and_healthy_after": true,
+        "configuration_preserved": true,
+        "database_rows_preserved": true,
+        "installed_release_files_matched": 99,
+        "additional_acceptance_test_suites_run": false
+      }
     }
   }
 }

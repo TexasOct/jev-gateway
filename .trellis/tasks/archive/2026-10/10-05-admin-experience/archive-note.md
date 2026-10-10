@@ -76,10 +76,32 @@ Public wheel SHA-256:
 This public wheel is separate from the interrupted preparation wheel. The
 publication receipt is retained at
 `.trellis/.runtime/admin-experience/release-014-20261010/direct-publication/publication-receipt.json`.
-No further local product tests, installer execution or wheel installation were
-performed. The existing publication workflow supplied its configured checks.
+At publication, no further local product tests, installer execution or wheel
+installation were performed. The existing publication workflow supplied its
+configured checks.
 
 Ten archived child context entries now point to the moved parent's current-state
 research file. Only their file fields changed; reasons and historical parent
 identities remain intact. Parent self-references use the loader's archived-task
 mapping. The archive command clears only session pointers matching this task.
+
+## Operator-requested local upgrade
+
+After publication, the operator explicitly requested a local update/install.
+The verified public 0.1.4 installer completed with native exit 0 at
+`2026-10-10T17:51:30.383563+00:00`. The originally running managed gateway was
+restarted through the ordinary ownership checks; the new owned process is
+running and healthy, and `jev --version` reports `jev 0.1.4`.
+
+Both CLI entrypoints resolve into the uv tool environment. All 99 installed
+wheel files, product membership and file modes match the public release. Seven
+runtime configuration files retain their exact bytes and modes. SQLite integrity
+is valid; all original typed row multiplicities remain present in its six tables.
+Target baseline and overlay compatibility used the protected runtime snapshot,
+real credential precedence and bundled pricing, with network and child launch
+denied during configuration preparation.
+
+The old tool environment, matching 0.1.3 recovery wheel, runtime files and
+consistent SQLite backups remain in the operator's protected local state area.
+No additional acceptance test suites ran. Historical acceptance exceptions
+remain recorded above.
