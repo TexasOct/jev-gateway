@@ -826,3 +826,63 @@ Wrong: compare unnormalized arrays, rewrite raw source history, or measure only
 the shortened normalized envelope. Correct: validate original bounds, normalize
 copied runtime/field values with the existing ladder, preserve raw history and
 reject provenance controls before mutation.
+
+## Scenario: serving overrides and explicit source choices
+
+### 1. Scope / trigger
+
+Use for canonical Models.dev inheritance and model editor reference/conflict
+resolution. A canonical link does not make its base parameters an independent
+serving quote.
+
+### 2. Signatures
+
+```ts
+modelSourceValues(item: ModelEvidence | undefined, field: ModelField): Array<{ source: CandidateSource; value: string }>
+```
+
+`MetadataClient.lookup()` retains its existing response and network boundaries.
+
+### 3. Contracts
+
+An exact provider row's known fields override canonical model facts. Canonical
+facts fill absent/null fields, excluding all prices. Retain overridden canonical
+fields in reference-only evidence; independent provider records can still
+conflict. Preserve false, zero and known empty effort lists as overrides.
+
+The model editor offers distinct valid current source values for reference-only
+or conflicting fields. Adoption uses the existing field change handler, sets
+manual ownership and retains provenance. It does not write until Save/import.
+Do not offer unknown, invalid or failed-source values. Known applicable values
+continue to prefill normally; manual values stay protected on later refreshes.
+
+### 4. Validation and error matrix
+
+| Condition | Result |
+| --- | --- |
+| Provider output 393216, canonical output 384000 | Automatic output 393216; canonical 384000 remains reference evidence |
+| Provider capability false, canonical true | Provider false wins |
+| Provider field absent/null | Canonical nonprice fact can fill it |
+| Independent serving sources disagree | Null automatic value; explicit valid source choices |
+| Custom proxy has original-provider prices | No automatic billing claim; adoption is manual |
+| Source failed or supplied an invalid value | No adoption button for that value |
+
+### 5. Good / base / bad cases
+
+Good: adopt a proxy reference price of 2, save it as manual confirmation and
+retain the original source. Base: a native applicable quote prefills as before.
+Bad: merge a canonical default as a competing serving override or automatically
+certify a proxy's billing using its brand.
+
+### 6. Tests required
+
+Assert canonical override/fallback, retained reference evidence, independent
+conflicts and immutable source inputs. Frontend tests cover explicit adoption,
+manual/source ownership, provenance, zero/false/empty values, invalid/failure
+rejection and native buttons through configured-model and import saves.
+
+### 7. Wrong vs correct
+
+Wrong: keep reference prices only in raw JSON, leaving the operator to copy them
+by hand. Correct: offer an explicit field choice with its source and preserve
+the manual confirmation boundary.

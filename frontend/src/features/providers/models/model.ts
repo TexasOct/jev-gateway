@@ -110,6 +110,25 @@ export function metadataSourceFailed(item: ModelEvidence): boolean {
   return item.warnings.includes("metadata_source_unavailable");
 }
 
+export function modelSourceValues(item: ModelEvidence | undefined, field: ModelField): Array<{ source: CandidateSource; value: string }> {
+  if (!item) return [];
+  const state = metadataFieldState(item, field);
+  if (state !== "reference" && state !== "conflict") return [];
+  const choices = new Map<string, { source: CandidateSource; value: string }>();
+  for (const source of item.sources) {
+    if (state === "conflict" && !source.applicable) continue;
+    const candidate = source.fields[field]?.value;
+    if (candidate == null) continue;
+    const value = JSON.stringify(candidate);
+    if (value === undefined) continue;
+    const draft = emptyModelDraft();
+    draft.values[field] = value;
+    if (modelErrors("source", draft)[field]) continue;
+    if (!choices.has(value)) choices.set(value, { source, value });
+  }
+  return [...choices.values()];
+}
+
 export function failedModelRefresh(draft: ModelDraft, upstream_model: string): ModelDraft {
   return { ...draft, evidence: { upstream_model, fields: {}, sources: [], warnings: ["metadata_source_unavailable"] }, currentMetadata: { version: 1, sources: [] } };
 }

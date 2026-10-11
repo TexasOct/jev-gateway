@@ -290,6 +290,8 @@ export const zhCN = {
   strategyEditor: "策略工作流",
   providerModels: "供应商",
   modelManagement: "模型管理",
+  mmUseSourceValue: "采用来源值",
+  mmReferenceNote: "这些值来自原厂资料。采用前请核对当前供应商的实际费率和功能。采用后会标记为人工确认，确认保存后才会生效。",
   strategyDiscard: "放弃未保存的工作流修改？",
   providerManagementPending: "配置接口就绪后，可在这里管理供应商和模型。",
   settings: "通用设置",

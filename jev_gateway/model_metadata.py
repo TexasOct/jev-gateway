@@ -455,7 +455,8 @@ class MetadataClient:
                 row, date = native
                 sources.append(_openrouter(row, model, date))
             for source, row, date in _find_models_dev(entries, source_provider, model):
-                sources.append(_models_dev(row, source, source_provider, model, date, applicable))
+                serving_fact = _models_dev(row, source, source_provider, model, date, applicable)
+                sources.append(serving_fact)
                 canonical = row.get("canonical_model_id", row.get("base_model"))
                 catalog = entries.get("models_dev_catalog")
                 if safe_identifier(canonical) and catalog is not None:
@@ -465,7 +466,16 @@ class MetadataClient:
                         # Canonical facts never carry a serving price.
                         source_fact["fields"] = {k: v for k, v in source_fact["fields"].items() if k not in {"input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"}}
                         source_fact.pop("pricing", None)
-                        sources.append(source_fact)
+                        # Provider fields override base_model facts in Models.dev.
+                        # Keep overridden facts for review without making them
+                        # competing automatic suggestions for this endpoint.
+                        overrides = {name for name, field in serving_fact["fields"].items() if _automatic_metadata_value(name, field["value"]) is not None}
+                        reference_fields = {name: field for name, field in source_fact["fields"].items() if name in overrides}
+                        source_fact["fields"] = {name: field for name, field in source_fact["fields"].items() if name not in overrides}
+                        if source_fact["fields"]:
+                            sources.append(source_fact)
+                        if reference_fields:
+                            sources.append({**source_fact, "applicable": False, "fields": reference_fields})
             if not sources:
                 snapshot = entries.get("litellm_snapshot")
                 if snapshot is not None and source_provider:

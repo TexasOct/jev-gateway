@@ -145,6 +145,53 @@ test("read-only supplier models remain inspectable through their editor", async 
   expect(state.writes).toEqual([]);
 });
 
+for (const mode of ["configured", "import"] as const) test(`reference source values can be adopted and saved from ${mode} models`, async ({ page, context }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  const state = fixture();
+  const values = { tools: false, vision: false, json_mode: true, reasoning: false, temperature: true, reasoning_effort: [], input_per_million: 1.5, output_per_million: 3, context_window: 100000, max_output_tokens: 1000 };
+  const source = { source: "models_dev", fetched_at: "2026-10-10T00:00:00Z", applicable: false, fields: Object.fromEntries(Object.entries(values).map(([field, value]) => [field, { value, source_field: field }])) };
+  state.metadataEvidence = { upstream_model: "existing", fields: {}, sources: [{ ...source, source_provider: "openai", source_model: "exact" }], warnings: ["reference_only", "serving_endpoint_unmatched"], metadata: { version: 1, sources: [{ ...source, id: "reference", provider_id: "openai", model_id: "exact" }] } };
+  await installProviderFixture(context, state); await open(page); await models(page, false, mode === "import");
+  const primary = group(page);
+  if (mode === "import") {
+    await primary.getByRole("button", { name: "Fetch upstream models", exact: true }).click();
+    await primary.getByRole("checkbox", { name: "fixture/alpha", exact: true }).check();
+    await primary.getByRole("region", { name: "fixture/alpha", exact: true }).getByRole("button", { name: "Edit model", exact: true }).click();
+  } else await primary.getByRole("button", { name: "Edit model", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  if (mode === "configured") await dialog.getByRole("button", { name: "Refresh metadata sources", exact: true }).click();
+  await expect(dialog).toContainText("These values describe the original provider.");
+  expect(state.writes).toEqual([]);
+  if (mode === "import") await expect(dialog.getByLabel("Input price (USD / million tokens)", { exact: true })).toHaveValue("");
+  else await expect(dialog.getByLabel("Input price (USD / million tokens)", { exact: true })).toHaveValue("1");
+  for (const field of Object.keys(values)) {
+    const control = dialog.locator(`#model-dialog-${field}`);
+    await expect(control).toHaveCount(1);
+    const fieldGroup = control.locator("xpath=ancestor::*[@data-model-field][1]");
+    await expect(fieldGroup).toHaveCount(1);
+    await expect(fieldGroup).toHaveAttribute("data-model-field", field);
+    const adoption = fieldGroup.getByRole("button", { name: /^Use source value:/ });
+    await expect(adoption).toHaveCount(1);
+    await adoption.click();
+  }
+  await expect(dialog.getByLabel("Input price (USD / million tokens)", { exact: true })).toHaveValue("1.5");
+  await expect(dialog.locator("#model-dialog-tools")).toHaveValue("false");
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  if (mode === "import") {
+    expect(state.writes).toEqual([]);
+    await primary.getByLabel("I reviewed the capabilities", { exact: false }).check();
+    await primary.getByRole("button", { name: "Confirm and import selected models (1)", exact: true }).click();
+  }
+  await expect.poll(() => state.writes.length).toBe(1);
+  const operation = state.writes[0]!.operations[0]!;
+  const saved = operation.action === "update_model" ? operation.model : operation.action === "import" ? operation.models[0]! : null;
+  expect(saved?.cost).toMatchObject({ input_per_million: 1.5, output_per_million: 3 });
+  expect(saved?.metadata?.fields?.input_per_million).toMatchObject({ status: "confirmed", value: 1.5, method: "manual", source_ids: ["reference"] });
+  expect(saved?.metadata?.sources?.[0]?.applicable).toBe(false);
+});
+
 test("import conflict reload retains model edits and retries the fresh revision", async ({ page, context }) => {
   const state = fixture(); await installProviderFixture(context, state); await open(page); await models(page, false, true);
   const primary = group(page);

@@ -290,6 +290,8 @@ export const en = {
   strategyEditor: "Strategy workflow",
   providerModels: "Suppliers",
   modelManagement: "Model management",
+  mmUseSourceValue: "Use source value",
+  mmReferenceNote: "These values describe the original provider. Check your supplier's rates and supported features before adopting them. Adopted values are marked as manual and are saved only when you confirm.",
   strategyDiscard: "Discard the unsaved workflow changes?",
   providerManagementPending: "Provider and model management will be available here when its configuration API is ready.",
   settings: "Settings",

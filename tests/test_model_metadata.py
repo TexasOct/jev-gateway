@@ -102,6 +102,26 @@ def test_source_conflicts_keep_both_candidates_and_null_field() -> None:
     assert len(item["sources"]) == 2 and "metadata_conflict" in item["warnings"]
 
 
+def test_serving_overrides_canonical_facts_without_losing_reference_evidence() -> None:
+    serving = {"canonical_model_id": "deepseek/base", "limit": {"output": 393216}, "tool_call": False, "temperature": None, "cost": {"input": 0.15}}
+    canonical = {"limit": {"context": 1000000, "output": 384000}, "tool_call": True, "temperature": True, "cost": {"input": 99}}
+    client = client_for(api={"deepseek": {"models": {"exact": serving}}}, catalog={"models": {"deepseek/base": canonical}})
+    provider = {"id": "deepseek", "type": "deepseek", "api_base": "https://api.deepseek.com/v1"}
+    item = client.lookup(provider, ["exact"])["items"][0]
+    assert item["fields"]["max_output_tokens"] == 393216
+    assert item["fields"]["tools"] is False
+    assert item["fields"]["context_window"] == 1000000
+    assert item["fields"]["temperature"] is True
+    assert item["fields"]["input_per_million"] == 0.15
+    assert "metadata_conflict" not in item["warnings"]
+    references = [source for source in item["sources"] if source["source_provider"] == "canonical" and not source["applicable"]]
+    assert len(references) == 1
+    assert references[0]["fields"]["max_output_tokens"]["value"] == 384000
+    assert references[0]["fields"]["tools"]["value"] is True
+    assert all("input_per_million" not in source["fields"] for source in item["sources"] if source["source_provider"] == "canonical")
+    assert serving["limit"]["output"] == 393216 and canonical["limit"]["output"] == 384000
+
+
 def test_litellm_backup_fallback_has_no_implicit_zero_or_total_input_window() -> None:
     client = client_for(snapshot={"openai/exact": {"litellm_provider": "openai", "input_cost_per_token": 0.000002, "input_cost_per_token_above_272k_tokens_priority": 0.000004, "cache_creation_input_token_cost_above_1hr_above_200k_tokens": 0.000001, "input_dbu_cost_per_token": 99, "max_input_tokens": 128000, "max_output_tokens": 4096, "supports_function_calling": False}, "other": {"litellm_provider": "anthropic", "input_cost_per_token": 0}})
     result = client.lookup(PROVIDER, ["exact", "other"])

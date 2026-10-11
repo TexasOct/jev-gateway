@@ -87,6 +87,10 @@ The import preview distinguishes complete matches, missing fields, conflicting e
 
 Prices use USD per million tokens. Input, output and applicable cache-read/cache-write prices keep their source units and billing conditions in the evidence record. A provider-wide retail quote does not establish a proxy's effective price. Matching uses the serving provider and exact upstream model ID or an evidenced alias; similar names alone are insufficient.
 
+When Models.dev links a provider record to a canonical model, the provider's declared parameters override the base model's values. Missing parameters can inherit canonical facts. Overridden canonical values remain reference evidence and do not create automatic conflicts with the serving record.
+
+For reference-only or conflicting values, open Edit model and choose Use source value beside the relevant field. The editor fills that value as a manual choice and retains its source evidence. Review a proxy's actual rates and features before adopting original-provider values. Saving or importing still requires confirmation; unknown fields need an explicit value or limit decision.
+
 Unknown price is not zero. Unknown capabilities are not support or rejection. Capability controls retain three states in a draft. Before adding a routable model, the existing confirmation boundary requires explicit input/output prices, capabilities, reasoning-effort values and limit decisions. A positive integer declares a known limit; an explicit unknown limit preserves the existing routing treatment and is explained in the editor. An incomplete row can be edited or retried while other evidence remains visible.
 
 ## One model editor

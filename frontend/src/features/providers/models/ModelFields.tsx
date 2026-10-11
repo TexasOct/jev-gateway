@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import type { useLocale } from "@/shared/i18n";
-import { capabilityFields, modelFields, modelFieldLabels } from "./model";
+import { capabilityFields, modelFields, modelFieldLabels, modelSourceValues } from "./model";
 import type { ModelDraft, ModelField } from "./model";
 import { Field } from "@/shared/ui/Field";
 import { Input } from "@/shared/ui/input";
@@ -28,6 +28,10 @@ export function ModelFields({ draft, onChange, t, prefix, states, errors = {} }:
           <Input {...props} type={field === "reasoning_effort" ? "text" : "number"} min={limit ? 1 : 0} step={limit ? 1 : "any"} disabled={value === "null"} value={value === "null" ? "" : value} placeholder={field === "reasoning_effort" ? '["low","high"]' : t(limit ? "pmLimitKnown" : "pmUnknown")} onChange={(event) => onChange(field, event.target.value)} />
         </>}</Field>
         {error === "mmReviewEvidence" && <Button variant="outline" onClick={() => onChange(field, value)}>{t("mmKeepValue")}</Button>}
+        {modelSourceValues(draft.evidence, field).map((choice) => <div key={choice.value} className="grid min-w-0 gap-1">
+          <span className="break-all text-xs text-ink-muted">{choice.source.source_provider}/{choice.source.source_model}: {choice.value === "true" ? t("pmSupported") : choice.value === "false" ? t("pmUnsupportedFlag") : choice.value}</span>
+          <Button variant="outline" className="min-h-11 whitespace-normal" aria-label={`${t("mmUseSourceValue")}: ${t(modelFieldLabels[field])} (${choice.value})`} onClick={() => onChange(field, choice.value)}>{t("mmUseSourceValue")}</Button>
+        </div>)}
         <Badge variant="outline">{t(!value ? "pmSourceUnknown" : draft.touched[field] ? "mmManual" : states?.[field] === "known" || (!states && draft.currentMetadata?.fields?.[field]?.method === "source") ? "mmAutomatic" : "pmSourceUnknown")}</Badge>
         {states?.[field] && states[field] !== "known" && <span className="text-xs text-ink-muted">{t(states[field] === "conflict" ? "pmConflictField" : states[field] === "reference" ? "pmReference" : "pmSourceUnknown")}</span>}
       </div></Fragment>;
