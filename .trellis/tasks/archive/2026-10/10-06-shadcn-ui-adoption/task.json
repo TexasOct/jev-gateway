@@ -15,7 +15,7 @@
   "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "69cf58501ecba3bc95d8dbdf9bad64fb29412347",
   "pr_url": null,
   "subtasks": [],
   "children": [
@@ -36,6 +36,31 @@
       "recordedOn": "2026-10-11",
       "record": "e1-manual-acceptance.md",
       "sourceManifestSHA256": "91c5fc7d9630d45f6e2be04bfd31d02e062646d765287fa8f2aea9d72030829d"
+    },
+    "release": {
+      "version": "0.1.5",
+      "status": "published",
+      "sourceCommit": "69cf58501ecba3bc95d8dbdf9bad64fb29412347",
+      "migrationCommit": "c3e6c8355a353aebd664d158e177502f42bcc668",
+      "allRemainingChangesIncluded": true,
+      "workflowRun": 38136766231,
+      "url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.5",
+      "publishedAt": "2026-10-11T11:52:55Z",
+      "wheelSHA256": "b255a0185cd97dc88160635fa2bae9dc84dbd2d419452bcc9822e2ef78cb4b9c",
+      "record": "release-0.1.5.md",
+      "operatorLocalUpgrade": {
+        "version": "0.1.5",
+        "installerNativeExit": 0,
+        "installerFinishedAt": "2026-10-11T12:12:40.469754+00:00",
+        "verifiedAt": "2026-10-11T12:23:06.231638+00:00",
+        "previouslyRunning": true,
+        "runningAndHealthyAfter": true,
+        "installedReleaseFilesMatched": 99,
+        "runtimeFilesPreserved": 7,
+        "databaseIntegrity": "ok",
+        "originalTypedRowMultiplicitiesPreserved": true,
+        "recoveryLocation": "/Users/texas/.local/state/jev-gateway/upgrade-0.1.5-20261011T184735"
+      }
     }
   }
 }

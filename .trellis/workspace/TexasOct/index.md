@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-10-04
+- **Total Sessions**: 10
+- **Last Active**: 2026-10-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~213 | Active |
+| `journal-1.md` | ~276 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-10-11 | Publish 0.1.5 and upgrade operator installation | `c3e6c8355a353aebd664d158e177502f42bcc668`, `69cf58501ecba3bc95d8dbdf9bad64fb29412347` | `main` |
 | 9 | 2026-10-04 | Provider icons and mainstream presets | `170b878`, `4e05f07` | `feat/provider-icon-presets` |
 | 7 | 2026-10-04 | 原生选择框箭头留白与宽屏对齐 | `95ef46f8fbfd4ae8a900dfc4e23bd8c06294a93c`, `4aa0eef9cc1338cea6c2d0b97d623d12ad517d40` | `fix/select-spacing-alignment` |
 | 6 | 2026-10-04 | v0.1.1 release acceptance | `6fc0f0e19e31f52d8e831593e8c530aed7e73141`, `3edb7e67f794182a21b050145c3ede06e0a06c3b` | `main` |

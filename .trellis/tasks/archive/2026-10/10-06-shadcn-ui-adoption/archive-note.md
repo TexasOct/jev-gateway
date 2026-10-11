@@ -11,4 +11,6 @@ Historical children:
 - `10-06-shadcn-config-surfaces`
 - `10-06-shadcn-operational-surfaces`
 
-The Git commit follows archival. `commit-plan.md` records the original proposal; the closure record will identify the final selected scope, including the E1 follow-up and mixed supplier browser file. Inherited metadata, locales, backend changes and source-adoption cases remain uncommitted. Original failure and review receipts remain unchanged. Release and operator service changes are outside this closure.
+At initial archival, the Git commit followed the move. `commit-plan.md` records that scope, including the E1 follow-up and mixed supplier browser file. Inherited metadata, locales, backend changes and source-adoption cases remained uncommitted at that point. Original failure and review receipts remain unchanged. Release and operator service changes were outside that initial closure.
+
+The operator subsequently authorized including all remaining changes in 0.1.5, publication and the local upgrade. These are complete; see [the release and upgrade record](release-0.1.5.md). The original archive and acceptance receipts retain their historical source bindings.

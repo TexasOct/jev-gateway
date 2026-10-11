@@ -240,3 +240,37 @@ managed gateway successfully. All 99 wheel files match the release; seven
 configuration files retain bytes/modes, SQLite integrity is valid and all
 original row multiplicities remain present. Protected recovery material is
 retained in local state. No additional acceptance test suites ran.
+
+
+## Session 10: Publish 0.1.5 and upgrade operator installation
+<!-- trellis-session: v=2 fp=3e8460e457c700e6 -->
+
+**Date**: 2026-10-11
+**Task**: Publish 0.1.5 and upgrade operator installation
+**Branch**: `main`
+
+### Summary
+
+Published stable 0.1.5 with all pending changes and upgraded the local gateway, preserving runtime configuration and SQLite records.
+
+### Main Changes
+
+The operator included all pending changes, published stable 0.1.5 and requested the local upgrade. Source `69cf58501ecba3bc95d8dbdf9bad64fb29412347` follows the shadcn B migration and archival commit `c3e6c8355a353aebd664d158e177502f42bcc668`. Tag `v0.1.5` remains immutable.
+
+Workflow `38136766231` completed build, Ubuntu/macOS installed smoke and publication successfully. Build results were 409 frontend units, 3210 Python tests passed with two skips, and Pyright with zero errors or warnings. Four public assets match API digests and checksum sidecars. Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.5
+
+The public installer returned native 0 and installed `jev 0.1.5`. The actual uv wheel input matches public SHA256 `b255a0185cd97dc88160635fa2bae9dc84dbd2d419452bcc9822e2ef78cb4b9c`. Both missing CLI entrypoints were restored; 99 installed files and 42 static assets match the release. The previously running gateway restarted and is healthy at `127.0.0.1:8000`. Seven configuration files retain bytes/modes, SQLite integrity is valid, and every original typed row multiplicity remains present across six tables.
+
+Recovery uses a complete verified copy of the former installed tool environment because its metadata module and two dashboard files differed from the official 0.1.4 wheel. Protected evidence remains at `/Users/texas/.local/state/jev-gateway/upgrade-0.1.5-20261011T184735`. E1 manual PASS and original automated failures remain distinct; this local upgrade does not rewrite historical admin acceptance exceptions.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c3e6c8355a353aebd664d158e177502f42bcc668` | feat(dashboard): adopt shadcn B surfaces and archive accepted tasks |
+| `69cf58501ecba3bc95d8dbdf9bad64fb29412347` | chore(release): include pending metadata changes in 0.1.5 |
+
+### Status
+
+[OK] **Completed**
