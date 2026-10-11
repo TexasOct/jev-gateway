@@ -166,7 +166,7 @@ test("waits for a successful rotation response before exposing an old read's ear
   await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toBeEnabled();
   let releaseRead: (() => void) | undefined;
   let intercept = true;
-  await context.route("**/v1/routing/configuration", async (route) => {
+  await context.route("**/v1/routing/configuration?strategy=balanced", async (route) => {
     if (!intercept) return route.fallback();
     intercept = false;
     await new Promise<void>((resolve) => { releaseRead = resolve; });
@@ -180,7 +180,7 @@ test("waits for a successful rotation response before exposing an old read's ear
   await page.getByRole("button", { name: "Replace access key", exact: true }).click();
   await input.fill("synthetic-after-race"); await input.press("Enter");
   await expect.poll(() => typeof releaseWrite).toBe("function");
-  const earlyRead = page.waitForResponse((response) => response.url().endsWith("/v1/routing/configuration") && response.status() === 401);
+  const earlyRead = page.waitForResponse((response) => response.url().endsWith("/v1/routing/configuration?strategy=balanced") && response.status() === 401);
   releaseRead!(); await (await earlyRead).finished();
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   await expect(page.getByRole("heading", { name: "Connect", exact: true })).toHaveCount(0);

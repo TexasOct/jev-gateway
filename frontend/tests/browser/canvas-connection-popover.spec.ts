@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import type { MockApiState } from "../setup/mock-api";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -162,7 +162,7 @@ test("connection card retains click-to-connect destinations and disconnect repai
   expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path.includes("configuration"))).toEqual([]);
 });
 
-test("edge context menu and keyboard edge list open the same card and return focus", async ({ page, mockApi }) => {
+test("edge context menu and native SVG edge keyboard entrance open the same card and return focus", async ({ page, mockApi }) => {
   setup(mockApi); await page.setViewportSize({ width: 1280, height: 1000 }); await open(page);
   const output = page.locator('[data-output-node="rule-0"][data-canvas-output="match"]');
   const panel = page.getByRole("region", { name: en.canvasConnectionActions });
@@ -175,13 +175,12 @@ test("edge context menu and keyboard edge list open the same card and return foc
   expect((await panel.boundingBox())!.x).toBeCloseTo(menuBounds!.x + 8, 0);
   await page.keyboard.press("Escape");
   await expect(output).toBeFocused();
-  await page.getByRole("button", { name: en.canvasInformation, exact: true }).click();
-  const summary = page.locator("summary").filter({ hasText: en.canvasEdgeList });
-  await summary.focus(); await page.keyboard.press("Enter"); await page.keyboard.press("Tab");
-  const entry = page.getByRole("button", { name: en.canvasSelectConnection, exact: true }).first();
+  await expect(page.locator(".workflow-info, .workflow-drawer")).toHaveCount(0);
+  const entry = page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="match"]');
+  await entry.focus();
   await expect(entry).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(panel).toContainText(en.canvasReason_context);
+  await expect(panel).toContainText(`${en.rule} 1`);
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(8);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(992);
@@ -211,7 +210,7 @@ for (const width of [1280, 320]) {
   for (const corner of ["top-left", "top-right", "bottom-left", "bottom-right"]) {
     test(`connection port near ${corner} keeps the card visible at ${width}px`, async ({ page, mockApi }) => {
       setup(mockApi);
-      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - 210 : -171, y: corner.includes("bottom") ? 250 : 0 };
+      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - 210 : -171, y: corner.includes("bottom") ? (width === 320 ? 180 : 250) : 0 };
       await page.setViewportSize({ width, height: 740 }); await open(page);
       const output = page.locator('[data-output-node="rule-0"][data-canvas-output="match"]');
       const panel = page.getByRole("region", { name: en.canvasConnectionActions });

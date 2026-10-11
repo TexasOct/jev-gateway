@@ -7,6 +7,13 @@ model discovery, metadata lookup, and explicit model import. Read the dashboard
 routing guide for overlays, theme, canvas layout, shell privacy, and packaging.
 Provider management owns baseline changes; routing overlays keep their separate
 schema and leave baseline bytes unchanged.
+Named v2 workflows keep model selection and explicit pools in routing storage.
+Removing a workflow node never deletes a supplier model. HTTP supplier deletion
+continues rejecting remaining model records. CLI force removal reconciles v2
+selected IDs, explicit pool references, legacy override IDs and saved model-node
+positions atomically with supplier/model removal, while retaining global-default
+and baseline-reference guards. Unrelated supplier bytes and credential actions
+keep their existing transaction ownership.
 Safe model views expose optional `routing_overlay_fields`, containing only
 `tags` and/or `priority` when those fields are present in that model's overlay.
 An empty list identifies baseline-owned values. The projection uses the same
@@ -80,7 +87,7 @@ Validation and apply accept `{expected_revision, operations}`. Operations use:
 - `{action: "set_default_model", model: string|null}`.
 - `{action: "update_model", model_id: string, model: ImportModel}`.
 
-Whole-model updates require the same explicit runtime fields as imports and
+Whole-model updates accept the same optional runtime fields as imports and
 preserve provider/upstream identity. Omitted tags, priority, quality and metadata
 retain baseline values; overlay-owned tags/priority remain in their original
 files. Validate retained confirmations against the completed record. Model
@@ -195,10 +202,14 @@ Revision tokens are process-keyed; restart invalidates earlier tokens.
 Validation/apply returns the snapshot plus `{valid: true, applied, imported,
 skipped}`. Validation retains the current revision and does not activate state.
 
-New imports require finite nonnegative input/output prices, five explicit boolean
-capabilities, an explicit effort list, and both limits as positive integers or
-explicitly confirmed null. Keep the old catalog parser's omission defaults for
-existing files. Model `metadata` records source/confirmation information; routing
+New imports require supplier ownership and upstream identity. Capabilities,
+reasoning effort, prices and limits may remain omitted. Supplied prices must be
+finite and nonnegative, capability flags must be booleans, effort must be a legal
+list, and limits must be positive integers or null. Cache prices also allow null.
+Persist omissions and preserve false, zero, empty lists and explicit null.
+Management views project stored facts without inventing serving defaults or
+confirmations. Keep the catalog parser's legacy serving defaults independently.
+Model `metadata` records source/confirmation information; routing
 continues using the confirmed `cost`, `capabilities`, and limit fields. Existing
 qualified IDs are skipped without overwriting values, tags, priority, or overlay
 membership. Import does not automatically assign strategy tags or derive quality
@@ -364,7 +375,7 @@ the PUT automatically. Do not validate against the stale saved snapshot first.
 | Management POST/PUT without a configured gateway key | `403 config_writes_disabled` |
 | Malformed body on provider validate/apply/discovery/metadata/connection-test | Apply the same authorization guard before body validation: missing/wrong configured Bearer yields `401 invalid_api_key` with `WWW-Authenticate: Bearer`; no configured key yields `403 config_writes_disabled`; authorized malformed input yields safe `400`. No mutation or upstream call. |
 | Stale expected revision | `409 revision_conflict`; files and active catalog unchanged |
-| Incomplete import metadata or unconfirmed import | `400`; no routable model added |
+| Invalid supplied model facts or unconfirmed import | `400`; no routable model added; missing optional facts are valid |
 | Deletion has model/strategy/shared-credential references | Reject the operation; no implicit cascade |
 | Invalid provider, advanced parameter, or metadata shape | Reject with safe fixed public error text |
 | Source confirmation with no resolved references, non-null unknown/conflict value, or nonpublic evidence URL | `400`; validation/import/update preserve files, backups, and active catalog. Evidence validation makes no network request. |

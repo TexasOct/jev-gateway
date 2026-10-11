@@ -364,12 +364,13 @@ class RouteLabel:
     tag: str | None = None
     description: str = ""
     reasoning_effort: str | None = None
+    explicit_models: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
             "description": self.description,
         }
-        if self.models:
+        if self.models or self.explicit_models:
             result["models"] = list(self.models)
         if self.tag is not None:
             result["tag"] = self.tag
@@ -425,6 +426,7 @@ class RoutingPolicy:
     pin: PinPolicy = field(default_factory=PinPolicy)
     budget: BudgetPolicy = field(default_factory=BudgetPolicy)
     reasoning: ReasoningPolicy = field(default_factory=ReasoningPolicy)
+    selected_models: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.labels and set(self.tier_models) == set(TIER_ORDER):
@@ -463,6 +465,8 @@ class RoutingPolicy:
                 tier: list(model_ids)
                 for tier, model_ids in self.tier_models.items()
             }
+        if self.selected_models is not None:
+            result["selected_models"] = list(self.selected_models)
         return result
 
 
@@ -570,15 +574,15 @@ class Catalog:
         route = self.policy.labels.get(tier)
         if route is None:
             return []
-        if route.models:
+        if route.models or route.explicit_models:
             return [
                 profile
                 for model_id in route.models
                 for profile in [self.by_name(model_id)]
-                if profile is not None
+                if profile is not None and (self.policy.selected_models is None or profile.name in self.policy.selected_models)
             ]
         tag = route.tag or f"{self.default_strategy}/{tier}"
-        return [profile for profile in self.profiles if tag in profile.tags]
+        return [profile for profile in self.profiles if tag in profile.tags and (self.policy.selected_models is None or profile.name in self.policy.selected_models)]
 
     def provider_for(self, profile: ModelProfile) -> ProviderProfile:
         """Return the reusable provider configuration for one model."""
@@ -669,6 +673,8 @@ def _validate_policy(
     if not policy.labels:
         raise ValueError(f"{label} labels must be a non-empty object.")
     model_names = {profile.name for profile in profiles}
+    if policy.selected_models is not None and any(name not in model_names for name in policy.selected_models):
+        raise ValueError(f"{label} selected_models references unknown model ids.")
     for name, route in policy.labels.items():
         if not isinstance(name, str) or not name.strip():
             raise ValueError(f"{label} labels must have non-empty names.")
@@ -1262,7 +1268,7 @@ def _legacy_labels(routes: dict[str, tuple[str, ...]], source: str) -> dict[str,
             for name, description in zip(TIER_ORDER, descriptions, strict=True)}
 
 
-def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
+def _labels_from_dict(value: Any, source: str, *, allow_empty_models: bool = False) -> dict[str, RouteLabel]:
     if not isinstance(value, dict) or not value:
         raise ValueError(f"{source} policy labels must be a non-empty object.")
     labels: dict[str, RouteLabel] = {}
@@ -1284,7 +1290,7 @@ def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
             not isinstance(model, str) or not model for model in models
         ):
             raise ValueError(f"{subject}.models must be a list of model ids.")
-        if "models" in raw and not models:
+        if "models" in raw and not models and not allow_empty_models:
             raise ValueError(f"{subject}.models must not be empty when declared.")
         tag = raw.get("tag")
         if tag is not None and (not isinstance(tag, str) or not tag.strip()):
@@ -1305,6 +1311,7 @@ def _labels_from_dict(value: Any, source: str) -> dict[str, RouteLabel]:
             tag=clean_tag,
             description=description,
             reasoning_effort=effort,
+            explicit_models="models" in raw,
         )
     return labels
 
@@ -1322,6 +1329,7 @@ def policy_from_dict(
     known = {
         "mode",
         "selection",
+        "selected_models",
         "tier_models",
         "labels",
         "escalation",
@@ -1390,6 +1398,13 @@ def policy_from_dict(
         pin_overrides["break_on"] = tuple(str(reason) for reason in break_on)
 
     default_policy = base or RoutingPolicy()
+    selected = data.get("selected_models", default_policy.selected_models)
+    if "selected_models" in data and (
+        not isinstance(selected, list)
+        or any(not isinstance(item, str) or not item.strip() for item in selected)
+        or len(set(selected)) != len(selected)
+    ):
+        raise ValueError(f"{source} selected_models must be a list of unique model ids.")
     if "labels" in data and "tier_models" in data:
         raise ValueError(f"{source} policy cannot mix labels and tier_models.")
     tier_models = dict(default_policy.tier_models) if base is not None else {}
@@ -1403,7 +1418,7 @@ def policy_from_dict(
             )
         tier_models[str(tier)] = tuple(str(model_id) for model_id in model_ids)
     if "labels" in data:
-        labels = _labels_from_dict(data["labels"], source)
+        labels = _labels_from_dict(data["labels"], source, allow_empty_models=selected is not None)
         tier_models = {}
     elif "tier_models" in data:
         # Legacy tier overrides retain the old partial-merge behavior only when
@@ -1467,6 +1482,7 @@ def policy_from_dict(
             },
         ),
         reasoning=reasoning,
+        selected_models=None if selected is None else tuple(selected),
     )
 
 

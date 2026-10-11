@@ -40,6 +40,7 @@ artifacts/
 .trellis/tasks/**/research/
 .trellis/tasks/**/evidence/
 .trellis/tasks/**/evidence-successor/
+.trellis/tasks/**/receipts/
 .trellis/tasks/**/verification/
 .trellis/tasks/**/snapshot/
 .trellis/tasks/**/.runtime/

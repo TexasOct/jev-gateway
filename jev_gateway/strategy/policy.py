@@ -69,6 +69,8 @@ class PolicyStrategy:
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         """Route one request according to this strategy's policy."""
+        if request.manual is not None and not self._selected(request.manual):
+            raise SetupIncompleteError("The model is not selected in this strategy.")
         if request.session is None or (
             request.session.tier != "default"
             and request.session.tier not in self.policy.labels
@@ -106,7 +108,7 @@ class PolicyStrategy:
     ) -> StrategyOutcome:
         manual = request.manual
         current = catalog.by_name(session.route)
-        if current is None or not current.enabled:
+        if current is None or not current.enabled or not self._selected(current):
             return self._initial(request, catalog)
 
         if manual is not None and manual.name != current.name:
@@ -348,11 +350,17 @@ class PolicyStrategy:
 
     # Selection
 
+    def _selected(self, profile: ModelProfile) -> bool:
+        return self.policy.selected_models is None or profile.name in self.policy.selected_models
+
+    def _candidates(self, catalog: Catalog) -> list[ModelProfile]:
+        return [profile for profile in catalog.profiles if profile.enabled and self._selected(profile)]
+
     def _default_model(self, catalog: Catalog) -> Selection:
         """Resolve the global model without applying a strategy's ordering rule."""
         model_id = catalog.defaults.default_model
         profile = catalog.by_name(model_id) if model_id is not None else None
-        if profile is None or not profile.enabled:
+        if profile is None or not profile.enabled or not self._selected(profile):
             raise SetupIncompleteError(
                 "Configure the global default model for unassigned routing labels."
             )
@@ -361,15 +369,15 @@ class PolicyStrategy:
     def _tier_pool(self, tier: str, catalog: Catalog) -> list[ModelProfile]:
         """Return this strategy's candidates for one routing label."""
         route = self.policy.labels[tier]
-        if route.models:
+        if route.models or route.explicit_models:
             return [
                 profile
                 for model_id in route.models
                 for profile in [catalog.by_name(model_id)]
-                if profile is not None and profile.enabled
+                if profile is not None and profile.enabled and self._selected(profile)
             ]
         tag = route.tag or f"{self.name}/{tier}"
-        return [profile for profile in catalog.profiles if profile.enabled and tag in profile.tags]
+        return [profile for profile in self._candidates(catalog) if tag in profile.tags]
 
     def _select(
         self,
@@ -390,7 +398,7 @@ class PolicyStrategy:
         required_output = self._output_requirement(facts)
         pools: list[tuple[list[ModelProfile], bool]] = []
         pools.append((tier_pool, False))
-        pools.append((list(catalog.profiles), True))
+        pools.append((self._candidates(catalog), True))
 
         steps: list[tuple[bool, int, int | None]] = [
             (True, required_context, required_output),
@@ -418,7 +426,7 @@ class PolicyStrategy:
 
         fallback = [
             profile
-            for profile in catalog.profiles
+            for profile in self._candidates(catalog)
             if profile.enabled and (exclude is None or profile.name != exclude)
         ]
         if not fallback:

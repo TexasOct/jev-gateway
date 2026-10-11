@@ -133,22 +133,27 @@ def _import_model(entry: Any, provider_id: str, *, existing_model: Mapping[str, 
     if result.get("provider", provider_id) != provider_id:
         raise ValueError("Imported model provider does not match provider_id.")
     result["provider"] = provider_id
-    capabilities = result.get("capabilities")
-    if not isinstance(capabilities, dict) or any(type(capabilities.get(key)) is not bool for key in ("tools", "vision", "json_mode", "reasoning", "temperature")) or not isinstance(capabilities.get("reasoning_effort"), list):
-        raise ValueError("Import requires five capability booleans and a reasoning_effort list.")
-    capabilities["reasoning_effort"] = list(ladder_from_list(capabilities["reasoning_effort"], "Import capabilities.reasoning_effort"))
-    costs = result.get("cost")
+    capabilities = result.get("capabilities", {})
+    flags = {"tools", "vision", "json_mode", "reasoning", "temperature"}
+    if not isinstance(capabilities, dict) or set(capabilities) - (flags | {"reasoning_effort"}) or any(type(value) is not bool for key, value in capabilities.items() if key in flags):
+        raise ValueError("Import capabilities must contain only supplied boolean flags and a reasoning_effort list.")
+    if "reasoning_effort" in capabilities:
+        if not isinstance(capabilities["reasoning_effort"], list):
+            raise ValueError("Import capabilities.reasoning_effort must be a list.")
+        capabilities["reasoning_effort"] = list(ladder_from_list(capabilities["reasoning_effort"], "Import capabilities.reasoning_effort"))
+    costs = result.get("cost", {})
     required_prices = {"input_per_million", "output_per_million"}
     optional_prices = {"cache_read_per_million", "cache_write_per_million"}
-    if not isinstance(costs, dict) or not required_prices <= set(costs) or set(costs) - (required_prices | optional_prices) or any(not _metadata_number(value) for key, value in costs.items() if key in required_prices or value is not None):
-        raise ValueError("Import requires explicit finite nonnegative input and output prices.")
+    if not isinstance(costs, dict) or set(costs) - (required_prices | optional_prices) or any(not _metadata_number(value) for key, value in costs.items() if key in required_prices or value is not None):
+        raise ValueError("Import prices must be finite nonnegative numbers; cache prices may be null.")
     for name in ("context_window", "max_output_tokens"):
-        if name not in result or (result[name] is not None and (type(result[name]) is not int or result[name] <= 0)):
-            raise ValueError("Import requires explicit null or positive integer limits.")
+        if name in result and result[name] is not None and (type(result[name]) is not int or result[name] <= 0):
+            raise ValueError("Import limits must be null or positive integers.")
     metadata = model_metadata(result.get("metadata"))
     for name, evidence in metadata.get("fields", {}).items():
         actual = capabilities.get(name) if name in capabilities else costs.get(name) if name in costs else result.get(name)
-        if evidence["status"] == "confirmed" and ("value" not in evidence or evidence["value"] != actual):
+        present = name in capabilities or name in costs or name in result
+        if evidence["status"] == "confirmed" and (not present or "value" not in evidence or evidence["value"] != actual):
             raise ValueError("Confirmed metadata must match imported routing values.")
     if isinstance(result.get("metadata"), dict):
         result["metadata"] = metadata
@@ -168,10 +173,26 @@ class ProviderConfiguration:
             if error:
                 raise ValueError("Routing overlay could not be read.")
             catalog = catalog_from_document(merge_overlay(document, overlay), str(self.models_file), env, allow_missing_credentials=True)
-            return self.project(catalog, revision(self.models_file), overlay=overlay, write_available=write_available)
+            return self.project(catalog, revision(self.models_file), document=document, overlay=overlay, write_available=write_available)
 
     @staticmethod
-    def project(catalog: Catalog, token: str, *, overlay: Mapping[str, Any] | None = None, write_available: bool = False) -> dict[str, Any]:
+    def project(catalog: Catalog, token: str, *, document: Mapping[str, Any] | None = None, overlay: Mapping[str, Any] | None = None, write_available: bool = False) -> dict[str, Any]:
+        models = []
+        stored = {f"{item['provider']}/{item['upstream_model']}": item for item in (document or {}).get("models", [])}
+        for item in catalog.profiles:
+            view = item.as_dict()
+            if item.name in stored:
+                raw = stored[item.name]
+                # Management facts follow storage, independently of legacy serving defaults.
+                for field in ("capabilities", "cost"):
+                    view[field] = {key: view[field][key] for key in (raw.get(field) or {})}
+                for field in ("context_window", "max_output_tokens", "metadata"):
+                    if field not in raw:
+                        view.pop(field, None)
+                    elif raw[field] is None:
+                        view[field] = None
+            view["routing_overlay_fields"] = [field for field in ("tags", "priority") if field in (overlay or {}).get("models", {}).get(item.name, {})]
+            models.append(view)
         return {
             "revision": token, "write_available": write_available,
             "gateway": {"api_key_env": catalog.gateway.api_key_env, "has_api_key": bool(catalog.gateway.api_key)},
@@ -179,7 +200,7 @@ class ProviderConfiguration:
             "providers": [item.as_dict() for item in catalog.providers],
             "decision": catalog.decision.as_dict(),
             "defaults": catalog.defaults.as_dict(),
-            "models": [{**item.as_dict(), "routing_overlay_fields": [field for field in ("tags", "priority") if field in (overlay or {}).get("models", {}).get(item.name, {})]} for item in catalog.profiles],
+            "models": models,
             "presets": provider_presets(), "provider_types": list(provider_list),
             "decision_protocols": list(registered_protocols()),
         }
@@ -355,7 +376,7 @@ class ProviderConfiguration:
                     changes[secret_path] = credential_content
                     changes[secret_path.with_name("credentials.json.backup")] = original_credentials
                 replace_configuration(self.models_file, changes, activate=(lambda: activate(catalog, registry)) if activate else None, restore_runtime=restore_runtime)
-            return {"valid": True, "applied": apply, "imported": imported, "skipped": skipped, **self.project(catalog, revision(self.models_file), overlay=overlay, write_available=True)}
+            return {"valid": True, "applied": apply, "imported": imported, "skipped": skipped, **self.project(catalog, revision(self.models_file), document=candidate, overlay=overlay, write_available=True)}
 
     def gateway_credential(self, body: Any, *, prepare: Callable[[Catalog], Any], activate: Callable[[Catalog, Any], None], restore_runtime: Callable[[], None]) -> dict[str, Any]:
         if not isinstance(body, dict) or set(body) != {"expected_revision", "credential"} or not isinstance(body["expected_revision"], str) or not body["expected_revision"]:
@@ -400,7 +421,7 @@ class ProviderConfiguration:
                 path.with_name("credentials.json.backup"): original,
             }
             replace_configuration(self.models_file, changes, activate=lambda: activate(catalog, registry), restore_runtime=restore_runtime)
-            return {"valid": True, "applied": True, **self.project(catalog, revision(self.models_file), overlay=overlay, write_available=True)}
+            return {"valid": True, "applied": True, **self.project(catalog, revision(self.models_file), document=candidate, overlay=overlay, write_available=True)}
 
     def discovery_provider(self, body: Any) -> tuple[dict[str, Any], str | None, set[str]]:
         if not isinstance(body, dict) or ("provider_id" in body) == ("provider" in body):

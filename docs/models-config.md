@@ -116,7 +116,7 @@ Provider 页分别管理 LLM 与 decision 实例。供应商预设和自定义�
 
 LLM 模型发现支持 OpenAI 兼容、Anthropic 和 DeepSeek transport；不支持的 transport 可手动添加模型。列表只生成候选，搜索、刷新和取消都不会写入有效目录。选中模型后，用户补齐或确认元数据，再显式导入；已有 `provider/upstream_model` 跳过导入，保留原有配置和 routing overlay。
 
-管理导入接口要求显式提供输入和输出价格、`tools`、`vision`、`json_mode`、`reasoning`、`temperature` 五项布尔能力、`reasoning_effort` 列表，以及 `context_window` 和 `max_output_tokens`。价格须为有限非负数。两个 limit 可以是正整数，也可以在确认未知后设为 `null`。旧的手工配置仍采用字段表中的省略默认值；发现数据缺失时不能用这些默认值完成新模型确认。
+管理导入接口只要求供应商归属、`upstream_model` 和用户确认。输入和输出价格、`tools`、`vision`、`json_mode`、`reasoning`、`temperature` 五项能力、`reasoning_effort` 列表，以及 `context_window` 和 `max_output_tokens` 均可省略。已填写的能力须为布尔值，effort 须为合法列表，价格须为有限非负数，两个 limit 须为正整数或 `null`；缓存价格也可为 `null`。省略值保留为未知，不会填入零价格、默认能力或确认记录。`false`、`0`、空 effort 列表和显式 `null` 分别保留。后续编辑仍可保存不完整记录；完整记录更新中省略原有事实会清除该事实，其确认记录须同步改为未确认。管理读取和编辑不把字段表中的运行兼容默认值当作已存事实。
 
 在线元数据建议按实际服务商和 upstream model 精确匹配。Models.dev 的价格已经是 USD/百万 token；OpenRouter 和 LiteLLM 的 per-token 数据在查询中转换为该单位。OpenRouter 的服务价格只适用于对应 OpenRouter 实例，不能套用到任意代理。缓存、时段和上下文分段报价需要用户选择适用估算值；检索时间与来源声明的更新时间分别显示。查询不会覆盖已经确认或手工修改的值，也不会改写路由标签。
 
@@ -404,7 +404,48 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 
 `models.json` 是基线配置。路由覆盖接口不会改写它；面板上的拖拽改动写到与它同目录的运行时文件里，重启和 `POST /v1/routing/reload` 都会重新应用。
 
-`routing-overrides.json` 覆盖规则顺序和模型的标签、优先级：
+`routing-overrides.json` 的 v2 格式按策略保存完整定义和显式模型选择：
+
+```json
+{
+  "version": 2,
+  "strategies": {
+    "research": {
+      "selected_models": [],
+      "definition": {
+        "kind": "decision_matrix",
+        "policy": {"labels": {"routine": {"models": []}}},
+        "options": {
+          "questions": {"task": {"type": "choice", "instructions": "Choose task scope.", "criteria": {"routine": "Routine.", "complex": "Complex."}}},
+          "rules": [],
+          "fallback": {"label": "routine"}
+        }
+      }
+    }
+  },
+  "deleted_strategies": [],
+  "models": {}
+}
+```
+
+`selected_models` 是有序且不重复的已导入模型 ID；空列表表示没有候选模型。
+`definition` 使用现有策略的 `kind`、`description`、`policy` 和 `options` 格式。
+显式模型选择下，池的 `models` 可为空，非空引用必须包含在该策略的选择中。
+新池编辑只改策略内的引用，不改供应商模型的全局标签或优先级。
+`models` 仅保留迁移自 v1 的全局覆盖。`deleted_strategies` 保存已删除的基线策略名，
+不能删除运行时默认策略。创建、编辑、重置和删除都不会改写 `models.json`。
+
+读取 v1 不会立即改写磁盘。首次创建或 v2 编辑时，迁移保留原有问题、规则、
+fallback、模型标签和优先级覆盖，并按规则、默认分支和 fallback 的实际池引用
+初始化节点；未被引用的目录模型不加入画布。其它类型的基线策略仍由原定义加载。
+运行时扩展搜索、全局默认、最终回退和会话保留都受显式选择范围约束。
+
+`routing-canvas-layout.json` 的 v2 磁盘格式为
+`{version: 2, strategies: {name: {nodes, viewport}}}`，每个策略独立保存位置和视口。
+布局接口仍提交 v1 的单策略坐标格式，通过可选 `?strategy=name` 选择目标；省略时
+使用 `task_aware`。旧布局属于 `task_aware`，其它策略初始为空。
+
+以下 v1 格式及其旧合并规则仍可读取：
 
 ```json
 {

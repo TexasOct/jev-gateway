@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Applicable spec index and checklist"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Types, checks and test isolation"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Owner boundaries and reuse"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Safe error and rollback conventions"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Keep credential values out of reports"}
+{"file": ".trellis/spec/backend/initialization.md", "reason": "Incomplete catalog and startup behavior"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Trace wire contracts across all consumers"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse real parsers and transactions"}
+{"file": ".trellis/tasks/archive/2026-10/10-11-workflow-model-nodes-016/research/lane-board.md", "reason": "Exclusive sequential ownership and source gates"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Domain contract; task requirements explicitly supersede requested old behavior"}
+{"file": ".trellis/spec/backend/credential-configuration.md", "reason": "Domain contract; task requirements explicitly supersede requested old behavior"}

@@ -78,14 +78,11 @@ for (const width of [320, 390, 1280, 1920, 2560]) {
             expect(Math.abs(canvasBox.y - headerBox.y - headerBox.height)).toBeLessThanOrEqual(2);
             expect(canvasBox.height).toBeGreaterThan(300);
             expect(Math.abs(canvasBox.y + canvasBox.height - 900)).toBeLessThanOrEqual(2);
-            const information = page.getByRole("button", { name: words.canvasInformation, exact: true });
-            await information.click();
-            await expect(page.locator(".workflow-info")).toBeVisible();
-            const expandedBox = await canvas.boundingBox();
-            expect(expandedBox).toEqual(canvasBox);
+            await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced, .workflow-footer")).toHaveCount(0);
+            await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toHaveValue("balanced");
+            const currentBox = await canvas.boundingBox();
+            expect(currentBox).toEqual(canvasBox);
             await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-            await information.click();
-            await expect(page.locator(".workflow-info")).toBeHidden();
             if (width >= 1920) {
               const node = canvas.locator('[data-canvas-node="questions"]');
               await node.focus();
@@ -108,7 +105,7 @@ for (const width of [320, 390, 1280, 1920, 2560]) {
         }
       }
     }
-    expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+    expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
   });
 }
 

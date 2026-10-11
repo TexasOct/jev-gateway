@@ -35,7 +35,8 @@ test("unknown metadata and query failures preserve a manual route with retry", a
   await expect.poll(() => state.metadataCalls).toBe(2);
   await page.getByLabel("Search fetched models").fill("alpha");
   await page.getByRole("button", { name: "Select all visible unconfigured models" }).click();
-  await expect(page.getByText("Still required:", { exact: false })).toContainText("Input price");
+  await expect(page.getByText("Still required:", { exact: false })).toHaveCount(0);
+  await expect(page.getByLabel("I reviewed the capabilities", { exact: false })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Confirm and import selected models (1)" })).toBeDisabled();
   state.metadataUnknown = false;
   await page.getByRole("button", { name: "Query model metadata", exact: true }).click();
@@ -43,7 +44,7 @@ test("unknown metadata and query failures preserve a manual route with retry", a
   expect(state.writes).toEqual([]);
 });
 
-test("conflicting and mismatched suggestions stay incomplete", async ({ page, context }) => {
+test("conflicting and mismatched suggestions stay unknown and allow optional fields", async ({ page, context }) => {
   const state = fixture();
   const source = (price: number) => ({ source: "fixture", source_provider: "fixture", source_model: "alpha", fetched_at: "2026-10-05", applicable: true, fields: { input_per_million: { value: price, source_field: "price" } } });
   state.metadataEvidence = { upstream_model: "alpha", fields: { input_per_million: 1 }, sources: [source(1), source(2)], warnings: ["conflicting_sources"], metadata: { version: 1, sources: [] } };
@@ -57,7 +58,7 @@ test("conflicting and mismatched suggestions stay incomplete", async ({ page, co
   const price = dialog.getByLabel("Input price (USD / million tokens)", { exact: true });
   await expect(price).toHaveCount(1);
   await expect(price).toHaveValue("");
-  await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   state.metadataEvidence = { ...state.metadataEvidence, fields: { input_per_million: 99 }, sources: [source(1)] };
   await dialog.getByRole("button", { name: "Refresh metadata sources", exact: true }).click();
   await expect.poll(() => state.metadataCalls).toBe(2);
@@ -159,7 +160,7 @@ test("existing edits save one full transaction, retain failed inputs and persist
   expect(state.writes[1]?.operations).toHaveLength(1);
   expect(state.validations).toEqual(state.writes);
   expect(state.writes[1]?.operations).toMatchObject([{ action: "update_model", model_id: "fixture/existing", model: { upstream_model: "existing", provider: "fixture", display_name: "Operator model", enabled: false, tags: ["retained-routing-tag"], priority: 8, quality: 0.61, cost: { input_per_million: 9, output_per_million: 2, cache_read_per_million: 0 }, capabilities: { tools: false }, context_window: null, max_output_tokens: null, metadata: { fields: { input_per_million: { method: "manual" } } } } }]);
-  expect(state.writes[1]?.operations[0]).not.toHaveProperty("model.cost.cache_write_per_million");
+  expect(state.writes[1]?.operations[0]).toHaveProperty("model.cost.cache_write_per_million", null);
   expect(state.configuration.models[0]?.name).toBe("fixture/existing");
   expect(state.configuration.models[0]?.provider).toBe("fixture");
   expect(state.configuration.revision).not.toBe("r1");

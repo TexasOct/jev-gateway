@@ -10,7 +10,7 @@ export function createEditableNode(draft: RoutingDraft, config: ConfigurationPay
     return { draft: addQuestion(draft, `question_${index}`), id: "questions" };
   }
   const entry = Object.entries(draft.questions).find(([, question]) => Object.keys(question.criteria).length > 0);
-  const label = config.labels.find((item) => item.resolution === "tag" || item.models.some((id) => Object.hasOwn(draft.models, id)));
+  const label = config.labels.find((item) => draft.pools !== undefined || item.resolution === "tag" || item.models.some((id) => Object.hasOwn(draft.models, id)));
   if (!entry || !label) return null;
   const added = addRule(draft, config, entry[0], Object.keys(entry[1].criteria)[0]!, label.name);
   if (added === draft) return null;

@@ -120,6 +120,9 @@ describe("whole-model workspace drafts", () => {
     expect(next.values.output_per_million).toBe("2");
     expect(next.metadata).toEqual(original.metadata);
     expect(next.evidence).toBeUndefined();
-    expect(confirmedModel("exact", next)).toBeNull();
+    const saved = withConfirmedMetadata(confirmedModel("exact", next)!, next, "2026-10-11");
+    expect(saved.cost).not.toHaveProperty("input_per_million");
+    expect(saved.cost.output_per_million).toBe(2);
+    expect(saved.metadata?.fields?.input_per_million?.status).not.toBe("confirmed");
   });
 });

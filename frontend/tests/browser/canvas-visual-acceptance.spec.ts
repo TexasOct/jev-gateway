@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 import { writeFile } from "node:fs/promises";
-import { configuration } from "../fixtures/configuration";
+import { configuration, editableConfiguration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -29,7 +29,7 @@ for (const viewport of [
     }));
     catalog.labels[0]!.models = catalog.models.map(({ id }) => id);
     catalog.labels[1]!.models = [catalog.models[0]!.id];
-    mockApi.appliedConfiguration = catalog;
+    mockApi.appliedConfiguration = editableConfiguration(catalog);
 
     await page.setViewportSize(viewport);
     await page.goto("/dashboard/");
@@ -49,7 +49,7 @@ for (const viewport of [
         const canvas = page.locator(".routing-canvas-scroll");
         const toolbar = page.getByRole("toolbar", { name: words.canvasTools });
         await expect(toolbar).toBeVisible();
-        const layoutSaved = page.waitForResponse((response) => response.url().endsWith("/v1/dashboard/canvas-layout") && response.request().method() === "PUT" && response.ok());
+        const layoutSaved = page.waitForResponse((response) => response.url().endsWith("/v1/dashboard/canvas-layout?strategy=balanced") && response.request().method() === "PUT" && response.ok());
         await toolbar.getByRole("button", { name: words.canvasZoomFit, exact: true }).click();
         await layoutSaved;
         await expect(page.getByText(words.canvasSavingLayout, { exact: true })).toHaveCount(0);
@@ -78,8 +78,8 @@ for (const viewport of [
         await expect(questions).toBeFocused();
         expect(await questions.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
         await expect(questions).toHaveCSS("outline-style", "solid");
-        await expect(page.locator(".workspace-heading h2")).toHaveText(catalog.strategy);
-        await expect(page.locator(".workspace-heading summary")).toHaveText(words.ruleOrderFirstMatch);
+        await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toHaveValue(catalog.strategy);
+        await expect(page.locator(".workspace-heading, .workflow-info, .workflow-drawer")).toHaveCount(0);
 
         const geometry = await canvas.locator("[data-canvas-node]").evaluateAll((elements) => elements.map((element) => {
           const style = getComputedStyle(element);
@@ -113,6 +113,6 @@ for (const viewport of [
         await expect(page.getByText(words.canvasSavingLayout, { exact: true })).toHaveCount(0);
       }
     }
-    expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+    expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
   });
 }

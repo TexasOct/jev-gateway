@@ -59,9 +59,11 @@ models can be configured after entering the console.
 | `POST` | `/v1/provider-connection-test` | Test a saved or candidate LLM provider through a bounded model-listing request. |
 | `POST` | `/v1/provider-metadata` | Look up price, capability, and limit suggestions with source information. |
 | `GET` | `/v1/routing/configuration` | Editable routing surface: rule order, labels and their pools, every model with tags and priority, plus overlay state. |
+| `POST` | `/v1/routing/strategies` | Create an empty named editable workflow with `{name}`. |
+| `DELETE` | `/v1/routing/strategies/{name}` | Delete an editable workflow and its layout; protect the runtime default. |
 | `POST` | `/v1/routing/configuration/validate` | Validate an overlay payload against the full catalog pipeline without applying it. |
 | `PUT` | `/v1/routing/configuration` | Validate an overlay payload, write it beside `models.json`, and reload. |
-| `DELETE` | `/v1/routing/configuration` | Remove the overlay and reload the baseline `models.json`. |
+| `DELETE` | `/v1/routing/configuration` | Reset the selected workflow; legacy v1 no-query calls remove the overlay. |
 | `GET` | `/v1/dashboard/canvas-layout` | Versioned whiteboard coordinates and viewport, with defaults and `read_error` when the layout is corrupt. |
 | `PUT` | `/v1/dashboard/canvas-layout` | Validate and atomically store whiteboard layout without reloading routing policy. |
 | `GET` | `/v1/dashboard/theme` | Stored theme seed, or the default when no file exists. |
@@ -191,6 +193,46 @@ to use normal selection rules without requiring a global fallback.
 
 ### Routing and preferences
 
+Configuration GET, validate POST, PUT and DELETE accept optional `?strategy=name`.
+Canvas-layout GET and PUT accept the same selector. Omitting it keeps the legacy
+`task_aware` management scope. These query parameters do not change chat or
+preview selection; those endpoints still select a virtual model through the body.
+
+Configuration GET includes `selected_models`, a complete `definition`,
+`runtime_default` and `deletable`. `models` remains the full supplier-model library
+for choosing nodes. Only selected IDs belong to the workflow graph. The strategy
+list includes `editable` and `deletable`; only `decision_matrix` workflows are
+editable through these endpoints.
+
+Version 2 configuration validate/apply accepts exactly
+`{version: 2, strategy, selected_models, definition}`. `definition` contains
+`kind: "decision_matrix"`, optional `description`, canonical `policy` and matrix
+`options: {questions, rules, fallback}`. Policy labels use local explicit `models`
+lists, which may be empty when selection is explicit. A pool reference must also
+be selected. The selector, if supplied, must match the body strategy. A write
+replaces only that workflow and preserves every other strategy, deletion record
+and inherited v1 model override. Supplier tags, priority, credentials and baseline
+data are outside this write body. V1 request bodies remain supported.
+After v2 migration, legacy bodies may update workflow options but cannot change
+global model overrides; nonempty `models` changes return `400`.
+
+Create accepts only `{name}`. Names contain 1 to 80 characters without leading
+or trailing whitespace, `/` or controls; reserved and duplicate names reject with
+`400 invalid_configuration`. New workflows contain a valid editable question,
+an empty routine pool and no selected models. Generation remains unavailable
+until a selected enabled model can serve the workflow. Delete rejects unknown,
+noneditable and runtime-default strategies. Baseline deletions persist as
+tombstones. Creation/deletion changes policy and the affected layout together
+under the existing recoverable transaction, with runtime rollback on failure.
+
+Reset with a selector restores that strategy's baseline definition or empties a
+new strategy. It preserves other workflows and layouts. Without a selector,
+reset removes a v1 overlay as before; with v2 storage it resets only `task_aware`
+and returns `overlay_removed: false`. Layout saves keep their existing v1 wire
+body while v2 disk storage holds separate `{nodes, viewport}` entries by name.
+Legacy positions belong to `task_aware`. Layouts remain shared across browsers
+and use atomic last-writer-wins saves within each strategy.
+
 `POST /v1/routing/reload` rereads the catalog and any existing overlay; it keeps
 its existing authentication behavior and does not write either file. The routing
 `PUT`/`DELETE` routes change live routing and write or remove
@@ -232,6 +274,11 @@ decision-failure and final default links show their editing restrictions. The
 connection panel and edge list provide keyboard controls, and Escape cancels a
 connection edit. The strategy requires choice questions with instructions and at
 least two described criteria; incomplete questions must be repaired before review.
+
+V2 workflow drafts use local explicit pool references for membership edits.
+They can keep an empty pool while the operator repairs the workflow, and node
+removal prunes that workflow's references while preserving the supplier model.
+The tag-mutation and fixed-explicit-pool rules above describe v1 compatibility.
 
 Node positions can also be moved with Alt + arrow keys. Arrange the canvas or
 align selected nodes to keep the flow readable. These actions save layout
@@ -358,11 +405,11 @@ Clearing a credential must not invalidate another configured reference.
 
 Model imports use
 `{action: "import", provider_id, models: [...], confirmed: true}`. Each model has
-an `upstream_model`, explicit finite nonnegative `cost.input_per_million` and
-`cost.output_per_million`, five explicit capability booleans (`tools`, `vision`,
-`json_mode`, `reasoning`, `temperature`), and a `reasoning_effort` list. Both
-`context_window` and `max_output_tokens` must be supplied as a positive integer
-or an explicitly confirmed `null`. IDs are generated as
+an `upstream_model`. Input/output prices, capability booleans (`tools`, `vision`,
+`json_mode`, `reasoning`, `temperature`), `reasoning_effort`, `context_window`
+and `max_output_tokens` are optional. Supplied prices must be finite and
+nonnegative, flags must be booleans, efforts must be legal levels, and limits
+must be positive integers or null. IDs are generated as
 `provider/upstream_model`; existing IDs are skipped without overwriting their
 values, tags, priority, or overlay membership. Import adds the confirmed models
 to the effective catalog without assigning them to a strategy label.
@@ -470,6 +517,16 @@ the existing canonical `provider/upstream_model` ID; `model` uses the same stric
 record shape as import. Provider and upstream identity are immutable. The edit
 validates the baseline and effective overlay catalog before saving atomically,
 and uses the same revision/conflict and activation rollback rules as other writes.
+Only supplier ownership and upstream identity are required for model import.
+Capabilities, reasoning efforts, prices and token limits may be omitted in imports
+and whole-record edits. Supplied flags must be booleans, effort values must be
+legal levels, prices must be finite nonnegative numbers, and limits must be
+positive integers or null. Cache prices also allow null. Omitted facts remain
+omitted on disk and unknown in management views; false, zero, empty effort lists
+and explicit null remain distinct. Management reads do not expose legacy serving
+defaults as stored model facts. A whole-record edit submits the desired facts;
+omitting a previously supplied fact clears it, so retained metadata confirmations
+must agree with the completed record. Source history may remain unconfirmed.
 LLM `upsert` operations and provider selectors accept optional
 `transport_credentials: Record<parameter_name, CredentialChange>`. Each parameter
 must have a declared `provider.param_env` reference. For example,

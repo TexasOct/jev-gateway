@@ -144,12 +144,74 @@ def test_import_provenance_and_duplicate_preservation(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("field", ["cost", "capabilities", "context_window", "max_output_tokens"])
-def test_import_requires_explicit_metadata(tmp_path: Path, field: str) -> None:
+def test_import_preserves_omitted_parameters(tmp_path: Path, field: str) -> None:
     current = service(tmp_path)
     entry = model()
     entry.pop(field)
-    with pytest.raises(ValueError, match="Import requires"):
+    result = current.command(import_body(current, [entry]), apply=True)
+    saved = json.loads(current.models_file.read_text())["models"][-1]
+    assert field not in saved
+    view = result["models"][-1]
+    assert view.get(field) == ({} if field in {"cost", "capabilities"} else None)
+    assert current.read()["models"][-1] == view
+
+
+@pytest.mark.parametrize("facts", [{}, {"capabilities": {"tools": False, "reasoning_effort": []}, "cost": {"input_per_million": 0, "cache_read_per_million": None}, "context_window": None}, {"max_output_tokens": 128}])
+def test_partial_import_update_and_reload_keep_unknown_facts(tmp_path: Path, facts: dict[str, Any]) -> None:
+    current = service(tmp_path)
+    entry = {"upstream_model": "partial", **facts}
+    original = json.loads(json.dumps(entry))
+    before = current.models_file.read_bytes()
+    preview = current.command(import_body(current, [entry]))
+    assert current.models_file.read_bytes() == before
+    result = current.command(import_body(current, [entry]), apply=True)
+    assert entry == original
+    assert preview["models"][-1] == result["models"][-1] == current.read()["models"][-1]
+    view = result["models"][-1]
+    assert view["capabilities"] == facts.get("capabilities", {})
+    assert view["cost"] == facts.get("cost", {})
+    assert "metadata" not in view
+    updated = {**entry, "display_name": "Partial record"}
+    body = {"expected_revision": revision(current.models_file), "operations": [{"action": "update_model", "model_id": "test-provider/partial", "model": updated}]}
+    current.command(body, apply=True)
+    persisted = json.loads(current.models_file.read_text())["models"][-1]
+    assert persisted == {**updated, "provider": "test-provider"}
+    assert ProviderConfiguration(current.models_file).read()["models"][-1]["capabilities"] == facts.get("capabilities", {})
+    catalog = catalog_from_document(json.loads(current.models_file.read_text()), str(current.models_file), credentials={"TEST_PROVIDER_KEY": "fake"})
+    assert catalog.profiles[-1].name == "test-provider/partial"
+
+
+@pytest.mark.parametrize("facts", [{"capabilities": {"tools": None}}, {"capabilities": {"tools": 0}}, {"capabilities": {"reasoning_effort": None}}, {"capabilities": {"reasoning_effort": ["vendor"]}}, {"capabilities": []}, {"cost": None}, {"cost": {"input_per_million": None}}, {"cost": {"output_per_million": -1}}, {"context_window": False}, {"max_output_tokens": 0}, {"context_window": 32, "max_output_tokens": 64}])
+@pytest.mark.parametrize("action", ["import", "update_model"])
+def test_invalid_supplied_partial_facts_never_write(tmp_path: Path, facts: dict[str, Any], action: str) -> None:
+    current = service(tmp_path)
+    current.command(import_body(current, [{"upstream_model": "partial"}]), apply=True)
+    before = {path.name: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in tmp_path.iterdir() if path.is_file()}
+    entry = {"upstream_model": "partial" if action == "update_model" else "invalid-partial", **facts}
+    operation = {"action": "update_model", "model_id": "test-provider/partial", "model": entry} if action == "update_model" else {"action": "import", "provider_id": "test-provider", "confirmed": True, "models": [entry]}
+    with pytest.raises((ValueError, TypeError)):
+        current.command({"expected_revision": revision(current.models_file), "operations": [operation]}, apply=True)
+    assert {path.name: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in tmp_path.iterdir() if path.is_file()} == before
+
+
+def test_partial_metadata_confirmation_requires_a_present_fact(tmp_path: Path) -> None:
+    current = service(tmp_path)
+    entry = {"upstream_model": "partial", "metadata": {"version": 1, "fields": {"context_window": {"status": "confirmed", "value": None, "method": "manual"}}}}
+    before = current.models_file.read_bytes()
+    with pytest.raises(ValueError, match="Confirmed metadata"):
         current.command(import_body(current, [entry]), apply=True)
+    assert current.models_file.read_bytes() == before
+    entry["context_window"] = None
+    current.command(import_body(current, [entry]), apply=True)
+    assert current.read()["models"][-1]["metadata"]["fields"]["context_window"]["value"] is None
+
+
+def test_partial_records_preserve_explicit_null_metadata(tmp_path: Path) -> None:
+    current = service(tmp_path)
+    current.command(import_body(current, [{"upstream_model": "partial", "metadata": None}]), apply=True)
+    assert current.read()["models"][-1]["metadata"] is None
+    current.command({"expected_revision": revision(current.models_file), "operations": [{"action": "update_model", "model_id": "test-provider/partial", "model": {"upstream_model": "partial", "display_name": "Edited"}}]}, apply=True)
+    assert current.read()["models"][-1]["metadata"] is None
 
 
 @pytest.mark.parametrize("price", [True, -1, float("inf"), float("nan"), None, "0"])

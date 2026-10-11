@@ -70,7 +70,7 @@ def test_legacy_omissions_preserve_route_and_never_invent_provenance(tmp_path: P
         if enabled != "omitted":
             entry["enabled"] = enabled
         projected = roundtrip(app, config, entry, "update")
-        assert projected == {**before, "routing_overlay_fields": []}
+        assert projected == {**before, "cost": old["cost"], "routing_overlay_fields": []}
         saved = json.loads(config.models_file.read_text())["models"][0]
         assert "metadata" not in saved and "display_name" not in saved
         assert saved["cost"] == old["cost"]

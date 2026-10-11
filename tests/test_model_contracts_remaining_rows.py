@@ -795,8 +795,8 @@ def test_m9_restore_auto_requires_explicit_difference_selection(tmp_path: Path) 
         config.engine.close()
 
 
-def test_m9_unknown_source_cannot_satisfy_a_strict_required_field(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """M9: an unknown suggestion cannot stand in for a missing required runtime field."""
+def test_m9_unknown_source_preserves_an_omitted_optional_runtime_field(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """M9: an unknown suggestion does not invent an optional runtime price."""
     app, config = sqlite_app(tmp_path)
     try:
         # A lookup returns an unknown input price; it must not become a runtime value.
@@ -808,15 +808,23 @@ def test_m9_unknown_source_cannot_satisfy_a_strict_required_field(tmp_path: Path
         assert lookup.status_code == 200
         assert lookup.json()["items"][0]["metadata"]["fields"]["input_per_million"]["status"] == "unknown"
 
-        # A "restore" that drops the required runtime price still fails strict import.
+        # Clearing an optional runtime price must retain its unknown state.
         incomplete = {"upstream_model": "vendor/only", "capabilities": {"tools": True, "vision": False, "json_mode": True, "reasoning": False, "temperature": True, "reasoning_effort": []}, "cost": {"output_per_million": 2.0}, "context_window": None, "max_output_tokens": 512, "provider": "test-provider"}
         body = {"expected_revision": revision(config.models_file), "operations": [{"action": "update_model", "model_id": "test-provider/vendor/only", "model": incomplete}]}
         before_bytes, before_versions = config.models_file.read_bytes(), versions(config)
-        original_input = model_view(app, config)["cost"]["input_per_million"]
+        invalid = copy.deepcopy(body)
+        invalid["operations"][0]["model"]["cost"]["input_per_million"] = -1
         for method, route in (("POST", "/v1/provider-configuration/validate"), ("PUT", "/v1/provider-configuration")):
-            response = request(app, method, route, headers=headers(config), json=body)
+            response = request(app, method, route, headers=headers(config), json=invalid)
             assert response.status_code == 400 and response.json()["error"]["code"] == "invalid_configuration"
             assert config.models_file.read_bytes() == before_bytes and versions(config) == before_versions
-        assert model_view(app, config)["cost"]["input_per_million"] == original_input
+        checked = request(app, "POST", "/v1/provider-configuration/validate", headers=headers(config), json=body)
+        assert checked.status_code == 200
+        assert config.models_file.read_bytes() == before_bytes and versions(config) == before_versions
+        applied = request(app, "PUT", "/v1/provider-configuration", headers=headers(config), json=body)
+        assert applied.status_code == 200
+        assert "input_per_million" not in model_view(app, config)["cost"]
+        assert "input_per_million" not in json.loads(config.models_file.read_text())["models"][0]["cost"]
+        assert len(versions(config)) == len(before_versions) + 1
     finally:
         config.engine.close()

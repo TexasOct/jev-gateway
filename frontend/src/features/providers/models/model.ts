@@ -4,7 +4,7 @@ export const capabilityFields = ["tools", "vision", "json_mode", "reasoning", "t
 export const modelFields = [...capabilityFields, "reasoning_effort", "input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million", "context_window", "max_output_tokens"] as const;
 export const modelFieldLabels = { tools: "pmTools", vision: "pmVision", json_mode: "pmJSON", reasoning: "pmReasoning", temperature: "pmTemperature", reasoning_effort: "pmEffort", input_per_million: "pmInputCost", output_per_million: "pmOutputCost", context_window: "pmContext", max_output_tokens: "pmOutput", cache_read_per_million: "mmCacheRead", cache_write_per_million: "mmCacheWrite" } as const;
 export type ModelField = typeof modelFields[number];
-export type ModelDraft = { values: Record<ModelField, string>; touched: Partial<Record<ModelField, boolean>>; sources: CandidateSource[]; warnings: string[]; metadata?: ModelMetadata; metadataHistory?: ModelMetadata; metadataRefreshBlocked?: boolean; evidence?: ModelEvidence & { upstream_model?: string }; currentMetadata?: ModelMetadata; displayName?: string; enabled?: boolean; tags?: string; priority?: string; quality?: string; originalQuality?: number };
+export type ModelDraft = { values: Record<ModelField, string>; touched: Partial<Record<ModelField, boolean>>; sources: CandidateSource[]; warnings: string[]; metadata?: ModelMetadata; originalMetadataNull?: boolean; originalNullMetadataValues?: Record<ModelField, string>; originalCacheNull?: Partial<Record<ModelField, boolean>>; metadataHistory?: ModelMetadata; metadataRefreshBlocked?: boolean; evidence?: ModelEvidence & { upstream_model?: string }; currentMetadata?: ModelMetadata; displayName?: string; enabled?: boolean; tags?: string; priority?: string; quality?: string; originalQuality?: number };
 export const emptyModelDraft = (): ModelDraft => ({ values: Object.fromEntries(modelFields.map((field) => [field, ""])) as Record<ModelField, string>, touched: {}, sources: [], warnings: [] });
 
 export function modelDraftChanged(original: ModelDraft, draft: ModelDraft): boolean {
@@ -30,18 +30,18 @@ export function modelErrors(identity: string, draft: ModelDraft): Record<string,
     if (!draft.touched[field] && draft.values[field] && metadataFieldState(draft.evidence, field) !== "known") errors[field] = "mmReviewEvidence";
   }
   if (!identity.trim() || [...identity].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) errors.identity = "mmIdentityError";
-  for (const field of capabilityFields) if (!["true", "false"].includes(draft.values[field])) errors[field] = "mmRequired";
+  for (const field of capabilityFields) if (draft.values[field] && !["true", "false"].includes(draft.values[field])) errors[field] = "mmRequired";
   for (const field of ["input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"] as const) {
-    if (field.startsWith("cache_") && !draft.values[field]?.trim()) continue;
+    if (!draft.values[field]?.trim() || (field.startsWith("cache_") && draft.values[field] === "null")) continue;
     if (finiteNumber(draft.values[field], 0) === undefined) errors[field] = "mmPriceError";
   }
   for (const field of ["context_window", "max_output_tokens"] as const) {
-    if (draft.values[field] === "null") continue;
+    if (!draft.values[field]?.trim() || draft.values[field] === "null") continue;
     const value = finiteNumber(draft.values[field], 1);
     if (value === undefined || !Number.isInteger(value)) errors[field] = "mmLimitError";
   }
-  if (!errors.context_window && !errors.max_output_tokens && draft.values.context_window !== "null" && draft.values.max_output_tokens !== "null" && Number(draft.values.max_output_tokens) > Number(draft.values.context_window)) errors.max_output_tokens = "mmLimitRelationship";
-  try {
+  if (!errors.context_window && !errors.max_output_tokens && draft.values.context_window.trim() && draft.values.max_output_tokens.trim() && draft.values.context_window !== "null" && draft.values.max_output_tokens !== "null" && Number(draft.values.max_output_tokens) > Number(draft.values.context_window)) errors.max_output_tokens = "mmLimitRelationship";
+  if (draft.values.reasoning_effort.trim()) try {
     const effort: unknown = JSON.parse(draft.values.reasoning_effort);
     if (!Array.isArray(effort) || effort.some((value) => !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(value))) errors.reasoning_effort = "mmEffortError";
   } catch { errors.reasoning_effort = "mmEffortError"; }
@@ -56,12 +56,14 @@ export function draftFromModel(model: ImportModel): ModelDraft {
   const draft = emptyModelDraft();
   for (const field of modelFields) {
     const value = field.endsWith("per_million") ? model.cost[field as keyof typeof model.cost] : field === "context_window" || field === "max_output_tokens" ? model[field] : model.capabilities[field as keyof typeof model.capabilities];
-    draft.values[field] = value === undefined || (field.startsWith("cache_") && value === null) ? "" : Array.isArray(value) ? JSON.stringify(value) : String(value);
+    const cacheNull = field.startsWith("cache_") && value === null;
+    if (cacheNull) draft.originalCacheNull = { ...draft.originalCacheNull, [field]: true };
+    draft.values[field] = value === undefined || cacheNull ? "" : Array.isArray(value) ? JSON.stringify(value) : String(value);
     // Legacy runtime values have no source certification; protect them during refresh.
     const method = model.metadata?.fields?.[field]?.method;
-    draft.touched[field] = method === "manual" || (value !== undefined && !(field.startsWith("cache_") && value === null) && method !== "source");
+    draft.touched[field] = method === "manual" || (!cacheNull && value !== undefined && method !== "source");
   }
-  return { ...draft, metadata: model.metadata, currentMetadata: model.metadata, displayName: model.display_name ?? "", enabled: model.enabled ?? true, tags: model.tags?.join(", ") ?? "", priority: String(model.priority ?? 100), quality: String(model.quality ?? 0.5), originalQuality: model.quality ?? 0.5 };
+  return { ...draft, metadata: model.metadata ?? undefined, currentMetadata: model.metadata ?? undefined, originalMetadataNull: model.metadata === null, originalNullMetadataValues: model.metadata === null ? { ...draft.values } : undefined, displayName: model.display_name ?? "", enabled: model.enabled ?? true, tags: model.tags?.join(", ") ?? "", priority: String(model.priority ?? 100), quality: String(model.quality ?? 0.5), originalQuality: model.quality ?? 0.5 };
 }
 
 export function automaticDifferences(draft: ModelDraft): Array<{ field: ModelField; before: string; after: string }> {
@@ -73,26 +75,16 @@ export function automaticDifferences(draft: ModelDraft): Array<{ field: ModelFie
 export function confirmedModel(upstream_model: string, draft: ModelDraft): ImportModel | null {
   if (Object.keys(modelErrors(upstream_model, draft)).length) return null;
   const v = draft.values;
-  if (capabilityFields.some((field) => v[field] !== "true" && v[field] !== "false")) return null;
-  const input = finiteNumber(v.input_per_million, 0);
-  const output = finiteNumber(v.output_per_million, 0);
-  const context = v.context_window === "null" ? null : finiteNumber(v.context_window, 1);
-  const limit = v.max_output_tokens === "null" ? null : finiteNumber(v.max_output_tokens, 1);
-  if (input === undefined || output === undefined || context === undefined || limit === undefined || !v.reasoning_effort.trim()) return null;
-  if ((context !== null && !Number.isInteger(context)) || (limit !== null && !Number.isInteger(limit))) return null;
-  let effort: unknown;
-  try { effort = JSON.parse(v.reasoning_effort); } catch { return null; }
-  if (!Array.isArray(effort) || effort.some((entry) => typeof entry !== "string" || !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(entry))) return null;
   return {
     upstream_model,
     display_name: draft.displayName?.trim() || null,
     enabled: draft.enabled ?? true,
     tags: draft.tags?.split(",").map((tag) => tag.trim()).filter(Boolean) ?? [],
     priority: Number(draft.priority ?? 100), quality: Number(draft.quality ?? 0.5),
-    capabilities: { tools: v.tools === "true", vision: v.vision === "true", json_mode: v.json_mode === "true", reasoning: v.reasoning === "true", temperature: v.temperature === "true", reasoning_effort: effort as string[] },
-    cost: { input_per_million: input, output_per_million: output, ...Object.fromEntries((["cache_read_per_million", "cache_write_per_million"] as const).filter((field) => v[field]?.trim()).map((field) => [field, Number(v[field])])) },
-    context_window: context,
-    max_output_tokens: limit,
+    capabilities: { ...Object.fromEntries(capabilityFields.filter((field) => v[field]).map((field) => [field, v[field] === "true"])), ...(v.reasoning_effort.trim() ? { reasoning_effort: JSON.parse(v.reasoning_effort) as string[] } : {}) },
+    cost: Object.fromEntries((["input_per_million", "output_per_million", "cache_read_per_million", "cache_write_per_million"] as const).filter((field) => v[field]?.trim() || draft.originalCacheNull?.[field]).map((field) => [field, v[field] === "null" || (!v[field].trim() && draft.originalCacheNull?.[field]) ? null : Number(v[field])])),
+    ...(v.context_window.trim() ? { context_window: v.context_window === "null" ? null : Number(v.context_window) } : {}),
+    ...(v.max_output_tokens.trim() ? { max_output_tokens: v.max_output_tokens === "null" ? null : Number(v.max_output_tokens) } : {}),
   };
 }
 
@@ -210,8 +202,11 @@ function metadataFits(metadata: ModelMetadata | undefined, draft: ModelDraft): b
   const confirmedAt = "2000-01-01T00:00:00.000Z";
   const fields = { ...metadata.fields };
   for (const field of modelFields) {
-    const raw = draft.values[field];
-    if (!raw) continue;
+    const raw = !draft.values[field].trim() && draft.originalCacheNull?.[field] ? "null" : draft.values[field];
+    if (!raw.trim()) {
+      if (fields[field]?.status === "confirmed") fields[field] = { status: "unknown", value: null, source_ids: fields[field]?.source_ids };
+      continue;
+    }
     let value: boolean | string[] | number | null;
     try { value = JSON.parse(raw); } catch { value = null; }
     const references = fieldReferences(draft, field);
@@ -240,11 +235,16 @@ function persistenceJSON(value: unknown): string {
 }
 
 export function withConfirmedMetadata(model: ImportModel, draft: ModelDraft, confirmedAt: string): ImportModel {
+  if (!draft.metadata && draft.originalMetadataNull && modelFields.every((field) => draft.values[field] === draft.originalNullMetadataValues?.[field])) return { ...model, metadata: null };
+  if (!draft.metadata && !modelFields.some((field) => draft.values[field].trim())) return draft.originalMetadataNull ? { ...model, metadata: null } : model;
   const sources = metadataForWrite(draft)?.sources ?? [];
   const fields: NonNullable<ModelMetadata["fields"]> = { ...draft.metadata?.fields };
   for (const field of modelFields) {
     const value = field.endsWith("per_million") ? model.cost[field as keyof typeof model.cost] : field === "context_window" || field === "max_output_tokens" ? model[field] : model.capabilities[field as keyof typeof model.capabilities];
-    if (value === undefined) continue;
+    if (value === undefined) {
+      if (fields[field]?.status === "confirmed") fields[field] = { status: "unknown", value: null, source_ids: fields[field]?.source_ids };
+      continue;
+    }
     const references = fieldReferences(draft, field);
     const currentSources = draft.currentMetadata?.sources ?? sources;
     const fromSource = !draft.touched[field] && currentSources.some((source) => source.applicable && JSON.stringify(source.fields?.[field]?.value) === JSON.stringify(value));

@@ -14,7 +14,9 @@ export const test = base.extend<Fixtures>({
     });
     await use(state);
     expect(state.unexpected, "browser suite must remain isolated from unmocked APIs and origins").toEqual([]);
-    expect(state.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout" && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
+    const strategy = state.appliedConfiguration?.strategy ?? "balanced";
+    const layoutPaths = ["/v1/dashboard/canvas-layout", `/v1/dashboard/canvas-layout?strategy=${encodeURIComponent(strategy)}`];
+    expect(state.requests.filter(({ method, path }) => method !== "GET" && !(method === "PUT" && layoutPaths.includes(path)) && !state.allowedWrites.some((write) => write.method === method && write.path === path))).toEqual([]);
   }, { auto: true }],
 });
 export { expect };

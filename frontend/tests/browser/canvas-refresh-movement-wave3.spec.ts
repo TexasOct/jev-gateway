@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -10,7 +10,7 @@ for(const kind of ["node","connection"] as const)for(const [locale,width,scheme]
   const requests:{method:string;path:string}[]=[];page.on("request",r=>{const p=new URL(r.url()).pathname;if(p.startsWith("/v1/"))requests.push({method:r.method(),path:p});});
   let hold=false,reads=0,release!:()=>void;const gate=new Promise<void>(r=>{release=r});
   const fresh={...structuredClone(configuration),config_hash:"movement-new-root-hash",fallback:{label:"quality"},questions:{intent:{...configuration.questions.intent!,instructions:"New Root refresh snapshot"}}};
-  await page.route("**/v1/routing/configuration",async route=>{if(route.request().method()==="GET"&&hold){reads++;await gate;return route.fulfill({json:fresh});}return route.fallback();});
+  await page.route("**/v1/routing/configuration?strategy=balanced",async route=>{if(route.request().method()==="GET"&&hold){reads++;await gate;return route.fulfill({json:fresh});}return route.fallback();});
   await page.setViewportSize({width,height:900});await page.emulateMedia({colorScheme:scheme,reducedMotion:"reduce"});await page.goto("/dashboard/");
   if(locale==="zh-CN"){await page.getByRole("button",{name:en.settings,exact:true}).click();await page.locator("[data-settings-language]").selectOption(locale);}
   const words=locale==="en"?en:zhCN;await page.getByRole("button",{name:words.strategyEditor,exact:true}).click();await expect(page.getByRole("button",{name:words.canvasAddNode,exact:true})).toBeEnabled();
@@ -36,7 +36,7 @@ for(const kind of ["node","connection"] as const)for(const [locale,width,scheme]
   expect((mockApi.canvasWrites??[]).slice(writesBefore).every(value=>JSON.stringify(value.nodes)===JSON.stringify(saved!.nodes))).toBe(true);
   await page.mouse.move(point.x+80,point.y+45,{steps:3});await page.mouse.up();
   await expect(page.locator("[data-dragging],.canvas-edge-preview")).toHaveCount(0);await expect(page.locator("[data-canvas-node].selected")).toHaveCount(0);await expect(page.getByRole("button",{name:words.canvasUndo,exact:true})).toBeDisabled();
-  expect(mockApi.canvasLayout?.nodes).toEqual(saved!.nodes);expect(mockApi.canvasWrites?.length??0).toBe(writesAfterRefresh);expect(mockApi.requests.filter(r=>r.method!=="GET"&&r.path!=="/v1/dashboard/canvas-layout")).toEqual([]);
+  expect(mockApi.canvasLayout?.nodes).toEqual(saved!.nodes);expect(mockApi.canvasWrites?.length??0).toBe(writesAfterRefresh);expect(mockApi.requests.filter(r=>r.method!=="GET"&&r.path!=="/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
   await writeFile(info.outputPath("closed-after-late-release.json"),JSON.stringify({kind,saved,current:mockApi.canvasLayout,writesBefore,writesAfterRefresh,reads,pointerId:id,captured:false,requests,truth:fresh},null,2));await page.screenshot({path:info.outputPath("closed-after-late-release.png")});
   await page.locator('[data-canvas-node="questions"]').focus();await page.keyboard.press("Enter");await expect(page.getByRole("complementary",{name:words.nodeInspector}).getByRole("textbox",{name:words.instructions,exact:true})).toHaveValue("New Root refresh snapshot");await page.screenshot({path:info.outputPath("fresh-field-probe.png")});
 });

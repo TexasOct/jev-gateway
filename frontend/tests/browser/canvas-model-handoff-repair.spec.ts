@@ -30,7 +30,7 @@ test("model dialog focus handoff and clean workflow navigation make no layout wr
   const strategy = page.getByRole("button", { name: en.strategyEditor, exact: true });
   await strategy.focus(); await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeEnabled();
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: en.settings, exact: true })).toBeEnabled();
   await page.getByRole("button", { name: en.settings, exact: true }).focus(); await page.keyboard.press("Enter");
   await expect(page.locator("[data-settings-language]")).toBeVisible();

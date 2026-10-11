@@ -1,8 +1,8 @@
 import type { BrowserContext, Route } from "@playwright/test";
 import { activity, providers } from "../fixtures/activity";
-import { configuration } from "../fixtures/configuration";
+import { configuration, workflowConfiguration } from "../fixtures/configuration";
 import { emptyDetail, sessionDetail, sessionsPageOne, sessionsPageTwo, sessionRequestsPageOne, sessionRequestsPageTwo } from "../fixtures/sessions";
-import type { CanvasLayout, ProviderConfiguration, RoutingActivityPayload, SessionRequestsPayload } from "@/shared/api/types";
+import type { CanvasLayout, ProviderConfiguration, RoutingActivityPayload, SessionRequestsPayload, WorkflowWritePayload } from "@/shared/api/types";
 import { policy, strategies } from "../fixtures/strategies";
 
 export interface MockApiState {
@@ -91,7 +91,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       (state.canvasWrites ??= []).push(structuredClone(state.canvasLayout));
       return fulfill(route, state.canvasLayout);
     }
-    const allowedWrite = state.allowedWrites.find((write) => write.method === method && write.path === url.pathname);
+    const allowedWrite = state.allowedWrites.find((write) => write.method === method && write.path === `${url.pathname}${url.search}`);
     if (allowedWrite) {
       allowedWrite.body = request.postDataJSON();
       if (method === "POST" && url.pathname === "/v1/routing/configuration/validate") {
@@ -99,6 +99,26 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
       }
       if (url.pathname === "/v1/routing/configuration" && method === "PUT") {
         state.configurationApplied = true;
+        const body = allowedWrite.body as WorkflowWritePayload | { version?: number };
+        if (body.version === 2) {
+          const payload = body as WorkflowWritePayload;
+          const current = state.appliedConfiguration ?? workflowConfiguration;
+          if (payload.strategy !== current.strategy || url.searchParams.get("strategy") !== payload.strategy) {
+            state.unexpected.push(`${method} ${url.pathname}${url.search}`);
+            return fulfill(route, { error: { message: "Fixture strategy mismatch" } }, 400);
+          }
+          state.appliedConfiguration = {
+            ...current,
+            selected_models: [...payload.selected_models], definition: structuredClone(payload.definition),
+            questions: structuredClone(payload.definition.options.questions),
+            rules: payload.definition.options.rules.map((rule, index) => ({ ...structuredClone(rule), index })),
+            fallback: structuredClone(payload.definition.options.fallback),
+            labels: current.labels.map((label) => ({ ...label, resolution: "models", models: [...(payload.definition.policy.labels[label.name]?.models ?? [])] })),
+            models: structuredClone(current.models),
+            config_hash: "fixture-hash-applied", overlay: { ...current.overlay, applied: true },
+          };
+          return fulfill(route, { applied: true, warnings: [] });
+        }
         const payload = allowedWrite.body as { questions?: typeof configuration.questions; rules?: typeof configuration.rules; fallback?: typeof configuration.fallback; models?: Record<string, { tags: string[]; priority: number }> };
         const current = state.appliedConfiguration ?? configuration;
         state.routingModelOwnership = Object.fromEntries(Object.entries(payload.models ?? {}).map(([id, fields]) => [id, Object.keys(fields).filter((field): field is "tags" | "priority" => field === "tags" || field === "priority")]));
@@ -138,7 +158,7 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
     }
     if (url.pathname === "/v1/routing/strategies") return fulfill(route, strategies);
     if (url.pathname === "/v1/routing/policy") return fulfill(route, policy);
-    if (url.pathname === "/v1/routing/configuration") return fulfill(route, state.appliedConfiguration ?? { ...configuration, overlay: { ...configuration.overlay, applied: state.configurationApplied } });
+    if (url.pathname === "/v1/routing/configuration") return fulfill(route, state.appliedConfiguration ?? { ...workflowConfiguration, overlay: { ...workflowConfiguration.overlay, applied: state.configurationApplied } });
     if (url.pathname === "/v1/dashboard/theme") {
       if (state.delayThemeRead) { const delay = state.delayThemeRead; state.delayThemeRead = undefined; await delay(); }
       if (state.rejectThemeRead) { state.rejectThemeRead = false; return fulfill(route, { error: { message: "Synthetic theme read failure" } }, 503); }

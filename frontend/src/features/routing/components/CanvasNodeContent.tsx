@@ -73,7 +73,7 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
     case "label": {
       const label = config.labels.find((item) => `zone::${item.tag}` === id);
       if (label) {
-        const count = label.resolution === "models" ? label.models.length : labelMembers(draft, config, label).length;
+        const count = draft.pools !== undefined ? labelMembers(draft, config, label).length : label.resolution === "models" ? label.models.length : labelMembers(draft, config, label).length;
         summary = t(count === 1 ? "canvasNodeModelCountOne" : "canvasNodeModelCount").replace("{count}", String(count));
         if (workflowEdges(draft, config).some((edge) => edge.from === id && edge.kind === "default")) {
           summary = t("inheritedDefaultPath").replace("{label}", formatRouteLabel("default", t, { defaulted: true }));

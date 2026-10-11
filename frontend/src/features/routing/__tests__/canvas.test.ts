@@ -324,18 +324,20 @@ describe("first-match edge conversion", () => {
     expect(disconnectPoolEdge(draft, config, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" })?.models["p/a"]?.tags).toEqual(["foreign/tag"]);
     expect(reconnectEdge(draft, config, { from: "rule-0", to: "zone::task_aware/craft", kind: "match" }, "model::p/a")).toBeNull();
   });
-  it("adds a model link, rejects a duplicate, and preserves the source pool", () => {
-    const draft = draftFromConfiguration(config);
-    const first = disconnectPoolEdge(draft, config, { from: "zone::task_aware/craft", to: "model::p/b", kind: "pool" })!;
-    expect(disconnectPoolEdge(first, config, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" })).toBeNull();
-    const added = connectPoolEdge(first, config, "zone::task_aware/craft", "model::p/b")!;
-    expect(added.models["p/a"]?.tags).toContain("task_aware/craft");
-    expect(added.models["p/b"]?.tags).toContain("task_aware/craft");
-    expect(connectPoolEdge(added, config, "zone::task_aware/craft", "model::p/b")).toBeNull();
-    expect(reconnectEdge(draft, config, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" }, "model::p/b")).toBeNull();
-    expect(connectPoolEdge(first, config, "zone::task_aware/ultra", "model::p/b")?.models["p/b"]?.tags).toContain("task_aware/ultra");
-    expect(compatibleTargets(first, config, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" })).not.toContain("model::p/b");
-    expect(compatibleTargets(draft, config, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" })).toEqual(["model::p/a"]);
+  it("adds a local model link, rejects a duplicate, and preserves supplier tags and the source pool", () => {
+    const local = { ...config, selected_models: ["p/a", "p/b"] };
+    const draft = draftFromConfiguration(local);
+    const first = disconnectPoolEdge(draft, local, { from: "zone::task_aware/craft", to: "model::p/b", kind: "pool" })!;
+    expect(first.pools?.["task_aware/craft"]).toEqual(["p/a"]);
+    const added = connectPoolEdge(first, local, "zone::task_aware/craft", "model::p/b")!;
+    expect(added.pools?.["task_aware/craft"]).toEqual(["p/a", "p/b"]);
+    expect(added.models).toBe(draft.models);
+    expect(connectPoolEdge(added, local, "zone::task_aware/craft", "model::p/b")).toBeNull();
+    expect(reconnectEdge(draft, local, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" }, "model::p/b")).toBeNull();
+    const alternate = connectPoolEdge(first, local, "zone::task_aware/ultra", "model::p/b")!;
+    expect(alternate.pools?.["task_aware/ultra"]).toContain("p/b");
+    expect(alternate.models).toBe(draft.models);
+    expect(compatibleTargets(draft, local, { from: "zone::task_aware/craft", to: "model::p/a", kind: "pool" })).toEqual(["model::p/a"]);
   });
   it("rejects stale, fabricated, explicit-model and contradictory links", () => {
     const draft = draftFromConfiguration(config);

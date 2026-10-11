@@ -2,14 +2,14 @@ import { test, expect } from "./fixtures";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 import { writeFile } from "node:fs/promises";
-import { configuration } from "../fixtures/configuration";
+import { configuration, editableConfiguration } from "../fixtures/configuration";
 
 for (const width of [320, 390, 1280]) for (const locale of ["en", "zh-CN"] as const) for (const scheme of ["light", "dark"] as const) {
   test(`controls expose their full hit targets ${width} ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
     const words = locale === "en" ? en : zhCN;
     const dense = structuredClone(configuration);
     for (let i = 0; i < 30; i++) dense.questions.intent!.criteria[`criterion_${i}`] = `可辨识的条件 ${i} / identifiable criterion ${i}`;
-    mockApi.appliedConfiguration = dense;
+    mockApi.appliedConfiguration = editableConfiguration(dense);
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/dashboard/");
     await page.getByRole("button", { name: en.settings, exact: true }).click();
@@ -74,7 +74,7 @@ for (const width of [320, 390, 1280]) for (const locale of ["en", "zh-CN"] as co
     const viewportAfter = await page.locator(".routing-canvas-scroll").evaluate(el => ({ x: el.scrollLeft, y: el.scrollTop, pageX: scrollX, pageY: scrollY }));
     expect(viewportAfter).toEqual(viewportBefore);
     expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual(writesBefore);
-    expect(writesBefore.every(request => request.path === "/v1/dashboard/canvas-layout")).toBe(true);
+    expect(writesBefore.every(request => request.path === "/v1/dashboard/canvas-layout?strategy=balanced")).toBe(true);
     await info.attach("measurements", { body: JSON.stringify(measurements, null, 2), contentType: "application/json" });
   });
 }
@@ -109,7 +109,7 @@ test.describe("touch explicit addition", () => {
     await expect(menu).toHaveCount(0);
     await expect(page.locator('[data-canvas-node="rule-1"]')).toHaveAttribute("data-node-state", "incomplete");
     await expect.poll(() => mockApi.canvasLayout?.nodes["rule-1"]).toBeDefined();
-    expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+    expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
     await writeFile(info.outputPath("touch-hit-targets.json"), JSON.stringify({ hit, itemHit, writes: mockApi.canvasWrites }, null, 2));
     await page.screenshot({ path: info.outputPath("touch-created-rule.png") });
   });

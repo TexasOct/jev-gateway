@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { WorkspaceActivity } from "@/shared/navigation/workspace-activity";
 import { ApiError } from "@/shared/api/client";
 import { RefreshCw } from "lucide-react";
@@ -8,6 +8,7 @@ import type { SchemePreference } from "./hooks/useDashboardTheme";
 import { MonitoringView } from "@/features/monitoring/MonitoringView";
 import AppearanceView from "@/features/appearance/AppearanceView";
 import RoutingEditor from "@/features/routing/RoutingEditor";
+import { createCanvasHistoryScope, type CanvasHistoryScope } from "@/features/routing/model/history-scope";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { ToolButton } from "@/shared/ui/ToolButton";
@@ -50,6 +51,9 @@ type Theme = {
   changeSeed: (seed: string) => void;
 };
 type Props = {
+  historyOwner?: number;
+  historyScope?: CanvasHistoryScope;
+  strategyDiscardEpoch?: number;
   setup?: SetupStatus | null;
   setupLoading?: boolean;
   setupPending?: boolean;
@@ -85,21 +89,20 @@ type Props = {
   onRefresh: () => void;
   onConnect: (event: FormEvent<HTMLFormElement>) => void;
   onKeyDraftChange: (value: string) => void;
-  onReloadConfiguration: (current: () => boolean) => Promise<void>;
+  onReloadConfiguration: (current: () => boolean, strategy?: string) => Promise<boolean | void>;
   onError: (error: string | null) => void;
   onRetryMonitoring: () => void;
 };
 
-function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized, onOpenModel }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized" | "onOpenCanvasModel"> & { configuration: ConfigurationPayload; onOpenModel?: (identity: { provider: string; upstream: string }) => boolean }) {
-  const [informationOpen, setInformationOpen] = useState(false);
+function RoutingWorkspace({ historyScope, strategyDiscardEpoch, configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized, onOpenModel }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized" | "onOpenCanvasModel" | "strategyDiscardEpoch"> & { historyScope: CanvasHistoryScope; configuration: ConfigurationPayload; onOpenModel?: (identity: { provider: string; upstream: string }) => boolean }) {
   return <RoutingEditor
-    key={configuration.config_hash}
+    historyScope={historyScope}
+    discardEpoch={strategyDiscardEpoch}
+    key={`${configuration.strategy}:${configuration.config_hash}`}
     config={configuration}
     error={error}
     onReloaded={onReloadConfiguration}
     onError={onError}
-    informationOpen={informationOpen}
-    onInformationOpenChange={setInformationOpen}
     onDirtyChange={onStrategyDirtyChange}
     onPendingChange={onStrategyPendingChange}
     onUnauthorized={onUnauthorized}
@@ -108,6 +111,9 @@ function RoutingWorkspace({ configuration, error, onReloadConfiguration, onError
 }
 
 export function AppShell({
+  historyOwner = 0,
+  historyScope: admittedHistoryScope,
+  strategyDiscardEpoch = 0,
   setup,
   setupLoading = false,
   setupPending = false,
@@ -147,6 +153,8 @@ export function AppShell({
   onError,
   onRetryMonitoring,
 }: Props) {
+  const localHistoryScope = useMemo(() => createCanvasHistoryScope(historyOwner), [historyOwner]);
+  const historyScope = admittedHistoryScope ?? localHistoryScope;
   const savedFocus = useRef<HTMLElement | null>(null);
   // A failed initial configuration read leaves the strategy view with no workspace.
   // The read retry is owned here so the shell can re-admit it through the existing owner path.
@@ -434,6 +442,8 @@ export function AppShell({
           </Card>
         ) : (
           <RoutingWorkspace
+            historyScope={historyScope}
+            strategyDiscardEpoch={strategyDiscardEpoch}
             configuration={configuration}
             error={error}
             onReloadConfiguration={onReloadConfiguration}

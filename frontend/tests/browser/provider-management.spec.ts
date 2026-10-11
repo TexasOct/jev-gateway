@@ -87,7 +87,7 @@ for (const change of ["endpoint", "transport", "credential revision"] as const) 
     await expect(dialog.getByLabel("Tools", { exact: true })).toHaveValue("");
     await dialog.getByText("Sources and evidence", { exact: true }).click();
     await expect(dialog.locator("[data-current-evidence]")).not.toContainText("88");
-    await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
     expect(state.writes).toHaveLength(1);
     state.metadataEvidence = undefined;
     await dialog.getByRole("button", { name: "Refresh metadata sources", exact: true }).click();
@@ -267,11 +267,10 @@ for (const write of ["import", "save"] as const) {
     expect(state.catalogReads).toBe(2); expect(state.writes).toHaveLength(1);
     if (write === "import") {
       await page.getByRole("button", { name: "Strategy workflow", exact: true }).click();
-      await page.getByRole("button", { name: "Canvas information", exact: false }).click();
-      await page.getByText("Legacy editor controls", { exact: true }).click();
-      const control = page.getByLabel("Add fixture/alpha to label", { exact: true });
-      await expect(control).toBeVisible(); await control.selectOption("balanced/default");
-      await expect(page.getByRole("button", { name: "Remove fixture/alpha from balanced/default", exact: true })).toBeVisible();
+      await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
+      await page.getByRole("button", { name: "Add model", exact: true }).click();
+      await page.getByRole("dialog", { name: "Choose an imported supplier model", exact: true }).getByRole("button", { name: "fixture / alpha Add", exact: true }).click();
+      await expect(page.locator('[data-canvas-node="model::fixture/alpha"]')).toBeVisible();
       expect(state.writes).toHaveLength(1);
     }
   });

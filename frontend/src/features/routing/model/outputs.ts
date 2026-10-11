@@ -1,6 +1,6 @@
 import type { ConfigurationPayload } from "@/shared/api/types";
 import type { ConnectionIntent } from "./canvas";
-import { invalidQuestions, workflowEdges } from "./draft";
+import { invalidQuestions, workflowEdges, workflowModels } from "./draft";
 import type { RoutingDraft, WorkflowEdge } from "./draft";
 import { nodeCardMetrics } from "./node-card";
 import type { NodeDimensions } from "./node-card";
@@ -39,9 +39,9 @@ export function canvasOutputs(draft: RoutingDraft, config: ConfigurationPayload)
     outputs[from] = edges.filter((edge) => edge.from === from).map((edge) => ({
       id: edge.to, kind: edge.kind, name: edge.to.slice(7), edge, intent: { kind: "reconnect", edge },
     }));
-    if (label.resolution === "tag") outputs[from]!.push({ id: "add", kind: "add", intent: { kind: "new-pool", from } });
+    if (label.resolution === "tag" || draft.pools !== undefined) outputs[from]!.push({ id: "add", kind: "add", intent: { kind: "new-pool", from } });
   }
-  for (const model of config.models) outputs[`model::${model.id}`] = [];
+  for (const model of workflowModels(draft, config)) outputs[`model::${model.id}`] = [];
   return outputs;
 }
 

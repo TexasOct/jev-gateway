@@ -1,5 +1,5 @@
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
-import { labelMembers, moveRule, setFallback, setLabelMembership, setRuleChoice, workflowEdges } from "./draft";
+import { labelMembers, moveRule, setFallback, setLabelMembership, setRuleChoice, workflowEdges, selectedModelIds, workflowModels } from "./draft";
 import type { RoutingDraft, WorkflowEdge } from "./draft";
 import { nodeCardMetrics } from "./node-card";
 import type { NodeDimensions } from "./node-card";
@@ -155,17 +155,18 @@ export function classifyConnection(draft: RoutingDraft, config: ConfigurationPay
     const source = intent.kind === "new-pool" ? intent.from : intent.edge.from;
     const label = config.labels.find((item) => `zone::${item.tag}` === source);
     if (!label) return block("unknownLabel");
-    if (label.resolution !== "tag") return block("explicit");
+    if (label.resolution !== "tag" && draft.pools === undefined) return block("explicit");
     const modelId = target.startsWith("model::") ? target.slice(7) : "";
-    if (!Object.hasOwn(draft.models, modelId) || !config.models.some((model) => model.id === modelId)) return block("unknownModel");
+    if (!Object.hasOwn(draft.models, modelId) || !selectedModelIds(draft, config).includes(modelId)) return block("unknownModel");
+    const members = labelMembers(draft, config, label);
     if (intent.kind === "remove") {
       if (intent.edge.to !== target) return block("invalid");
-      return labelMembers(draft, config, label).length > 1 ? allow("remove") : block("lastMember");
+      return draft.pools !== undefined || members.length > 1 ? allow("remove") : block("lastMember");
     }
-    if (intent.kind === "new-pool") return draft.models[modelId]!.tags.includes(label.tag) ? block("duplicate") : allow("add");
+    if (intent.kind === "new-pool") return members.some((model) => model.id === modelId) ? block("duplicate") : allow("add");
     if (intent.edge.to === target) return allow("noop");
-    if (labelMembers(draft, config, label).length <= 1) return block("lastMember");
-    return draft.models[modelId]!.tags.includes(label.tag) ? block("duplicate") : allow("move");
+    if (draft.pools === undefined && members.length <= 1) return block("lastMember");
+    return members.some((model) => model.id === modelId) ? block("duplicate") : allow("move");
   }
   if (intent.kind === "reconnect" && intent.edge.kind === "match") {
     if (!config.labels.some((label) => `zone::${label.tag}` === target)) return block("unknownLabel");
@@ -424,11 +425,11 @@ export function reconnectEdge(
   if (edge.kind === "pool" && edge.from.startsWith("zone::") && target.startsWith("model::")) {
     const source = config.labels.find((item) => `zone::${item.tag}` === edge.from);
     const model = target.slice(7);
-    if (source?.resolution === "tag" && Object.hasOwn(draft.models, model)) {
+    if (source && (source.resolution === "tag" || draft.pools !== undefined) && Object.hasOwn(draft.models, model)) {
       if (!edge.to.startsWith("model::") || !Object.hasOwn(draft.models, edge.to.slice(7))) return null;
-      if (edge.to !== target && labelMembers(draft, config, source).length <= 1) return null;
+      if (draft.pools === undefined && edge.to !== target && labelMembers(draft, config, source).length <= 1) return null;
       if (edge.to === target) return draft;
-      if (draft.models[model]!.tags.includes(source.tag)) return null;
+      if (labelMembers(draft, config, source).some((member) => member.id === model)) return null;
       return setLabelMembership(
         setLabelMembership(draft, edge.to.slice(7), source.tag, false), model, source.tag, true,
       );
@@ -450,8 +451,8 @@ export function disconnectPoolEdge(draft: RoutingDraft, config: ConfigurationPay
   if (edge.kind !== "pool" || classifyConnection(draft, config, { kind: "remove", edge }, edge.to).reason) return null;
   const label = config.labels.find((item) => `zone::${item.tag}` === edge.from);
   const model = edge.to.slice(7);
-  return label?.resolution === "tag" && labelMembers(draft, config, label).length > 1 && Object.hasOwn(draft.models, model) &&
-    draft.models[model]!.tags.includes(label.tag) ? setLabelMembership(draft, model, label.tag, false) : null;
+  return label && (label.resolution === "tag" || draft.pools !== undefined) && Object.hasOwn(draft.models, model) &&
+    labelMembers(draft, config, label).some((member) => member.id === model) ? setLabelMembership(draft, model, label.tag, false) : null;
 }
 
 export function disconnectEdge(draft: RoutingDraft, config: ConfigurationPayload, edge: WorkflowEdge): RoutingDraft | null {
@@ -471,7 +472,7 @@ export function connectMatchEdge(draft: RoutingDraft, config: ConfigurationPaylo
 
 export function intentTargets(draft: RoutingDraft, config: ConfigurationPayload, intent: ConnectionIntent): string[] {
   const candidates = [...draft.rules.map((_, index) => `rule-${index}`), "fallback",
-    ...config.labels.map((label) => `zone::${label.tag}`), ...config.models.map((model) => `model::${model.id}`)];
+    ...config.labels.map((label) => `zone::${label.tag}`), ...workflowModels(draft, config).map((model) => `model::${model.id}`)];
   return candidates.filter((target) => !classifyConnection(draft, config, intent, target).reason);
 }
 
@@ -507,8 +508,8 @@ export function connectPoolEdge(draft: RoutingDraft, config: ConfigurationPayloa
   if (classifyConnection(draft, config, { kind: "new-pool", from: source }, target).reason) return null;
   const label = config.labels.find((item) => `zone::${item.tag}` === source);
   const model = target.startsWith("model::") ? target.slice(7) : "";
-  return label?.resolution === "tag" && Object.hasOwn(draft.models, model) &&
-    !draft.models[model]!.tags.includes(label.tag) ? setLabelMembership(draft, model, label.tag, true) : null;
+  return label && (label.resolution === "tag" || draft.pools !== undefined) && Object.hasOwn(draft.models, model) &&
+    !labelMembers(draft, config, label).some((member) => member.id === model) ? setLabelMembership(draft, model, label.tag, true) : null;
 }
 
 /** Reject inert explicit-model edits and removal of the last resolved model. */
@@ -517,8 +518,8 @@ export function changeLabelMembership(
 ): RoutingDraft | null {
   const label = config.labels.find((item) => item.tag === tag);
   const model = draft.models[modelId];
-  if (!label || label.resolution !== "tag" || !model) return null;
-  if (!member && model.tags.includes(tag) && labelMembers(draft, config, label).length <= 1) return null;
+  if (!label || label.resolution !== "tag" && draft.pools === undefined || !model) return null;
+  if (draft.pools === undefined && !member && model.tags.includes(tag) && labelMembers(draft, config, label).length <= 1) return null;
   return setLabelMembership(draft, modelId, tag, member);
 }
 
@@ -531,6 +532,6 @@ function workflowEdgeExists(draft: RoutingDraft, config: ConfigurationPayload, e
 export function compatibleTargets(draft: RoutingDraft, config: ConfigurationPayload, edge: WorkflowEdge): string[] {
   if (edge.kind === "unmatched" && edge.to.startsWith("zone::")) return [];
   const candidates = ["questions", "fallback", ...draft.rules.map((_, index) => `rule-${index}`),
-    ...config.labels.map((label) => `zone::${label.tag}`), ...config.models.map((model) => `model::${model.id}`)];
+    ...config.labels.map((label) => `zone::${label.tag}`), ...workflowModels(draft, config).map((model) => `model::${model.id}`)];
   return candidates.filter((target) => classifyConnection(draft, config, { kind: "reconnect", edge }, target).reason === null);
 }

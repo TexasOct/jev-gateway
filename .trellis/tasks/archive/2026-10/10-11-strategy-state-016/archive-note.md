@@ -1,0 +1,3 @@
+Strategy state is independently accepted by `check-recovery-handoff.md` and retained by the complete integration PASS. Selection, policy, layout and named-strategy persistence preserve v1/no-query compatibility and isolation. The initial REWORK, its reconciliation and the failed HTTP/2 checker remain preserved.
+
+This task was constructed directly on `main`, with `branch == base_branch == main` and no PR. The authorized parent release uses `archive --no-commit --skip-branch-validation`; this records the actual delivery route. Child archival does not claim that 0.1.6 has been published. The parent retains A8 and the operator installation remains outside scope.

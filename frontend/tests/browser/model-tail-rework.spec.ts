@@ -37,11 +37,11 @@ test("mixed source failure retry targets one item, preserves batch selection and
   const alpha = page.locator("label").filter({ has: page.getByRole("checkbox", { name: "fixture/alpha", exact: true }) });
   const beta = page.locator("label").filter({ has: page.getByRole("checkbox", { name: "fixture/beta", exact: true }) });
   await expect(alpha).toContainText("Metadata fetch failed: retry or complete manually");
-  await expect(beta).toContainText("Partial or unknown");
+  await expect(beta).toContainText("Ready for review");
   await page.getByRole("button", { name: "Select all visible unconfigured models", exact: true }).click();
   await page.getByRole("button", { name: "Retry: fixture/alpha", exact: true }).click();
-  await expect(alpha).toContainText("Matched and ready for review");
-  await expect(beta).toContainText("Partial or unknown");
+  await expect(alpha).toContainText("Ready for review");
+  await expect(beta).toContainText("Ready for review");
   await expect(page.getByRole("checkbox", { name: "fixture/alpha", exact: true })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "fixture/beta", exact: true })).toBeChecked();
   expect(metadata[1]).toEqual({ provider_id: "fixture", upstream_models: ["alpha"], refresh: true });

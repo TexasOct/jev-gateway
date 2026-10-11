@@ -1,0 +1,51 @@
+{
+  "id": "workflow-model-nodes-016",
+  "name": "workflow-model-nodes-016",
+  "title": "0.1.6 optional model imports and strategy-owned workflow nodes",
+  "description": "Allow partial model parameters on import; select explicit model nodes per named strategy; move workflow actions to floating controls; verify and publish stable 0.1.6.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-11",
+  "completedAt": "2026-10-12",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-11-model-optional-016",
+    "10-11-strategy-state-016",
+    "10-11-workflow-controls-016"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "A1-A7 independently PASS against the recovered 525-file candidate. A8 publication remains pending parent release work; archival does not assert a published 0.1.6. No operator upgrade is authorized.",
+  "meta": {
+    "closure": {
+      "disposition": "construction_verified_release_pending",
+      "acceptance_complete": false,
+      "accepted_criteria": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7"
+      ],
+      "pending_criteria": [
+        "A8"
+      ],
+      "review_run": "1771abd7-c053-4a15-9ac1-0766aff0864f",
+      "review": "check-recovery-handoff.md",
+      "delivery": "direct_main_no_pr",
+      "release": "0.1.6"
+    }
+  }
+}

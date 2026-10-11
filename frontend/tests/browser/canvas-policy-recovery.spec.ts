@@ -1,13 +1,15 @@
 import { writeFile } from "node:fs/promises";
 import type { Page, Locator, TestInfo } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
-import type { RoutingOverlayPayload } from "../../src/shared/api/types";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
+import type { WorkflowWritePayload } from "../../src/shared/api/types";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
-const policyPath = "/v1/routing/configuration";
-const layoutPath = "/v1/dashboard/canvas-layout";
+const policyBase = "/v1/routing/configuration";
+const policyPath = `${policyBase}?strategy=balanced`;
+const validatePath = `${policyBase}/validate?strategy=balanced`;
+const layoutPath = "/v1/dashboard/canvas-layout?strategy=balanced";
 type Words = typeof en | typeof zhCN;
 const initialLayout = { version: 1 as const, nodes: { "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
 
@@ -46,13 +48,13 @@ async function evidence(page: Page, info: TestInfo, name: string, state: unknown
 
 for (const [locale, width] of [["en", 1280], ["zh-CN", 320]] as const) test(`committed policy failed read blocks replay and recovers by GET only ${locale} ${width}`, async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   let puts = 0, recoveryReads = 0, releasePut!: () => void, releaseFirst!: () => void, releaseLast!: () => void;
   const put = new Promise<void>(resolve => { releasePut = resolve; });
   const first = new Promise<void>(resolve => { releaseFirst = resolve; }), last = new Promise<void>(resolve => { releaseLast = resolve; });
   const order: string[] = [];
-  page.on("request", request => { const path = new URL(request.url()).pathname; if (path.startsWith(policyPath) || path === layoutPath) order.push(`${request.method()} ${path}`); });
-  await page.route(`**${policyPath}`, async route => {
+  page.on("request", request => { const url = new URL(request.url()), path = url.pathname + url.search; if (url.pathname.startsWith(policyBase) || path === layoutPath) order.push(`${request.method()} ${path}`); });
+  await page.route(`**${policyBase}{,?strategy=balanced}`, async route => {
     if (route.request().method() === "PUT") { puts++; await put; return route.fallback(); }
     if (route.request().method() !== "GET" || !puts) return route.fallback();
     const read = ++recoveryReads;
@@ -98,31 +100,30 @@ for (const [locale, width] of [["en", 1280], ["zh-CN", 320]] as const) test(`com
   await expect(page.getByRole("button", { name: words.settings, exact: true })).toBeDisabled();
   expect(puts).toBe(1);
   releaseLast();
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: words.canvasRedo, exact: true })).toBeDisabled();
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.locator(".workflow-info")).toHaveCount(1);
-  await expect(page.locator(".workflow-info")).not.toBeVisible();
+  await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
   expect(puts).toBe(1); expect(mockApi.appliedConfiguration).toEqual(committed); expect(mockApi.canvasLayout).toEqual(layoutBefore);
-  expect(order.filter(value => value.includes(policyPath))).toEqual([`GET ${policyPath}`, `POST ${policyPath}/validate`, `PUT ${policyPath}`, `GET ${policyPath}`, `GET ${policyPath}`, `GET ${policyPath}`]);
+  expect(order.filter(value => value.includes(policyBase))).toEqual([`GET ${policyBase}`, `POST ${validatePath}`, `PUT ${policyPath}`, `GET ${policyPath}`, `GET ${policyPath}`, `GET ${policyPath}`]);
   expect(order.filter(value => value === `PUT ${layoutPath}`)).toEqual(layoutWritesBefore);
   await evidence(page, info, "recovered", { committed, order, layout: mockApi.canvasLayout });
 });
 
 for (const committed of [false, true]) test(`unknown policy response requires a read before mutation committed=${committed}`, async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath });
   let puts = 0, reads = 0;
   const original = structuredClone(configuration);
   mockApi.appliedConfiguration = original;
-  await page.route(`**${policyPath}`, async route => {
+  await page.route(`**${policyBase}{,?strategy=balanced}`, async route => {
     if (route.request().method() === "GET") { reads++; return route.fallback(); }
     if (route.request().method() !== "PUT") return route.fallback();
     puts++;
-    const payload = route.request().postDataJSON() as RoutingOverlayPayload;
-    expect(payload.questions).toBeDefined(); expect(payload.fallback).toBeDefined();
-    if (committed) mockApi.appliedConfiguration = { ...original, questions: payload.questions!, fallback: payload.fallback!, rules: payload.rules.map((rule, index) => ({ ...rule, index })), config_hash: "unknown-response-committed" };
+    const payload = route.request().postDataJSON() as WorkflowWritePayload;
+    expect(payload.version).toBe(2); expect(payload.definition.options.questions).toBeDefined(); expect(payload.definition.options.fallback).toBeDefined();
+    if (committed) mockApi.appliedConfiguration = { ...original, selected_models: payload.selected_models, definition: payload.definition, questions: payload.definition.options.questions, fallback: payload.definition.options.fallback, rules: payload.definition.options.rules.map((rule, index) => ({ ...rule, index })), config_hash: "unknown-response-committed" };
     await route.abort("failed");
   });
   const words = await open(page, "en", 1280);
@@ -137,7 +138,7 @@ for (const committed of [false, true]) test(`unknown policy response requires a 
   await expect(page.getByRole("button", { name: words.settings, exact: true })).toBeDisabled();
   expect(puts).toBe(1); expect(reads).toBe(1);
   await activate(page, retry);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(retry).toHaveCount(0);
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText(committed ? "quality" : "default");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
@@ -149,14 +150,14 @@ for (const committed of [false, true]) test(`unknown policy response requires a 
 
 for (const suspension of ["metadata", "read-401"] as const) test(`committed recovery survives ${suspension} suspension and rejects old completion`, async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   let puts = 0, reads = 0, metadataCalls = 0, releaseMetadata!: () => void, releaseOld!: () => void;
   const metadata = new Promise<void>(resolve => { releaseMetadata = resolve; }), old = new Promise<void>(resolve => { releaseOld = resolve; });
   if (suspension === "metadata") await page.route("**/v1/routing/strategies", async route => {
     if (++metadataCalls !== 2) return route.fallback();
     await metadata; return route.fulfill({ status: 401, json: { error: { message: "Synthetic recovery suspension" } } });
   });
-  await page.route(`**${policyPath}`, async route => {
+  await page.route(`**${policyBase}{,?strategy=balanced}`, async route => {
     if (route.request().method() === "PUT") { puts++; return route.fallback(); }
     if (route.request().method() !== "GET" || !puts) return route.fallback();
     if (++reads !== 1) return route.fallback();
@@ -176,7 +177,7 @@ for (const suspension of ["metadata", "read-401"] as const) test(`committed reco
   await activate(page, page.getByRole("button", { name: words.connect, exact: true }));
   await expect(page.locator("[data-connection-page]")).toHaveCount(0);
   await activate(page, page.getByRole("button", { name: "Retry configuration read", exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await activate(page, page.locator('[data-canvas-node="fallback"]'));
   await page.getByRole("complementary", { name: words.nodeInspector }).getByRole("combobox", { name: words.label, exact: true }).selectOption("default");
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
@@ -185,7 +186,7 @@ for (const suspension of ["metadata", "read-401"] as const) test(`committed reco
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   }
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   await page.locator(".routing-canvas-scroll").focus(); await page.keyboard.press("ControlOrMeta+z");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("quality");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
@@ -196,12 +197,12 @@ for (const suspension of ["metadata", "read-401"] as const) test(`committed reco
 
 test("successful apply and reset render fresh snapshots and reset history boundaries", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath }, { method: "DELETE", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath }, { method: "DELETE", path: policyPath });
   const words = await open(page, "en", 1280);
   await edit(page, words, "Saved server instruction snapshot");
   await activate(page, page.getByRole("button", { name: words.reviewChanges, exact: true }));
   await activate(page, page.getByRole("button", { name: words.confirmAndSave, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   await activate(page, page.locator('[data-canvas-node="fallback"]'));
   await page.getByRole("complementary", { name: words.nodeInspector }).getByRole("combobox", { name: words.label, exact: true }).selectOption("default");
@@ -212,20 +213,20 @@ test("successful apply and reset render fresh snapshots and reset history bounda
   await activate(page, page.getByRole("button", { name: words.resetBaseline, exact: true }));
   await activate(page, page.getByRole("button", { name: words.confirmReset, exact: true }));
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: words.canvasRedo, exact: true })).toBeDisabled();
   expect(mockApi.appliedConfiguration).toBeUndefined(); expect(mockApi.configurationApplied).toBe(false);
-  expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual([{ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath }, { method: "DELETE", path: policyPath }]);
+  expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual([{ method: "POST", path: validatePath }, { method: "PUT", path: policyPath }, { method: "DELETE", path: policyPath }]);
   expect(mockApi.canvasLayout).toEqual(initialLayout);
   await evidence(page, info, "reset-boundary", { requests: mockApi.requests, layout: mockApi.canvasLayout });
 });
 
 test("failed policy apply retains draft and history for explicit retry", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   const attempts: unknown[] = [];
-  await page.route(`**${policyPath}`, async route => {
+  await page.route(`**${policyBase}{,?strategy=balanced}`, async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     attempts.push(route.request().postDataJSON());
     if (attempts.length === 1) return route.fulfill({ status: 503, json: { error: { message: "Policy rejected before commit" } } });
@@ -248,13 +249,13 @@ test("failed policy apply retains draft and history for explicit retry", async (
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
   await activate(page, page.getByRole("button", { name: words.reviewChanges, exact: true }));
   await activate(page, page.getByRole("button", { name: words.confirmAndSave, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   expect(attempts).toHaveLength(2); expect(attempts[1]).toEqual(attempts[0]); expect(mockApi.appliedConfiguration?.questions.intent!.instructions).toBe(raw);
   expect(mockApi.canvasLayout).toEqual(initialLayout);
   await evidence(page, info, "apply-retry", { attempts, committed: mockApi.appliedConfiguration, requests: mockApi.requests });
 });
 
-test("same-hash reset read recovery retains raw draft and the disclosed baseline preview", async ({ page, mockApi }, info) => {
+test("same-hash reset read recovery retains raw draft and the current canvas without a preview drawer", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(initialLayout);
   mockApi.allowedWrites.push({ method: "DELETE", path: policyPath });
   let deletes = 0, reads = 0;
@@ -287,13 +288,11 @@ test("same-hash reset read recovery retains raw draft and the disclosed baseline
   await expect(inspector.getByRole("textbox", { name: words.newCriterion, exact: true })).toHaveValue("  未完成条件  ");
   await expect(inspector.getByRole("textbox", { name: words.newQuestion, exact: true })).toHaveValue("  未完成问题  ");
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-  const information = page.getByRole("button", { name: words.canvasInformation, exact: true });
-  if (await information.getAttribute("aria-expanded") !== "true") await activate(page, information);
-  await expect(page.locator(".workflow-info")).toBeVisible();
+  await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
   await activate(page, retry);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
-  await expect(page.locator(".workflow-info")).toBeVisible();
+  await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: words.canvasRedo, exact: true })).toBeDisabled();
   await expect(page.getByRole("complementary", { name: words.nodeInspector })).toHaveCount(0);

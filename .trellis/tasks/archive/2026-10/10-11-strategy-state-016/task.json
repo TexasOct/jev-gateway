@@ -1,0 +1,35 @@
+{
+  "id": "strategy-state-016",
+  "name": "strategy-state-016",
+  "title": "Strategy-local model nodes and persistence",
+  "description": "Persist named workflow strategies, explicit model selection and isolated policy/layout data with v1 compatibility.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-11",
+  "completedAt": "2026-10-12",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-11-workflow-model-nodes-016",
+  "relatedFiles": [],
+  "notes": "A2-A4 independently accepted by the recovered state checker and retained by complete parent integration PASS. Original REWORK and HTTP/2 failure remain historical. Publication belongs to the parent.",
+  "meta": {
+    "closure": {
+      "disposition": "implementation_verified",
+      "acceptance_complete": true,
+      "review_run": "50471859-d5b2-4574-9e2c-3924b342b756",
+      "review": "check-recovery-handoff.md",
+      "delivery": "direct_main_no_pr",
+      "parent_release": "0.1.6"
+    }
+  }
+}

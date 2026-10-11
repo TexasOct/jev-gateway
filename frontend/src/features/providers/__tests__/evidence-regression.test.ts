@@ -56,7 +56,10 @@ describe("provider evidence regressions", () => {
     expect(draft.values.tools).toBe("");
     expect(draft.evidence).toBeUndefined();
     expect(draft.metadata?.sources).toHaveLength(2);
-    expect(confirmedModel("m", draft)).toBeNull();
+    const saved = withConfirmedMetadata(confirmedModel("m", draft)!, draft, "2026-10-11");
+    expect(saved.capabilities).toEqual({});
+    expect(saved.cost).toEqual({ input_per_million: 9 });
+    expect(saved.metadata?.fields?.tools?.status).not.toBe("confirmed");
   });
   it("never marks historic matching evidence as the source of a new confirmation", () => {
     let draft = prefillMetadata(emptyModelDraft(), item([1]));

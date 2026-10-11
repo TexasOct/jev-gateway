@@ -1,10 +1,12 @@
 /** In-memory history. Viewport navigation is intentionally outside the undo stack. */
 export function createHistory<T>(equal: (a: T, b: T) => boolean, limit = 50) {
   let current: T | null = null;
+  let retired = false;
   const past: T[] = [], future: T[] = [];
   return {
-    reset(value: T) { current = value; past.length = 0; future.length = 0; },
+    reset(value: T) { if (retired) return; current = value; past.length = 0; future.length = 0; },
     record(value: T) {
+      if (retired) return false;
       if (current !== null && equal(current, value)) { current = value; return false; }
       if (current !== null) past.push(current);
       if (past.length > limit) past.shift();
@@ -13,8 +15,23 @@ export function createHistory<T>(equal: (a: T, b: T) => boolean, limit = 50) {
     },
     undo() { const value = past.pop(); if (value === undefined) return null; if (current !== null) future.push(current); current = value; return value; },
     redo() { const value = future.pop(); if (value === undefined) return null; if (current !== null) past.push(current); current = value; return value; },
+    retire() { retired = true; current = null; past.length = 0; future.length = 0; },
     get canUndo() { return past.length > 0; },
     get canRedo() { return future.length > 0; },
+  };
+}
+
+/** The caller guards departure; each admitted strategy keeps its own checkpoints. */
+export function createStrategyHistory<T>(equal: (a: T, b: T) => boolean, limit = 50) {
+  const histories = new Map<string, ReturnType<typeof createHistory<T>>>();
+  return {
+    forStrategy(name: string) {
+      let history = histories.get(name);
+      if (!history) { history = createHistory(equal, limit); histories.set(name, history); }
+      return history;
+    },
+    remove(name: string) { histories.get(name)?.retire(); histories.delete(name); },
+    clear() { for (const history of histories.values()) history.retire(); histories.clear(); },
   };
 }
 

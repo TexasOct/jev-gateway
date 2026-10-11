@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration, editableConfiguration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -11,7 +11,7 @@ import { zhCN } from "../../src/shared/i18n/zh-CN";
 //        reports a successful policy save (and the reverse), duplicate-submit no-op.
 //   C21  cancel preserves edits/selection/accessible focus; layout-only persistence
 //        never claims pending policy changes.
-//   C22  collapsed/expanded drawer, menu, selected inspector and validation state
+//   C22  current floating controls, menu, selected inspector and validation state
 //        geometry in the sixteen viewport/locale/scheme combinations, with document
 //        horizontal overflow measured separately from intentionally scrollable content.
 //   C23  28px output rows, 18px handles and output growth/shrink geometry, plus
@@ -23,8 +23,10 @@ import { zhCN } from "../../src/shared/i18n/zh-CN";
 //   WF6  explicit save and reopen retain configuration, derived connections and layout.
 // Every pointer drives a real input event; elementFromPoint confirms the hit target.
 
-const policyPath = "/v1/routing/configuration";
-const layoutPath = "/v1/dashboard/canvas-layout";
+const policyBase = "/v1/routing/configuration";
+const policyPath = `${policyBase}?strategy=balanced`;
+const validatePath = `${policyBase}/validate?strategy=balanced`;
+const layoutPath = "/v1/dashboard/canvas-layout?strategy=balanced";
 type Words = typeof en | typeof zhCN;
 const layout = { version: 1 as const, nodes: { "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
 
@@ -59,11 +61,11 @@ async function open(page: Page, locale: "en" | "zh-CN", width: number, height: n
 
 test("C20 delayed validation failure retains the draft and lets Review retry without a PUT", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   let validations = 0, puts = 0;
   const order: string[] = [];
-  page.on("request", request => { const path = new URL(request.url()).pathname; if (path.startsWith(policyPath)) order.push(`${request.method()} ${path}`); });
-  await page.route(`**${policyPath}/validate`, async route => {
+  page.on("request", request => { const url = new URL(request.url()), path = url.pathname + url.search; if (url.pathname.startsWith(policyBase)) order.push(`${request.method()} ${path}`); });
+  await page.route(`**${validatePath}`, async route => {
     validations++;
     if (validations === 1) return route.fulfill({ status: 503, json: { error: { message: "Validation service unavailable" } } });
     return route.fallback();
@@ -80,7 +82,7 @@ test("C20 delayed validation failure retains the draft and lets Review retry wit
   await activate(page, review);
   await expect(page.getByRole("alert")).toContainText("Validation service unavailable");
   expect(puts).toBe(0);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   await activate(page, page.getByRole("button", { name: words.canvasUndo, exact: true }));
   // undo restores the baseline; redo brings the raw draft back to prove it was retained
   await activate(page, page.getByRole("button", { name: words.canvasRedo, exact: true }));
@@ -96,11 +98,12 @@ test("C20 delayed validation failure retains the draft and lets Review retry wit
 
 test("C20 a failed layout write never reports a successful policy save and vice versa", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
-  let layoutPuts = 0;
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
+  let layoutPuts = 0, rejectLayout = true;
   await page.route(`**${layoutPath}`, async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     layoutPuts++;
+    if (!rejectLayout) return route.fallback();
     return route.fulfill({ status: 503, json: { error: { message: "Layout storage offline" } } });
   });
   const words = await open(page, "en", 1280, 900, "light");
@@ -110,12 +113,17 @@ test("C20 a failed layout write never reports a successful policy save and vice 
   await expect.poll(() => layoutPuts).toBeGreaterThan(0);
   await expect(page.getByRole("status").filter({ hasText: "Layout storage offline" })).toBeVisible();
   await expect(page.getByRole("button", { name: words.routingRetryRead, exact: true })).toHaveCount(0);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   expect(mockApi.requests.filter(request => request.method === "PUT" && request.path === policyPath)).toEqual([]);
   // Retry closing the banner issues no policy write.
   const retryLayout = page.getByRole("button", { name: words.canvasRetryLayout, exact: true });
   if (await retryLayout.count()) { await retryLayout.first().click(); await expect.poll(() => layoutPuts).toBeGreaterThan(1); }
   expect(mockApi.requests.filter(request => request.method === "PUT" && request.path === policyPath)).toEqual([]);
+  await expect(page.getByRole("button", { name: words.reviewChanges, exact: true })).toBeDisabled();
+  rejectLayout = false;
+  await retryLayout.first().click();
+  await expect.poll(() => mockApi.canvasLayout?.nodes).toEqual(layout.nodes);
+  await expect(page.locator('[data-canvas-node="rule-0"]')).toHaveCSS("left", "420px");
   // Now commit a policy successfully; a subsequent layout failure must not revoke it.
   await activate(page, page.locator('[data-canvas-node="fallback"]'));
   const inspector = page.getByRole("complementary", { name: words.nodeInspector });
@@ -123,21 +131,22 @@ test("C20 a failed layout write never reports a successful policy save and vice 
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
   await activate(page, page.getByRole("button", { name: words.reviewChanges, exact: true }));
   await activate(page, page.getByRole("button", { name: words.confirmAndSave, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const committed = structuredClone(mockApi.appliedConfiguration);
   expect(committed?.fallback).toEqual({ label: "quality" });
+  rejectLayout = true;
   await page.locator('[data-canvas-node="rule-0"]').focus();
   await page.keyboard.press("Alt+ArrowRight");
   await expect(page.getByRole("status").filter({ hasText: "Layout storage offline" })).toBeVisible();
   // The committed policy is untouched by the later layout failure: no revoked success.
   expect(mockApi.appliedConfiguration).toEqual(committed);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await capture(page, info, "c20-failure-separation", { layoutPuts, committed, requests: mockApi.requests });
 });
 
 test("C20 saving controls prevent duplicate submission during a delayed apply", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; });
   let puts = 0;
   await page.route(`**${policyPath}`, async route => {
@@ -155,13 +164,13 @@ test("C20 saving controls prevent duplicate submission during a delayed apply", 
   const confirm = page.getByRole("button", { name: words.confirmAndSave, exact: true });
   await activate(page, confirm);
   await expect.poll(() => puts).toBe(1);
-  // While the write is in flight the control is disabled; a forced second Enter cannot add a write.
+  // While the write is in flight the disabled control ignores native keyboard submission.
   await expect(confirm).toBeDisabled();
-  await confirm.click({ force: true }).catch(() => undefined);
+  await confirm.press("Enter");
   await page.keyboard.press("Enter");
   expect(puts).toBe(1);
   release();
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   expect(puts).toBe(1);
   await capture(page, info, "c20-duplicate-submit", { puts, requests: mockApi.requests });
 });
@@ -187,7 +196,7 @@ test("C21 cancel preserves semantic edits, selection and accessible focus", asyn
   await activate(page, settings);
   await expect(settings).toBeFocused();
   await expect(page.locator('[data-canvas-node="questions"]')).toHaveClass(/selected/);
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   expect(dialogs.length).toBe(1);
   expect(mockApi.canvasLayout).toEqual(before);
   expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual(writesBefore);
@@ -197,7 +206,7 @@ test("C21 cancel preserves semantic edits, selection and accessible focus", asyn
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
   // The toolbar Cancel button discards the draft and the selection as a separate boundary.
   await activate(page, page.locator(".workflow-toolbar").getByRole("button", { name: words.cancel, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await activate(page, page.locator('[data-canvas-node="questions"]'));
   await expect(field).toHaveValue(configuration.questions.intent!.instructions);
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
@@ -213,8 +222,8 @@ test("C21 layout-only persistence never claims pending policy changes", async ({
   await expect.poll(() => mockApi.canvasLayout?.nodes["rule-0"]).toEqual({ x: 440, y: 80 });
   await frames(page);
   // The policy draft stays unchanged; the layout indicator explains it is layout only.
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
-  await expect(page.getByText(words.canvasLayoutOnly, { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.getByRole("toolbar", { name: words.canvasTools }).locator("output")).toHaveAttribute("title", words.canvasZoom);
   const layoutWrites = mockApi.requests.filter(request => request.method === "PUT" && request.path === layoutPath);
   expect(layoutWrites.length).toBeGreaterThan(0);
   expect(mockApi.requests.filter(request => request.method === "PUT" && request.path === policyPath)).toEqual([]);
@@ -229,7 +238,7 @@ for (const [locale, width, height, scheme] of [
   ["en", 390, 900, "light"], ["en", 390, 900, "dark"], ["zh-CN", 390, 900, "light"], ["zh-CN", 390, 900, "dark"],
   ["en", 320, 900, "light"], ["en", 320, 900, "dark"], ["zh-CN", 320, 900, "light"], ["zh-CN", 320, 900, "dark"],
 ] as const) {
-  test(`C22 drawer menu inspector and validation geometry ${width}x${height} ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
+  test(`C22 floating controls menu inspector and validation geometry ${width}x${height} ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
     mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 350, y: 80 }, fallback: { x: 350, y: 300 } } };
     const words = await open(page, locale, width, height, scheme);
     const canvas = page.locator(".routing-canvas-scroll");
@@ -254,17 +263,13 @@ for (const [locale, width, height, scheme] of [
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
 
-    // Collapsed then expanded drawer: the body scrolls internally, not the page.
-    const toggle = page.getByRole("button", { name: words.canvasInformation, exact: true });
-    const infoPanel = page.locator("#routing-information");
-    expect(await toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(await infoPanel.isVisible()).toBe(false);
-    await activate(page, toggle);
-    expect(await toggle.getAttribute("aria-expanded")).toBe("true");
-    await expect(infoPanel).toBeVisible();
-    const drawerScroll = await infoPanel.evaluate(el => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, overflowY: getComputedStyle(el).overflowY }));
-    expect(drawerScroll.overflowY).toBe("auto");
-    expect(drawerScroll.scrollHeight).toBeGreaterThanOrEqual(drawerScroll.clientHeight);
+    // R4 removes the drawer. Current floating actions remain inside the native viewport.
+    await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced, .workflow-footer")).toHaveCount(0);
+    const floating = page.locator(".canvas-tools[data-canvas-occlusion='bottom']");
+    await expect(floating).toBeVisible();
+    const controlsBox = (await floating.boundingBox())!;
+    expect(controlsBox.x).toBeGreaterThanOrEqual(0); expect(controlsBox.x + controlsBox.width).toBeLessThanOrEqual(width + 1);
+    expect(controlsBox.y).toBeGreaterThanOrEqual(0); expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(height + 1);
     const pageAfterDrawer = await page.evaluate(() => ({ documentHeight: document.documentElement.scrollHeight, inner: window.innerHeight }));
     expect(pageAfterDrawer.documentHeight).toBeLessThanOrEqual(pageAfterDrawer.inner + 24);
 
@@ -288,13 +293,11 @@ for (const [locale, width, height, scheme] of [
     await expect(instructions).toBeEnabled();
     await instructions.fill("");
     await expect(instructions).toHaveValue("");
-    await expect(page.locator(".workspace-heading [role=status]")).toHaveText(words.canvasInvalidState);
-    await expect.poll(async () =>
-      (await page.locator(".workspace-heading [role=status]").innerText()) === words.canvasInvalidState
-      || (await page.locator('[data-canvas-node="questions"]').getAttribute("aria-invalid")) === "true",
-    ).toBe(true);
+    await expect(page.locator('[data-canvas-node="questions"]')).toHaveAttribute("data-node-state", "invalid");
+    await expect(page.getByRole("status").filter({ hasText: words.canvasQuestionInstructionsError })).toBeVisible();
+    await expect(page.getByRole("button", { name: words.reviewChanges, exact: true })).toBeDisabled();
     await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-    await writeFile(info.outputPath("c22-geometry.json"), JSON.stringify({ locale, width, height, scheme, canvasBox, header, menuBox, drawerScroll, inspectorBox, overflow }, null, 2));
+    await writeFile(info.outputPath("c22-geometry.json"), JSON.stringify({ locale, width, height, scheme, canvasBox, header, menuBox, controlsBox, inspectorBox, overflow, requests: mockApi.requests }, null, 2));
     await page.screenshot({ path: info.outputPath("c22-state.png") });
   });
 }
@@ -307,7 +310,7 @@ test("C23 dense output rows, handles and growth/shrink keep the documented metri
   dense.models = Array.from({ length: 10 }, (_, index) => ({ ...dense.models[0]!, id: `fixture-provider/长名称模型-${index + 1}`, upstream_model: `长名称模型-${index + 1}`, tags: ["balanced/default"], baseline_tags: ["balanced/default"] }));
   dense.labels[0]!.models = dense.models.map(({ id }) => id);
   dense.labels[1]!.models = [dense.models[0]!.id];
-  mockApi.appliedConfiguration = dense;
+  mockApi.appliedConfiguration = editableConfiguration({ ...dense, selected_models: dense.models.map(({ id }) => id) });
   mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: {} };
   const words = await open(page, "en", 1280, 900, "light");
   const canvas = page.locator(".routing-canvas-scroll");
@@ -349,7 +352,7 @@ function toolbarAdd(words: Words, page: Page) { return page.getByRole("button", 
 // --- C24: empty, failed reads, disabled writes and 403 controlled failure ---
 
 test("C24 complete empty configuration stays usable and is not silently filled", async ({ page, mockApi }, info) => {
-  const empty = { ...structuredClone(configuration), questions: {}, rules: [], labels: [], models: [] };
+  const empty = editableConfiguration({ ...structuredClone(configuration), selected_models: [], questions: {}, rules: [], labels: [], models: [] });
   mockApi.appliedConfiguration = empty;
   mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: {} };
   const words = await open(page, "en", 1280, 900, "light");
@@ -407,7 +410,7 @@ test("C24 disabled writes keep read-only inspection, pan and fit while blocking 
 
 test("C24 a controlled 403 policy write is refused with recovery and no false success", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath });
   await page.route(`**${policyPath}`, async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     return route.fulfill({ status: 403, json: { error: { message: "Forbidden synthetic write" } } });
@@ -422,7 +425,7 @@ test("C24 a controlled 403 policy write is refused with recovery and no false su
   await expect(page.getByRole("alert")).toContainText("Forbidden synthetic write");
   await expect(page.getByRole("status").filter({ hasText: words.routingApplied })).toHaveCount(0);
   // The draft is retained and the review stays available for a corrected explicit retry.
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   await expect(page.getByRole("button", { name: words.confirmAndSave, exact: true })).toBeEnabled();
   await capture(page, info, "c24-forbidden", { requests: mockApi.requests });
 });
@@ -463,13 +466,11 @@ test("C25 unmounted inspector and menu never retain focus and restore an exposed
 
 test("WF6 explicit save and reopen retain configuration, derived connections and layout", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policyPath}/validate` }, { method: "PUT", path: policyPath });
+  mockApi.allowedWrites.push({ method: "POST", path: validatePath }, { method: "PUT", path: policyPath });
   const words = await open(page, "en", 1280, 900, "light");
   // Workflow identity and explanatory help are understandable.
-  await expect(page.locator(".workspace-heading h2")).toHaveText(configuration.strategy);
-  await activate(page, page.getByRole("button", { name: words.canvasInformation, exact: true }));
-  await expect(page.getByText(words.firstMatch, { exact: true })).toBeVisible();
-  await expect(page.locator("#routing-information").getByText(words.canvasLayoutOnly, { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toHaveValue(configuration.strategy);
+  await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
   // Make a semantic change and move a node, then explicitly save.
   await activate(page, page.locator('[data-canvas-node="fallback"]'));
   const inspector = page.getByRole("complementary", { name: words.nodeInspector });
@@ -481,7 +482,7 @@ test("WF6 explicit save and reopen retain configuration, derived connections and
   await frames(page);
   await activate(page, page.getByRole("button", { name: words.reviewChanges, exact: true }));
   await activate(page, page.getByRole("button", { name: words.confirmAndSave, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const committed = structuredClone(mockApi.appliedConfiguration);
   const savedLayout = structuredClone(mockApi.canvasLayout);
   expect(committed?.fallback).toEqual({ label: "quality" });
@@ -490,14 +491,14 @@ test("WF6 explicit save and reopen retain configuration, derived connections and
   // Reopen by remount and verify the retained values in the rendered UI.
   await page.reload();
   await activate(page, page.getByRole("button", { name: words.strategyEditor, exact: true }));
-  await expect(page.locator(".workspace-heading h2")).toHaveText(configuration.strategy);
+  await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toHaveValue(configuration.strategy);
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("quality");
   await activate(page, page.locator('[data-canvas-node="questions"]'));
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-  // The derived connection for the saved fallback label is present in the edge list.
-  await activate(page, page.getByRole("button", { name: words.canvasInformation, exact: true }));
-  const infoPanel = page.locator("#routing-information");
-  await expect(infoPanel).toContainText(configuration.labels.find(label => label.name === "quality")!.name);
+  // The saved fallback projects to the actual mounted SVG endpoint.
+  await expect(page.locator('[data-canvas-edge][data-edge-from="fallback"][data-edge-kind="match"]')).toHaveAttribute("data-edge-to", "zone::balanced/quality");
+  expect(mockApi.appliedConfiguration).toEqual(committed); expect(mockApi.canvasLayout).toEqual(savedLayout);
+  expect(mockApi.requests.filter(request => request.method === "PUT")).toEqual(puts);
   await writeFile(info.outputPath("wf6-reopen.json"), JSON.stringify({ committed, savedLayout, puts, requests: mockApi.requests }, null, 2));
   await page.screenshot({ path: info.outputPath("wf6-reopened.png") });
 });

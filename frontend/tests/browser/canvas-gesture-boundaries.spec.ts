@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -10,7 +10,7 @@ for (const gesture of ["node", "connection"] as const) for (const mechanism of [
     const catalog = structuredClone(configuration);
     mockApi.appliedConfiguration = catalog;
     mockApi.canvasLayout = { version: 1, nodes: structuredClone(positions), viewport: { x: 0, y: 0 } };
-    mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate" });
+    mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" });
     await page.setViewportSize({ width: 1280, height: 900 }); await page.goto("/dashboard/");
     await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
     await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeEnabled();
@@ -55,10 +55,11 @@ for (const gesture of ["node", "connection"] as const) for (const mechanism of [
       await cancel.focus(); await page.keyboard.press("Enter");
     }
     if (mechanism === "hash-refresh") {
-      mockApi.appliedConfiguration = { ...catalog, config_hash: "external-current-hash", fallback: { label: "quality" }, questions: { intent: { ...catalog.questions.intent!, instructions: "External current instructions" } } };
+      const questions = { intent: { ...catalog.questions.intent!, instructions: "External current instructions" } };
+      mockApi.appliedConfiguration = { ...catalog, config_hash: "external-current-hash", fallback: { label: "quality" }, questions, definition: { ...catalog.definition!, options: { ...catalog.definition!.options, fallback: { label: "quality" }, questions } } };
       page.once("dialog", dialog => dialog.accept());
       await page.getByRole("button", { name: en.refresh, exact: true }).focus(); await page.keyboard.press("Enter");
-      await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+      await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
       await expect(page.getByRole("button", { name: en.canvasUndo, exact: true })).toBeDisabled();
     }
     const expectedLabel = mechanism === "undo" || mechanism === "discard" ? "default" : "quality";
@@ -74,7 +75,7 @@ for (const gesture of ["node", "connection"] as const) for (const mechanism of [
     expect(mockApi.canvasLayout?.nodes).toEqual(positions);
     const expectedWrites = mechanism === "undo" || mechanism === "redo" ? writesBefore + 1 : writesBefore;
     await expect.poll(() => mockApi.canvasWrites?.length ?? 0).toBe(expectedWrites);
-    expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+    expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
     // A fresh explicit edit permits whole-payload validation after the gesture oracle.
     await page.locator('[data-canvas-node="questions"]').focus(); await page.keyboard.press("Enter");
     const expectedInstructions = mechanism === "hash-refresh" ? "External current instructions" : catalog.questions.intent!.instructions;
@@ -84,7 +85,7 @@ for (const gesture of ["node", "connection"] as const) for (const mechanism of [
     await page.getByRole("button", { name: en.reviewChanges, exact: true }).click();
     await expect(page.getByRole("button", { name: en.confirmAndSave, exact: true })).toBeEnabled();
     const payload = mockApi.allowedWrites[0]!.body;
-    expect(payload).toEqual({ version: 1, strategy: catalog.strategy, questions: { intent: { ...catalog.questions.intent!, instructions: "Whole draft validation marker" } }, rules: catalog.rules.map(({ when, select }) => ({ when, select })), fallback: { label: expectedLabel }, models: {} });
+    expect(payload).toEqual({ version: 2, strategy: catalog.strategy, selected_models: catalog.selected_models, definition: { ...catalog.definition, options: { ...catalog.definition!.options, questions: { intent: { ...catalog.questions.intent!, instructions: "Whole draft validation marker" } }, fallback: { label: expectedLabel } } } });
     await writeFile(info.outputPath("final-state.json"), JSON.stringify({ payload, requests: mockApi.requests, layout: mockApi.canvasLayout, events: await page.evaluate(() => (window as unknown as { boundaryEvents: object[] }).boundaryEvents) }, null, 2));
     await page.screenshot({ path: info.outputPath("final-state.png") });
   });
@@ -101,7 +102,7 @@ test("Chinese desktop semantic discard restores draft without a layout write", a
   await page.getByRole("button", { name: zhCN.closeInspector, exact: true }).click();
   const cancel = page.locator(".workflow-toolbar").getByRole("button", { name: zhCN.cancel, exact: true });
   await expect(cancel).toBeEnabled(); await cancel.focus(); await page.keyboard.press("Enter");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: zhCN.canvasUndo, exact: true })).toBeDisabled();
   expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual([]);
   await writeFile(info.outputPath("semantic-discard.json"), JSON.stringify({ requests: mockApi.requests, layout: mockApi.canvasLayout }, null, 2));

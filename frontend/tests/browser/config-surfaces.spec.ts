@@ -128,7 +128,9 @@ for (const width of [1440, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     const confirm = models.getByLabel(text.pmConfirm, { exact: true });
     await confirm.scrollIntoViewIfNeeded();
     await expect(confirm).toBeInViewport();
-    await expect(confirm).toBeDisabled();
+    await expect(confirm).toBeEnabled();
+    await expect(confirm).not.toBeChecked();
+    await expect(models.getByRole("button", { name: `${text.pmImport} (5)`, exact: true })).toBeDisabled();
     expect(state.writes).toEqual([]);
     expect(state.validations).toEqual([]);
     expect(state.selectors).toEqual([]);

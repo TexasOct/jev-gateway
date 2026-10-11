@@ -5,6 +5,10 @@
 
 ## Overview
 
+Named workflow management uses the v2 contract below. Its explicit local model
+references supersede v1 tag-mutation and installation-wide layout rules for new
+workflow writes. V1 data and request compatibility remain documented separately.
+
 The dashboard is a Vite + React + TypeScript app in `frontend/`. Generated output
 lives at `jev_gateway/static/` during local/release builds and is served by the
 gateway process, so there is no second server to start. The generated bundle is
@@ -30,7 +34,106 @@ atomic write, and `load_catalog_with_overlay()`. It must not import
 static mount, the shell route, and the theme routes. The routing-configuration
 routes live in `gateway.py` because they must share the `reload_lock` closure.
 
-## Scenario: runtime routing overlay
+## Scenario: named workflow state and explicit model selection
+
+Configuration GET/validate/PUT/DELETE and layout GET/PUT accept optional
+`strategy`. Without it, management keeps `task_aware`. Chat and preview still
+reject this query selector. Only decision-matrix workflows are editable.
+The strategy list exposes `editable` and `deletable`; GET configuration includes
+the complete definition, selected IDs, runtime default and deletion permission.
+The `models` array remains the supplier-model library.
+
+The exact v2 routing disk document is
+`{version: 2, strategies: {name: {definition, selected_models}}, deleted_strategies: [], models: {}}`.
+`definition` uses `{kind: "decision_matrix", description?, policy, options}`.
+Options retain the existing questions/rules/fallback validator. `models` carries
+legacy v1 tag/priority overrides; new v2 writes cannot edit it. Deletions name
+baseline strategies and cannot remove the runtime default. Unknown keys,
+duplicate selections, unknown references and references outside selection reject
+before replacement. Names contain 1 to 80 characters without leading/trailing
+whitespace, slashes or controls and exclude reserved/catalog-conflicting names.
+The dot segments `.` and `..` are reserved so every admitted name remains
+addressable through the strategy DELETE URL. HTTP versions must be integers;
+numeric `2.0` is rejected before request normalization.
+
+The v2 write body is exactly
+`{version: 2, strategy, selected_models, definition}`. The selector must match
+the body, and only that entry is replaced. POST `/v1/routing/strategies` accepts
+`{name}`; DELETE `/v1/routing/strategies/{name}` deletes only an editable nondefault
+workflow. New strategies have valid questions and an empty routine pool. An
+explicit empty selection cannot route through a global default or query a
+decision provider. Selected IDs project into `RoutingPolicy.selected_models`;
+all pools, widening, final fallback, global default and retained pins obey it.
+Empty explicit pools use `RouteLabel.explicit_models` to distinguish them from
+legacy tag absence. Omitted selection retains legacy runtime scope.
+
+Migration preserves v1 options and model overrides, seeds only referenced
+rule/first-label/fallback members and genuinely inherited global defaults, and
+retains nonmatrix baseline strategies. It filters unused explicit pool references
+out of each migrated workflow's local selection. Reads do not migrate disk.
+Scoped reset restores a baseline entry or empties a newly created strategy;
+other workflows/layouts and legacy global overrides survive. No-query DELETE
+removes a v1 overlay; with v2 storage it resets only `task_aware`.
+Restored baseline entries retain explicit seeded selection in v2 storage, so
+runtime widening after reset and reload stays within the advertised model nodes.
+
+Layout disk v2 is `{version: 2, strategies: {name: {nodes, viewport}}}` with the
+existing total 65536-byte bound, at most 64 entries and existing per-layout node
+and coordinate bounds. Wire bodies remain v1 single-layout objects. V1 positions
+belong to `task_aware`; writes merge only the chosen strategy while holding the
+shared configuration lock. Creation/deletion clears that strategy's old layout
+in the same recoverable transaction as policy activation. Standalone layout
+saves never reload policy or publish configuration versions.
+
+CLI force supplier removal prunes new selected IDs, local explicit pools and
+saved model-node positions through the existing protected transaction. It keeps
+global-default and baseline explicit-reference guards. HTTP provider deletion
+still rejects suppliers with model records. Node removal never deletes suppliers.
+
+Pure frontend owners export `selectedModelIds`, `workflowModels`, `addModelNode`,
+`removeModelNode`, `toWorkflowPayload` and `createStrategyHistory`. V2 drafts edit
+`pools` and `selectedModels` without changing supplier tags/priority. The UI stage
+must consume these helpers, capture the selected strategy on writes, keep its
+existing dirty/pending/auth/read-recovery guards and retire stale responses.
+The older `toOverlayPayload` remains the v1 compatibility serializer.
+The mounted editor uses `toWorkflowPayload`, with the admitted strategy captured
+for validation, apply, reset and confirming reads. Initial no-query configuration
+reads remain compatible; later reads use the selected strategy. Editor remounts
+are keyed by strategy and configuration hash. Canvas layout reads/writes and
+history are scoped to that same identity. The in-memory history owner lives
+above keyed editor remounts, retains each clean strategy's undo/redo/cursor,
+and binds caches to the admitted connection and accepted configuration hash.
+Confirmed deletion, hash changes and dirty discard/departure invalidate only
+the affected strategy. Canceled or blocked departure and retired responses
+leave valid history intact. History is never persisted to disk or localStorage.
+
+Top-left native controls switch, create and delete editable strategies and open
+the supplier-library model chooser. Protected default deletion stays disabled.
+Choosing/removing a model changes selected IDs and local pool references only.
+The full supplier library remains in the configuration response. Model-node
+inspection uses the shared supplier ModelDialog and never edits global priority
+or tags through a workflow payload.
+
+Review/discard/reset and canvas tools share one measured bottom-right floating
+panel. The tool row scrolls horizontally on narrow screens; policy actions wrap.
+Review/reset/create/delete/model selection use the existing webpage Dialog and
+native controls. Errors, repair and GET-only recovery retain their owners. The
+information drawer, advanced editors, original footer and heading/source/status
+copy are removed. These presentation clauses supersede the old drawer assertions
+in the historical v1 canvas scenarios below; their mutation, geometry, focus and
+recovery assertions remain required.
+After migration, nonempty v1 `models` edits reject before replacement; v1 options
+can still edit the selected workflow. Existing global overrides remain read-only.
+
+Required tests cover v1 seeding/override preservation, partial-model selection,
+strict names/shapes/references, default/tombstone guards, independent policy/layout
+round trips, source-preserving local removal, auth-before-malformed-body guards,
+activation rollback with exact bytes/modes, supplier-force reconciliation and
+selected-only runtime widening/default/pins. Pure tests distinguish explicit
+empty from legacy absence and prove local graph/history/serialization ownership.
+Visual controls and browser interaction remain the following stage's responsibility.
+
+## Scenario: runtime routing overlay (v1 compatibility)
 
 ### 1. Scope / Trigger
 

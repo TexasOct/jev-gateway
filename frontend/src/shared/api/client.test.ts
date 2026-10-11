@@ -9,6 +9,40 @@ afterEach(() => {
 });
 
 describe("registered strategies read", () => {
+  it("keeps admitted dotted names addressable under native URL normalization", async () => {
+    const names = [".Research", "Research..", "Research & review", "研究"];
+    const paths: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      paths.push(new URL(path, "http://localhost").pathname);
+      return new Response("{}", { status: 200 });
+    }));
+    for (const name of names) await api.deleteStrategy(name);
+    expect(paths).toEqual(names.map((name) => `/v1/routing/strategies/${encodeURIComponent(name)}`));
+    expect(new URL("/v1/routing/strategies/.", "http://localhost").pathname).toBe("/v1/routing/strategies/");
+    expect(new URL("/v1/routing/strategies/..", "http://localhost").pathname).toBe("/v1/routing/");
+  });
+  it("captures selected strategy names in every policy and layout request and preserves no-query callers", async () => {
+    const calls: Array<{ path: string; init: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init: RequestInit) => { calls.push({ path, init }); return new Response("{}", { status: 200 }); }));
+    let selected = "Research & review";
+    const pending = api.configuration(selected);
+    selected = "next";
+    await pending;
+    const payload = { version: 2 as const, strategy: selected, selected_models: [], definition: { kind: "decision_matrix" as const, policy: { labels: { routine: { models: [] } } }, options: { questions: {}, rules: [], fallback: {} } } };
+    await api.validateConfiguration(payload, selected);
+    await api.applyConfiguration(payload, selected);
+    await api.resetConfiguration(selected);
+    await api.canvasLayout(selected);
+    await api.saveCanvasLayout({ version: 1, nodes: {}, viewport: { x: 0, y: 0 }, read_error: "not written" }, selected);
+    await api.createStrategy("new"); await api.deleteStrategy("Research & review");
+    await api.configuration();
+    expect(calls.map((call) => call.path)).toEqual([
+      "/v1/routing/configuration?strategy=Research%20%26%20review", "/v1/routing/configuration/validate?strategy=next", "/v1/routing/configuration?strategy=next", "/v1/routing/configuration?strategy=next", "/v1/dashboard/canvas-layout?strategy=next", "/v1/dashboard/canvas-layout?strategy=next", "/v1/routing/strategies", "/v1/routing/strategies/Research%20%26%20review", "/v1/routing/configuration",
+    ]);
+    expect(JSON.parse(String(calls[2]!.init.body))).toEqual(payload);
+    expect(JSON.parse(String(calls[5]!.init.body))).toEqual({ version: 1, nodes: {}, viewport: { x: 0, y: 0 } });
+    expect(JSON.parse(String(calls[6]!.init.body))).toEqual({ name: "new" });
+  });
   it.each([
     "short", "a".repeat(8193), " fixture-management-key", "fixture-management-key ",
     "fixture interior space", "fixture-management-\u00a0key",

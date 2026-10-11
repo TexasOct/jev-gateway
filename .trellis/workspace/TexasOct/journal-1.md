@@ -274,3 +274,23 @@ Recovery uses a complete verified copy of the former installed tool environment 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: 0.1.6 construction accepted and release prepared
+<!-- trellis-session: v=2 fp=7b37a66bfd841ed0 -->
+
+**Date**: 2026-10-12
+**Task**: 0.1.6 construction accepted and release prepared
+**Branch**: `main`
+
+### Summary
+
+Optional model imports, strategy-local nodes and named workflows passed independent A1-A7 review. Complete browser 777+9, backend 3306 with separate replay2, units421, native LSP46 and isolated 0.1.6 macOS smoke passed. Four tasks archived; A8 awaits signed commit, hosted build/smokes and public asset verification. Operator installation unchanged.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**

@@ -2,6 +2,8 @@ import { test, expect } from "../fixtures/provider-browser";
 import { openProviderModels, providerModelGroup } from "../fixtures/open-provider-models";
 import { installProviderFixture, providerFixture, type ProviderFixtureState } from "../fixtures/provider-management";
 import type { Page } from "@playwright/test";
+import { en } from "../../src/shared/i18n/en";
+import { zhCN } from "../../src/shared/i18n/zh-CN";
 
 function fixture(): ProviderFixtureState {
   const configuration = providerFixture();
@@ -18,6 +20,89 @@ async function open(page: Page) {
 }
 const models = (page: Page, secondary = false, importModels = false) => openProviderModels(page, secondary ? "second" : "fixture", { importModels });
 const cancel = (page: Page) => page.getByRole("button", { name: "Cancel", exact: true }).first().click();
+
+for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) test(`supplier priority save and reopen preserve the whole model record (${locale}, ${width})`, async ({ page, context }, info) => {
+  const words = locale === "en" ? en : zhCN;
+  const state = fixture();
+  state.configuration.models[0]!.tags = ["retained-supplier-tag"];
+  state.configuration.models[0]!.priority = 1;
+  const before = structuredClone(state.configuration.models[0]!);
+  const untouched = structuredClone(state.configuration.models[1]!);
+  const requests: { method: string; path: string }[] = [];
+  page.on("request", (request) => { const url = new URL(request.url()); if (url.pathname.startsWith("/v1/")) requests.push({ method: request.method(), path: url.pathname + url.search }); });
+  await installProviderFixture(context, state);
+  await page.setViewportSize({ width, height: 900 });
+  await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
+  await page.goto("/dashboard/");
+  const workspace = await openProviderModels(page, "fixture", { locale });
+  const trigger = workspace.getByRole("button", { name: words.mmEdit, exact: true });
+  await trigger.focus(); await page.keyboard.press("Enter");
+  let dialog = page.getByRole("dialog");
+  const priority = dialog.getByRole("spinbutton", { name: words.mmPriority, exact: true });
+  await expect(priority).toHaveValue("1"); await priority.fill("2");
+  const save = dialog.getByRole("button", { name: words.mmSave, exact: true });
+  await save.focus(); await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused();
+  expect(state.writes).toHaveLength(1); expect(state.validations).toEqual(state.writes);
+  expect(state.writes[0]!.expected_revision).toBe("r1");
+  expect(state.writes[0]!.operations).toHaveLength(1);
+  expect(state.writes[0]!.operations[0]).toMatchObject({ action: "update_model", model_id: "fixture/existing", model: { upstream_model: "existing", provider: "fixture", priority: 2, tags: before.tags, cost: before.cost, capabilities: before.capabilities } });
+  expect(state.writes[0]!.operations[0]).not.toHaveProperty("model.defaults");
+  expect(state.configuration.models[0]).toEqual({ ...before, priority: 2, metadata: expect.objectContaining({ version: 1, confirmation: expect.objectContaining({ method: "reviewed" }) }) });
+  expect(state.configuration.models[1]).toEqual(untouched);
+  const saved = structuredClone(state.configuration.models[0]!);
+  expect(requests.filter(({ method }) => method !== "GET")).toEqual([{ method: "POST", path: "/v1/provider-configuration/validate" }, { method: "PUT", path: "/v1/provider-configuration" }]);
+  await page.reload();
+  const reopened = await openProviderModels(page, "fixture", { locale });
+  await reopened.getByRole("button", { name: words.mmEdit, exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("spinbutton", { name: words.mmPriority, exact: true })).toHaveValue("2");
+  expect(state.configuration.models[0]).toEqual(saved); expect(state.configuration.models[1]).toEqual(untouched);
+  await dialog.getByRole("button", { name: words.cancel, exact: true }).click();
+  expect(state.writes).toHaveLength(1); expect(state.validations).toHaveLength(1);
+  expect(requests.filter(({ method }) => method !== "GET")).toEqual([{ method: "POST", path: "/v1/provider-configuration/validate" }, { method: "PUT", path: "/v1/provider-configuration" }]);
+  await info.attach("priority-whole-record-and-full-ledger", { contentType: "application/json", body: JSON.stringify({ before, saved, untouched, requests, writes: state.writes, validations: state.validations }, null, 2) });
+});
+
+test("incomplete supplier model imports and reopens without invented facts", async ({ page, context }) => {
+  const state = fixture(); state.metadataUnknown = true;
+  await installProviderFixture(context, state); await open(page); await models(page, false, true);
+  const primary = group(page);
+  await primary.getByRole("button", { name: "Fetch upstream models", exact: true }).click();
+  await primary.getByRole("checkbox", { name: "fixture/alpha", exact: true }).check();
+  await primary.getByRole("region", { name: "fixture/alpha", exact: true }).getByRole("button", { name: "Edit model", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator("#model-dialog-vision")).toHaveValue("");
+  await expect(dialog.locator("#model-dialog-output_per_million")).toHaveValue("");
+  await dialog.locator("#model-dialog-tools").selectOption("false");
+  await dialog.locator("#model-dialog-input_per_million").fill("0");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.writes).toEqual([]);
+  await primary.getByLabel("I reviewed the capabilities", { exact: false }).check();
+  await primary.getByRole("button", { name: "Confirm and import selected models (1)", exact: true }).click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.validations).toHaveLength(1);
+  const operation = state.writes[0]!.operations[0]!;
+  expect(operation.action).toBe("import");
+  if (operation.action !== "import") throw new Error("Expected model import");
+  const saved = operation.models[0]!;
+  expect(saved.capabilities).toEqual({ tools: false });
+  expect(saved.cost).toEqual({ input_per_million: 0 });
+  expect(saved).not.toHaveProperty("context_window");
+  expect(saved).not.toHaveProperty("max_output_tokens");
+  expect(saved.metadata?.fields?.vision?.status).not.toBe("confirmed");
+  const configured = primary.getByRole("region", { name: "Configured models", exact: true });
+  await configured.getByRole("searchbox", { name: "Search configured models", exact: true }).fill("alpha");
+  await configured.getByRole("button", { name: "Edit model", exact: true }).click();
+  await expect(dialog.locator("#model-dialog-tools")).toHaveValue("false");
+  await expect(dialog.locator("#model-dialog-input_per_million")).toHaveValue("0");
+  await expect(dialog.locator("#model-dialog-vision")).toHaveValue("");
+  await expect(dialog.locator("#model-dialog-output_per_million")).toHaveValue("");
+  await expect(dialog.locator("#model-dialog-context_window")).toHaveValue("");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(state.writes).toHaveLength(1);
+});
 
 test("supplier list shows summaries and editing entries; model editing belongs to the selected supplier", async ({ page, context }) => {
   const state = fixture(); await installProviderFixture(context, state); await open(page);

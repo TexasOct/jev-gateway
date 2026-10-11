@@ -1,7 +1,7 @@
 import type { BrowserContext } from "@playwright/test";
 import type { CanvasLayout, GatewayCredentialMutation, ImportModel, MetadataItem, ProviderConfiguration, ProviderModelView, ProviderMutation, ProviderSelector, SetupStatus } from "../../src/shared/api/types";
 import { isValidSetupKey } from "../../src/shared/api/setup-key";
-import { configuration as routingConfiguration } from "./configuration";
+import { configuration as routingConfiguration, editableConfiguration } from "./configuration";
 
 /** Model the browser-visible transaction boundary, without keeping secret bytes. */
 function mutationError(configuration: ProviderConfiguration, body: ProviderMutation): { status: number; code: string; message: string } | null {
@@ -42,8 +42,8 @@ function mutationError(configuration: ProviderConfiguration, body: ProviderMutat
       for (const model of operation.action === "update_model" ? [operation.model] : operation.models) {
         if (operation.action === "import" && configuration.models.some((existing) => existing.provider === operation.provider_id && existing.upstream_model === model.upstream_model)) continue;
         if (!model.upstream_model.trim() || Object.values(model.cost).some((value) => value !== null && (!Number.isFinite(value) || value < 0))) return invalid("Invalid model price or identity");
-        if ([model.context_window, model.max_output_tokens].some((value) => value !== null && (!Number.isInteger(value) || value <= 0))) return invalid("Invalid model token limit");
-        if (model.context_window !== null && model.max_output_tokens !== null && model.max_output_tokens > model.context_window) return invalid("Maximum output exceeds context window");
+        if ([model.context_window, model.max_output_tokens].some((value) => value != null && (!Number.isInteger(value) || value <= 0))) return invalid("Invalid model token limit");
+        if (model.context_window != null && model.max_output_tokens != null && model.max_output_tokens > model.context_window) return invalid("Maximum output exceeds context window");
       }
     }
   }
@@ -56,9 +56,9 @@ function modelView(provider: string, upstream_model: string, imported?: ImportMo
     capabilities: { tools: false, vision: false, json_mode: true, reasoning: false, temperature: true, reasoning_effort: [] },
     display_name: null, enabled: true,
     routing_overlay_fields: [],
-    context_window: null, max_output_tokens: null,
+    ...(imported ? {} : { context_window: null, max_output_tokens: null }),
     ...imported,
-    cost: { input_per_million: 1, output_per_million: 2, cache_read_per_million: null, cache_write_per_million: null, ...imported?.cost },
+    cost: imported ? imported.cost : { input_per_million: 1, output_per_million: 2, cache_read_per_million: null, cache_write_per_million: null },
   };
 }
 
@@ -98,6 +98,7 @@ export type ProviderFixtureState = {
   metadataSelectors?: ProviderSelector[];
   rejectCatalogRead?: number;
   catalogReads?: number;
+  routingSelectedModels?: string[];
   inheritedCredential?: boolean;
   inheritedTransportCredentials?: Record<string, boolean>;
   gatewayWrites?: GatewayCredentialMutation[];
@@ -137,7 +138,9 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
         const index = candidate.models.findIndex((model) => model.name === operation.model_id);
         const existing = candidate.models[index];
         if (!existing || operation.model.upstream_model !== existing.upstream_model) throw new Error("Model identity cannot change");
-        const updated = { ...existing, ...operation.model, display_name: operation.model.display_name ?? null, enabled: operation.model.enabled ?? true, cost: { cache_read_per_million: null, cache_write_per_million: null, ...operation.model.cost }, name: existing.name, provider: existing.provider, upstream_model: existing.upstream_model };
+        const { context_window: previousContext, max_output_tokens: previousOutput, ...retained } = existing;
+        void previousContext; void previousOutput;
+        const updated = { ...retained, ...operation.model, display_name: operation.model.display_name ?? null, enabled: operation.model.enabled ?? true, name: existing.name, provider: existing.provider, upstream_model: existing.upstream_model };
         if (existing.routing_overlay_fields?.includes("tags")) updated.tags = existing.tags;
         if (existing.routing_overlay_fields?.includes("priority")) updated.priority = existing.priority;
         candidate.models[index] = updated;
@@ -195,7 +198,7 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     state.configuration.revision = `gateway-r${state.gatewayWrites!.length}`;
     return reply({ ...state.configuration, valid: true, applied: true });
   });
-  await context.route("**/v1/dashboard/canvas-layout", async (route) => {
+  await context.route("**/v1/dashboard/canvas-layout{,?strategy=balanced}", async (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
       state.canvasLayout = request.postDataJSON() as CanvasLayout;
@@ -206,7 +209,7 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     }
     return route.fulfill({ json: state.canvasLayout ?? { version: 1, nodes: {}, viewport: { x: 0, y: 0 } } });
   });
-  await context.route("**/v1/routing/configuration", async (route) => {
+  await context.route("**/v1/routing/configuration{,?strategy=balanced}", async (route) => {
     if (route.request().method() !== "GET") {
       (state.unexpected ??= []).push(`${route.request().method()} /v1/routing/configuration`);
       return route.abort("blockedbyclient");
@@ -214,7 +217,9 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     state.catalogReads = (state.catalogReads ?? 0) + 1;
     if (state.delayCatalogRead) { const delay = state.delayCatalogRead; state.delayCatalogRead = undefined; await delay(); }
     if (state.rejectCatalogRead) return route.fulfill({ status: state.rejectCatalogRead, contentType: "application/json", body: JSON.stringify({ error: { message: "synthetic-catalog-read-error" } }) });
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...routingConfiguration, write_available: state.configuration.write_available, defaults: state.configuration.defaults, models: [...routingConfiguration.models, ...state.configuration.models.map((model) => ({ id: model.name, provider: model.provider, upstream_model: model.upstream_model, priority: model.priority, baseline_priority: model.priority, tags: model.tags, baseline_tags: model.tags }))] }) });
+    const catalog = editableConfiguration({ ...routingConfiguration, write_available: state.configuration.write_available, defaults: state.configuration.defaults, models: [...routingConfiguration.models, ...state.configuration.models.map((model) => ({ id: model.name, provider: model.provider, upstream_model: model.upstream_model, priority: model.priority, baseline_priority: model.priority, tags: model.tags, baseline_tags: model.tags }))] });
+    catalog.selected_models = state.routingSelectedModels ?? routingConfiguration.models.map((model) => model.id);
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(catalog) });
   });
   await context.route("**/v1/provider-**", async (route) => {
     const request = route.request(); const path = new URL(request.url()).pathname;

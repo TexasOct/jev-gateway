@@ -7,16 +7,17 @@ import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
 const layout = { version: 1 as const, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 350, y: 80 }, fallback: { x: 350, y: 300 }, "model::fixture/existing": { x: 700, y: 80 } }, viewport: { x: 0, y: 0 } };
-const layoutPath = "/v1/dashboard/canvas-layout";
+const layoutBase = "/v1/dashboard/canvas-layout", layoutPath = `${layoutBase}?strategy=balanced`;
+const selectedModels = ["fixture-provider/fixture-model", "fixture/existing"];
 type RequestEntry = { method: string; path: string; body: string | null };
 type ExposureLedger = { requests: RequestEntry[]; completed: { method: string; status: number; body: unknown }[]; pending: Promise<void>[]; errors: string[]; baseline?: unknown };
 const exposure = new WeakMap<Page, ExposureLedger>();
 test.beforeEach(async ({ page }) => {
   const ledger: ExposureLedger = { requests: [], completed: [], pending: [], errors: [] };
   exposure.set(page, ledger);
-  page.on("request", request => ledger.requests.push({ method: request.method(), path: new URL(request.url()).pathname, body: request.postData() }));
+  page.on("request", request => { const url = new URL(request.url()); ledger.requests.push({ method: request.method(), path: url.pathname + url.search, body: request.postData() }); });
   page.on("response", response => {
-    if (new URL(response.url()).pathname !== layoutPath) return;
+    if (new URL(response.url()).pathname !== layoutBase) return;
     ledger.pending.push(response.json().then(body => { ledger.completed.push({ method: response.request().method(), status: response.status(), body }); }).catch(error => { ledger.errors.push(String(error)); }));
   });
 });
@@ -40,11 +41,14 @@ async function openStrategy(page: import("@playwright/test").Page, words: typeof
 }
 
 async function modelNode(page: Page, state: ProviderFixtureState, words: typeof en | typeof zhCN) {
-  const status = page.locator('.workspace-chrome > p[role="status"]').first();
-  await expect(status).toHaveText(words.canvasLayoutOnly);
+  const status = page.getByRole("toolbar", { name: words.canvasTools }).locator("output");
+  await expect(status).toHaveAttribute("title", words.canvasZoom);
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const node = page.locator('[data-canvas-node="model::fixture/existing"]');
   await expect(node).toBeVisible();
-  await node.scrollIntoViewIfNeeded();
+  for (let count = 0; count < 180 && !await node.evaluate(element => element === document.activeElement); count++) await page.keyboard.press("Tab");
+  await expect(node).toBeFocused();
+  expect(await node.evaluate(element => element.matches(":focus-visible"))).toBe(true);
   await frames(page);
   const viewport = await page.locator(".routing-canvas-scroll").evaluate(canvas => {
     const content = canvas.querySelector(".routing-canvas-content")!;
@@ -56,7 +60,8 @@ async function modelNode(page: Page, state: ProviderFixtureState, words: typeof 
   const ledger = exposure.get(page)!;
   const pendingStatus = await status.textContent();
   if (changed) await expect.poll(() => ledger.completed.filter(response => response.method === "PUT").length).toBe(1);
-  await expect(status).toHaveText(words.canvasLayoutOnly);
+  await expect(status).toHaveText("100%");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const writes = changed ? [expected] : [];
   expect(state.canvasWrites ?? []).toEqual(writes);
   expect(ledger.completed.filter(response => response.method === "PUT")).toEqual(writes.map(body => ({ method: "PUT", status: 200, body })));
@@ -75,10 +80,10 @@ async function exposed(node: import("@playwright/test").Locator) {
 // The model node must open the one shared webpage model editor Dialog bound to
 // its exact provider/model identity. Read-only inspection writes nothing.
 test("strategy model node opens the shared model Dialog bound to its exact identity", async ({ page, context }, info) => {
-  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], canvasLayout: structuredClone(layout) };
+  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], routingSelectedModels: selectedModels, canvasLayout: structuredClone(layout) };
   await installProviderFixture(context, state);
   const requests: { method: string; path: string }[] = [];
-  page.on("request", (request) => requests.push({ method: request.method(), path: new URL(request.url()).pathname }));
+  page.on("request", (request) => { const url = new URL(request.url()); requests.push({ method: request.method(), path: url.pathname + url.search }); });
   await openStrategy(page, en);
   const { node, baseline } = await modelNode(page, state, en);
   const before = await exposed(node);
@@ -112,7 +117,7 @@ test("strategy model node opens the shared model Dialog bound to its exact ident
 
 for (const [locale, width, scheme] of [["en", 390, "light"], ["zh-CN", 320, "dark"]] as const) {
   test(`dirty model draft blocks dismissal and returns focus ${locale} ${width} ${scheme}`, async ({ page, context }, info) => {
-    const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], canvasLayout: structuredClone(layout) };
+    const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], routingSelectedModels: selectedModels, canvasLayout: structuredClone(layout) };
     await installProviderFixture(context, state);
     await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
     await page.goto("/dashboard/");
@@ -151,7 +156,7 @@ for (const [locale, width, scheme] of [["en", 390, "light"], ["zh-CN", 320, "dar
 
 test("pending model write blocks dismissal and failed save retains the draft", async ({ page, context }, info) => {
   let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
-  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], canvasLayout: structuredClone(layout), delayWrite: () => gate, rejectWrite: 503 };
+  const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], routingSelectedModels: selectedModels, canvasLayout: structuredClone(layout), delayWrite: () => gate, rejectWrite: 503 };
   await installProviderFixture(context, state);
   await openStrategy(page, en);
   const { node, baseline } = await modelNode(page, state, en);

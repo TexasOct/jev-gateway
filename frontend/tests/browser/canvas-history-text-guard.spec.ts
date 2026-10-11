@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 
 const layout = (nodes: Record<string, { x: number; y: number }>) => ({ version: 1 as const, nodes, viewport: { x: 0, y: 0 } });
@@ -66,7 +66,7 @@ for (const surface of ["menu", "delete", "backspace"] as const) for (const slot 
     await expect.poll(() => mockApi.canvasLayout!.nodes).toEqual(original);
     for (const id of ["rule-0", "rule-1", "rule-2"]) await expect(page.locator(`[data-canvas-node="${id}"]`)).toBeVisible();
     await expect(page.locator('[data-canvas-node="rule-0"]')).toContainText("intent=default");
-    await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+    await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
     await writeFile(info.outputPath("rule-removal.json"), JSON.stringify({ surface, slot, expectedRules, layout: mockApi.canvasLayout, original }, null, 2));
     await page.screenshot({ path: info.outputPath("rule-removal-undone.png") });
   });
@@ -127,14 +127,20 @@ test("editing text, number, textarea and select controls never deletes graph obj
   await expect(page.locator('[data-canvas-node="rule-0"]')).toHaveCount(1);
   await expect.poll(() => mockApi.canvasLayout!.nodes["rule-0"]).toEqual(movedLayout.nodes["rule-0"]);
 
-  // number (model priority) — native Delete cannot reach the delete handler.
+  // The supplier-owned model Dialog retains native number editing and canvas isolation.
   await page.getByRole("button", { name: en.closeInspector, exact: true }).click();
   const modelNode = page.locator('[data-canvas-node="model::fixture-provider/fixture-model"]');
   const modelPoint = await nodePoint(page, "model::fixture-provider/fixture-model"); await page.mouse.click(modelPoint.x, modelPoint.y);
-  const priority = page.getByRole("complementary", { name: en.nodeInspector }).getByRole("spinbutton", { name: en.priority, exact: true });
+  await page.getByRole("button", { name: en.canvasOpenModel, exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const priority = dialog.getByRole("spinbutton", { name: en.mmPriority, exact: true });
+  const originalPriority = await priority.inputValue();
   await priority.focus(); await page.keyboard.press("Delete"); await page.keyboard.press("Backspace");
   await expect(modelNode).toHaveCount(1);
   await expect(page.locator("[data-canvas-node]")).toHaveCount(nodeCount);
+  await priority.fill(originalPriority);
+  await dialog.getByRole("button", { name: en.cancel, exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   // No key press inside a control changed the layout or canvas history.
   await expect.poll(() => mockApi.canvasLayout!.nodes).toEqual(movedLayout.nodes);
   await writeFile(info.outputPath("text-guard.json"), JSON.stringify({ nodeCount, layoutBefore, movedLayout, layout: mockApi.canvasLayout }, null, 2));

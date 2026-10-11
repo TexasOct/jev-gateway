@@ -40,11 +40,13 @@ it("keeps exactly nine purpose-owned stylesheets behind the sole application CSS
   expect(geometry).toMatch(/canvas-edge-handle[^\n]*\[pointer-events:auto\]/);
   expect(geometry).toMatch(/canvas-edge-preview pointer-events-none/);
   expect(geometry).toMatch(/canvas-marquee absolute pointer-events-none/);
-  expect(geometry).toMatch(/canvas-tools absolute[^\n]*z-\[7\][^\n]*flex-nowrap[^\n]*overflow-x-auto overflow-y-hidden/);
+  expect(geometry).toMatch(/canvas-tools absolute bottom-3 right-3[^\n]*z-\[7\][^\n]*grid/);
+  expect(geometry).toMatch(/canvas-tool-buttons flex[^\n]*flex-nowrap[^\n]*overflow-x-auto overflow-y-hidden/);
   expect(geometry).toContain("animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate]");
   expect(editor).toMatch(/workflow-workspace relative[^\n]*isolate/);
   expect(editor).toMatch(/workflow-inspector absolute/);
-  expect(editor).toMatch(/workflow-drawer absolute/);
+  expect(editor).not.toMatch(/workflow-drawer absolute/);
+  expect(editor).toMatch(/workflow-toolbar flex flex-wrap/);
   const canvasStyles = readFileSync(resolve(styles, "canvas-geometry.css"), "utf8");
   expect(canvasStyles).toContain("@keyframes node-drag-pulse");
   expect(canvasStyles).not.toMatch(/\.[\w-]+\s*\{/);

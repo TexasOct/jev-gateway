@@ -2,7 +2,7 @@ import type { Locator } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
-import { configuration } from "../fixtures/configuration";
+import { configuration, editableConfiguration } from "../fixtures/configuration";
 
 async function expectDecorativeIcon(control: Locator, name: string) {
   await expect(control).toHaveAccessibleName(name);
@@ -42,10 +42,10 @@ const scenarios = [
 for (const { width, locale, font } of scenarios) {
     test(`icon controls preserve names, geometry and interactions in ${locale} at ${width}px with ${font} font`, async ({ page, mockApi }) => {
       const words = locale === "en" ? en : zhCN;
-      mockApi.appliedConfiguration = {
+      mockApi.appliedConfiguration = editableConfiguration({
         ...configuration,
         rules: [...configuration.rules, { index: 1, when: { intent: "default" }, select: { label: "quality" } }],
-      };
+      });
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/dashboard/");
       if (font !== "system") await page.addStyleTag({ content: `body { font-family: ${font}; }` });
@@ -135,23 +135,15 @@ for (const { width, locale, font } of scenarios) {
       await page.mouse.up();
       await expect.poll(() => node.evaluate((element) => element.style.left)).not.toBe(beforeDrag);
 
-      const disclosure = page.getByRole("button", { name: words.canvasInformation, exact: true });
-      await expectDecorativeIcon(disclosure, words.canvasInformation);
-      await expect(disclosure).toHaveAttribute("aria-expanded", "false");
-      await expect(disclosure.locator("svg")).toHaveClass(/lucide-chevron-up/);
-      await disclosure.focus();
-      await disclosure.press("Enter");
-      await expect(disclosure).toHaveAttribute("aria-expanded", "true");
-      await expect(disclosure.locator("svg")).toHaveClass(/lucide-chevron-down/);
-      await expect(page.locator("#routing-information")).toBeVisible();
-      await disclosure.click();
-      await expect(page.locator("#routing-information")).toBeHidden();
+      await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced, #routing-information")).toHaveCount(0);
+      await expectDecorativeIcon(tool(words.canvasUndo), words.canvasUndo);
+      await expectDecorativeIcon(tool(words.canvasRedo), words.canvasRedo);
       await tool(words.canvasAddNode).click();
       const nodeMenu = page.getByRole("menu", { name: words.canvasActions });
       await expect(nodeMenu).toBeVisible();
       await expect(nodeMenu.getByRole("menuitem", { name: words.addRule, exact: true })).toBeEnabled();
       await nodeMenu.getByRole("menuitem", { name: words.canvasAddQuestion, exact: true }).click();
-      await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+      await expect(page.locator(".workflow-info, .workflow-drawer")).toHaveCount(0);
       const close = page.getByRole("button", { name: words.closeInspector, exact: true });
       await expectDecorativeIcon(close, words.closeInspector);
       await expect(close).toHaveCSS("height", "36px");
@@ -159,39 +151,24 @@ for (const { width, locale, font } of scenarios) {
       await close.press("Enter");
       await expect(page.locator(".workflow-inspector")).toHaveCount(0);
 
-      // Native rule-row controls keep sortable attributes and localized reorder actions.
-      if (await disclosure.getAttribute("aria-expanded") === "false") await disclosure.click();
-      await page.getByText(words.advancedEditors, { exact: true }).click();
-      const earlierName = (index: number) => words.moveRuleEarlier.replace("{index}", String(index));
-      const laterName = (index: number) => words.moveRuleLater.replace("{index}", String(index));
-      const gripName = words.reorderRule.replace("{index}", "1").replace("{total}", "2");
-      const grip = page.getByRole("button", { name: gripName, exact: true });
-      await expectDecorativeIcon(grip, gripName);
-      await expect(grip).toHaveCSS("height", "36px");
-      await expect(grip).toHaveAttribute("aria-roledescription", "sortable");
-      const first = page.getByRole("button", { name: earlierName(1), exact: true });
-      const down = page.getByRole("button", { name: laterName(1), exact: true });
-      const up = page.getByRole("button", { name: earlierName(2), exact: true });
-      const last = page.getByRole("button", { name: laterName(2), exact: true });
-      await expectDecorativeIcon(first, earlierName(1));
-      await expectDecorativeIcon(down, laterName(1));
-      await expect(first).toBeDisabled();
-      await expect(last).toBeDisabled();
-      const conditions = page.locator(".rule-condition");
-      await expect(conditions.first()).toContainText("→ default");
+      // Current inspector actions retain native rule order; the old sortable row is retired.
+      const firstRule = page.locator('[data-canvas-node="rule-0"]');
+      await firstRule.focus(); await page.keyboard.press("Enter");
+      const inspector = page.getByRole("complementary", { name: words.nodeInspector });
+      const up = inspector.getByRole("button", { name: words.moveEarlier, exact: true });
+      const down = inspector.getByRole("button", { name: words.moveLater, exact: true });
+      await expect(up).toBeDisabled(); await expect(down).toBeEnabled();
+      await expect(firstRule).toContainText("→ default");
       await down.click();
-      await expect(conditions.first()).toContainText("→ quality");
+      await expect(firstRule).toContainText("→ quality");
+      await expect(up).toBeEnabled(); await expect(down).toBeDisabled();
       await up.focus();
       await up.press("Enter");
-      await expect(conditions.first()).toContainText("→ default");
-      await grip.focus();
-      await grip.press("Space");
-      await expect(grip).toHaveAttribute("aria-pressed", "true");
-      // KeyboardSensor attaches its document keydown listener in a deferred task.
-      await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
-      await grip.press("Space");
-      await expect(grip).not.toHaveAttribute("aria-pressed", "true");
+      await expect(firstRule).toContainText("→ default");
+      await expect(up).toBeDisabled(); await expect(down).toBeEnabled();
+      await expect(page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="match"]')).toHaveAttribute("data-edge-to", "zone::balanced/default");
+      await expect(page.locator('[data-canvas-edge][data-edge-from="rule-1"][data-edge-kind="match"]')).toHaveAttribute("data-edge-to", "zone::balanced/quality");
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+      expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
     });
 }

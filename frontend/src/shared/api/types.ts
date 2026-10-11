@@ -53,6 +53,11 @@ export interface ConfigurationWarning {
 }
 
 export interface ConfigurationPayload {
+  selected_models?: string[];
+  editable?: boolean;
+  definition?: WorkflowDefinition;
+  runtime_default?: string;
+  deletable?: boolean;
   defaults?: { default_model: string | null };
   write_available: boolean;
   write_disabled_reason: string | null;
@@ -124,6 +129,8 @@ export interface SessionsPayload {
 }
 
 export interface StrategyRow {
+  editable?: boolean;
+  deletable?: boolean;
   name: string;
   description: string | null;
   kind?: string;
@@ -204,6 +211,20 @@ export interface OverlayRulePayload {
   select: RuleChoice;
 }
 
+export interface WorkflowDefinition {
+  kind: "decision_matrix";
+  description?: string | null;
+  policy: Record<string, unknown> & { labels: Record<string, { models?: string[]; tag?: string; description?: string; reasoning_effort?: string | null }> };
+  options: { questions: Record<string, Question>; rules: OverlayRulePayload[]; fallback: RuleChoice };
+}
+
+export interface WorkflowWritePayload {
+  version: 2;
+  strategy: string;
+  selected_models: string[];
+  definition: WorkflowDefinition;
+}
+
 export interface RoutingOverlayPayload {
   version: number;
   strategy: string;
@@ -268,11 +289,11 @@ export type ImportModel = {
   tags?: string[];
   priority?: number;
   quality?: number;
-  capabilities: { tools: boolean; vision: boolean; json_mode: boolean; reasoning: boolean; temperature: boolean; reasoning_effort: string[] };
-  cost: { input_per_million: number; output_per_million: number; cache_read_per_million?: number | null; cache_write_per_million?: number | null };
-  context_window: number | null;
-  max_output_tokens: number | null;
-  metadata?: ModelMetadata;
+  capabilities: { tools?: boolean; vision?: boolean; json_mode?: boolean; reasoning?: boolean; temperature?: boolean; reasoning_effort?: string[] };
+  cost: { input_per_million?: number; output_per_million?: number; cache_read_per_million?: number | null; cache_write_per_million?: number | null };
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+  metadata?: ModelMetadata | null;
 };
 export type ProviderModelView = ImportModel & { name: string; provider: string; tags: string[]; api_base: string | null; provider_type: string; has_api_key: boolean; priority: number; quality: number; routing_overlay_fields?: ("tags" | "priority")[] };
 export type ProviderCommandResult = ProviderConfiguration & { valid: true; applied: boolean; imported: number; skipped: number };

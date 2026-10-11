@@ -110,8 +110,8 @@ test("layout menu aligns a selected group, saves only layout and supports undo/r
   await layout.click();
   await page.keyboard.press("End"); await page.keyboard.press("Enter");
   await expect.poll(() => mockApi.canvasLayout?.nodes.fallback?.y).toBe(80);
-  expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);
-  await expect(page.locator('.workspace-status[data-policy-draft="unchanged"]')).toBeVisible();
+  expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
+  await expect(page.locator('.workflow-toolbar[data-policy-draft="unchanged"]')).toBeVisible();
 });
 
 for (const locale of ["en", "zh-CN"] as const) {

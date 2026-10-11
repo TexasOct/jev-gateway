@@ -2,10 +2,10 @@ import { writeFile } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 
-const policy = "/v1/routing/configuration", layoutPath = "/v1/dashboard/canvas-layout";
+const policy = "/v1/routing/configuration?strategy=balanced", validate = "/v1/routing/configuration/validate?strategy=balanced", layoutPath = "/v1/dashboard/canvas-layout?strategy=balanced";
 const layout = { version: 1 as const, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
 async function enter(page: Page, target: Locator) {
   await expect(target).toBeEnabled();
@@ -34,12 +34,12 @@ async function record(page: Page, info: TestInfo, name: string, data: unknown) {
 
 test("C20 genuinely held validation blocks duplicate admission and departure and retains raw draft", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policy}/validate` });
+  mockApi.allowedWrites.push({ method: "POST", path: validate });
   let release!: () => void, validations = 0;
   const barrier = new Promise<void>(resolve => { release = resolve; });
   const payloads: unknown[] = [], dialogs: string[] = [];
   page.on("dialog", async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
-  await page.route(`**${policy}/validate`, async route => {
+  await page.route(`**${validate}`, async route => {
     validations++; payloads.push(route.request().postDataJSON());
     await barrier;
     await route.fulfill({ status: 503, json: { error: { message: "Held validation rejected" } } });
@@ -58,7 +58,7 @@ test("C20 genuinely held validation blocks duplicate admission and departure and
     await frames(page);
     expect(validations).toBe(1); expect(dialogs).toEqual([]);
     await expect(page.locator("[data-settings-language]")).toHaveCount(0);
-    await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+    await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
     expect(mockApi.appliedConfiguration).toBeUndefined();
     expect(mockApi.requests.filter(request => request.method === "PUT" && request.path === policy)).toEqual([]);
     await record(page, info, "c20-held-post", { validations, payloads, dialogs, requests: mockApi.requests });
@@ -66,18 +66,18 @@ test("C20 genuinely held validation blocks duplicate admission and departure and
   await expect(page.getByRole("alert")).toContainText("Held validation rejected");
   await enter(page, page.locator('[data-canvas-node="questions"]'));
   await expect(page.getByRole("complementary", { name: en.nodeInspector }).getByRole("textbox", { name: en.instructions, exact: true })).toHaveValue(raw);
-  expect(payloads).toEqual([{ version: 1, strategy: configuration.strategy, questions: { ...configuration.questions, intent: { ...configuration.questions.intent!, instructions: raw } }, rules: configuration.rules.map(({ when, select }) => ({ when, select })), fallback: configuration.fallback, models: {} }]);
+  expect(payloads).toEqual([{ version: 2, strategy: configuration.strategy, selected_models: configuration.selected_models, definition: { ...configuration.definition, options: { ...configuration.definition!.options, questions: { ...configuration.questions, intent: { ...configuration.questions.intent!, instructions: raw } } } } }]);
   await record(page, info, "c20-rejected-retained", { raw, validations, payloads, requests: mockApi.requests });
 });
 
 test("C21 valid saved policy with held layout-only dirty state blocks then permits clean navigation", async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = structuredClone(layout);
-  mockApi.allowedWrites.push({ method: "POST", path: `${policy}/validate` }, { method: "PUT", path: policy });
+  mockApi.allowedWrites.push({ method: "POST", path: validate }, { method: "PUT", path: policy });
   await open(page);
   await edit(page, "C21 valid saved policy snapshot");
   await enter(page, page.getByRole("button", { name: en.reviewChanges, exact: true }));
   await enter(page, page.getByRole("button", { name: en.confirmAndSave, exact: true }));
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const saved = structuredClone(mockApi.appliedConfiguration), before = structuredClone(mockApi.canvasLayout);
   expect(saved?.questions.intent!.instructions).toBe("C21 valid saved policy snapshot");
   let release!: () => void, puts = 0;
@@ -96,7 +96,7 @@ test("C21 valid saved policy with held layout-only dirty state blocks then permi
     await expect(settings).toBeDisabled(); await settings.press("Enter");
     await expect(page.locator("[data-settings-language]")).toHaveCount(0);
     await expect(rule).toHaveCSS("left", "440px");
-    await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+    await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
     expect(mockApi.appliedConfiguration).toEqual(saved); expect(mockApi.canvasLayout).toEqual(before);
     expect(puts).toBe(1); expect(dialogs).toEqual([]);
     expect(payloads[0]).toEqual({ ...before, nodes: { ...before!.nodes, "rule-0": { x: 440, y: 80 } } });
@@ -108,7 +108,7 @@ test("C21 valid saved policy with held layout-only dirty state blocks then permi
   await settings.click(); await expect(page.locator("[data-settings-language]")).toBeVisible();
   await enter(page, page.getByRole("button", { name: en.strategyEditor, exact: true }));
   await expect(rule).toHaveCSS("left", "440px");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   expect(dialogs).toEqual([]); expect(mockApi.appliedConfiguration).toEqual(saved); expect(mockApi.canvasLayout).toEqual(settled);
   expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual(requests);
   await record(page, info, "c21-reopened", { saved, settled, puts, payloads, requests });

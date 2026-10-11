@@ -2,27 +2,26 @@ import { test, expect } from "./fixtures";
 import { configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 
-test("workflow header reads selected strategy metadata and actual source", async ({ page }) => {
+test("workflow controls identify the selected strategy and omit old metadata copy", async ({ page, mockApi }) => {
   await page.route("**/v1/routing/strategies", route => route.fulfill({ json: { object: "list", default: "other", data: [
-    { name: "other", description: "Unselected strategy", policy: {} },
-    { name: configuration.strategy, description: "Routes requests using ordered intent rules.", policy: {} },
+    { name: "other", description: "Unselected strategy", policy: {}, editable: true },
+    { name: configuration.strategy, description: "Routes requests using ordered intent rules.", policy: {}, editable: true },
   ] } }));
   await page.goto("/dashboard/");
   await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
-  const header = page.locator(".workspace-heading");
-  await expect(header.getByRole("heading")).toHaveText(configuration.strategy);
-  await header.locator("summary").click();
-  await expect(header).toContainText("Routes requests using ordered intent rules.");
-  await expect(header).toContainText(configuration.baseline_source);
-  await expect(header).not.toContainText("Unselected strategy");
-  await expect(header.getByRole("status")).toHaveText(en.noPendingChanges);
+  await expect(page.getByRole("combobox", { name: en.strategy, exact: true })).toHaveValue(configuration.strategy);
+  await expect(page.locator(".workspace-heading, .workspace-status, .workflow-info, .workflow-drawer")).toHaveCount(0);
+  await expect(page.locator(".strategy-controls")).not.toContainText("Routes requests using ordered intent rules.");
+  await expect(page.locator(".strategy-controls")).not.toContainText(configuration.baseline_source);
+  await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
+  expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
 });
 
 test("layout authorization loss shows the root connection form", async ({ page }) => {
   await page.goto("/dashboard/");
   await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
   await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeEnabled();
-  await page.route("**/v1/dashboard/canvas-layout", async route => {
+  await page.route("**/v1/dashboard/canvas-layout?strategy=balanced", async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     await route.fulfill({ status: 401, json: { error: { message: "Synthetic expired authorization" } } });
   });
@@ -36,7 +35,7 @@ test("pending layout disables native departure and enables it after settlement",
   let release!: () => void;
   const blocked = new Promise<void>(resolve => { release = resolve; });
   let entered = false;
-  await page.route("**/v1/dashboard/canvas-layout", async route => {
+  await page.route("**/v1/dashboard/canvas-layout?strategy=balanced", async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     entered = true;
     const next = route.request().postDataJSON();
@@ -51,7 +50,7 @@ test("pending layout disables native departure and enables it after settlement",
   await page.keyboard.press("Alt+ArrowRight");
   try {
     await expect.poll(() => entered).toBe(true);
-    await expect(page.getByRole("button", { name: en.settings, exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: en.settings, exact: true, includeHidden: true })).toBeDisabled();
     await expect(page.locator(".routing-canvas-scroll")).toBeVisible();
   } finally { release(); }
   await expect(page.getByRole("button", { name: en.settings, exact: true })).toBeEnabled();
@@ -60,11 +59,11 @@ test("pending layout disables native departure and enables it after settlement",
 });
 
 test("pending policy disables native departure until apply settles", async ({ page, mockApi }) => {
-  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate" }, { method: "PUT", path: "/v1/routing/configuration" });
+  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" }, { method: "PUT", path: "/v1/routing/configuration?strategy=balanced" });
   let release!: () => void;
   const blocked = new Promise<void>(resolve => { release = resolve; });
   let entered = false;
-  await page.route("**/v1/routing/configuration", async route => {
+  await page.route("**/v1/routing/configuration?strategy=balanced", async route => {
     if (route.request().method() !== "PUT") return route.fallback();
     entered = true;
     await blocked;
@@ -76,15 +75,15 @@ test("pending policy disables native departure until apply settles", async ({ pa
   await page.keyboard.press("Enter");
   await page.getByRole("complementary", { name: en.nodeInspector }).getByRole("combobox", { name: en.label, exact: true }).selectOption("quality");
   await page.getByRole("button", { name: en.closeInspector, exact: true }).click();
-  await expect(page.locator(".workspace-heading [data-policy-draft]")).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "pending");
   await page.getByRole("button", { name: en.reviewChanges, exact: true }).click();
   await page.getByRole("button", { name: en.confirmAndSave, exact: true }).click();
   try {
     await expect.poll(() => entered).toBe(true);
-    await expect(page.getByRole("button", { name: en.settings, exact: true })).toBeDisabled();
-    await expect(page.locator(".workspace-heading")).toContainText(en.canvasApplyingPolicy);
+    await expect(page.getByRole("button", { name: en.settings, exact: true, includeHidden: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: en.confirmAndSave, exact: true })).toBeDisabled();
     await expect(page.locator(".routing-canvas-scroll")).toBeVisible();
   } finally { release(); }
   await expect(page.getByRole("button", { name: en.settings, exact: true })).toBeEnabled();
-  await expect(page.locator(".workspace-heading [data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
 });

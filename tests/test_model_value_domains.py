@@ -1,4 +1,4 @@
-"""Strict complete records and bounded provenance through the management API."""
+"""Supplied model fact domains and bounded provenance through the management API."""
 
 from __future__ import annotations
 
@@ -125,7 +125,10 @@ def test_cache_unknown_zero_and_independent_prices_persist(tmp_path: Path, actio
                 entry["metadata"]["fields"][field]["value"] = value
         projected = persist(app, config, entry, action)
         for field, value in [("cache_read_per_million", read), ("cache_write_per_million", write)]:
-            assert projected["cost"][field] == (None if value == "omitted" else value)
+            if value == "omitted":
+                assert field not in projected["cost"]
+            else:
+                assert projected["cost"][field] == value
         saved = json.loads(config.models_file.read_text())["models"][-1 if action == "import" else 0]
         assert saved["cost"] == entry["cost"]
     finally:
@@ -220,14 +223,49 @@ def test_false_reasoning_and_canonical_confirmed_effort_persist(tmp_path: Path, 
 
 @pytest.mark.parametrize("action", ["import", "update"])
 @pytest.mark.parametrize("field", FIELDS[:2] + FIELDS[4:] + ["cost", "capabilities"])
-def test_known_suggestion_cannot_fill_missing_complete_record(tmp_path: Path, action: str, field: str) -> None:
+def test_known_suggestion_keeps_omitted_runtime_facts_unknown(tmp_path: Path, action: str, field: str) -> None:
     app, config = sqlite_app(tmp_path)
     try:
         entry = record()
         location(entry, field).pop(field)
         for evidence in entry["metadata"]["fields"].values():
             evidence["status"] = "known"
-        reject(app, config, body(app, config, entry, action))
+        projected = persist(app, config, entry, action)
+        if field in {"cost", "capabilities"}:
+            assert projected[field] == {}
+        else:
+            assert field not in location(projected, field)
+        assert all(evidence["status"] == "known" for evidence in projected["metadata"]["fields"].values())
+        saved = json.loads(config.models_file.read_text())["models"][-1 if action == "import" else 0]
+        assert field not in location(saved, field)
+        assert saved["metadata"] == entry["metadata"]
+    finally:
+        config.engine.close()
+
+
+@pytest.mark.parametrize("facts", [{}, {"capabilities": {"tools": False, "reasoning_effort": []}, "cost": {"input_per_million": 0, "cache_read_per_million": None}, "context_window": None}])
+def test_minimal_and_partial_http_import_edit_reload_preserve_facts(tmp_path: Path, facts: dict[str, Any]) -> None:
+    app, config = sqlite_app(tmp_path)
+    try:
+        entry = {"upstream_model": "vendor/partial", **facts}
+        token = request(app, "GET", "/v1/provider-configuration", headers=headers(config)).json()["revision"]
+        payload = {"expected_revision": token, "operations": [{"action": "import", "provider_id": "test-provider", "confirmed": True, "models": [entry]}]}
+        before, stored = files(tmp_path), versions(config)
+        preview = request(app, "POST", "/v1/provider-configuration/validate", headers=headers(config), json=payload)
+        assert preview.status_code == 200 and files(tmp_path) == before and versions(config) == stored
+        applied = request(app, "PUT", "/v1/provider-configuration", headers=headers(config), json=payload)
+        assert applied.status_code == 200 and applied.json()["imported"] == 1
+        view = applied.json()["models"][-1]
+        assert view["capabilities"] == facts.get("capabilities", {}) and view["cost"] == facts.get("cost", {})
+        assert "metadata" not in view
+        edit = {"expected_revision": applied.json()["revision"], "operations": [{"action": "update_model", "model_id": view["name"], "model": {**entry, "display_name": "Partial HTTP model"}}]}
+        updated = request(app, "PUT", "/v1/provider-configuration", headers=headers(config), json=edit)
+        assert updated.status_code == 200
+        saved = json.loads(config.models_file.read_text())["models"][-1]
+        assert saved == {**entry, "provider": "test-provider", "display_name": "Partial HTTP model"}
+        assert request(app, "POST", "/v1/routing/reload", headers=headers(config)).status_code == 200
+        assert request(app, "GET", "/v1/provider-configuration", headers=headers(config)).json()["models"][-1] == updated.json()["models"][-1]
+        assert config.engine.catalog.by_name(view["name"]) is not None
     finally:
         config.engine.close()
 

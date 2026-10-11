@@ -1,0 +1,3 @@
+Workflow controls are independently accepted by `check-handoff-recheck-2.md`, followed by the complete integration PASS. Selected model nodes, named strategy controls and floating actions retain native guards, focus, geometry and supplier ownership. Both REWORK rounds and scoped reconciliation receipts remain historical. Integration's later read-only/history repairs are reviewed separately in the parent report.
+
+This task was constructed directly on `main`, with `branch == base_branch == main` and no PR. The authorized parent release uses `archive --no-commit --skip-branch-validation`; this records the actual delivery route. Child archival does not claim that 0.1.6 has been published. The parent retains A8 and the operator installation remains outside scope.

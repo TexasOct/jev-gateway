@@ -1,11 +1,11 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { configuration, editableConfiguration } from "../fixtures/configuration";
 import type { MockApiState } from "../setup/mock-api";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
-function setupCatalog(state: MockApiState) {
+function setupCatalog(state: MockApiState, legacy = false) {
   const catalog = structuredClone(configuration);
   catalog.models = ["a", "b", "c"].map((name, index) => ({
     ...catalog.models[0]!, id: `fixture-provider/${name}`, upstream_model: name,
@@ -14,13 +14,13 @@ function setupCatalog(state: MockApiState) {
   }));
   catalog.labels[0]!.models = catalog.models.slice(0, 2).map((model) => model.id);
   catalog.labels[1]!.models = [catalog.models[0]!.id];
-  state.appliedConfiguration = catalog;
+  state.appliedConfiguration = legacy ? catalog : editableConfiguration(catalog);
   state.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: {
     questions: { x: 50, y: 80 }, "rule-0": { x: 360, y: 80 }, fallback: { x: 360, y: 300 },
     "zone::balanced/default": { x: 680, y: 80 }, "zone::balanced/quality": { x: 680, y: 300 },
     "model::fixture-provider/a": { x: 1000, y: 80 }, "model::fixture-provider/b": { x: 1000, y: 180 }, "model::fixture-provider/c": { x: 1000, y: 280 },
   } };
-  return catalog;
+  return state.appliedConfiguration;
 }
 
 async function open(page: Page) {
@@ -133,7 +133,7 @@ test("selects native wires, disconnects and repairs match outputs before review"
 
 test("adds and disconnects pool members with native drag and preserves foreign tags through apply", async ({ page, mockApi }) => {
   setupCatalog(mockApi);
-  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate" }, { method: "PUT", path: "/v1/routing/configuration" });
+  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" }, { method: "PUT", path: "/v1/routing/configuration?strategy=balanced" });
   await open(page);
   const add = page.locator('[data-output-node="zone::balanced/default"][data-canvas-output="add"]');
   const target = page.locator('[data-canvas-input="model::fixture-provider/c"]');
@@ -154,7 +154,9 @@ test("adds and disconnects pool members with native drag and preserves foreign t
   await page.getByRole("button", { name: "Review changes", exact: true }).click();
   expect(mockApi.requests.filter(({ method, path }) => method === "PUT" && path.includes("configuration"))).toEqual([]);
   await page.getByRole("button", { name: "Confirm and save" }).click();
-  await expect.poll(() => mockApi.appliedConfiguration!.models.find((model) => model.id === "fixture-provider/c")!.tags).toEqual(["foreign/tag", "balanced/default"]);
+  await expect.poll(() => mockApi.appliedConfiguration!.labels[0]!.models).toEqual(["fixture-provider/a", "fixture-provider/b", "fixture-provider/c"]);
+  expect(mockApi.appliedConfiguration!.models.find((model) => model.id === "fixture-provider/c")!.tags).toEqual(["foreign/tag"]);
+  expect(mockApi.allowedWrites.find(({ method }) => method === "PUT")!.body).toMatchObject({ version: 2, strategy: "balanced", selected_models: ["fixture-provider/a", "fixture-provider/b", "fixture-provider/c"] });
 });
 
 test("reconnects an empty failure fallback by pointer drag and cancels keyboard connection controls", async ({ page, mockApi }) => {
@@ -192,6 +194,8 @@ test("question options grow and shrink ports and dense handles keep full size an
   const catalog = setupCatalog(mockApi);
   catalog.models = Array.from({ length: 12 }, (_, index) => ({ ...catalog.models[0]!, id: `fixture-provider/member-${index}`, upstream_model: `member-${index}` }));
   catalog.labels[0]!.models = catalog.models.map((model) => model.id);
+  mockApi.appliedConfiguration = editableConfiguration(catalog);
+  mockApi.appliedConfiguration.selected_models = catalog.models.map(({ id }) => id);
   await open(page);
   const pool = page.locator('[data-canvas-node="zone::balanced/default"]');
   await expect(pool).toHaveCSS("height", "420px");
@@ -241,29 +245,40 @@ test("aligns a selected group and restores its layout without policy writes", as
   expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path.includes("configuration"))).toEqual([]);
 });
 
-test("guards fixed paths, explicit pools, last members and read-only connection actions", async ({ page, mockApi }) => {
-  const catalog = setupCatalog(mockApi);
+test("legacy connection actions preserve fixed, explicit and tag-pool facts without policy edits", async ({ page, mockApi }) => {
+  // Deliberate v1 projection: legacy semantic controls remain read-only. Pure
+  // classification retains its explicit/last-tag-member boundary separately.
+  const catalog = setupCatalog(mockApi, true);
+  expect(catalog.definition).toBeUndefined(); expect(catalog.selected_models).toBeUndefined();
   catalog.labels[1]!.resolution = "models";
+  const original = structuredClone(catalog), originalLayout = structuredClone(mockApi.canvasLayout);
   await open(page);
   const panel = page.getByRole("region", { name: "Connection actions" });
   await page.locator('[data-output-node="questions"][data-output-kind="context"]').first().click();
-  await expect(panel).toContainText("These paths are fixed"); await expect(panel.getByRole("button", { name: "Disconnect connection" })).toBeDisabled();
+  await expect(panel).toContainText(en.canvasReadOnly); await expect(panel.getByRole("button", { name: "Disconnect connection" })).toHaveCount(0);
+  await expect(page.locator('[data-canvas-edge][data-edge-from="questions"][data-edge-kind="context"]')).toHaveCount(2);
   await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   const explicit = page.locator('[data-output-node="zone::balanced/quality"]');
   await expect(explicit).toHaveCount(1); await explicit.focus(); await explicit.press("Enter");
-  await expect(panel).toContainText("explicit, read-only model list");
-  await expect(panel.getByRole("button", { name: "Disconnect connection" })).toBeDisabled();
+  await expect(panel).toContainText(en.canvasReadOnly);
+  await expect(panel.getByRole("button", { name: "Disconnect connection" })).toHaveCount(0);
   await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   const firstMember = page.locator('[data-output-node="zone::balanced/default"]').first();
-  await firstMember.click(); await panel.getByRole("button", { name: "Disconnect connection" }).click();
-  await firstMember.click(); await expect(panel).toContainText("Keep at least one model");
-  await expect(panel.getByRole("button", { name: "Disconnect connection" })).toBeDisabled();
+  await firstMember.click(); await expect(panel).toContainText(en.canvasReadOnly);
+  await expect(panel.getByRole("button", { name: "Disconnect connection" })).toHaveCount(0);
+  await expect(page.locator('[data-canvas-edge][data-edge-from="zone::balanced/default"][data-edge-kind="pool"]')).toHaveCount(2);
+  await expect(page.locator('[data-canvas-edge][data-edge-from="zone::balanced/quality"][data-edge-kind="pool"]')).toHaveCount(1);
+  expect(mockApi.appliedConfiguration).toEqual(original); expect(mockApi.canvasLayout).toEqual(originalLayout);
+  expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
   catalog.write_available = false;
   await page.reload();
   await page.getByRole("button", { name: "Strategy workflow", exact: true }).click();
   await page.locator('[data-output-node="rule-0"][data-canvas-output="match"]').click();
   await expect(panel).toContainText("read-only or under review");
   await expect(panel.getByRole("button", { name: "Connect", exact: true })).toHaveCount(0);
+  expect(mockApi.appliedConfiguration).toEqual({ ...original, write_available: false });
+  expect(mockApi.canvasLayout).toEqual(originalLayout);
+  expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
 });
 
 test("blocks unsupported question drafts with a specific error", async ({ page, mockApi }) => {
@@ -311,6 +326,8 @@ test("a stale native connection gesture cannot overwrite a newer inspector edit"
 test("rejects an oversized arrange-all operation visibly without a layout or policy PUT", async ({ page, mockApi }) => {
   const catalog = setupCatalog(mockApi);
   catalog.models = Array.from({ length: 257 }, (_, index) => ({ ...catalog.models[0]!, id: `fixture-provider/member-${index}`, upstream_model: `member-${index}`, tags: [] }));
+  mockApi.appliedConfiguration = editableConfiguration(catalog);
+  mockApi.appliedConfiguration.selected_models = catalog.models.map(({ id }) => id);
   mockApi.canvasLayout = { version: 1, nodes: {}, viewport: { x: 0, y: 0 } };
   await open(page);
   const writes = mockApi.requests.filter(({ method }) => method === "PUT").length;

@@ -52,7 +52,7 @@ for (const [locale, width] of [["en", 1280], ["zh-CN", 320]] as const) test(`fai
   await expect(addNode).toBeEnabled();
   await expect(page.locator(`[data-canvas-node="rule-0"]`)).toBeVisible();
   await expect(retry).toHaveCount(0);
-  await expect(page.locator(".workspace-heading")).toContainText(configuration.strategy);
+  await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toHaveValue(configuration.strategy);
   expect(reads).toBe(2);
   expect(order).toEqual([`GET ${configurationPath}`, `GET ${configurationPath}`]);
   await evidence(page, info, "config-read-recovered", { reads, order, strategy: configuration.strategy });

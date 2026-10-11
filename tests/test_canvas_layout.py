@@ -54,3 +54,30 @@ def test_layout_size_check_matches_written_encoding(tmp_path: Path) -> None:
                 "viewport": {"x": 0, "y": 0}}
     write_layout(models_file, document)
     assert read_layout(models_file) == (document, None)
+
+
+def test_named_layout_migration_preserves_default_and_other_strategies(tmp_path: Path) -> None:
+    from jev_gateway.canvas_layout import layout_path
+    models_file = tmp_path / "models.json"
+    default = {"version": 1, "nodes": {"questions": {"x": 1, "y": 2}}, "viewport": {"x": 3, "y": 4}}
+    other = {"version": 1, "nodes": {"fallback": {"x": 5, "y": 6}}, "viewport": {"x": 7, "y": 8}}
+    write_layout(models_file, default)
+    assert read_layout(models_file, "other") == (default_layout(), None)
+    write_layout(models_file, other, "other")
+    assert json.loads(layout_path(models_file).read_text())["version"] == 2
+    assert read_layout(models_file) == (default, None)
+    assert read_layout(models_file, "other") == (other, None)
+    empty = default_layout()
+    write_layout(models_file, empty)
+    assert read_layout(models_file) == (empty, None)
+    assert read_layout(models_file, "other") == (other, None)
+
+
+@pytest.mark.parametrize("document", [
+    {"version": 2, "strategies": {}, "secret": "x"},
+    {"version": 2, "strategies": {"auto": {"nodes": {}, "viewport": {"x": 0, "y": 0}}}},
+    {"version": 2, "strategies": {"other": {"nodes": {}, "viewport": {"x": False, "y": 0}}}},
+    {"version": 2, "strategies": {"other": {"version": 1, "nodes": {}, "viewport": {"x": 0, "y": 0}}}},
+])
+def test_version_two_layout_is_strict(document: object) -> None:
+    with pytest.raises(ValueError): validate_layout(document)

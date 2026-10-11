@@ -1,0 +1,35 @@
+{
+  "id": "model-optional-016",
+  "name": "model-optional-016",
+  "title": "Optional model parameters at import",
+  "description": "Allow omitted basic model parameters while validating provided values and preserving unknown values and evidence.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-11",
+  "completedAt": "2026-10-12",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-11-workflow-model-nodes-016",
+  "relatedFiles": [],
+  "notes": "A1 independently accepted in check-handoff.md and retained by the complete parent integration PASS. Publication belongs to the parent; no operator upgrade.",
+  "meta": {
+    "closure": {
+      "disposition": "implementation_verified",
+      "acceptance_complete": true,
+      "review_run": "b12a7064-4a9e-41d9-ae0d-850cb91777ec",
+      "review": "check-handoff.md",
+      "delivery": "direct_main_no_pr",
+      "parent_release": "0.1.6"
+    }
+  }
+}

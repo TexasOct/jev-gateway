@@ -1,12 +1,62 @@
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
-import type { ConfigurationPayload, RoutingOverlayPayload } from "@/shared/api/types";
+import { configuration, workflowConfiguration } from "../fixtures/configuration";
+import type { CanvasLayout, ConfigurationPayload, RoutingOverlayPayload } from "@/shared/api/types";
+import { en } from "../../src/shared/i18n/en";
+import { zhCN } from "../../src/shared/i18n/zh-CN";
+
+for (const state of ["uneditable", "missing-definition"] as const) for (const width of [1280, 320]) test(`read-only ${state} blocks native policy edits while preserving layout history at ${width}px`, async ({ page, mockApi }, info) => {
+  const readonly = structuredClone(workflowConfiguration);
+  if (state === "uneditable") readonly.editable = false;
+  else { delete readonly.definition; readonly.editable = true; }
+  expect(readonly.write_available).toBe(true);
+  mockApi.appliedConfiguration = readonly;
+  const layout: CanvasLayout = { version: 1, nodes: width === 320 ? { questions: { x: 50, y: 40 }, "rule-0": { x: 50, y: 200 }, fallback: { x: 50, y: 330 }, "zone::balanced/default": { x: 50, y: 450 }, "zone::balanced/quality": { x: 50, y: 580 }, "model::fixture-provider/fixture-model": { x: 50, y: 710 } } : { questions: { x: 50, y: 80 }, "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
+  mockApi.canvasLayout = structuredClone(layout);
+  await page.setViewportSize({ width, height: 900 }); await page.goto("/dashboard/");
+  await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
+  await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: en.workflowAddModel, exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: en.workflowCreate, exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: en.canvasPanTool, exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: en.canvasZoomFit, exact: true })).toBeEnabled();
+  const branch = page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="match"]');
+  await branch.focus(); await page.keyboard.press("Enter");
+  const card = page.getByRole("region", { name: en.canvasConnectionActions });
+  await expect(card).toContainText(en.canvasReadOnly);
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: en.canvasConnect, exact: true })).toHaveCount(0);
+  await page.keyboard.press("Delete");
+  await expect(branch).toHaveAttribute("data-edge-to", "zone::balanced/default");
+  await page.keyboard.press("Escape");
+  const rule = page.locator('[data-canvas-node="rule-0"]');
+  await rule.focus(); await page.keyboard.press("Enter");
+  const inspector = page.getByRole("complementary", { name: en.nodeInspector });
+  await expect(inspector.getByRole("combobox", { name: en.label, exact: true })).toBeDisabled();
+  await expect(inspector.getByRole("button", { name: en.moveLater, exact: true })).toBeDisabled();
+  await expect(inspector.getByRole("button", { name: en.deleteRule, exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: en.closeInspector, exact: true }).click();
+  await rule.focus(); await page.keyboard.press("Delete"); await page.keyboard.press("Backspace");
+  await expect(rule).toHaveCount(1);
+  await page.keyboard.press("Alt+ArrowRight");
+  const moved = { ...layout, nodes: { ...layout.nodes, "rule-0": { x: layout.nodes["rule-0"]!.x + 20, y: layout.nodes["rule-0"]!.y } } };
+  await expect.poll(() => mockApi.canvasLayout).toEqual(moved);
+  await page.getByRole("button", { name: en.canvasUndo, exact: true }).click();
+  await expect.poll(() => mockApi.canvasLayout).toEqual(layout);
+  await page.getByRole("button", { name: en.canvasRedo, exact: true }).click();
+  await expect.poll(() => mockApi.canvasLayout).toEqual(moved);
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  expect(mockApi.appliedConfiguration).toEqual(readonly);
+  expect(mockApi.canvasWrites).toEqual([moved, layout, moved]);
+  expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual(Array.from({ length: 3 }, () => ({ method: "PUT", path: "/v1/dashboard/canvas-layout?strategy=balanced" })));
+  await info.attach("readonly-policy-independent-layout-ledger", { contentType: "application/json", body: JSON.stringify({ readonly, layout, moved, requests: mockApi.requests, layoutWrites: mockApi.canvasWrites }, null, 2) });
+});
 
 for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) {
-  test(`inherited configured path stays read-only through save/reload and global clear (${locale}, ${width})`, async ({ page }) => {
+  test(`inherited legacy path stays read-only through reload and global clear (${locale}, ${width})`, async ({ page, mockApi }) => {
     const zh = locale === "zh-CN";
+    const words = zh ? zhCN : en;
     let config: ConfigurationPayload = {
-      ...structuredClone(configuration), defaults: { default_model: "fixture/global" },
+      ...structuredClone(configuration), editable: false, defaults: { default_model: "fixture/global" },
       rules: [{ index: 0, when: { intent: "default" }, select: { label: "missing" } }],
       labels: [
         { ...configuration.labels[0]!, models: ["fixture/literal"] },
@@ -20,6 +70,7 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
     const strategy = { name: "balanced", kind: "decision_matrix", description: "Fixture strategy", policy: { labels: { default: {}, missing: {} } }, options: { rules: config.rules, fallback: config.fallback } };
     const writes: RoutingOverlayPayload[] = [];
     const validations: RoutingOverlayPayload[] = [];
+    const supplierFacts = structuredClone(config.models), layoutBefore = structuredClone(mockApi.canvasLayout);
     await page.route("**/v1/routing/strategies", (route) => route.fulfill({ json: { object: "list", default: "balanced", data: [strategy] } }));
     await page.route("**/v1/routing/policy", (route) => route.fulfill({ json: { defaults: config.defaults, strategies: [strategy], models: config.models.map((model) => ({ name: model.id, tags: model.tags })) } }));
     await page.route("**/v1/routing/sessions*", (route) => route.fulfill({ json: { data: [], storage: {}, evidence_available: true, page_size: 30, has_more: false, next_cursor: null } }));
@@ -28,7 +79,7 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
       validations.push(route.request().postDataJSON() as RoutingOverlayPayload);
       await route.fulfill({ json: { valid: true, warnings: [] } });
     });
-    await page.route("**/v1/routing/configuration", async (route) => {
+    await page.route("**/v1/routing/configuration{,?strategy=balanced}", async (route) => {
       if (route.request().method() === "GET") return route.fulfill({ json: config });
       expect(route.request().method()).toBe("PUT");
       const payload = route.request().postDataJSON() as RoutingOverlayPayload;
@@ -52,49 +103,34 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
     await expect(inheritedEdge.locator("..").locator(".canvas-edge-handle")).toHaveCount(0);
     await expect(page.locator('[data-output-node="zone::balanced/missing"][data-output-kind="default"]')).toHaveCount(0);
     await expect(page.locator('[data-canvas-node="zone::balanced/missing"]')).toContainText(zh ? "默认" : "Default");
-    await page.locator(".workflow-drawer button[aria-controls='routing-information']").click();
-    const flow = page.getByRole("region", { name: zh ? "策略路径预览" : "Configured route", exact: true });
-    await expect(flow).toContainText("missing");
-    await expect(flow).toContainText("fixture/global");
-    await expect(flow).toContainText(zh ? "不是模型池成员" : "not a pool member");
-    await flow.getByRole("button", { name: zh ? /^规则 1/ : /^Rule 1/ }).click();
-    await expect(flow.locator('[data-flow-kind="default"]')).toHaveAttribute("data-flow-state", "active");
+    await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced, .workflow-footer")).toHaveCount(0);
+    const inherited = page.locator('[data-canvas-edge][data-edge-from="zone::balanced/missing"][data-edge-kind="default"]');
+    await expect(inherited).toHaveAttribute("data-edge-to", "model::fixture/global");
+    await expect(page.locator('[data-canvas-edge][data-edge-from="zone::balanced/missing"][data-edge-kind="pool"]')).toHaveCount(0);
+    await inherited.focus(); await page.keyboard.press("Enter");
+    const card = page.getByRole("region", { name: words.canvasConnectionActions, exact: true });
+    await expect(card).toContainText("missing"); await expect(card).toContainText("fixture/global");
+    await expect(card.getByRole("combobox")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: words.canvasConnect, exact: true })).toHaveCount(0);
     if (width === 320) {
-      const geometry = await page.locator("#routing-information").evaluate((information) => {
-        const drawer = information.closest(".workflow-drawer")!;
-        return {
-          bodyWidth: information.getBoundingClientRect().width,
-          drawerWidth: drawer.getBoundingClientRect().width,
-          bodyHeight: information.clientHeight,
-          drawerHeight: drawer.clientHeight,
-          overflow: getComputedStyle(information).overflowY,
-        };
-      });
-      expect(geometry.bodyWidth).toBeGreaterThanOrEqual(geometry.drawerWidth - 2);
-      expect(geometry.bodyHeight).toBeLessThan(geometry.drawerHeight);
-      expect(geometry.overflow).toBe("auto");
-      const modelLines = await flow.getByText("fixture/global", { exact: true }).evaluate((model) => {
+      const geometry = await card.evaluate((element) => element.getBoundingClientRect().toJSON());
+      expect(geometry.left).toBeGreaterThanOrEqual(0); expect(geometry.right).toBeLessThanOrEqual(width);
+      expect(geometry.top).toBeGreaterThanOrEqual(0); expect(geometry.bottom).toBeLessThanOrEqual(900);
+      const modelLines = await card.getByText("fixture/global", { exact: false }).first().evaluate((model) => {
         const range = document.createRange();
         range.selectNodeContents(model);
         return range.getClientRects().length;
       });
       expect(modelLines).toBeLessThanOrEqual(3);
     }
+    await page.keyboard.press("Escape"); await expect(card).toHaveCount(0);
     await expect(page.getByRole("button", { name: zh ? "审阅草稿" : "Review changes", exact: true })).toBeDisabled();
     expect(writes).toEqual([]);
     expect(validations).toEqual([]);
 
-    // A real priority edit follows the normal review/save flow. Inheritance must
-    // not turn into tag membership in its payload or the subsequent GET.
-    const advanced = page.locator("summary").filter({ hasText: zh ? "备用编辑控件" : "Legacy editor controls" });
-    await advanced.click();
-    await page.getByLabel(zh ? "fixture/literal 的优先级" : "Priority for fixture/literal", { exact: true }).fill("2");
-    await page.getByRole("button", { name: zh ? "审阅草稿" : "Review changes", exact: true }).click();
-    await page.getByRole("button", { name: zh ? "确认并应用" : "Confirm and save", exact: true }).click();
-    await expect.poll(() => writes.length).toBe(1);
-    expect(writes[0]).toEqual(validations[0]);
-    expect(writes[0]?.models).toEqual({ "fixture/literal": { tags: ["balanced/default"], priority: 2 } });
-    expect(writes[0]).not.toHaveProperty("defaults");
+    // R2 assigns priority editing to the supplier Dialog; this v1 workflow stays read-only.
+    await expect(page.getByLabel(zh ? "fixture/literal 的优先级" : "Priority for fixture/literal", { exact: true })).toHaveCount(0);
+    expect(config.models.find((model) => model.id === "fixture/literal")?.priority).toBe(1);
     expect(config.models.find((model) => model.id === "fixture/global")?.tags).toEqual([]);
     await page.reload();
     await expect(page.locator('[data-route-target="fixture/global"]')).toContainText(zh ? "默认" : "Default");
@@ -104,24 +140,27 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
     await expect(page.locator(".monitoring-destinations")).toContainText(zh ? "通用设置" : "Settings");
     await page.getByRole("button", { name: zh ? "策略工作流" : "Strategy workflow", exact: true }).click();
     await expect(page.locator('path[data-workflow-edge="default"]')).toHaveCount(0);
-    await page.locator(".workflow-drawer button[aria-controls='routing-information']").click();
-    await expect(flow).not.toContainText("fixture/global");
-    await expect(flow).toContainText(zh ? "通用设置" : "Settings");
-    expect(writes).toHaveLength(1);
+    await expect(page.locator('[data-canvas-edge][data-edge-from="zone::balanced/missing"][data-edge-kind="pool"]')).toHaveCount(0);
+    await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced")).toHaveCount(0);
+    expect(config.models.find((model) => model.id === "fixture/global")?.tags).toEqual([]);
+    expect(writes).toEqual([]); expect(validations).toEqual([]);
+    expect(config.models).toEqual(supplierFacts); expect(mockApi.canvasLayout).toEqual(layoutBefore);
+    expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
   });
 }
 
 for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) {
-  test(`shared implicit pool highlights only the chosen inherited branch (${locale}, ${width})`, async ({ page }) => {
+  test(`shared implicit pool isolates the selected native branch (${locale}, ${width})`, async ({ page, mockApi }) => {
     const zh = locale === "zh-CN";
+    const words = zh ? zhCN : en;
     const config: ConfigurationPayload = {
-      ...structuredClone(configuration), defaults: { default_model: "fixture/global" },
+      ...structuredClone(configuration), editable: false, defaults: { default_model: "fixture/global" },
       rules: [{ index: 0, when: { intent: "default" }, select: { selection: "quality_first" } }], fallback: {},
       labels: [{ ...configuration.labels[0]!, name: "missing", tag: "balanced/missing", models: [] }],
       models: [{ id: "fixture/global", provider: "fixture", upstream_model: "global", priority: 1, baseline_priority: 1, tags: [], baseline_tags: [] }],
     };
     let writes = 0;
-    await page.route("**/v1/routing/configuration", (route) => {
+    await page.route("**/v1/routing/configuration{,?strategy=balanced}", (route) => {
       if (route.request().method() !== "GET") writes += 1;
       return route.fulfill({ json: config });
     });
@@ -129,19 +168,25 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
     await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
     await page.goto("/dashboard/");
     await page.getByRole("button", { name: zh ? "策略工作流" : "Strategy workflow", exact: true }).click();
-    await page.locator(".workflow-drawer button[aria-controls='routing-information']").click();
-    const flow = page.getByRole("region", { name: zh ? "策略路径预览" : "Configured route", exact: true });
-    const branches = flow.locator(":scope > ol > li");
-    await expect(flow.locator('[data-flow-kind="default"]')).toHaveCount(3);
+    await expect(page.locator(".workflow-info, .workflow-drawer, .configured-route-trace")).toHaveCount(0);
+    await expect(page.locator('[data-canvas-edge][data-edge-kind="default"]')).toHaveCount(1);
+    await expect(page.locator('[data-canvas-edge][data-edge-kind="default"]')).toHaveAttribute("data-edge-to", "model::fixture/global");
+    const branches = [page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="match"]'), page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="unmatched"]'), page.locator('[data-canvas-edge][data-edge-from="fallback"][data-edge-kind="match"]')];
     for (const index of [0, 1, 2]) {
-      const branch = branches.nth(index);
-      await branch.getByRole("button", { name: index === 0 ? zh ? /^规则 1/ : /^Rule 1/ : index === 1 ? zh ? "所有规则未命中" : "No rule matches" : zh ? "判定失败兜底" : "Decision failure fallback", exact: index !== 0 }).click();
-      await expect(branch.locator('[data-flow-kind="default"]')).toHaveAttribute("data-flow-state", "active");
-      await expect(flow.locator('[data-flow-kind="default"][data-flow-state="idle"]')).toHaveCount(2);
-      await expect(flow.locator('[data-flow-kind="default"][data-flow-state="active"]')).toHaveCount(1);
+      const branch = branches[index]!;
+      await expect(branch).toHaveAttribute("data-edge-to", "zone::balanced/missing");
+      await branch.focus(); await page.keyboard.press("Enter");
+      await expect(branch).toHaveAttribute("aria-pressed", "true");
+      for (const [otherIndex, other] of branches.entries()) if (otherIndex !== index) await expect(other).toHaveAttribute("aria-pressed", "false");
+      await expect(page.locator('[data-canvas-edge][aria-pressed="true"]')).toHaveCount(1);
+      await expect(page.getByRole("region", { name: words.canvasConnectionActions }).getByRole("combobox")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(branch).toHaveAttribute("aria-pressed", "false");
     }
     await expect(page.getByRole("button", { name: zh ? "审阅草稿" : "Review changes", exact: true })).toBeDisabled();
     expect(writes).toBe(0);
+    expect(config.models[0]!.tags).toEqual([]);
+    expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
   });
 }
 

@@ -49,7 +49,10 @@ test("fixture skips duplicate imports and applies an exact model update with the
   expect(state.configuration.models[0]).toEqual(existing);
   const updated = await command(page, { expected_revision: state.configuration.revision, operations: [{ action: "update_model", model_id: "fixture/existing", model: { ...model, upstream_model: "existing" } }] });
   expect(updated.status).toBe(200);
-  expect(state.configuration.models[0]).toMatchObject({ name: "fixture/existing", provider: "fixture", upstream_model: "existing", display_name: null, enabled: true, tags: ["retained"], priority: 4, quality: 0.75, cost: { cache_read_per_million: null, cache_write_per_million: null } });
+  expect(state.configuration.models[0]).toMatchObject({ name: "fixture/existing", provider: "fixture", upstream_model: "existing", display_name: null, enabled: true, tags: ["retained"], priority: 4, quality: 0.75 });
+  expect(state.configuration.models[0]!.cost).toEqual({ input_per_million: 1, output_per_million: 2 });
+  expect(state.configuration.models[0]!.cost).not.toHaveProperty("cache_read_per_million");
+  expect(state.configuration.models[0]!.cost).not.toHaveProperty("cache_write_per_million");
 });
 
 test("fixture rechecks complete-candidate sharing and never echoes transport secret bytes or raw params", async ({ page, context }) => {

@@ -1,0 +1,3 @@
+Optional-model implementation is accepted by the independent model checker and the complete integration review. Minimal or partial imported records retain unknown facts and validate supplied values. See `check-handoff.md` and the parent's `check-recovery-handoff.md` for exact scopes and historical failures.
+
+This task was constructed directly on `main`, with `branch == base_branch == main` and no PR. The authorized parent release uses `archive --no-commit --skip-branch-validation`; this records the actual delivery route. Child archival does not claim that 0.1.6 has been published. The parent retains A8 and the operator installation remains outside scope.

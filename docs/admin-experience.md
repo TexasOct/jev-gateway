@@ -89,9 +89,9 @@ Prices use USD per million tokens. Input, output and applicable cache-read/cache
 
 When Models.dev links a provider record to a canonical model, the provider's declared parameters override the base model's values. Missing parameters can inherit canonical facts. Overridden canonical values remain reference evidence and do not create automatic conflicts with the serving record.
 
-For reference-only or conflicting values, open Edit model and choose Use source value beside the relevant field. The editor fills that value as a manual choice and retains its source evidence. Review a proxy's actual rates and features before adopting original-provider values. Saving or importing still requires confirmation; unknown fields need an explicit value or limit decision.
+For reference-only or conflicting values, open Edit model and choose Use source value beside the relevant field. The editor fills that value as a manual choice and retains its source evidence. Review a proxy's actual rates and features before adopting original-provider values. Saving or importing still requires confirmation.
 
-Unknown price is not zero. Unknown capabilities are not support or rejection. Capability controls retain three states in a draft. Before adding a routable model, the existing confirmation boundary requires explicit input/output prices, capabilities, reasoning-effort values and limit decisions. A positive integer declares a known limit; an explicit unknown limit preserves the existing routing treatment and is explained in the editor. An incomplete row can be edited or retried while other evidence remains visible.
+Unknown price is not zero. Unknown capabilities are not support or rejection. Capability controls retain three states in a draft. Import requires supplier ownership, model identity and operator review; prices, capabilities, reasoning efforts and token limits can remain blank. Supplied values must pass their field validation. A positive integer declares a known limit; explicit null records an unknown limit. Saved records reopen with omitted facts still unknown, without source confirmations for missing values. An incomplete row can be edited or retried while other evidence remains visible.
 
 ## One model editor
 
@@ -119,15 +119,19 @@ Disabled model records remain manageable. Runtime selection excludes them, inclu
 
 ## Canvas editing
 
+The top-left native selector opens an editable strategy without changing the runtime default. Create strategy opens a named-workflow dialog; Delete strategy removes that workflow and its saved layout. The runtime default cannot be deleted. Switching or deleting asks before discarding unsaved policy work, and pending policy/layout operations block departure. Each strategy has its own policy, selected model nodes and layout. Clean switching also restores that strategy's in-memory undo/redo and selection cursor. Accepted configuration-hash changes, deletion and confirmed dirty discard clear the affected history; changing the admitted connection starts a new history owner.
+
+Add model opens the imported supplier-model library. Choosing a model adds only its node to the current draft; pool membership is edited through the inspector or connections. Delete, Backspace and the model context menu remove the node and its local pool references. Supplier records, global tags and other strategies remain available. Empty selection stays empty after saving and reopening.
+
 The visual graph represents the existing ordered routing workflow. It is not an independent executable graph. Questions feed the ordered rule sequence; matching rules select configured model pools, and generated failure/default paths retain their existing meaning.
 
 Right-click blank canvas space or use the explicit add control to create a supported editable node. Pointer coordinates account for zoom, pan, scroll and the canvas content origin. The new node is selected and its configuration is accessible. Menus stay within the window and close on Escape or an outside interaction.
 
 Node and connection actions use the same semantic mutation helpers as other editors. Delete and Backspace affect the selected supported object unless focus is in a text-editing control. Removing a rule updates dependent connections and rule-slot layout. Generated or necessary nodes and connections explain why they cannot be deleted independently. Undo and redo cover ordinary draft/layout changes, respecting configuration reload and save boundaries.
 
-The inspector groups the selected node's configuration. Cards show type, name and a useful summary, with separate selected/incomplete/error feedback. Validation identifies the affected question, rule or connection so the operator can repair it. The advanced editors use the same pending draft and validation feedback as canvas actions.
+The inspector groups the selected node's configuration. Cards show type, name and a useful summary, with separate selected/incomplete/error feedback. Validation identifies the affected question, rule or connection so the operator can repair it. Model nodes open the shared supplier-model Dialog; its edits retain the supplier transaction and source evidence.
 
-The information area identifies the selected strategy and its matching catalog description, with the actual baseline source and overlay state. Policy validation, review and application feedback remain separate from layout saving. Description requests stop when the editor becomes inactive, and a late response cannot describe a different selected strategy.
+The bottom-right floating panel holds review, discard, reset, history and canvas tools. Review and reset use protected webpage dialogs. The information drawer, advanced editor section, original footer and old workflow heading/source copy are absent. Policy errors and read-recovery actions remain visible above the canvas and stay separate from layout saving. Controls wrap at narrow widths, and the canvas tools have native keyboard access in their scrollable row.
 
 After reconnection, validation, application and reset requests from the previous connection cannot display an obsolete error, disconnect the current session or clear the status of a new operation. A server write that already committed remains effective and is recovered through authenticated reads.
 

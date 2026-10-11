@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confirmedModel, emptyModelDraft, metadataFieldState, prefillMetadata, withConfirmedMetadata } from "../models/model";
+import { confirmedModel, draftFromModel, emptyModelDraft, metadataFieldState, prefillMetadata, withConfirmedMetadata } from "../models/model";
 import { profileForWrite, searchProfiles } from "../shared/profiles";
 import type { ModelMetadata } from "@/shared/api/types";
 
@@ -8,17 +8,59 @@ describe("provider import confirmation", () => {
     const draft = prefillMetadata(emptyModelDraft(), { upstream_model: "m", fields: { tools: null, vision: null, input_per_million: null, output_per_million: null }, sources: [], warnings: [] });
     expect(draft.values.tools).toBe("");
     expect(draft.values.input_per_million).toBe("");
-    expect(confirmedModel("m", draft)).toBeNull();
+    const model = confirmedModel("m", draft)!;
+    expect(model.capabilities).toEqual({});
+    expect(model.cost).toEqual({});
+    expect(withConfirmedMetadata(model, draft, "2026-10-11")).not.toHaveProperty("metadata");
   });
-  it("requires all five flags, effort, a price pair and explicit limit decisions", () => {
+  it("allows each basic parameter to remain omitted while validating supplied values", () => {
     const draft = emptyModelDraft();
     draft.values = { ...emptyModelDraft().values, tools: "false", vision: "false", json_mode: "true", reasoning: "true", temperature: "false", reasoning_effort: '["low","high"]', input_per_million: "0", output_per_million: "2.5", context_window: "null", max_output_tokens: "1000" };
     expect(confirmedModel("m", draft)).toMatchObject({ upstream_model: "m", context_window: null, cost: { input_per_million: 0, output_per_million: 2.5 }, capabilities: { temperature: false } });
     for (const field of Object.keys(draft.values).filter((field) => !field.startsWith("cache_"))) {
-      expect(confirmedModel("m", { ...draft, values: { ...draft.values, [field]: "" } })).toBeNull();
+      expect(confirmedModel("m", { ...draft, values: { ...draft.values, [field]: "" } })).not.toBeNull();
     }
     expect(confirmedModel("m", { ...draft, values: { ...draft.values, output_per_million: "Infinity" } })).toBeNull();
     expect(confirmedModel("m", { ...draft, values: { ...draft.values, max_output_tokens: "1.5" } })).toBeNull();
+  });
+  it("reopens partial records and keeps false, zero, empty efforts, null and absent facts distinct", () => {
+    const partial = { upstream_model: "partial", capabilities: { tools: false, reasoning_effort: [] }, cost: { input_per_million: 0, cache_read_per_million: null }, context_window: null };
+    const draft = draftFromModel(partial);
+    expect(draft.values).toMatchObject({ tools: "false", vision: "", reasoning_effort: "[]", input_per_million: "0", output_per_million: "", cache_read_per_million: "", context_window: "null", max_output_tokens: "" });
+    draft.displayName = "Edited";
+    const saved = withConfirmedMetadata(confirmedModel("partial", draft)!, draft, "2026-10-11");
+    expect(saved).toMatchObject(partial);
+    expect(saved).not.toHaveProperty("max_output_tokens");
+    expect(saved.metadata?.fields?.vision).toBeUndefined();
+    expect(saved.metadata?.fields?.tools).toMatchObject({ status: "confirmed", value: false, method: "manual" });
+    expect(saved.metadata?.fields?.cache_read_per_million).toMatchObject({ status: "confirmed", value: null });
+  });
+  it("clearing a confirmed optional fact retains evidence without retaining its confirmation", () => {
+    const draft = draftFromModel({ upstream_model: "m", capabilities: { tools: false }, cost: {}, metadata: { version: 1, sources: [{ id: "old", fields: { tools: { value: false, source_field: "tools" } } }], fields: { tools: { status: "confirmed", value: false, method: "manual", source_ids: ["old"] } } } });
+    draft.values.tools = ""; draft.touched.tools = true;
+    const saved = withConfirmedMetadata(confirmedModel("m", draft)!, draft, "2026-10-11");
+    expect(saved.capabilities).toEqual({});
+    expect(saved.metadata?.fields?.tools).toEqual({ status: "unknown", value: null, source_ids: ["old"] });
+    expect(saved.metadata?.sources).toEqual(draft.metadata?.sources);
+  });
+  it("keeps explicit null metadata and cache prices on unrelated edits", () => {
+    const draft = draftFromModel({ upstream_model: "m", capabilities: { tools: false }, cost: { input_per_million: 0, cache_read_per_million: null }, metadata: null });
+    draft.displayName = "Renamed";
+    const saved = withConfirmedMetadata(confirmedModel("m", draft)!, draft, "2026-10-11");
+    expect(saved.metadata).toBeNull();
+    expect(saved.cost).toEqual({ input_per_million: 0, cache_read_per_million: null });
+    draft.values.cache_read_per_million = "2"; draft.touched.cache_read_per_million = true;
+    expect(withConfirmedMetadata(confirmedModel("m", draft)!, draft, "2026-10-11").metadata?.fields?.cache_read_per_million).toMatchObject({ status: "confirmed", value: 2, method: "manual" });
+  });
+  it("protects a manually confirmed unknown cache price during source refresh", () => {
+    const metadata: ModelMetadata = { version: 1, sources: [], fields: { cache_read_per_million: { status: "confirmed", value: null, source_ids: [], method: "manual", confirmed_at: "2026-10-01" } } };
+    const draft = draftFromModel({ upstream_model: "m", capabilities: {}, cost: { cache_read_per_million: null }, metadata });
+    const next = prefillMetadata(draft, { upstream_model: "m", fields: { cache_read_per_million: 2 }, sources: [{ source: "fixture", source_provider: "fixture", source_model: "m", fetched_at: "2026-10-11", applicable: true, fields: { cache_read_per_million: { value: 2, source_field: "cache" } } }], warnings: [] });
+    expect(next.values.cache_read_per_million).toBe("");
+    expect(next.touched.cache_read_per_million).toBe(true);
+    const saved = withConfirmedMetadata(confirmedModel("m", next)!, next, "2026-10-11");
+    expect(saved.cost.cache_read_per_million).toBeNull();
+    expect(saved.metadata?.fields?.cache_read_per_million).toEqual(metadata.fields?.cache_read_per_million);
   });
   it("prefills only untouched conflict-free fields and retains source evidence", () => {
     const draft = emptyModelDraft(); draft.values.tools = "false"; draft.touched.tools = true;

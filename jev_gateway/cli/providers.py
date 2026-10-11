@@ -15,8 +15,9 @@ from jev_gateway.provider_config import credential_snapshot, _references
 from jev_gateway.credentials import credential_path, credential_update, read_credential_bytes
 from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
 from jev_gateway.catalog import catalog_from_document, defaults_from_dict
-from jev_gateway.routing_overlay import read_overlay, merge_overlay
+from jev_gateway.routing_overlay import read_overlay, merge_overlay, reconcile_model_references, overlay_path
 from jev_gateway.strategy import StrategyRegistry
+from jev_gateway.canvas_layout import layout_path, read_layout_document, reconcile_layout_models
 
 
 def _locked(function: Callable[..., Any]) -> Callable[..., Any]:
@@ -209,7 +210,18 @@ def remove_provider(paths: RuntimePaths, provider_id: str, force: bool = False, 
     overlay, error = read_overlay(paths.models)
     if error:
         raise ValueError("Routing overlay must be repaired before changing providers.")
+    removed = {f"{provider_id}/{item['upstream_model']}" for item in owned}
+    overlay = reconcile_model_references(overlay, removed)
+    previous_layout, layout_error = read_layout_document(paths.models)
+    if layout_error:
+        raise ValueError("Canvas layout must be repaired before removing providers.")
+    layout = reconcile_layout_models(paths.models, removed)
     StrategyRegistry.from_catalog(catalog_from_document(merge_overlay(candidate, overlay), str(paths.models), credentials, allow_missing_credentials=True))
     if not dry_run:
-        write_document_atomic(paths.models, candidate, validate=False)
+        changes = {paths.models: (json.dumps(candidate, ensure_ascii=False, indent=2) + "\n").encode(), paths.models.with_name("models.json.bak"): optional_bytes(paths.models)}
+        if overlay != read_overlay(paths.models)[0]:
+            changes[overlay_path(paths.models)] = (json.dumps(overlay, ensure_ascii=False, indent=2) + "\n").encode()
+        if layout != previous_layout:
+            changes[layout_path(paths.models)] = json.dumps(layout, ensure_ascii=False, separators=(",", ":")).encode()
+        replace_configuration(paths.models, changes)
     return {"provider": provider_id, "models_removed": len(owned), "affected_tags": affected, "dry_run": dry_run}

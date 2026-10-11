@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, Response
 from starlette.staticfiles import StaticFiles
 
 from jev_gateway.canvas_layout import read_layout, write_layout
+from jev_gateway.config_transaction import configuration_read_lock
 from jev_gateway.records import StorageUnavailableError
 
 
@@ -487,19 +488,27 @@ def create_dashboard_router(
     @router.get("/v1/dashboard/canvas-layout", response_model=None)
     def dashboard_canvas_layout(
         authorization: str | None = Header(default=None),
+        strategy: str | None = None,
     ) -> dict[str, Any]:
         authorize(state.gateway_api_key, authorization)
-        document, error = read_layout(state.models_file)
+        with configuration_read_lock(state.models_file):
+            if strategy is not None and not state.engine.strategies.has(strategy):
+                raise HTTPException(status_code=400, detail={"error": {"message": "Unknown strategy.", "type": "invalid_request_error", "param": "strategy", "code": "invalid_canvas_layout"}})
+            document, error = read_layout(state.models_file, strategy)
         return {**document, "read_error": error}
 
     @router.put("/v1/dashboard/canvas-layout", response_model=None)
     def save_dashboard_canvas_layout(
         body: Any = Body(...),
         authorization: str | None = Header(default=None),
+        strategy: str | None = None,
     ) -> dict[str, Any]:
         require_write(authorization)
         try:
-            return write_layout(state.models_file, body)
+            with configuration_read_lock(state.models_file):
+                if strategy is not None and not state.engine.strategies.has(strategy):
+                    raise ValueError("Unknown strategy.")
+                return write_layout(state.models_file, body, strategy)
         except (TypeError, ValueError) as error:
             raise HTTPException(status_code=400, detail={"error": {
                 "message": str(error), "type": "invalid_request_error",

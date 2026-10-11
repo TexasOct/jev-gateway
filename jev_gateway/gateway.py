@@ -33,6 +33,7 @@ from jev_gateway.catalog import (
     Catalog,
     GatewaySettings,
     ModelProfile,
+    StrategyDefinition,
     catalog_from_document,
 )
 from jev_gateway.config import coerce_int
@@ -53,7 +54,8 @@ from jev_gateway.decision import (
 from jev_gateway.logging.config import safe_traceback
 from jev_gateway.provider import adapter_for
 from jev_gateway.provider_config import ProviderConfiguration, RevisionConflict, credential_snapshot, metadata_envelope
-from jev_gateway.config_transaction import configuration_lock, configuration_read_lock, require_readable_configuration
+from jev_gateway.config_transaction import configuration_lock, configuration_read_lock, require_readable_configuration, replace_configuration
+from jev_gateway.canvas_layout import layout_path, without_strategy_layout
 from jev_gateway import model_discovery, model_metadata
 from jev_gateway.reasoning import leaves_payload_alone
 from jev_gateway.records import (
@@ -73,6 +75,11 @@ from jev_gateway.routing_overlay import (
     remove_overlay,
     validate_overlay_shape,
     write_overlay,
+    migrate_overlay,
+    referenced_models,
+    workflow_definition,
+    empty_workflow,
+    validate_strategy_name,
 )
 from jev_gateway.sessions import (
     SESSION_HEADER,
@@ -512,6 +519,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             ("POST", "/v1/provider-discovery"),
             ("POST", "/v1/provider-metadata"),
             ("POST", "/v1/provider-connection-test"),
+            ("POST", "/v1/routing/strategies"),
+            ("POST", "/v1/routing/configuration/validate"),
+            ("PUT", "/v1/routing/configuration"),
+            ("PUT", "/v1/dashboard/canvas-layout"),
         }:
             # Body parsing can fail before the endpoint's configuration guard runs.
             with reload_lock:
@@ -673,7 +684,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         return {
             "object": "list",
             "default": active.engine.strategies.default_name,
-            "data": active.engine.strategies.describe(),
+            "data": [{**item, "editable": item.get("type") == "decision_matrix", "deletable": item.get("type") == "decision_matrix" and item["name"] != active.engine.catalog.default_strategy} for item in active.engine.strategies.describe()],
         }
 
     @app.post("/v1/routing/preview", response_model=None)
@@ -1008,20 +1019,64 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             detail=error_body(str(error), code="invalid_configuration"),
         )
 
+    def strategy_definition(name: str | None) -> StrategyDefinition:
+        selected_name = name or "task_aware"
+        definition = next((item for item in active.engine.catalog.strategies if item.name == selected_name and item.kind == "decision_matrix"), None)
+        if definition is None:
+            raise ValueError(f"Editable strategy {selected_name!r} is not configured.")
+        return definition
+
+    def workflow_state_from_disk(previous: dict[str, Any]) -> dict[str, Any]:
+        require_readable_configuration(active.models_file)
+        baseline = read_models_document(active.models_file)
+        catalog = catalog_from_document(merge_overlay(baseline, previous), str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment), allow_missing_credentials=True)
+        return migrate_overlay(previous, catalog)
+
+    def selected_overlay_payload(body: dict[str, Any], strategy: str | None) -> dict[str, Any]:
+        if type(body.get("version")) is not int or body["version"] not in (1, 2):
+            raise ValueError("Overlay version must be integer 1 or 2.")
+        name = strategy or body.get("strategy", "task_aware")
+        if body.get("strategy") != name:
+            raise ValueError("Strategy selector must match the payload.")
+        previous, error = read_overlay(active.models_file)
+        if error:
+            raise ValueError("Routing overlay must be repaired before editing strategies.")
+        if body.get("version") == 1 and previous.get("version") != 2:
+            if not active.engine.strategies.has(name):
+                raise ValueError(f"Unknown overlay strategy {name!r}.")
+            return validate_overlay_shape(body)
+        definition = strategy_definition(name)
+        state = workflow_state_from_disk(previous)
+        if body.get("version") == 2:
+            if set(body) != {"version", "strategy", "definition", "selected_models"}:
+                raise ValueError("Workflow write requires version, strategy, definition and selected_models only.")
+            entry = {"definition": body["definition"], "selected_models": body["selected_models"]}
+        else:
+            legacy = validate_overlay_shape(body)
+            if legacy.get("models"):
+                raise ValueError("Global model overrides are read-only after workflow migration.")
+            entry = state["strategies"].get(name, {"definition": workflow_definition(definition), "selected_models": referenced_models(definition, active.engine.catalog)})
+            for key in ("questions", "rules", "fallback"):
+                if key in legacy:
+                    entry["definition"]["options"][key] = legacy[key]
+        state["strategies"][name] = entry
+        return validate_overlay_shape(state)
+
     @app.get("/v1/routing/configuration")
     def routing_configuration(
         authorization: str | None = Header(default=None),
+        strategy: str | None = None,
     ) -> dict[str, Any]:
         require_gateway_key(active.gateway_api_key, authorization)
         with reload_lock, configuration_lock(active.models_file):
             catalog = active.engine.catalog
             definition = next(
-                (item for item in catalog.strategies if item.name == "task_aware"), None
+                (item for item in catalog.strategies if item.name == (strategy or "task_aware")), None
             )
             if definition is None:
                 raise HTTPException(
                     status_code=400,
-                    detail=error_body("Strategy 'task_aware' is not configured.", code="invalid_configuration"),
+                    detail=error_body(f"Editable strategy {strategy or 'task_aware'!r} is not configured.", code="invalid_configuration"),
                 )
             options = definition.as_dict()["options"]
             try:
@@ -1048,12 +1103,12 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             ]
             labels = []
             for name, route in definition.policy.labels.items():
-                tag = route.tag or f"task_aware/{name}"
+                tag = route.tag or f"{definition.name}/{name}"
                 pool = (
                     [catalog.by_name(model_id) for model_id in route.models]
-                    if route.models else [model for model in catalog.profiles if tag in model.tags]
+                    if route.models or route.explicit_models else [model for model in catalog.profiles if tag in model.tags]
                 )
-                candidates = [model for model in pool if model is not None]
+                candidates = [model for model in pool if model is not None and (definition.policy.selected_models is None or model.name in definition.policy.selected_models)]
                 selection = definition.policy.selection
                 costs = {
                     model.name: model.estimated_cost(1000, 1000) for model in candidates
@@ -1078,13 +1133,18 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     "reasoning_effort": route.reasoning_effort,
                     "description": route.description,
                     "tag": tag,
-                    "resolution": "models" if route.models else "tag",
+                    "resolution": "models" if route.models or route.explicit_models else "tag",
                     "models": [model.name for model in sorted(candidates, key=rank)],
                 })
             return {
                 "write_available": bool(active.gateway_api_key),
                 "write_disabled_reason": None if active.gateway_api_key else "gateway_key_not_configured",
-                "strategy": "task_aware",
+                "strategy": definition.name,
+                "selected_models": referenced_models(definition, catalog),
+                "editable": definition.kind == "decision_matrix",
+                **({"definition": workflow_definition(definition)} if definition.kind == "decision_matrix" else {}),
+                "runtime_default": catalog.default_strategy,
+                "deletable": definition.kind == "decision_matrix" and definition.name != catalog.default_strategy,
                 "baseline_source": str(active.models_file),
                 "overlay": {
                     "applied": bool(overlay) and overlay_error is None,
@@ -1107,11 +1167,12 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     @app.post("/v1/routing/configuration/validate")
     def validate_routing_configuration(
         body: dict[str, Any], authorization: str | None = Header(default=None),
+        strategy: str | None = None,
     ) -> dict[str, Any]:
         require_config_write(authorization)
         try:
             with reload_lock, configuration_lock(active.models_file):
-                _catalog, _registry, warnings = prepare_overlay(body)
+                _catalog, _registry, warnings = prepare_overlay(selected_overlay_payload(body, strategy))
             return {
                 "valid": True, "warnings": warnings,
                 "diff": {
@@ -1124,11 +1185,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         except (ValueError, TypeError, RuntimeError) as error:
             raise invalid_configuration(error) from error
 
-    @app.put("/v1/routing/configuration")
-    def apply_routing_configuration(
-        body: dict[str, Any], authorization: str | None = Header(default=None),
-    ) -> dict[str, Any]:
-        require_config_write(authorization)
+    def apply_routing_document(body: dict[str, Any], clear_layout: str | None = None) -> dict[str, Any]:
         with reload_lock, configuration_lock(active.models_file), active.engine.defer_config_publication():
             try:
                 catalog, registry, warnings = prepare_overlay(body)
@@ -1149,6 +1206,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             previous_catalog = active.engine.catalog
             previous_registry = active.engine.strategies
             previous_source = active.engine.config_source
+            if clear_layout is not None:
+                try:
+                    layout = without_strategy_layout(active.models_file, clear_layout)
+                    replace_configuration(active.models_file, {
+                        path: (json.dumps(body, ensure_ascii=False, indent=2) + "\n").encode(),
+                        layout_path(active.models_file): json.dumps(layout, ensure_ascii=False, separators=(",", ":")).encode(),
+                    }, activate=lambda: active.engine.reload_catalog(catalog, source=str(active.models_file), registry=registry), restore_runtime=lambda: active.engine.reload_catalog(previous_catalog, source=previous_source, registry=previous_registry))
+                except Exception as error:
+                    raise HTTPException(status_code=500, detail=error_body("Could not change routing strategy.", code="overlay_apply_failed")) from error
+                return {"applied": True, "warnings": warnings}
             try:
                 write_overlay(active.models_file, body)
                 active.engine.reload_catalog(
@@ -1177,15 +1244,92 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 ) from error
         return {"applied": True, "warnings": warnings}
 
+    @app.put("/v1/routing/configuration")
+    def apply_routing_configuration(body: dict[str, Any], authorization: str | None = Header(default=None), strategy: str | None = None) -> dict[str, Any]:
+        require_config_write(authorization)
+        with reload_lock, configuration_lock(active.models_file):
+            try:
+                return apply_routing_document(selected_overlay_payload(body, strategy))
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise invalid_configuration(error) from error
+
+    @app.post("/v1/routing/strategies")
+    def create_routing_strategy(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        with reload_lock, configuration_lock(active.models_file):
+            try:
+                require_readable_configuration(active.models_file)
+                if set(body) != {"name"}:
+                    raise ValueError("Strategy creation requires name only.")
+                name = validate_strategy_name(body["name"])
+                if active.engine.strategies.has(name) or name in active.engine.catalog.names():
+                    raise ValueError("Strategy name is already configured.")
+                previous, error = read_overlay(active.models_file)
+                if error:
+                    raise ValueError("Routing overlay must be repaired before creating strategies.")
+                state = workflow_state_from_disk(previous)
+                baseline = read_models_document(active.models_file)
+                raw = baseline["strategies"].get("definitions", baseline["strategies"])
+                if name in state["strategies"] or name in raw and name not in state["deleted_strategies"]:
+                    raise ValueError("Strategy name is already configured on disk.")
+                state["deleted_strategies"] = [item for item in state["deleted_strategies"] if item != name]
+                state["strategies"][name] = empty_workflow(name)
+                return {"name": name, **apply_routing_document(state, clear_layout=name)}
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise invalid_configuration(error) from error
+
+    @app.delete("/v1/routing/strategies/{name}")
+    def delete_routing_strategy(name: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        with reload_lock, configuration_lock(active.models_file):
+            try:
+                require_readable_configuration(active.models_file)
+                strategy_definition(name)
+                if name == active.engine.catalog.default_strategy:
+                    raise ValueError("The runtime default strategy cannot be deleted.")
+                previous, error = read_overlay(active.models_file)
+                if error:
+                    raise ValueError("Routing overlay must be repaired before deleting strategies.")
+                state = workflow_state_from_disk(previous)
+                state["strategies"].pop(name, None)
+                baseline = read_models_document(active.models_file)
+                raw = baseline["strategies"].get("definitions", baseline["strategies"])
+                if name in raw:
+                    state["deleted_strategies"].append(name)
+                return {"deleted": name, **apply_routing_document(state, clear_layout=name)}
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise invalid_configuration(error) from error
+
     @app.delete("/v1/routing/configuration")
     def reset_routing_configuration(
         authorization: str | None = Header(default=None),
+        strategy: str | None = None,
     ) -> dict[str, Any]:
         require_config_write(authorization)
         with reload_lock, configuration_lock(active.models_file), active.engine.defer_config_publication():
             try:
                 require_readable_configuration(active.models_file)
                 baseline = read_models_document(active.models_file)
+                previous, error = read_overlay(active.models_file)
+                if error:
+                    raise ValueError("Routing overlay must be repaired before resetting strategies.")
+                if strategy is not None or previous.get("version") == 2:
+                    name = strategy or "task_aware"
+                    strategy_definition(name)
+                    state = workflow_state_from_disk(previous)
+                    state["strategies"].pop(name, None)
+                    raw = baseline["strategies"].get("definitions", baseline["strategies"])
+                    if name not in raw:
+                        state["strategies"][name] = empty_workflow(name)
+                    else:
+                        restored = catalog_from_document(
+                            merge_overlay(baseline, state), str(active.models_file),
+                            credential_snapshot(active.models_file, external=active.credential_environment),
+                            allow_missing_credentials=True,
+                        )
+                        state["strategies"][name] = migrate_overlay({}, restored)["strategies"][name]
+                    result = apply_routing_document(state)
+                    return {**result, "overlay_removed": False}
                 catalog = _resolve_storage_path(
                     catalog_from_document(baseline, str(active.models_file), credential_snapshot(active.models_file, external=active.credential_environment), allow_missing_credentials=True), active.models_file
                 )

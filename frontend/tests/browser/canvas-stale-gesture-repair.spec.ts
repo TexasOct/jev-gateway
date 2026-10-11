@@ -1,13 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { configuration, editableConfiguration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 
 test("held native node gesture cannot move a replacement rule after inspector deletion", async ({ page, mockApi }, info) => {
   const catalog = structuredClone(configuration);
   catalog.questions.intent!.criteria.third = "Third route";
   catalog.rules = ["default", "other", "third"].map((criterion, index) => ({ index, when: { intent: criterion }, select: { label: index === 1 ? "quality" : "default" } }));
-  mockApi.appliedConfiguration = catalog;
+  mockApi.appliedConfiguration = editableConfiguration(catalog);
   const positions = { "rule-0": { x: 350, y: 80 }, "rule-1": { x: 700, y: 300 }, "rule-2": { x: 1000, y: 80 } };
   mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: positions };
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -59,5 +59,5 @@ test("held native node gesture cannot move a replacement rule after inspector de
   await expect(first).toContainText("intent=default");
   await expect.poll(() => mockApi.canvasLayout?.nodes).toEqual(positions);
   await expect(first).toHaveClass(/selected/);
-  expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+  expect(mockApi.requests.filter(request => request.method !== "GET" && request.path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
 });

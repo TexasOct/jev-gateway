@@ -5,11 +5,56 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from jev_gateway.catalog import Catalog, catalog_from_document
+from jev_gateway.catalog import Catalog, StrategyDefinition, RESERVED_STRATEGY_MODEL_NAMES, catalog_from_document, policy_from_dict, strategies_from_document
+
+
+def validate_strategy_name(name: Any) -> str:
+    if not isinstance(name, str) or not name.strip() or name.strip() != name or not re.fullmatch(r"[^\x00-\x1f\x7f/]{1,80}", name) or name in RESERVED_STRATEGY_MODEL_NAMES or name in {"default", "definitions", ".", ".."}:
+        raise ValueError("Strategy name must be nonempty, bounded and not reserved.")
+    return name
+
+
+def _validate_v2(value: dict[str, Any]) -> dict[str, Any]:
+    _unknown_keys(value, {"version", "strategies", "deleted_strategies", "models"}, "Overlay")
+    if type(value.get("version")) is not int or value["version"] != 2 or set(value) != {"version", "strategies", "deleted_strategies", "models"}:
+        raise ValueError("Version 2 requires strategies, deleted_strategies and models.")
+    if not isinstance(value["strategies"], dict) or len(value["strategies"]) > 64:
+        raise ValueError("Overlay strategies must be a bounded object.")
+    for name, entry in value["strategies"].items():
+        validate_strategy_name(name)
+        if not isinstance(entry, dict) or set(entry) != {"definition", "selected_models"}:
+            raise ValueError("Workflow requires definition and selected_models only.")
+        selected = entry["selected_models"]
+        if not isinstance(selected, list) or len(selected) > 1000 or any(not isinstance(item, str) or not item.strip() for item in selected) or len(set(selected)) != len(selected):
+            raise ValueError("Workflow selected_models must contain unique model ids.")
+        body = entry["definition"]
+        if not isinstance(body, dict):
+            raise ValueError("Workflow definition must be an object.")
+        _unknown_keys(body, {"kind", "description", "policy", "options"}, "Workflow definition")
+        if body.get("kind") != "decision_matrix" or not isinstance(body.get("policy"), dict) or not isinstance(body.get("options"), dict):
+            raise ValueError("Workflow definition requires decision_matrix, policy and options.")
+        if "description" in body and body["description"] is not None and not isinstance(body["description"], str):
+            raise ValueError("Workflow description must be text or null.")
+        if not isinstance(body["policy"].get("labels"), dict) or not body["policy"]["labels"]:
+            raise ValueError("Workflow policy requires explicit labels.")
+        if "selected_models" in body["policy"]:
+            raise ValueError("Workflow selection belongs to selected_models.")
+        policy_from_dict({**body["policy"], "selected_models": selected}, "Workflow")
+        validate_overlay_shape({"version": 1, "strategy": name, **body["options"]})
+    deleted = value["deleted_strategies"]
+    if not isinstance(deleted, list) or any(not isinstance(name, str) for name in deleted) or len(set(deleted)) != len(deleted):
+        raise ValueError("deleted_strategies must be a unique list.")
+    for name in deleted:
+        validate_strategy_name(name)
+        if name in value["strategies"]:
+            raise ValueError("A strategy cannot be defined and deleted together.")
+    validate_overlay_shape({"version": 1, "strategy": "task_aware", "models": value["models"]})
+    return copy.deepcopy(value)
 
 
 def overlay_path(models_file: Path) -> Path:
@@ -41,6 +86,8 @@ def validate_overlay_shape(value: Any) -> dict[str, Any]:
     """Reject unrecognized or partial write payloads before they reach disk."""
     if not isinstance(value, dict):
         raise ValueError("Overlay must be an object.")
+    if value.get("version") == 2:
+        return _validate_v2(value)
     _unknown_keys(value, {"version", "strategy", "questions", "rules", "fallback", "models"}, "Overlay")
     if not value:
         return {}
@@ -166,6 +213,37 @@ def merge_overlay(document: dict[str, Any], overlay: dict[str, Any]) -> dict[str
     merged = copy.deepcopy(document)
     if not changes:
         return merged
+    if changes["version"] == 2:
+        definitions, default = strategies_from_document(merged, "baseline", base_policy=policy_from_dict(merged.get("policy", {}), "baseline"))
+        bodies = {item.name: {key: val for key, val in item.as_dict().items() if key != "name"} for item in definitions}
+        for body in bodies.values():
+            body["policy"].pop("tier_models", None)
+        for name in changes["deleted_strategies"]:
+            if name == default:
+                raise ValueError("The runtime default strategy cannot be deleted.")
+            if name not in bodies:
+                raise ValueError(f"Unknown deleted strategy {name!r}.")
+            del bodies[name]
+        known_models = {f"{item['provider']}/{item['upstream_model']}" for item in merged.get("models", [])}
+        for name, entry in changes["strategies"].items():
+            if name in known_models:
+                raise ValueError("Strategy conflicts with a catalog model id.")
+            if any(model not in known_models for model in entry["selected_models"]):
+                raise ValueError("Workflow selected_models references unknown model ids.")
+            body = copy.deepcopy(entry["definition"])
+            body["policy"]["selected_models"] = entry["selected_models"]
+            for route in body["policy"].get("labels", {}).values():
+                if any(model not in entry["selected_models"] for model in route.get("models", [])):
+                    raise ValueError("Workflow pools must reference selected models.")
+            bodies[name] = body
+        merged["strategies"] = {"default": default, "definitions": bodies}
+        if changes["models"]:
+            entries = {f"{item['provider']}/{item['upstream_model']}": item for item in merged.get("models", [])}
+            for model_id, fields in changes["models"].items():
+                if model_id not in entries:
+                    raise ValueError(f"Unknown overlay catalog id {model_id!r}.")
+                entries[model_id].update(fields)
+        return merged
     strategy = changes["strategy"]
     body = _strategy_body(merged, strategy)
     options = body.get("options")
@@ -197,7 +275,7 @@ def merge_warnings(
     document: dict[str, Any], overlay: dict[str, Any], catalog: Catalog
 ) -> list[dict[str, str]]:
     """Report tag edits that do not bind a model to a strategy label."""
-    if not overlay or "models" not in overlay:
+    if not overlay or "models" not in overlay or overlay.get("version") == 2:
         return []
     name = overlay["strategy"]
     definition = next((item for item in catalog.strategies if item.name == name), None)
@@ -235,6 +313,69 @@ def merge_warnings(
                 "message": f"Tag {tag!r} does not name a label in strategy {name!r}.",
             })
     return warnings
+
+
+def workflow_definition(definition: StrategyDefinition) -> dict[str, Any]:
+    body = {key: val for key, val in definition.as_dict().items() if key != "name"}
+    body["policy"].pop("tier_models", None)
+    body["policy"].pop("selected_models", None)
+    return body
+
+
+def referenced_models(definition: StrategyDefinition, catalog: Catalog) -> list[str]:
+    """Seed legacy nodes from matrix branches and genuinely inherited defaults."""
+    if definition.policy.selected_models is not None:
+        return list(definition.policy.selected_models)
+    options = definition.as_dict()["options"]
+    first = next(iter(definition.policy.labels))
+    choices = [rule["select"] for rule in options.get("rules", [])] + [options.get("fallback", {}), {}]
+    labels = {choice.get("label", choice.get("tier", first)) for choice in choices}
+    selected: set[str] = set()
+    for name, route in definition.policy.labels.items():
+        if name not in labels:
+            continue
+        tag = route.tag or f"{definition.name}/{name}"
+        members = list(route.models) if route.models or route.explicit_models else [model.name for model in catalog.profiles if tag in model.tags]
+        selected.update(members)
+        if not members and catalog.defaults.default_model is not None:
+            selected.add(catalog.defaults.default_model)
+    return [model.name for model in catalog.profiles if model.name in selected]
+
+
+def migrate_overlay(overlay: dict[str, Any], catalog: Catalog) -> dict[str, Any]:
+    if overlay.get("version") == 2:
+        return copy.deepcopy(overlay)
+    strategies = {}
+    for definition in catalog.strategies:
+        if definition.kind == "decision_matrix":
+            selected = referenced_models(definition, catalog)
+            body = workflow_definition(definition)
+            for route in body["policy"]["labels"].values():
+                if "models" in route:
+                    route["models"] = [model for model in route["models"] if model in selected]
+            strategies[definition.name] = {"definition": body, "selected_models": selected}
+    return {"version": 2, "strategies": strategies, "deleted_strategies": [], "models": copy.deepcopy(overlay.get("models", {}))}
+
+
+def empty_workflow(name: str) -> dict[str, Any]:
+    validate_strategy_name(name)
+    return {"selected_models": [], "definition": {
+        "kind": "decision_matrix", "policy": {"labels": {"routine": {"models": []}}},
+        "options": {"questions": {"task": {"type": "choice", "instructions": "Choose the task scope.", "criteria": {"routine": "Routine work.", "complex": "Complex work."}}}, "rules": [], "fallback": {"label": "routine"}},
+    }}
+
+
+def reconcile_model_references(overlay: dict[str, Any], removed: set[str]) -> dict[str, Any]:
+    result = copy.deepcopy(overlay)
+    if "models" in result:
+        result["models"] = {key: value for key, value in result["models"].items() if key not in removed}
+    if result.get("version") == 2:
+        for entry in result["strategies"].values():
+            entry["selected_models"] = [model for model in entry["selected_models"] if model not in removed]
+            for route in entry["definition"]["policy"].get("labels", {}).values():
+                if "models" in route:
+                    route["models"] = [model for model in route["models"] if model not in removed]
+    return result
 
 
 def write_overlay(models_file: Path, payload: dict[str, Any]) -> None:

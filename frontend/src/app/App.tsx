@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   api,
@@ -14,6 +14,7 @@ import { useLocale } from "@/shared/i18n";
 import { useProviderManagement } from "@/features/providers/shared/useProviderManagement";
 import { isValidSetupKey } from "@/shared/api/setup-key";
 import { hasUnsavedChanges } from "@/shared/navigation/unsaved-changes";
+import { createCanvasHistoryScope } from "@/features/routing/model/history-scope";
 
 export default function App() {
   const { locale, setLocale, t, formatDateTime } = useLocale();
@@ -21,10 +22,14 @@ export default function App() {
   const [canvasModel, setCanvasModel] = useState<{ provider: string; upstream: string } | null>(null);
   const [strategyDirty, setStrategyDirty] = useState(false);
   const [strategyPending, setStrategyPending] = useState(false);
+  const [strategyDiscardEpoch, setStrategyDiscardEpoch] = useState(0);
   const [needsKey, setNeedsKey] = useState(true);
   const [workspaceActivated, setWorkspaceActivated] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
   const [connectionPending, setConnectionPending] = useState(true);
+  const [historyOwner, setHistoryOwner] = useState(0);
+  const historyScope = useMemo(() => createCanvasHistoryScope(historyOwner), [historyOwner]);
+  const connectedCredential = useRef<string | undefined>(undefined);
   const connectionBusy = useRef(false);
   const initialValidationStarted = useRef(false);
   const [setup, setSetup] = useState<SetupStatus | null>(null);
@@ -36,6 +41,8 @@ export default function App() {
     useState<"authRequired" | "enterApiKey" | null>(null);
   const [configuration, setConfiguration] =
     useState<ConfigurationPayload | null>(null);
+  const editedStrategy = useRef<string | undefined>(undefined);
+  const configurationRead = useRef(0);
   const onActivityUnauthorized = useCallback(() => {
     setCredential(null);
     setSetup(null);
@@ -83,7 +90,10 @@ export default function App() {
   const { loadTheme, clearNotice } = theme;
 
   const loadConfiguration = useCallback(async () => {
-    setConfiguration(await api.configuration());
+    const strategy = editedStrategy.current;
+    const owner = ++configurationRead.current;
+    const next = await api.configuration(strategy);
+    if (owner === configurationRead.current && strategy === editedStrategy.current) { editedStrategy.current = next.strategy; setConfiguration(next); }
   }, []);
 
   const loadSetup = useCallback(async () => {
@@ -107,6 +117,10 @@ export default function App() {
         if (status.required) return;
         await loadMonitoring();
         await loadTheme();
+        if (credential !== undefined && credential !== connectedCredential.current) {
+          connectedCredential.current = credential;
+          setHistoryOwner((owner) => owner + 1);
+        }
         setKeyDraft("");
         setNeedsKey(false);
         setWorkspaceActivated(true);
@@ -149,11 +163,13 @@ export default function App() {
     selected,
   ]);
 
-  const reloadConfiguration = useCallback(async (current: () => boolean) => {
+  const reloadConfiguration = useCallback(async (current: () => boolean, strategy = editedStrategy.current) => {
     // A configuration read belongs to the editor operation that admitted it.
     // Propagate its failure; a committed policy must never be replayed to retry a read.
-    const next = await api.configuration();
-    if (!current()) return;
+    const owner = ++configurationRead.current;
+    const next = await api.configuration(strategy);
+    if (!current() || owner !== configurationRead.current) return false;
+    editedStrategy.current = next.strategy;
     setConfiguration(next);
     await run(async () => {
       try {
@@ -163,6 +179,7 @@ export default function App() {
         if (current()) throw caught;
       }
     }, current);
+    return true;
   }, [loadMonitoring, loadSetup, run]);
   const refreshProviderCatalog = useCallback(async () => {
     await loadConfiguration();
@@ -247,6 +264,11 @@ export default function App() {
         return false;
       }
       if (view === "strategy" && strategyDirty && !window.confirm(t("strategyDiscard"))) return false;
+      if (view === "strategy" && strategyDirty && configuration) {
+        historyScope.discard(configuration.strategy);
+        ++configurationRead.current;
+        setStrategyDiscardEpoch((epoch) => epoch + 1);
+      }
       if (managementView) {
         if (providerNavigationGuard.current?.() === false) return false;
         cancelProviderQuery();
@@ -259,7 +281,7 @@ export default function App() {
       if (next === "settings") void run(loadTheme);
       return true;
     },
-    [loadConfiguration, loadTheme, needsKey, run, stopRoutingActivity, view, managementView, strategyDirty, strategyPending, t, providerManagement.pending, providerNavigationGuard, cancelProviderQuery],
+    [loadConfiguration, loadTheme, needsKey, run, stopRoutingActivity, view, managementView, strategyDirty, strategyPending, t, providerManagement.pending, providerNavigationGuard, cancelProviderQuery, configuration, historyScope],
   );
 
   return (
@@ -275,13 +297,19 @@ export default function App() {
       onRetrySetup={() => void validateConnection()}
       providerManagement={providerManagement}
       canvasModel={canvasModel}
-      onOpenCanvasModel={(identity) => { setCanvasModel(identity); return true; }}
+      onOpenCanvasModel={(identity) => {
+        if (strategyPending || providerManagement.pending) return false;
+        setCanvasModel(identity); return true;
+      }}
       onCloseCanvasModel={() => setCanvasModel(null)}
       onStrategyDirtyChange={setStrategyDirty}
       onStrategyPendingChange={setStrategyPending}
       onUnauthorized={onUnauthorized}
       navigationPending={strategyPending || (managementView && providerManagement.pending)}
       needsKey={needsKey}
+      historyOwner={historyOwner}
+      historyScope={historyScope}
+      strategyDiscardEpoch={strategyDiscardEpoch}
       connectionPending={connectionPending}
       keyDraft={keyDraft}
       error={needsKey && connectionErrorKey !== null ? t(connectionErrorKey) : error}
@@ -301,6 +329,11 @@ export default function App() {
         if (strategyPending) return;
         if (managementView && providerManagement.pending) return;
         if (view === "strategy" && strategyDirty && !window.confirm(t("strategyDiscard"))) return;
+        if (view === "strategy" && strategyDirty && configuration) {
+          historyScope.discard(configuration.strategy);
+          ++configurationRead.current;
+          setStrategyDiscardEpoch((epoch) => epoch + 1);
+        }
         if (managementView && providerNavigationGuard.current?.() === false) return;
         if (managementView) cancelProviderQuery();
         void refresh();

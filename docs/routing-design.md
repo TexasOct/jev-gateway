@@ -81,8 +81,17 @@ output capacity. The remaining models are ranked by `policy.selection`:
 - `balanced` combines normalized cost and quality, then priority.
 
 If no model in the label can satisfy a hard constraint, JEV widens the search to
-the complete model catalog. The decision reports the actual selected model label
+the strategy's explicit `policy.selected_models`, or the complete model catalog
+when that field is absent in a legacy configuration. The decision reports the actual selected model label
 when a widened fallback selects a model configured for another label.
+
+The management overlay stores each named workflow's ordered `selected_models`
+and projects it into the runtime policy. Empty selection has no candidates.
+Label pools, widened search, final fallback and retained session pins obey the
+same scope; disabled models remain unavailable. A global default is usable only
+when it is selected. Removing a node removes local pool references and retains
+the supplier model and other workflows. Local membership writes use explicit
+model references and preserve global supplier tags and priority.
 
 An empty matched tag uses exactly `defaults.default_model` when configured,
 independently of strategy ranking preferences. It reports final label `default`

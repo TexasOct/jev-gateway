@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
@@ -51,7 +51,7 @@ async function open(page: Page, locale: "en" | "zh-CN", width: number) {
 
 for (const [locale, width] of [["en", 320], ["zh-CN", 1280]] as const) test(`native keyboard add edit delete undo review save and clean departure ${locale} ${width}`, async ({ page, mockApi }, info) => {
   mockApi.canvasLayout = { version: 1, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
-  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate" }, { method: "PUT", path: "/v1/routing/configuration" });
+  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" }, { method: "PUT", path: "/v1/routing/configuration?strategy=balanced" });
   const words = await open(page, locale, width);
   await tabTo(page, page.getByRole("button", { name: words.canvasAddNode, exact: true })); await page.keyboard.press("Enter");
   await expect(page.getByRole("menuitem", { name: words.addRule, exact: true })).toBeFocused(); await page.keyboard.press("Enter");
@@ -73,15 +73,15 @@ for (const [locale, width] of [["en", 320], ["zh-CN", 1280]] as const) test(`nat
   await expect.poll(() => mockApi.canvasLayout?.nodes).toEqual(configuredNodes);
   await tabTo(page, page.getByRole("button", { name: words.reviewChanges, exact: true })); await page.keyboard.press("Enter");
   await tabTo(page, page.getByRole("button", { name: words.confirmAndSave, exact: true })); await page.keyboard.press("Enter");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   const saved = structuredClone(mockApi.appliedConfiguration!);
   expect(saved.rules.map(({ when, select }) => ({ when, select }))).toEqual([{ when: { intent: "default" }, select: { label: "default" } }, { when: { intent: "default" }, select: { label: "quality" } }]);
-  const payload = { version: 1, strategy: configuration.strategy, questions: configuration.questions, rules: [{ when: { intent: "default" }, select: { label: "default" } }, { when: { intent: "default" }, select: { label: "quality" } }], fallback: configuration.fallback, models: {} };
+  const payload = { version: 2, strategy: configuration.strategy, selected_models: configuration.selected_models, definition: { ...configuration.definition, options: { ...configuration.definition!.options, rules: [{ when: { intent: "default" }, select: { label: "default" } }, { when: { intent: "default" }, select: { label: "quality" } }] } } };
   expect(mockApi.allowedWrites[0]!.body).toEqual(payload); expect(mockApi.allowedWrites[1]!.body).toEqual(payload);
   expect(saved.questions).toEqual(configuration.questions); expect(saved.fallback).toEqual(configuration.fallback);
   const writes = mockApi.requests.filter(request => request.method !== "GET");
-  expect(writes.filter(request => request.path !== "/v1/dashboard/canvas-layout")).toEqual([{ method: "POST", path: "/v1/routing/configuration/validate" }, { method: "PUT", path: "/v1/routing/configuration" }]);
+  expect(writes.filter(request => request.path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([{ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" }, { method: "PUT", path: "/v1/routing/configuration?strategy=balanced" }]);
   const dialogs: string[] = []; page.on("dialog", async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
   await tabTo(page, page.getByRole("button", { name: words.settings, exact: true }));
   const departureWrites = mockApi.requests.filter(request => request.method !== "GET"), layout = structuredClone(mockApi.canvasLayout);
@@ -110,25 +110,28 @@ for (const [locale, width] of [["en", 1280], ["zh-CN", 390]] as const) test(`dir
   const before = structuredClone(mockApi.canvasLayout), writesBefore = mockApi.requests.filter(request => request.method !== "GET");
   page.once("dialog", dialog => dialog.dismiss()); await page.keyboard.press("Enter");
   await expect(settings).toBeFocused(); await expect(page.locator('[data-canvas-node="fallback"].selected')).toContainText("quality");
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   expect(mockApi.canvasLayout).toEqual(before); expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual(writesBefore);
   page.once("dialog", dialog => dialog.accept()); await page.keyboard.press("Enter");
   await expect(page.locator("[data-settings-language]")).toBeVisible();
   await tabTo(page, page.getByRole("button", { name: words.strategyEditor, exact: true })); await page.keyboard.press("Enter");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
+  await expect(page.getByRole("button", { name: words.canvasAddNode, exact: true })).toBeEnabled();
+  await expect(page.locator('[data-canvas-node="fallback"]')).toHaveCSS("left", "420px");
+  await writeFile(info.outputPath("discard-reopened-history.json"), JSON.stringify({ before, writesBefore, current: mockApi.canvasLayout, requests: mockApi.requests, draft: await page.locator('.workflow-toolbar[data-policy-draft]').getAttribute("data-policy-draft"), nodes: await page.locator("[data-canvas-node]").evaluateAll(elements => elements.map(element => ({ id: element.getAttribute("data-canvas-node"), text: element.textContent, style: element.getAttribute("style") }))) }, null, 2));
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   expect(mockApi.canvasLayout).toEqual(before); expect(mockApi.appliedConfiguration).toBeUndefined();
   await tabTo(page, page.locator('[data-canvas-node="fallback"]')); await page.keyboard.press("Alt+ArrowRight");
   await expect.poll(() => mockApi.canvasLayout?.nodes.fallback).toEqual({ x: 440, y: 300 });
   await expect(settings).toBeEnabled();
-  await expect(page.locator('.workspace-heading [data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
+  await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   const dialogs: string[] = []; page.on("dialog", async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
   await tabTo(page, settings);
   const moved = structuredClone(mockApi.canvasLayout), writesAfterMove = mockApi.requests.filter(request => request.method !== "GET");
   expect(moved?.nodes.fallback).toEqual({ x: 440, y: 300 });
   await page.keyboard.press("Enter"); await expect(page.locator("[data-settings-language]")).toBeVisible();
   expect(dialogs).toEqual([]); expect(mockApi.canvasLayout).toEqual(moved); expect(mockApi.requests.filter(request => request.method !== "GET")).toEqual(writesAfterMove);
-  expect(writesAfterMove.every(request => request.path === "/v1/dashboard/canvas-layout")).toBe(true);
+  expect(writesAfterMove.every(request => request.path === "/v1/dashboard/canvas-layout?strategy=balanced")).toBe(true);
   expect(configuration.fallback.label).toBe("default");
   await writeFile(info.outputPath("departure-boundaries.json"), JSON.stringify({ before, moved, writesBefore, writesAfterMove, dialogs, requests: mockApi.requests }, null, 2));
   await page.screenshot({ path: info.outputPath("departed.png") });

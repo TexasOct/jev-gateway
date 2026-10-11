@@ -25,10 +25,10 @@ class SetupAlreadyConfigured(ValueError):
 
 def setup_projection(catalog: Catalog, token: str, *, local: bool = False) -> dict[str, Any]:
     required = not bool(catalog.gateway.api_key)
-    enabled = [model for model in catalog.profiles if model.enabled]
+    enabled = [model for model in catalog.profiles if model.enabled and (catalog.policy.selected_models is None or model.name in catalog.policy.selected_models)]
     default = catalog.by_name(catalog.defaults.default_model) if catalog.defaults.default_model is not None else None
-    ready = bool(enabled) and (default is not None and default.enabled or all(
-        any(model.name in route.models for model in enabled) if route.models else any((route.tag or f"{catalog.default_strategy}/{name}") in model.tags for model in enabled)
+    ready = bool(enabled) and (default is not None and default in enabled or all(
+        any(model.name in route.models for model in enabled) if route.models or route.explicit_models else any((route.tag or f"{catalog.default_strategy}/{name}") in model.tags for model in enabled)
         for name, route in catalog.policy.labels.items()
     ))
     next_step = "gateway_key" if required else "provider" if not catalog.providers else "model" if not catalog.profiles else "routing" if not ready else "ready"

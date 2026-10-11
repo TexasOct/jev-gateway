@@ -14,7 +14,7 @@ from jev_gateway.catalog import (
     RoutingPolicy,
 )
 
-from .contracts import DecisionMaker, RoutingRequest, StrategyOutcome
+from .contracts import DecisionMaker, RoutingRequest, SetupIncompleteError, StrategyOutcome
 from .policy import PolicyStrategy
 
 __all__ = ["DecisionMatrixStrategy"]
@@ -44,6 +44,8 @@ class DecisionMatrixStrategy(PolicyStrategy):
         return payload
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
+        if self.policy.selected_models is not None and not self._candidates(catalog):
+            raise SetupIncompleteError("Select an enabled model in this strategy before sending requests.")
         # Manual routes and cached continuations retain the built-in policy behavior.
         if request.manual is not None or (
             request.session is not None and self.policy.mode is RoutingMode.CACHED

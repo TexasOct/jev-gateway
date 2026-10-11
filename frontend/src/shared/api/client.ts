@@ -19,6 +19,7 @@ import type {
   StrategiesPayload,
   ThemePayload,
   SetupStatus,
+  WorkflowWritePayload,
 } from "./types";
 import type { ProviderConfiguration, ProviderCommandResult, ProviderMutation, ProviderSelector, ProviderConnectionResult, DiscoveryResult, MetadataResult, GatewayCredentialMutation, GatewayCredentialResult } from "./types";
 import { isValidSetupKey } from "./setup-key";
@@ -89,6 +90,10 @@ function saveGatewayCredential(payload: GatewayCredentialMutation): Promise<Gate
   return updateCredential(payload.credential.value, () => request<GatewayCredentialResult>("/v1/gateway-credential", { method: "PUT", body: JSON.stringify(payload) }));
 }
 
+function strategyPath(path: string, strategy?: string): string {
+  return strategy === undefined ? path : `${path}?strategy=${encodeURIComponent(strategy)}`;
+}
+
 export const api = {
   setup: () => request<SetupStatus>("/v1/setup"),
   initialize: async (expected_revision: string, api_key: string) => {
@@ -119,26 +124,28 @@ export const api = {
       `/v1/routing/sessions/${encodeURIComponent(sessionId)}/requests${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
       { signal },
     ),
-  configuration: () =>
-    request<ConfigurationPayload>("/v1/routing/configuration"),
-  validateConfiguration: (payload: RoutingOverlayPayload) =>
+  configuration: (strategy?: string, signal?: AbortSignal) =>
+    request<ConfigurationPayload>(strategyPath("/v1/routing/configuration", strategy), { signal }),
+  createStrategy: (name: string) => request<{ name: string; applied: boolean }>("/v1/routing/strategies", { method: "POST", body: JSON.stringify({ name }) }),
+  deleteStrategy: (name: string) => request<{ deleted: string; applied: boolean }>(`/v1/routing/strategies/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  validateConfiguration: (payload: RoutingOverlayPayload | WorkflowWritePayload, strategy?: string) =>
     request<{ valid: boolean; warnings: ConfigurationWarning[] }>(
-      "/v1/routing/configuration/validate",
+      strategyPath("/v1/routing/configuration/validate", strategy),
       { method: "POST", body: JSON.stringify(payload) },
     ),
-  applyConfiguration: (payload: RoutingOverlayPayload) =>
+  applyConfiguration: (payload: RoutingOverlayPayload | WorkflowWritePayload, strategy?: string) =>
     request<{ applied: boolean; warnings: ConfigurationWarning[] }>(
-      "/v1/routing/configuration",
+      strategyPath("/v1/routing/configuration", strategy),
       { method: "PUT", body: JSON.stringify(payload) },
     ),
-  resetConfiguration: () =>
+  resetConfiguration: (strategy?: string) =>
     request<{ applied: boolean; overlay_removed: boolean }>(
-      "/v1/routing/configuration",
+      strategyPath("/v1/routing/configuration", strategy),
       { method: "DELETE" },
     ),
-  canvasLayout: () => request<CanvasLayout>("/v1/dashboard/canvas-layout"),
-  saveCanvasLayout: (layout: CanvasLayout) =>
-    request<CanvasLayout>("/v1/dashboard/canvas-layout", {
+  canvasLayout: (strategy?: string, signal?: AbortSignal) => request<CanvasLayout>(strategyPath("/v1/dashboard/canvas-layout", strategy), { signal }),
+  saveCanvasLayout: (layout: CanvasLayout, strategy?: string) =>
+    request<CanvasLayout>(strategyPath("/v1/dashboard/canvas-layout", strategy), {
       method: "PUT",
       body: JSON.stringify({
         version: layout.version,

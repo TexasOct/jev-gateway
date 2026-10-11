@@ -157,7 +157,7 @@ def test_discovery_confirmation_import_preserves_overlay_and_runtime_identity(
             import_operation = {
                 "action": "import",
                 "provider_id": "new-provider",
-                "models": [incomplete],
+                "models": [{**incomplete, "context_window": 0}],
                 "confirmed": True,
             }
             rejected = await client.put(
@@ -169,7 +169,7 @@ def test_discovery_confirmation_import_preserves_overlay_and_runtime_identity(
             )
             assert rejected.status_code == 400
             assert models_file.read_bytes() == after_provider_bytes
-            import_operation["models"] = [confirmed_model]
+            import_operation["models"] = [incomplete]
             imported = await client.put(
                 "/v1/provider-configuration",
                 json={
@@ -189,6 +189,11 @@ def test_discovery_confirmation_import_preserves_overlay_and_runtime_identity(
             assert baseline["models"][:2] == document["models"]
             assert baseline["models"][-1]["provider"] == "new-provider"
             assert baseline["models"][-1]["tags"] == []
+            assert "context_window" not in baseline["models"][-1]
+            assert "context_window" not in next(
+                model for model in imported.json()["models"]
+                if model["name"] == "new-provider/vendor/new-model"
+            )
             routing = await client.get("/v1/routing/configuration")
             assert routing.status_code == 200
             assert "fixture-new-provider-key" not in routing.text

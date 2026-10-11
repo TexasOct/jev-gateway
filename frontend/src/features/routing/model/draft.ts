@@ -18,6 +18,7 @@ import type {
   RuleCondition,
   Question,
   RoutingOverlayPayload,
+  WorkflowWritePayload,
 } from "@/shared/api/types";
 import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 
@@ -28,6 +29,8 @@ export interface ModelDraft {
 }
 
 export interface RoutingDraft {
+  selectedModels?: string[];
+  pools?: Record<string, string[]>;
   questions: Record<string, Question>;
   rules: OverlayRulePayload[];
   fallback: RuleChoice;
@@ -52,6 +55,10 @@ export function draftFromConfiguration(config: ConfigurationPayload): RoutingDra
     models[model.id] = { id: model.id, tags: [...model.tags], priority: model.priority };
   }
   return {
+    ...(config.selected_models !== undefined ? {
+      selectedModels: [...config.selected_models],
+      pools: Object.fromEntries(config.labels.map((label) => [label.tag, (label.resolution === "models" ? label.models : config.models.filter((model) => model.tags.includes(label.tag)).map((model) => model.id)).filter((id) => config.selected_models!.includes(id))])),
+    } : {}),
     questions: Object.fromEntries(Object.entries(config.questions).map(([name, question]) => [
       name, { ...question, criteria: { ...question.criteria } },
     ])),
@@ -80,13 +87,17 @@ export function labelMembers(
 ): ModelDraft[] {
   return config.models
     .map((model: ModelRow) => draft.models[model.id])
-    .filter((model): model is ModelDraft => model !== undefined && hasLabelTag(model, label));
+    .filter((model): model is ModelDraft => model !== undefined && (draft.pools !== undefined ? (draft.pools[label.tag] ?? []).includes(model.id) && (draft.selectedModels ?? []).includes(model.id) : hasLabelTag(model, label)));
 }
 
 export function unassignedModels(
   draft: RoutingDraft,
   config: ConfigurationPayload,
 ): ModelDraft[] {
+  if (draft.pools !== undefined) {
+    const assigned = new Set(Object.values(draft.pools).flat());
+    return (draft.selectedModels ?? []).map((id) => draft.models[id]).filter((model): model is ModelDraft => model !== undefined && !assigned.has(model.id));
+  }
   const strategyTags = new Set(config.labels.map((label) => label.tag));
   return config.models
     .map((model: ModelRow) => draft.models[model.id])
@@ -105,6 +116,13 @@ export function setLabelMembership(
 ): RoutingDraft {
   const model = draft.models[modelId];
   if (model === undefined) return draft;
+  if (draft.pools !== undefined) {
+    if (!draft.selectedModels?.includes(modelId)) return draft;
+    const current = draft.pools[tag] ?? [];
+    const next = member ? [...new Set([...current, modelId])] : current.filter((id) => id !== modelId);
+    if (sameTags(current, next)) return draft;
+    return { ...draft, pools: { ...draft.pools, [tag]: next } };
+  }
   const withoutTag = model.tags.filter((value) => value !== tag);
   const tags = member ? [...withoutTag, tag] : withoutTag;
   if (sameTags(tags, model.tags)) return draft;
@@ -115,9 +133,60 @@ export function setLabelMembership(
 }
 
 export function setPriority(draft: RoutingDraft, modelId: string, priority: number): RoutingDraft {
+  if (draft.selectedModels !== undefined) return draft;
   const model = draft.models[modelId];
   if (model === undefined || model.priority === priority) return draft;
   return { ...draft, models: { ...draft.models, [modelId]: { ...model, priority } } };
+}
+
+/** Explicit selection is authoritative, including an empty list. */
+export function selectedModelIds(draft: RoutingDraft, config: ConfigurationPayload): string[] {
+  if (draft.selectedModels !== undefined) return draft.selectedModels;
+  const first = config.labels[0]?.name;
+  const referenced = new Set([...draft.rules.map((rule) => matrixChoiceLabel(rule.select, first)), matrixChoiceLabel(draft.fallback, first), first]);
+  const ids = new Set<string>();
+  for (const label of config.labels) {
+    if (!referenced.has(label.name)) continue;
+    const members = label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((model) => model.id);
+    members.forEach((id) => ids.add(id));
+    if (members.length === 0 && config.defaults?.default_model) ids.add(config.defaults.default_model);
+  }
+  return config.models.filter((model) => ids.has(model.id)).map((model) => model.id);
+}
+
+export function workflowModels(draft: RoutingDraft, config: ConfigurationPayload): ModelRow[] {
+  return selectedModelIds(draft, config).map((id) => config.models.find((model) => model.id === id)).filter((model): model is ModelRow => model !== undefined);
+}
+
+export function addModelNode(draft: RoutingDraft, config: ConfigurationPayload, modelId: string): RoutingDraft {
+  const selected = selectedModelIds(draft, config);
+  if (!Object.hasOwn(draft.models, modelId) || selected.includes(modelId)) return draft;
+  return { ...draft, selectedModels: [...selected, modelId], pools: draft.pools ?? Object.fromEntries(config.labels.map((label) => [label.tag, (label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((model) => model.id)).filter((id) => selected.includes(id))])) };
+}
+
+export function removeModelNode(draft: RoutingDraft, config: ConfigurationPayload, modelId: string): RoutingDraft {
+  const selected = selectedModelIds(draft, config);
+  if (!selected.includes(modelId)) return draft;
+  const pools = draft.pools ?? Object.fromEntries(config.labels.map((label) => [label.tag, label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((model) => model.id)]));
+  return { ...draft, selectedModels: selected.filter((id) => id !== modelId), pools: Object.fromEntries(Object.entries(pools).map(([tag, ids]) => [tag, ids.filter((id) => id !== modelId && selected.includes(id))])) };
+}
+
+/** Whole selected-strategy write; supplier tags and priority stay outside this body. */
+export function toWorkflowPayload(draft: RoutingDraft, config: ConfigurationPayload): WorkflowWritePayload {
+  if (!config.definition) throw new Error("The gateway must provide the workflow definition.");
+  const definition = structuredClone(config.definition);
+  const selected = selectedModelIds(draft, config);
+  const labels = Object.fromEntries(config.labels.map((label) => {
+    const prior = definition.policy.labels[label.name] ?? {};
+    const members = (draft.pools?.[label.tag] ?? (label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((model) => model.id))).filter((id) => selected.includes(id));
+    const { tag: _tag, ...metadata } = prior;
+    void _tag;
+    return [label.name, { ...metadata, models: [...members] }];
+  }));
+  return { version: 2, strategy: config.strategy, selected_models: [...selected], definition: {
+    ...definition, policy: { ...definition.policy, labels },
+    options: { questions: structuredClone(draft.questions), rules: structuredClone(draft.rules), fallback: { ...draft.fallback } },
+  } };
 }
 
 export function moveRule(draft: RoutingDraft, from: number, to: number): RoutingDraft {
@@ -300,7 +369,7 @@ export function addRule(
 ): RoutingDraft {
   const labelDefinition = config.labels.find((item) => item.name === label);
   // Use the known selectable catalog options; full catalog validity remains the server's authority.
-  const selectable = labelDefinition !== undefined && (labelDefinition.resolution === "tag" ||
+  const selectable = labelDefinition !== undefined && (draft.pools !== undefined || labelDefinition.resolution === "tag" ||
     labelDefinition.models.some((id) => Object.hasOwn(draft.models, id)));
   if (!Object.hasOwn(draft.questions[question]?.criteria ?? {}, criterion) || !selectable) return draft;
   const choices: RuleChoice = selection ? { label, selection } : { label };
@@ -384,12 +453,13 @@ export function workflowEdges(draft: RoutingDraft, config: ConfigurationPayload)
   const fallbackTag = config.labels.find((label) => label.name === matrixChoiceLabel(draft.fallback, config.labels[0]?.name))?.tag;
   if (fallbackTag !== undefined) edges.push({ from: "fallback", to: `zone::${fallbackTag}`, kind: "match" });
   for (const label of config.labels) {
-    const members = label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((item) => item.id);
+    const selected = selectedModelIds(draft, config);
+    const members = (draft.pools?.[label.tag] ?? (label.resolution === "models" ? label.models : labelMembers(draft, config, label).map((item) => item.id))).filter((id) => selected.includes(id));
     for (const model of members) {
       edges.push({ from: `zone::${label.tag}`, to: `model::${model}`, kind: "pool" });
     }
     const globalModel = config.defaults?.default_model;
-    if (label.resolution === "tag" && members.length === 0 && globalModel && config.models.some((model) => model.id === globalModel)) {
+    if (members.length === 0 && globalModel && selected.includes(globalModel)) {
       edges.push({ from: `zone::${label.tag}`, to: `model::${globalModel}`, kind: "default" });
     }
   }
@@ -449,6 +519,17 @@ export function diffSummary(draft: RoutingDraft, config: ConfigurationPayload): 
   }
 
   const models: DraftChange[] = [];
+  if (draft.selectedModels !== undefined && !sameTags(draft.selectedModels, config.selected_models ?? selectedModelIds(draftFromConfiguration(config), config))) {
+    models.push({ subject: "selected models", before: (config.selected_models ?? []).join(", "), after: draft.selectedModels.join(", ") });
+  }
+  if (draft.pools !== undefined) {
+    const original = draftFromConfiguration(config);
+    for (const label of config.labels) {
+      const before = original.pools?.[label.tag] ?? (label.resolution === "models" ? label.models : labelMembers(original, config, label).map((model) => model.id));
+      const after = draft.pools[label.tag] ?? [];
+      if (!sameTags(before, after)) models.push({ subject: label.name, before: before.join(", "), after: after.join(", ") });
+    }
+  }
   for (const model of config.models) {
     const current = draft.models[model.id];
     if (current === undefined) continue;

@@ -1,9 +1,9 @@
 import { test, expect } from "./fixtures";
 import { en } from "../../src/shared/i18n/en";
-import { configuration } from "../fixtures/configuration";
+import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import type { CanvasLayout } from "../../src/shared/api/types";
 
-const path = "/v1/dashboard/canvas-layout";
+const path = "/v1/dashboard/canvas-layout?strategy=balanced";
 const saved: CanvasLayout = { version: 1, nodes: { "rule-0": { x: 420, y: 80 } }, viewport: { x: 0, y: 0 } };
 
 for (const status of [503, 401]) for (const newer of [false, true]) test(`obsolete validation ${status} cannot deliver after reconnect with newer=${newer}`, async ({ page, mockApi }, info) => {
@@ -13,15 +13,17 @@ for (const status of [503, 401]) for (const newer of [false, true]) test(`obsole
   const currentValidation = new Promise<void>((resolve) => { releaseCurrent = resolve; });
   let metadataCalls = 0, validations = 0;
   const order: string[] = [];
+  const requests: { method: string; path: string }[] = [];
+  page.on("request", request => { const url = new URL(request.url()); if (url.pathname.startsWith("/v1/")) requests.push({ method: request.method(), path: url.pathname + url.search }); });
   mockApi.canvasLayout = structuredClone(saved);
-  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate" });
+  mockApi.allowedWrites.push({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" });
   await page.route("**/v1/routing/strategies", async (route) => {
     if (++metadataCalls !== 2) return route.fallback();
     order.push("metadata admitted"); await metadata;
     order.push("metadata 401");
     await route.fulfill({ status: 401, json: { error: { message: "Synthetic metadata suspension" } } });
   });
-  await page.route("**/v1/routing/configuration/validate", async (route) => {
+  await page.route("**/v1/routing/configuration/validate?strategy=balanced", async (route) => {
     expect(route.request().method()).toBe("POST");
     if (++validations === 2) {
       order.push("current validation admitted"); await currentValidation;
@@ -49,11 +51,11 @@ for (const status of [503, 401]) for (const newer of [false, true]) test(`obsole
     await page.getByRole("button", { name: en.reviewChanges, exact: true }).click();
     await expect.poll(() => validations).toBe(2);
   }
-  const rejected = page.waitForResponse((response) => response.url().endsWith("/v1/routing/configuration/validate"));
+  const rejected = page.waitForResponse((response) => response.url().endsWith("/v1/routing/configuration/validate?strategy=balanced"));
   releaseValidation(); expect((await rejected).status()).toBe(status);
   if (newer) {
     await expect(page.getByRole("button", { name: en.reviewChanges, exact: true })).toBeDisabled();
-    await expect(page.locator(".workspace-heading")).toContainText(en.canvasValidatingPolicy);
+    await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "pending");
   } else await expect(page.getByRole("button", { name: en.reviewChanges, exact: true })).toBeEnabled();
   await expect(page.getByText("OBSOLETE VALIDATION FAILURE", { exact: true })).toHaveCount(0);
   await expect(page.locator("[data-connection-page]")).toHaveCount(0);
@@ -65,7 +67,8 @@ for (const status of [503, 401]) for (const newer of [false, true]) test(`obsole
   expect(order).toEqual(newer ? ["metadata admitted", "validation admitted", "metadata 401", "current validation admitted", "obsolete validation rejected", "current validation resolved"] : ["metadata admitted", "validation admitted", "metadata 401", "obsolete validation rejected"]);
   expect(validations).toBe(newer ? 2 : 1);
   expect(mockApi.requests.filter((request) => request.method !== "GET")).toEqual([]);
-  await info.attach("request-order", { body: JSON.stringify(order), contentType: "application/json" });
+  expect(requests.filter(request => request.method !== "GET")).toEqual(Array.from({ length: newer ? 2 : 1 }, () => ({ method: "POST", path: "/v1/routing/configuration/validate?strategy=balanced" })));
+  await info.attach("request-order", { body: JSON.stringify({ order, requests }), contentType: "application/json" });
   await page.screenshot({ path: info.outputPath(`reconnected-${status}.png`), fullPage: true });
 });
 
