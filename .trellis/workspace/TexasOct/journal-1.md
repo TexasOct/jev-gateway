@@ -294,3 +294,25 @@ Optional model imports, strategy-local nodes and named workflows passed independ
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: 0.1.6 stable publication verified
+<!-- trellis-session: v=2 fp=270fee31892237b4 -->
+
+**Date**: 2026-10-12
+**Task**: 0.1.6 stable publication verified
+**Branch**: `main`
+
+### Summary
+
+Stable v0.1.6 published from the accepted signed commit. Workflow38178580657 passes build and both installed smokes. All four public HTTPS assets match hosted bytes and sidecars; 94 package members match source. Public-installer smoke passes169 using the existing reversible nine-tool PATH seam; original command19 missing-grep failure remains preserved. A1-A8 complete; no operator upgrade.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `06e246dec9229eb6eef9aa148d376eadbfdd90e1` | feat: add named strategy workflows for 0.1.6 |
+
+### Status
+
+[OK] **Completed**

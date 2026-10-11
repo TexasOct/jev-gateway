@@ -15,7 +15,7 @@
   "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "06e246dec9229eb6eef9aa148d376eadbfdd90e1",
   "pr_url": null,
   "subtasks": [],
   "children": [
@@ -25,11 +25,11 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "A1-A7 independently PASS against the recovered 525-file candidate. A8 publication remains pending parent release work; archival does not assert a published 0.1.6. No operator upgrade is authorized.",
+  "notes": "A1-A7 independently PASS; parent verified A8 stable v0.1.6 publication, tagged source, hosted build and both smokes, four public assets and isolated public-installer smoke. Original failures remain preserved. Operator installation was not modified.",
   "meta": {
     "closure": {
-      "disposition": "construction_verified_release_pending",
-      "acceptance_complete": false,
+      "disposition": "published_stable",
+      "acceptance_complete": true,
       "accepted_criteria": [
         "A1",
         "A2",
@@ -37,15 +37,19 @@
         "A4",
         "A5",
         "A6",
-        "A7"
-      ],
-      "pending_criteria": [
+        "A7",
         "A8"
       ],
+      "pending_criteria": [],
       "review_run": "1771abd7-c053-4a15-9ac1-0766aff0864f",
       "review": "check-recovery-handoff.md",
       "delivery": "direct_main_no_pr",
-      "release": "0.1.6"
+      "release": "0.1.6",
+      "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.6",
+      "published_at": "2026-10-11T22:05:41Z",
+      "workflow_run": 38178580657,
+      "tag_object": "e16eb5947140b9e756f744a83793b084959b8b16",
+      "operator_installation_modified": false
     }
   }
 }

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-10-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~296 | Active |
+| `journal-1.md` | ~318 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-10-12 | 0.1.6 stable publication verified | `06e246dec9229eb6eef9aa148d376eadbfdd90e1` | `main` |
 | 11 | 2026-10-12 | 0.1.6 construction accepted and release prepared | - | `main` |
 | 10 | 2026-10-11 | Publish 0.1.5 and upgrade operator installation | `c3e6c8355a353aebd664d158e177502f42bcc668`, `69cf58501ecba3bc95d8dbdf9bad64fb29412347` | `main` |
 | 9 | 2026-10-04 | Provider icons and mainstream presets | `170b878`, `4e05f07` | `feat/provider-icon-presets` |
