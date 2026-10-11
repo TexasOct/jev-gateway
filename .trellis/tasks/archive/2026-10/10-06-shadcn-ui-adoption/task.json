@@ -1,0 +1,41 @@
+{
+  "id": "shadcn-ui-adoption",
+  "name": "shadcn-ui-adoption",
+  "title": "引入标准 shadcn/ui 流程并统一后台组件样式",
+  "description": "规划 shadcn/ui 官方组件工作流接入与现有后台大部分组件的样式迁移，保留既有功能与交互契约。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-06",
+  "completedAt": "2026-10-11",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-06-shadcn-foundation",
+    "10-06-shadcn-primitives",
+    "10-06-shadcn-config-surfaces",
+    "10-06-shadcn-operational-surfaces"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "acceptance": {
+      "status": "accepted",
+      "criteria": "A1-A8",
+      "E1": "PASS by operator manual acceptance",
+      "operatorConfirmation": "验收通过",
+      "recordedOn": "2026-10-11",
+      "record": "e1-manual-acceptance.md",
+      "sourceManifestSHA256": "91c5fc7d9630d45f6e2be04bfd31d02e062646d765287fa8f2aea9d72030829d"
+    }
+  }
+}

@@ -251,7 +251,10 @@ describe("monitoring presentation", () => {
     const html = renderView();
     expect(html).toContain("grid w-full max-w-[1280px]");
     expect(html).toContain("bg-panel-muted");
-    expect(html).toContain("border-t-primary");
+    const overview = html.match(/<section\b[^>]*\saria-labelledby="monitoring-overview-title"[^>]*>/g);
+    expect(overview).toHaveLength(1);
+    expect(overview![0]).toContain('class="monitoring-overview-panel ');
+    expect(overview![0]).toContain("border-b border-outline");
     expect(html).toContain("min-h-10 w-full");
   });
 

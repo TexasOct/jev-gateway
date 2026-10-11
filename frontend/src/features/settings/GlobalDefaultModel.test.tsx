@@ -30,7 +30,7 @@ function renderSettings(locale: Locale, overrides: Partial<ProviderManagement> =
 it.each<Locale>(["en", "zh-CN"])("renders the saved global default and canonical model option in %s", (locale) => {
   const html = renderSettings(locale);
   expect(html).toContain(locale === "en" ? "Current default: p/model" : "当前默认模型: p/model");
-  expect(html).toContain('<option value="p/model" selected="">p/model</option>');
+  expect(html).toMatch(/<option[^>]*value="p\/model"[^>]*selected=""[^>]*>p\/model<\/option>/);
   expect(html).toContain(locale === "en" ? "Clear default model" : "清除默认模型");
 });
 

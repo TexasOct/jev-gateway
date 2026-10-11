@@ -2,7 +2,7 @@
 body { margin: 0; color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 /* Unlayered control defaults keep the arrow space when utilities set padding. */
-select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+select:not([data-slot="native-select"]):not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
   appearance: none;
   padding-right: 2rem;
   background-image:
@@ -14,8 +14,10 @@ select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
 }
 
 @media (forced-colors: active) {
-  select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+  select:not([data-slot="native-select"]):not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
     appearance: auto;
     background-image: none;
   }
+  select[data-slot="native-select"] { appearance: auto; }
+  [data-slot="native-select-icon"] { display: none; }
 }

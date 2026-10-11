@@ -1157,7 +1157,46 @@ The session list viewport is 480px on desktop and 280px at widths of 720px or le
 
 Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on 190px-wide canvas nodes with output-driven heights, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
 
-Single-select defaults in `base.css` reserve 32px of right padding and draw a current-color CSS chevron at least 12px from the right edge. Keep these shared defaults unlayered so component `px-*` utilities cannot remove the arrow space. Preserve the native element, labels, change handlers, keyboard operation and focus; exclude multiple/listbox controls and restore native appearance under `forced-colors`. CSS geometry avoids a data-URI icon blocked by the Dashboard's `img-src 'self'` policy. Provider main field grids use `items-start`: a neighboring endpoint checkbox must not stretch the transport select. The browser contract is 44px control height and at most 1px top/height difference on wide screens, no overflow at 320/390px, and current-palette arrows in both locales/schemes. `frontend/tests/browser/select-controls.spec.ts` exercises these assertions with synthetic APIs; rendered PNG pixel measurements check the arrow inset and center.
+Single selects use the public `NativeSelect` adapter around a native HTML select.
+Its single SVG chevron follows the current palette, sits at least 12px from the
+right edge and retains at least 32px arrow clearance. The legacy unlayered CSS
+chevron excludes `data-slot="native-select"`; never render both arrows. Preserve
+native labels, events, refs, sentinel values, numeric size/multiple props and
+keyboard/form semantics. Listboxes omit the decorative arrow; forced colors
+restores native appearance and hides the SVG. No data-URI asset or CSP change is
+needed. Provider field grids keep `items-start`: the adjacent endpoint checkbox
+must not stretch the transport select. The existing browser contract stays 44px
+control height, at most 1px top/height difference on wide screens, no overflow at
+320/390px and current-palette arrows in both locales/schemes. The preserved
+`select-controls.spec.ts` assertions and PNG pixel receipts verify the geometry.
+
+## Shared UI source and retained owners
+
+`frontend/components.json` and the exact development CLI version in
+`frontend/package.json` define the shadcn workflow. Generated presentation lives
+in `shared/ui/primitives`; public adapters live in `shared/ui`. Follow
+`frontend/src/shared/ui/WORKFLOW.md` for disposable add/view/diff, reviewed updates,
+local `cn` imports and MIT attribution. Do not overwrite the business Dialog.
+Input/Textarea keep raw string drafts. Native Checkbox preserves ChangeEvents,
+checked/indeterminate, refs and fieldset/FormData semantics; tri-state model
+capabilities remain NativeSelect. Field supplies localized label/help/error
+associations on the actual control. Feedback roles stay with their business owner.
+
+Keep native circular color controls and input-preview/change-commit ordering.
+Native Dnd handles, canvas nodes/ports, fixed session-row actions and
+details/summary retain gesture, geometry and disclosure ownership. Existing view
+navigation uses guarded pressed buttons, not content Tabs. Coordinate menus keep
+draft/target ownership; native title hints remain with their controls. No generic
+Switch, Tabs, DropdownMenu or Tooltip consumer requires installation. Supplier
+list identity/fallback geometry remains 96px by 44px; compact editor/preset icons
+keep their existing compact presentation.
+
+The operator closed E1 with manual acceptance of native-select popup-first
+Escape on 2026-10-11. This establishes manual PASS for the supplied scenario;
+the original automated popup probes retain their failed results. Preserve
+native values/events, Radix close/focus/auth guards and the original BLOCKED
+review. Current A5/A8 records carry the manual disposition; historical admin
+exceptions remain separate.
 
 ## Common mistakes
 

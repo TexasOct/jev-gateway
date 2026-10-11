@@ -1,0 +1,31 @@
+import { expect } from "@playwright/test";
+import { test } from "../fixtures/dialog-regression";
+import { configuredModelEdit, openProviderModels } from "../fixtures/open-provider-models";
+
+test("native select popup consumes first Escape before model Dialog", async ({ page, fixture }, info) => {
+  await page.addInitScript(() => localStorage.setItem("jev-dashboard-locale", "en"));
+  await page.goto(`${fixture.origin}/dashboard/`);
+  await page.locator("#gateway-api-key").fill("synthetic-dashboard-key");
+  await page.locator("[data-connection-page] button[type=submit]").click();
+  await openProviderModels(page, "fixture");
+  const trigger = configuredModelEdit(page, "fixture", "existing");
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  const select = dialog.locator("#model-dialog-tools");
+  const initialValue = await select.inputValue();
+  const initialFiles = fixture.bytes();
+  await select.click();
+  await expect.poll(() => select.evaluate((element) => element.matches(":open"))).toBe(true);
+  await page.screenshot({ path: info.outputPath("native-popup-open.png") });
+  await page.keyboard.press("Escape");
+  await expect.poll(() => select.evaluate((element) => element.matches(":open"))).toBe(false);
+  await expect(dialog).toBeVisible();
+  await expect(select).toBeFocused();
+  await expect(select).toHaveValue(initialValue);
+  await page.screenshot({ path: info.outputPath("first-escape-dialog-retained.png") });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  expect(fixture.bytes()).toEqual(initialFiles);
+  expect(fixture.receipts.filter((receipt) => receipt.path.includes("provider-configuration") && receipt.method !== "GET")).toEqual([]);
+});

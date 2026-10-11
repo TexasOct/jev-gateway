@@ -2,10 +2,31 @@ import { writeFile } from "node:fs/promises";
 import { test, expect } from "../fixtures/provider-browser";
 import { installProviderFixture, providerFixture } from "../fixtures/provider-management";
 import type { ProviderFixtureState } from "../fixtures/provider-management";
+import type { Page } from "@playwright/test";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 
 const layout = { version: 1 as const, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 350, y: 80 }, fallback: { x: 350, y: 300 }, "model::fixture/existing": { x: 700, y: 80 } }, viewport: { x: 0, y: 0 } };
+const layoutPath = "/v1/dashboard/canvas-layout";
+type RequestEntry = { method: string; path: string; body: string | null };
+type ExposureLedger = { requests: RequestEntry[]; completed: { method: string; status: number; body: unknown }[]; pending: Promise<void>[]; errors: string[]; baseline?: unknown };
+const exposure = new WeakMap<Page, ExposureLedger>();
+test.beforeEach(async ({ page }) => {
+  const ledger: ExposureLedger = { requests: [], completed: [], pending: [], errors: [] };
+  exposure.set(page, ledger);
+  page.on("request", request => ledger.requests.push({ method: request.method(), path: new URL(request.url()).pathname, body: request.postData() }));
+  page.on("response", response => {
+    if (new URL(response.url()).pathname !== layoutPath) return;
+    ledger.pending.push(response.json().then(body => { ledger.completed.push({ method: response.request().method(), status: response.status(), body }); }).catch(error => { ledger.errors.push(String(error)); }));
+  });
+});
+test.afterEach(async ({ page }, info) => {
+  const ledger = exposure.get(page)!;
+  await Promise.all(ledger.pending);
+  await writeFile(info.outputPath("exposure-boundary.json"), JSON.stringify({ requests: ledger.requests, completed: ledger.completed, baseline: ledger.baseline, errors: ledger.errors }, null, 2));
+  expect(ledger.errors).toEqual([]);
+});
+const mutations = (requests: RequestEntry[]) => requests.filter(request => request.method !== "GET");
 
 async function frames(page: import("@playwright/test").Page) {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
@@ -18,12 +39,33 @@ async function openStrategy(page: import("@playwright/test").Page, words: typeof
   await expect(page.getByRole("button", { name: words.canvasAddNode, exact: true })).toBeEnabled();
 }
 
-async function modelNode(page: import("@playwright/test").Page) {
+async function modelNode(page: Page, state: ProviderFixtureState, words: typeof en | typeof zhCN) {
+  const status = page.locator('.workspace-chrome > p[role="status"]').first();
+  await expect(status).toHaveText(words.canvasLayoutOnly);
   const node = page.locator('[data-canvas-node="model::fixture/existing"]');
   await expect(node).toBeVisible();
   await node.scrollIntoViewIfNeeded();
   await frames(page);
-  return node;
+  const viewport = await page.locator(".routing-canvas-scroll").evaluate(canvas => {
+    const content = canvas.querySelector(".routing-canvas-content")!;
+    return { x: Math.round(canvas.scrollLeft), y: Math.round(canvas.scrollTop), scale: new DOMMatrixReadOnly(getComputedStyle(content).transform).a };
+  });
+  expect(viewport.scale).toBe(1);
+  const expected = { ...layout, viewport: { x: viewport.x, y: viewport.y } };
+  const changed = viewport.x !== layout.viewport.x || viewport.y !== layout.viewport.y;
+  const ledger = exposure.get(page)!;
+  const pendingStatus = await status.textContent();
+  if (changed) await expect.poll(() => ledger.completed.filter(response => response.method === "PUT").length).toBe(1);
+  await expect(status).toHaveText(words.canvasLayoutOnly);
+  const writes = changed ? [expected] : [];
+  expect(state.canvasWrites ?? []).toEqual(writes);
+  expect(ledger.completed.filter(response => response.method === "PUT")).toEqual(writes.map(body => ({ method: "PUT", status: 200, body })));
+  expect(mutations(ledger.requests)).toEqual(writes.map(body => ({ method: "PUT", path: layoutPath, body: JSON.stringify(body) })));
+  expect(state.canvasLayout).toEqual(changed ? expected : layout);
+  expect(state.writes).toEqual([]); expect(state.validations).toEqual([]); expect(state.unexpected ?? []).toEqual([]);
+  const baseline = structuredClone({ requests: ledger.requests, canvasWrites: state.canvasWrites ?? [], canvasLayout: state.canvasLayout, configuration: state.configuration, viewport, pendingStatus, savedStatus: await status.textContent() });
+  ledger.baseline = baseline;
+  return { node, baseline };
 }
 
 async function exposed(node: import("@playwright/test").Locator) {
@@ -38,7 +80,7 @@ test("strategy model node opens the shared model Dialog bound to its exact ident
   const requests: { method: string; path: string }[] = [];
   page.on("request", (request) => requests.push({ method: request.method(), path: new URL(request.url()).pathname }));
   await openStrategy(page, en);
-  const node = await modelNode(page);
+  const { node, baseline } = await modelNode(page, state, en);
   const before = await exposed(node);
   expect(before.hit).toBe(true);
   const saved = structuredClone(state.canvasLayout);
@@ -55,9 +97,11 @@ test("strategy model node opens the shared model Dialog bound to its exact ident
   // The read-only inspection performed no layout, policy or credential write.
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+  expect(requests.filter((request) => request.method !== "GET")).toEqual(mutations(baseline.requests).map(({ method, path }) => ({ method, path })));
   expect(state.writes).toEqual([]);
-  expect(state.canvasWrites ?? []).toEqual([]);
+  expect(state.canvasWrites ?? []).toEqual(baseline.canvasWrites);
+  expect(mutations(exposure.get(page)!.requests)).toEqual(mutations(baseline.requests));
+  expect(state.configuration).toEqual(baseline.configuration);
   expect(state.canvasLayout).toEqual(saved);
   const returned = await exposed(node);
   expect(returned.hit).toBe(true); expect(returned.connected).toBe(true);
@@ -76,7 +120,7 @@ for (const [locale, width, scheme] of [["en", 390, "light"], ["zh-CN", 320, "dar
     const words = locale === "en" ? en : zhCN;
     await page.getByRole("button", { name: words.strategyEditor, exact: true }).click();
     await expect(page.getByRole("button", { name: words.canvasAddNode, exact: true })).toBeEnabled();
-    const node = await modelNode(page);
+    const { node, baseline } = await modelNode(page, state, words);
     const at = await exposed(node); expect(at.hit).toBe(true);
     await node.focus(); await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog");
@@ -88,11 +132,16 @@ for (const [locale, width, scheme] of [["en", 390, "light"], ["zh-CN", 320, "dar
     await expect(dialog.getByText(words.mmDiscardQuestion, { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: words.mmKeepEditing, exact: true }).click();
     await expect(name).toHaveValue(raw); await expect(dialog).toBeVisible();
+    expect(state.canvasWrites ?? []).toEqual(baseline.canvasWrites);
+    expect(mutations(exposure.get(page)!.requests)).toEqual(mutations(baseline.requests));
     await page.keyboard.press("Escape");
     await dialog.getByRole("button", { name: words.mmDiscard, exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await frames(page);
-    expect(state.writes).toEqual([]); expect(state.canvasWrites ?? []).toEqual([]);
+    expect(state.writes).toEqual([]); expect(state.canvasWrites ?? []).toEqual(baseline.canvasWrites);
+    expect(mutations(exposure.get(page)!.requests)).toEqual(mutations(baseline.requests));
+    expect(state.canvasLayout).toEqual(baseline.canvasLayout);
+    expect(state.configuration).toEqual(baseline.configuration);
     const returned = await exposed(node);
     expect(returned.hit).toBe(true); expect(returned.connected).toBe(true);
     await writeFile(info.outputPath("dirty-draft-returned.json"), JSON.stringify({ at, returned, writes: state.writes }, null, 2));
@@ -105,7 +154,7 @@ test("pending model write blocks dismissal and failed save retains the draft", a
   const state: ProviderFixtureState = { configuration: providerFixture(), writes: [], validations: [], selectors: [], canvasLayout: structuredClone(layout), delayWrite: () => gate, rejectWrite: 503 };
   await installProviderFixture(context, state);
   await openStrategy(page, en);
-  const node = await modelNode(page);
+  const { node, baseline } = await modelNode(page, state, en);
   const at = await exposed(node); expect(at.hit).toBe(true);
   await page.mouse.click(at.x, at.y); await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog");
@@ -121,6 +170,8 @@ test("pending model write blocks dismissal and failed save retains the draft", a
   // Dismissal during a pending write neither closes the dialog nor drops the draft.
   await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible(); await expect(name).toHaveValue(raw);
+  expect(state.canvasWrites ?? []).toEqual(baseline.canvasWrites);
+  expect(state.canvasLayout).toEqual(baseline.canvasLayout);
   await expect(dialog.getByRole("button", { name: en.mmKeepEditing, exact: true })).toHaveCount(0);
   release();
   // The admission then fails with the owned synthetic rejection; the draft survives.
@@ -136,4 +187,11 @@ test("pending model write blocks dismissal and failed save retains the draft", a
   await expect(dialog).toHaveCount(0);
   const returned = await exposed(node);
   expect(returned.hit).toBe(true); expect(returned.connected).toBe(true);
+  expect(state.canvasWrites ?? []).toEqual(baseline.canvasWrites);
+  expect(state.canvasLayout).toEqual(baseline.canvasLayout);
+  expect(mutations(exposure.get(page)!.requests)).toEqual([
+    ...mutations(baseline.requests),
+    ...state.validations.map(body => ({ method: "POST", path: "/v1/provider-configuration/validate", body: JSON.stringify(body) })),
+    ...state.writes.map(body => ({ method: "PUT", path: "/v1/provider-configuration", body: JSON.stringify(body) })),
+  ]);
 });

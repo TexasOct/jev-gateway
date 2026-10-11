@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PolicyCatalog, RoutingActivityPayload, SessionsPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
 import { activePaths, configuredRouteModels, connectorAnchors, connectorPath, pathForModel, routeDestinations, strategyChoices, validActivity } from "../model/route-activity";
 import { formatRouteLabel } from "@/shared/i18n/route-label";
 import { distributeSessions } from "../model/strategy-distribution";
@@ -111,14 +112,14 @@ export function StrategyDistribution({ strategies = null, policyCatalog = null, 
     : distribution.complete ? copy("Complete", "已完成")
     : copy("Loading", "读取中");
   return (
-    <section className="monitoring-home relative col-span-full min-w-0 overflow-hidden rounded-xl border border-outline bg-panel p-5 max-[600px]:p-3" aria-labelledby="monitoring-home-title">
+    <section className="monitoring-home relative col-span-full min-w-0 overflow-hidden border-b border-outline pb-5 max-[600px]:pb-3" aria-labelledby="monitoring-home-title">
         <div className="monitoring-home-heading flex items-start justify-between gap-5 max-[760px]:grid">
           <div>
             <p className="m-0 text-xs text-ink-muted">{copy("Current sessions", "当前会话")}</p>
             <h2 id="monitoring-home-title" className="my-1 text-[clamp(1.5rem,3vw,2.1rem)] tracking-[-0.035em]">{copy("Strategy routes", "策略路由")}</h2>
             <p className="mt-1 text-sm text-ink-muted">{copy("Latest route per session.", "按会话最近路由计数。")}</p>
           </div>
-          <span className="monitoring-read-state shrink-0 rounded-full border border-outline px-[0.65rem] py-[0.4rem] text-xs text-ink-muted" role="status">{readState}</span>
+          <Badge variant="outline" className="monitoring-read-state text-ink-muted" role="status">{readState}</Badge>
         </div>
         {strategyError ? <p role="alert">{copy("Could not list registered strategies.", "无法列出已注册策略。")}</p> : null}
         {strategies === null && !strategyError ? <p role="status">{copy("Loading registered strategies…", "正在读取已注册策略…")}</p> : null}
@@ -128,9 +129,9 @@ export function StrategyDistribution({ strategies = null, policyCatalog = null, 
             {choices.map((choice) => {
               const count = distribution.strategies.find((entry) => entry.name === choice.name)?.count ?? 0;
               const selected = selectedStrategyName === choice.name;
-              return <button key={choice.name} type="button" aria-pressed={selected} className={`monitoring-strategy-tab flex min-h-10 w-[min(13rem,75vw)] max-w-[min(13rem,75vw)] shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selected ? "border-primary bg-panel-muted font-semibold text-primary shadow-xs" : "border-outline bg-panel text-ink-muted hover:border-primary hover:text-ink"}`} onClick={() => setActiveStrategy(choice.name)}>
+              return <Button variant="outline" key={choice.name} type="button" aria-pressed={selected} className={`monitoring-strategy-tab flex min-h-10 w-[min(13rem,75vw)] max-w-[min(13rem,75vw)] shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selected ? "border-primary bg-panel-muted font-semibold text-primary shadow-xs" : "border-outline bg-panel text-ink-muted hover:border-primary hover:text-ink"}`} onClick={() => setActiveStrategy(choice.name)}>
                 <span className="min-w-0 truncate">{choice.name}{choice.retired ? <span className="ml-1 text-xs text-ink-muted">{copy("removed", "已移除")}</span> : null}</span><small className="shrink-0 text-xs text-ink-muted tabular-nums">{choice.retired ? "—" : distribution.complete ? count : count > 0 ? `${count}+` : "—"}</small>
-              </button>;
+              </Button>;
             })}
           </div>
           <div className="monitoring-route-map relative grid min-h-[190px] grid-cols-[minmax(130px,0.8fr)_minmax(180px,1fr)_minmax(240px,1.5fr)] items-center gap-[clamp(1.5rem,4vw,4rem)] rounded-xl border border-outline bg-panel-muted p-4 max-[760px]:grid-cols-[minmax(0,1fr)] max-[760px]:gap-8" aria-label={copy("Observed session route", "观察到的会话路由")} ref={mapRef}>

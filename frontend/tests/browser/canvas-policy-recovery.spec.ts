@@ -11,7 +11,13 @@ const layoutPath = "/v1/dashboard/canvas-layout";
 type Words = typeof en | typeof zhCN;
 const initialLayout = { version: 1 as const, nodes: { "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
 
-async function activate(page: Page, target: Locator) { await expect(target).toBeEnabled(); await target.focus(); await page.keyboard.press("Enter"); }
+async function activate(page: Page, target: Locator) {
+  await expect(target).toBeEnabled();
+  const opensInspector = await target.getAttribute("data-canvas-node", { timeout: 5000 }) !== null;
+  await target.focus();
+  await page.keyboard.press("Enter");
+  if (opensInspector) await expect(page.locator(".workflow-inspector > header").getByRole("button")).toBeFocused();
+}
 async function open(page: Page, locale: "en" | "zh-CN", width: number) {
   await page.setViewportSize({ width, height: 900 }); await page.goto("/dashboard/");
   if (locale !== "en") {

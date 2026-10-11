@@ -1,9 +1,11 @@
 import { test as base, expect } from "@playwright/test";
 import { installMockApi } from "../setup/mock-api";
 import type { MockApiState } from "../setup/mock-api";
+import { observeNativeAdmission } from "../fixtures/native-observation";
 
-type Fixtures = { mockApi: MockApiState };
+type Fixtures = { mockApi: MockApiState; nativeObservation: void };
 export const test = base.extend<Fixtures>({
+  nativeObservation: [async ({ page }, use, info) => observeNativeAdmission(page, info, () => use()), { auto: true }],
   mockApi: [async ({ context, page }, use) => {
     const state: MockApiState = { requests: [], unexpected: [], rejectNextSessionPage: false, allowedWrites: [], detailOverrides: {}, pagedDetailSessionId: null, detailFailures: {}, rejectNextActivity: false, configurationWarnings: false, configurationApplied: true, themeSeed: "#3b66d9", rejectThemeRead: false };
     await installMockApi(context, state);

@@ -1,8 +1,8 @@
 import type { PolicyCatalog, ProviderRow, ProvidersPayload, RetainedRequest, SessionRequestsPayload, SessionRow, SessionsPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import { formatRouteLabel, routeLabelContext } from "@/shared/i18n/route-label";
-import { Card } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
 import { Separator } from "@/shared/ui/separator";
 import { RouteTrace } from "./RouteTrace";
 import { VirtualList } from "./VirtualList";
@@ -91,10 +91,10 @@ function RequestCard({ item, t, formatDateTime, selected, onSelect, policyCatalo
   const statusClass = outcome === null ? "text-ink-muted" : outcome["ok"] === true ? "text-positive" : "text-negative";
   return (
     <article className={`request-card flex h-full min-w-0 flex-col overflow-auto rounded-md border border-outline bg-panel-muted p-3 ${selected ? "selected border-primary [box-shadow:inset_0_0_0_1px_var(--accent)]" : ""}`}>
-      <button type="button" className="request-select grid min-h-10 w-full gap-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-left text-ink hover:border-outline hover:bg-panel" aria-pressed={selected} onClick={onSelect}>
+      <Button variant="ghost" type="button" className="request-select grid h-auto min-h-10 w-full gap-1 whitespace-normal rounded-md border border-transparent bg-transparent px-2 py-1 text-left text-ink hover:border-outline hover:bg-panel" aria-pressed={selected} onClick={onSelect}>
         <span>{formatDateTime(receivedAt)}</span>
         <span className="text-ink-muted">{requestId} · <span className={statusClass}>{status}</span></span>
-      </button>
+      </Button>
       {selected ? <RouteTrace item={item} policyCatalog={policyCatalog} /> : null}
       <div className="request-evidence mt-2 min-w-0">
         <JsonBlock name={t("inboundRequest")} value={item.request} empty={t("notRecorded")} />
@@ -138,7 +138,7 @@ function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSele
         <div className="monitoring-route break-words text-lg font-semibold text-primary">{session.route ?? t("routeUnavailable")}</div>
         <div className="monitoring-result flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{t("latestRecordedRequest")}: {latest?.received_at == null ? t("notRecorded") : formatDateTime(latest.received_at)}</span>
-          <span className={resultClass}>{t("recordedResult")}: {result}</span>
+          <Badge variant="outline" className={resultClass}>{t("recordedResult")}: {result}</Badge>
         </div>
         <div className="monitoring-meta break-words text-xs text-ink-muted">
           {[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session, policyCatalog)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}
@@ -176,21 +176,21 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
     {providerError ? <p className="monitoring-attribution col-span-full mt-2 text-xs text-ink-muted" role="status">{copy("Provider observations are unavailable. Session routing results remain available.", "服务商观察记录暂不可用，会话路由结果仍可查看。")}</p> : null}
       <details className="monitoring-secondary col-span-full min-w-0 border-t border-outline py-[0.4rem] [&>summary]:flex [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:items-center [&>summary]:font-semibold">
         <summary>{copy("Inspect sessions, retained requests and provider observations", "查看会话、留存请求与服务商观察记录")}</summary>
-        <div className="monitoring-secondary-grid grid min-w-0 pt-3 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-4 max-[899px]:grid-cols-1">
-      <Card className="monitoring-overview-panel col-span-full min-w-0 border-t-[3px] border-t-primary p-4" aria-labelledby="monitoring-overview-title">
+        <div className="monitoring-secondary-grid grid min-w-0 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-x-4 rounded-lg border border-outline bg-panel px-4 max-[899px]:grid-cols-1 max-[600px]:px-3">
+      <section className="monitoring-overview-panel col-span-full min-w-0 border-b border-outline py-4" aria-labelledby="monitoring-overview-title">
         <div className="monitoring-overview-heading flex items-start justify-between gap-4 max-[600px]:gap-2">
           <div className="max-w-[60ch] min-w-0">
             <h2 id="monitoring-overview-title">{selectedSessionId === null ? (locale === "zh-CN" ? "网关活动" : "Gateway activity") : (locale === "zh-CN" ? "所选会话" : "Selected session")}</h2>
             <p className="monitoring-guidance mt-1 text-sm text-ink-muted">{guidance(locale, sessions, selectedSession, detail, t, monitoringError, detailError)}</p>
           </div>
-          {preview ? <span className="monitoring-preview-label shrink-0 rounded-md border border-outline px-2 py-1 text-xs text-ink-muted">{t("sessionPreview")}</span> : null}
+          {preview ? <Badge variant="outline" className="monitoring-preview-label text-ink-muted">{t("sessionPreview")}</Badge> : null}
         </div>
         {monitoringError ? <Button variant="outline" onClick={onRetryMonitoring}>{t("retryPage")}</Button> : null}
         {detailError && !monitoringError ? <Button variant="outline" onClick={onRetrySelectedDetail}>{t("retryPage")}</Button> : null}
         <SessionOverview session={activeOverviewSession} isPreview={selectedSessionId === null && preview !== null} locale={locale} t={t} formatDateTime={formatDateTime} policyCatalog={policyCatalog} onSelect={() => { if (preview) onSelectSession(preview.session_id); }} />
-      </Card>
+      </section>
 
-      <Card className="monitoring-sessions-panel col-start-1 min-w-0 p-4 max-[899px]:col-start-1 max-[899px]:row-auto">
+      <section className="monitoring-sessions-panel col-start-1 min-w-0 py-4 max-[899px]:col-start-1 max-[899px]:row-auto">
         <h2>{t("currentSessions")}</h2>
         <div className="text-ink-muted [overflow-wrap:anywhere]">{sessions === null ? (monitoringError ? t("evidenceUnavailable") : t("loading")) : storageNote(sessions, t)}</div>
         <Separator />
@@ -208,7 +208,7 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
           render={(session: SessionRow) => {
             const latest = session.latest_request ?? null;
             const status = latest === null ? t("traceUnknown") : latest.ok === true ? t("succeeded") : latest.ok === false ? t("failed") : t("traceUnknown");
-            return <button type="button" className={`session${session.session_id === selectedSessionId ? " active" : ""} grid h-full w-full content-start gap-1 overflow-hidden rounded-md border bg-panel px-3 py-2 text-left text-xs [overflow-wrap:anywhere] ${session.session_id === selectedSessionId ? "border-primary bg-panel-muted" : "border-outline hover:border-primary hover:bg-panel-muted"}`.replace(session.session_id === selectedSessionId ? "session active grid" : "session grid", session.session_id === selectedSessionId ? "session active" : "session")} aria-pressed={session.session_id === selectedSessionId} onClick={() => onSelectSession(session.session_id)}>
+            return <button type="button" className={`session${session.session_id === selectedSessionId ? " active" : ""} h-full w-full grid content-start gap-1 overflow-hidden rounded-md border bg-panel px-3 py-2 text-left text-xs [overflow-wrap:anywhere] ${session.session_id === selectedSessionId ? "border-primary bg-panel-muted" : "border-outline hover:border-primary hover:bg-panel-muted"}`} aria-pressed={session.session_id === selectedSessionId} onClick={() => onSelectSession(session.session_id)}>
               <span className="route">{session.route ?? t("routeUnavailable")}</span>
               <span className="text-ink-muted [overflow-wrap:anywhere]">{session.session_id}</span>
               <span className="text-ink-muted [overflow-wrap:anywhere]">{session.first_request_at == null ? t("unknownFirstRequest") : formatDateTime(session.first_request_at)}</span>
@@ -216,9 +216,9 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
             </button>;
           }}
         />
-      </Card>
+      </section>
 
-      <Card className="monitoring-requests-panel col-start-2 min-w-0 p-4 max-[899px]:col-start-1 max-[899px]:row-auto">
+      <section className="monitoring-requests-panel col-start-2 min-w-0 py-4 max-[899px]:col-start-1 max-[899px]:row-auto max-[899px]:border-t max-[899px]:border-outline">
         <h2>{selectedSessionId === null ? t("selectSession") : selectedSession?.route ?? selectedSessionId}</h2>
         <div className="text-ink-muted [overflow-wrap:anywhere]">{detail === null ? (detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("noSessionSelected") : t("loadingRequests")) : storageNote(detail, t)}</div>
         <Separator />
@@ -238,9 +238,9 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
             return <RequestCard item={item} t={t} formatDateTime={formatDateTime} selected={requestId === activeRequestId} policyCatalog={policyCatalog} onSelect={() => onSelectRequest(requestId)} />;
           }}
         />
-      </Card>
+      </section>
 
-      <Card className="monitoring-providers-panel col-span-full min-w-0 p-4 max-[899px]:col-span-1 max-[899px]:col-start-1 max-[899px]:row-auto">
+      <section className="monitoring-providers-panel col-span-full min-w-0 border-t border-outline py-4 max-[899px]:col-span-1 max-[899px]:col-start-1 max-[899px]:row-auto">
         <h2>{t("retainedOutcomes")}</h2>
         <p className="monitoring-provider-caveat text-ink-muted [overflow-wrap:anywhere]">{t("evidenceCaveat")}</p>
         <details className="monitoring-provider-details border-0 p-0">
@@ -263,7 +263,7 @@ export function SessionInspector({ locale, providers, sessions, selectedSessionI
             </table>
           </div>
         </details>
-      </Card>
+      </section>
         </div>
       </details>
     </>

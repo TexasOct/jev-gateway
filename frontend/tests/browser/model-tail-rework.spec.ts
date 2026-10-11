@@ -67,9 +67,15 @@ for (const failure of ["HTTP", "source"] as const) test(`retained automatic cach
   await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   await expect(dialog.getByRole("button", { name: "Restore automatic values", exact: true })).toBeDisabled();
   await expect(dialog.getByLabel("Cache read (USD/M tokens)", { exact: true })).toHaveAttribute("aria-invalid", "true");
-  for (const label of ["Input price (USD / million tokens)", "Cache read (USD/M tokens)", "Cache write (USD/M tokens)"]) {
+  for (const [field, label] of [["input_per_million", "Input price (USD / million tokens)"], ["cache_read_per_million", "Cache read (USD/M tokens)"], ["cache_write_per_million", "Cache write (USD/M tokens)"]] as const) {
     const control = dialog.getByLabel(label, { exact: true });
-    await control.locator("..").getByRole("button", { name: "Confirm retained value", exact: true }).click();
+    await expect(control).toHaveCount(1);
+    const fieldGroup = control.locator("xpath=ancestor::*[@data-model-field][1]");
+    await expect(fieldGroup).toHaveCount(1);
+    await expect(fieldGroup).toHaveAttribute("data-model-field", field);
+    const confirm = fieldGroup.getByRole("button", { name: "Confirm retained value", exact: true });
+    await expect(confirm).toHaveCount(1);
+    await confirm.click();
   }
   await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   await dialog.getByRole("button", { name: "Save", exact: true }).click(); await expect(dialog).toHaveCount(0);

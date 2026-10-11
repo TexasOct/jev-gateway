@@ -54,12 +54,14 @@ test("conflicting and mismatched suggestions stay incomplete", async ({ page, co
   await page.getByRole("button", { name: "Select all visible unconfigured models" }).click();
   await page.getByRole("region", { name: "fixture/alpha", exact: true }).getByRole("button", { name: "Edit model", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByLabel("Input price (USD / million tokens)")).toHaveValue("");
+  const price = dialog.getByLabel("Input price (USD / million tokens)", { exact: true });
+  await expect(price).toHaveCount(1);
+  await expect(price).toHaveValue("");
   await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   state.metadataEvidence = { ...state.metadataEvidence, fields: { input_per_million: 99 }, sources: [source(1)] };
   await dialog.getByRole("button", { name: "Refresh metadata sources", exact: true }).click();
   await expect.poll(() => state.metadataCalls).toBe(2);
-  await expect(dialog.getByLabel("Input price (USD / million tokens)")).toHaveValue("");
+  await expect(price).toHaveValue("");
   expect(state.writes).toEqual([]);
 });
 

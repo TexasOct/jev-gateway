@@ -2,6 +2,9 @@ import { useCallback, useState } from "react";
 import type { useLocale } from "@/shared/i18n";
 import { DEFAULT_SEED, normalizeSeed } from "@/shared/theme/palette";
 import { Pencil } from "lucide-react";
+import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select";
+import { Label } from "@/shared/ui/label";
+import { Alert, AlertDescription } from "@/shared/ui/alert";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 
@@ -55,23 +58,23 @@ export default function AppearanceView({
 
   return (
     <section aria-label={t("appearance")} aria-busy={loading} className="min-w-0">
-      <ul className="m-0 list-none divide-y divide-outline rounded-lg border border-outline bg-panel p-0">
-        <li className="grid min-w-0 gap-3 px-4 py-4 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-center">
-          <label htmlFor="settings-language" className="text-sm font-medium text-ink">{t("language")}</label>
-          <select id="settings-language" aria-label={t("language")} data-settings-language value={locale} onChange={(event) => onLocaleChange(event.target.value as "en" | "zh-CN")} className="min-h-9 w-full rounded-md border border-outline bg-panel py-2 ps-2 pe-4 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            <option value="en">{t("english")}</option>
-            <option value="zh-CN">{t("chinese")}</option>
-          </select>
+      <ul className="m-0 list-none divide-y divide-outline p-0">
+        <li className="grid min-w-0 gap-3 py-5 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-center">
+          <Label htmlFor="settings-language">{t("language")}</Label>
+          <NativeSelect id="settings-language" aria-label={t("language")} data-settings-language value={locale} onChange={(event) => onLocaleChange(event.target.value as "en" | "zh-CN")}>
+            <NativeSelectOption value="en">{t("english")}</NativeSelectOption>
+            <NativeSelectOption value="zh-CN">{t("chinese")}</NativeSelectOption>
+          </NativeSelect>
         </li>
-        <li className="grid min-w-0 gap-3 px-4 py-4 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-center">
-          <label htmlFor="settings-color-scheme" className="text-sm font-medium text-ink">{t("colorScheme")}</label>
-          <select id="settings-color-scheme" aria-label={t("colorScheme")} data-settings-scheme value={schemePreference} onChange={(event) => onSchemeChange(event.target.value as "system" | "light" | "dark")} className="min-h-9 w-full rounded-md border border-outline bg-panel py-2 ps-2 pe-4 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            <option value="system">{t("system")}</option>
-            <option value="light">{t("light")}</option>
-            <option value="dark">{t("dark")}</option>
-          </select>
+        <li className="grid min-w-0 gap-3 py-5 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-center">
+          <Label htmlFor="settings-color-scheme">{t("colorScheme")}</Label>
+          <NativeSelect id="settings-color-scheme" aria-label={t("colorScheme")} data-settings-scheme value={schemePreference} onChange={(event) => onSchemeChange(event.target.value as "system" | "light" | "dark")}>
+            <NativeSelectOption value="system">{t("system")}</NativeSelectOption>
+            <NativeSelectOption value="light">{t("light")}</NativeSelectOption>
+            <NativeSelectOption value="dark">{t("dark")}</NativeSelectOption>
+          </NativeSelect>
         </li>
-        <li className="grid min-w-0 gap-3 px-4 py-4 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-start">
+        <li className="grid min-w-0 gap-3 py-5 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1fr)] sm:items-start">
           <span className="pt-2 text-sm font-medium text-ink">{t("themeColor")}</span>
           <div className="grid min-w-0 gap-3">
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("themeColor")}>
@@ -103,8 +106,8 @@ export default function AppearanceView({
               </label>
             </div>
             {loading ? <p className="m-0 text-xs text-ink-muted" role="status">{t("loading")}</p> : null}
-            {error ? <p className="m-0 break-words rounded-sm border-l-[3px] border-negative bg-panel-muted px-3 py-2.5 text-sm [overflow-wrap:anywhere]" role="alert">{error}</p> : null}
-            {notice ? <p className="m-0 break-words rounded-sm border-l-[3px] border-primary bg-panel-muted px-3 py-2.5 text-sm [overflow-wrap:anywhere]" role="status">{notice}</p> : null}
+            {error ? <Alert variant="destructive" role="alert"><AlertDescription>{error}</AlertDescription></Alert> : null}
+            {notice ? <Alert role="status"><AlertDescription>{notice}</AlertDescription></Alert> : null}
           </div>
         </li>
       </ul>

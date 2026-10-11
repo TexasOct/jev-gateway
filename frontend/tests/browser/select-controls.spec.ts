@@ -153,6 +153,29 @@ for (const width of [320, 390, 1280, 1701, 1920])
               const style = await geometry(control);
               expect(style.appearance).toBe("none");
               expect(parseFloat(style.paddingRight)).toBeGreaterThanOrEqual(32);
+              if (await control.getAttribute("data-slot") === "native-select") {
+                expect(style.backgroundImage).toBe("none");
+                const icon = control.locator("..").locator('[data-slot="native-select-icon"]');
+                await expect(icon).toHaveCount(1);
+                await expect(icon).toBeVisible();
+                await expect(icon).toHaveAttribute("aria-hidden", "true");
+                const paint = await icon.evaluate((element) => {
+                  const rect = element.getBoundingClientRect();
+                  const select = element.parentElement!.querySelector("select")!;
+                  const bounds = select.getBoundingClientRect();
+                  const css = getComputedStyle(element);
+                  return { inset: bounds.right - rect.right, center: rect.y + rect.height / 2 - bounds.y - bounds.height / 2, width: rect.width, height: rect.height, color: css.color, stroke: css.stroke, pointerEvents: css.pointerEvents, clearance: parseFloat(getComputedStyle(select).paddingRight) - (bounds.right - rect.left) };
+                });
+                expect(paint.pointerEvents).toBe("none");
+                expect(paint.color).toBe(style.color);
+                expect(paint.stroke).toBe(style.color);
+                expect(paint.width).toBe(12);
+                expect(paint.height).toBe(12);
+                expect(paint.inset).toBeGreaterThanOrEqual(12);
+                expect(paint.inset).toBeLessThanOrEqual(13);
+                expect(Math.abs(paint.center)).toBeLessThanOrEqual(1);
+                expect(paint.clearance).toBeGreaterThanOrEqual(8);
+              } else {
               expect(style.backgroundImage).toContain("linear-gradient");
               expect(style.backgroundImage).toContain(style.color);
               expect(style.backgroundPosition).toBe(
@@ -160,6 +183,7 @@ for (const width of [320, 390, 1280, 1701, 1920])
               );
               expect(style.backgroundSize).toBe("5px 5px, 5px 5px");
               expect(style.backgroundRepeat).toBe("no-repeat, no-repeat");
+              }
             }
             if (width >= 1280) {
               expect(Math.abs(selected.y - input.y)).toBeLessThanOrEqual(1);
@@ -278,6 +302,9 @@ test("native keyboard, focus, disabled and listbox/forced-colors fallback", asyn
     const style = await geometry(select);
     expect(style.appearance).toBe("auto");
     expect(style.backgroundImage).toBe("none");
+    if (await select.getAttribute("data-slot") === "native-select") {
+      await expect(select.locator("..").locator('[data-slot="native-select-icon"]')).toBeHidden();
+    }
   }
   await chooseWithKeyboard(page, transport, "a");
   await expect(transport).toHaveValue("anthropic");

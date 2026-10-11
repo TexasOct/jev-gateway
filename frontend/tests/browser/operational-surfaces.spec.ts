@@ -1,0 +1,91 @@
+import { writeFile } from "node:fs/promises";
+import { test, expect } from "./fixtures";
+import { en } from "../../src/shared/i18n/en";
+import { zhCN } from "../../src/shared/i18n/zh-CN";
+
+for (const width of [1440, 390, 320]) for (const locale of ["en", "zh-CN"] as const) for (const scheme of ["light", "dark"] as const) {
+  test(`Operational B monitoring ${width}px ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(value => localStorage.setItem("jev-dashboard-locale", value), locale);
+    mockApi.themeSeed = "#856ca4";
+    mockApi.pagedDetailSessionId = "session-1";
+    await page.goto("/dashboard/");
+    await expect(page.locator("html")).toHaveAttribute("data-scheme", scheme);
+    const disclosure = page.locator(".monitoring-secondary > summary");
+    await expect(disclosure).toBeVisible();
+    await expect(page.locator('.monitoring-read-state[data-slot="badge"]')).toBeVisible();
+    await page.screenshot({ path: info.outputPath("monitoring-overview.png"), fullPage: true });
+    await disclosure.click();
+    const sessions = page.locator(".virtual-list.sessions"), timeline = page.locator(".virtual-list.timeline");
+    for (const [list, height] of [[sessions, width > 720 ? "480px" : "280px"], [timeline, width > 720 ? "480px" : "558px"]] as const) {
+      for (const property of ["height", "min-height", "max-height"]) await expect(list).toHaveCSS(property, height);
+    }
+    await expect(sessions.locator(".virtual-row").first()).toHaveCSS("height", "132px");
+    const first = sessions.locator('.virtual-row[data-key="session-1"] button');
+    await expect(first).toHaveCSS("display", "grid");
+    await first.focus();
+    await page.keyboard.press("Enter");
+    const request = timeline.locator('.virtual-row[data-key="request-1"]');
+    await expect(request).toHaveCSS("height", "360px");
+    const select = request.locator("button.request-select");
+    await expect(select).toHaveAttribute("data-slot", "button");
+    await expect(request.locator(".trace-outcome")).toHaveAttribute("data-slot", "badge");
+    await select.focus();
+    await expect(select).toBeFocused();
+    await page.screenshot({ path: info.outputPath("monitoring-selected.png"), fullPage: true });
+    await timeline.scrollIntoViewIfNeeded();
+    const box = await timeline.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width - 2, Math.max(1, Math.min(899, box!.y + box!.height / 2)));
+    await page.mouse.wheel(0, 2600);
+    await expect.poll(() => timeline.evaluate(element => element.scrollTop)).toBeGreaterThan(1800);
+    await expect.poll(() => mockApi.requests.filter(({ path }) => path.includes("cursor=fixture-request-page-2")).length).toBe(1);
+    await expect(select).toBeAttached();
+    await expect(select).toBeFocused();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await writeFile(info.outputPath("monitoring-geometry.json"), JSON.stringify({ width, locale, scheme, rows: await timeline.locator(".virtual-row").count(), requests: mockApi.requests, scrollTop: await timeline.evaluate(element => element.scrollTop) }, null, 2));
+    expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
+  });
+}
+
+for (const width of [1440, 390, 320]) for (const locale of ["en", "zh-CN"] as const) for (const scheme of ["light", "dark"] as const) {
+  test(`Operational B workflow editors ${width}px ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
+    const words = locale === "en" ? en : zhCN;
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(value => localStorage.setItem("jev-dashboard-locale", value), locale);
+    mockApi.themeSeed = "#856ca4";
+    await page.goto("/dashboard/");
+    await page.getByRole("button", { name: words.strategyEditor, exact: true }).click();
+    const canvas = page.locator(".routing-canvas-scroll");
+    await expect(page.getByRole("button", { name: words.canvasAddNode, exact: true })).toBeEnabled();
+    const questions = canvas.locator('[data-canvas-node="questions"]');
+    await questions.focus();
+    await page.keyboard.press("Enter");
+    const inspector = page.getByRole("complementary", { name: words.nodeInspector });
+    await expect(inspector).toBeVisible();
+    await expect(inspector.getByRole("textbox", { name: words.instructions, exact: true })).toHaveAttribute("data-slot", "textarea");
+    await expect(inspector.getByRole("textbox", { name: words.questionName, exact: true })).toHaveCSS("height", "44px");
+    await page.screenshot({ path: info.outputPath("workflow-questions.png") });
+    await inspector.getByRole("button", { name: words.closeInspector, exact: true }).click();
+    const rule = canvas.locator('[data-canvas-node="rule-0"]');
+    await rule.focus();
+    await page.keyboard.press("Enter");
+    await expect(inspector).toBeVisible();
+    const select = inspector.getByRole("combobox", { name: words.label, exact: true });
+    await expect(select).toHaveAttribute("data-slot", "native-select");
+    await expect(select).toHaveCSS("height", "44px");
+    await expect(inspector.locator('[data-slot="native-select-icon"]')).toHaveCount(2);
+    await expect(inspector.getByRole("checkbox").first()).toHaveAttribute("data-slot", "checkbox");
+    const bounds = await inspector.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(901);
+    await page.screenshot({ path: info.outputPath("workflow-rule.png") });
+    await writeFile(info.outputPath("workflow-fields.json"), JSON.stringify({width, locale, scheme, inspector: bounds, requests: mockApi.requests}, null, 2));
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path !== "/v1/dashboard/canvas-layout")).toEqual([]);
+  });
+}

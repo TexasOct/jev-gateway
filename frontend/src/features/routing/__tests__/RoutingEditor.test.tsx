@@ -151,7 +151,12 @@ describe("full canvas editor structure", () => {
     expect(html).toContain('>Edit fallback</button>');
     expect(html).toContain('>Edit model pool: craft</button>');
     expect(html).toContain('class="canvas-context-actions flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-ink shadow-[0_5px_16px_color-mix(in_srgb,var(--text)_10%,transparent)]" role="status">');
-    expect(html).toContain('disabled="">Review changes</button>');
+    const toolbars = [...html.matchAll(/<div\b[^>]*class="workflow-toolbar[^"]*"[^>]*>([\s\S]*?)<\/div>/g)];
+    expect(toolbars).toHaveLength(1);
+    const toolbar = toolbars[0]![1]!;
+    const reviewButtons = [...toolbar.matchAll(/<button\b([^>]*)>Review changes<\/button>/g)];
+    expect(reviewButtons).toHaveLength(1);
+    expect(reviewButtons[0]![1]).toMatch(/(?:^|\s)disabled=""(?:\s|$)/);
   });
   it("keeps errors in the top workspace overlay even with the drawer collapsed", () => {
     const html = renderToStaticMarkup(<LocaleProvider><RoutingEditor config={config} error="Failed to validate" onError={() => undefined} onReloaded={async () => undefined} /></LocaleProvider>);

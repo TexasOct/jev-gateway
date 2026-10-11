@@ -1,4 +1,4 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogRoot, DialogContent, DialogTitle } from "./primitives/dialog";
 import { useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
@@ -24,10 +24,8 @@ export function Dialog({ title, children, footer, onClose, fallbackFocusRef }: {
     if (active && !trigger.current && document.activeElement instanceof HTMLElement && document.activeElement !== document.body && !content.current?.contains(document.activeElement) && usableFocusTarget(document.activeElement)) trigger.current = document.activeElement;
   }, [active]);
 
-  return <DialogPrimitive.Root open={active} onOpenChange={(open) => { if (!open && active) onClose(); }}>
-    {active && <DialogPrimitive.Portal data-slot="dialog-portal">
-      <DialogPrimitive.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-black/50" />
-      <DialogPrimitive.Content
+  return <DialogRoot open={active} onOpenChange={(open) => { if (!open && active) onClose(); }}>
+    {active && <DialogContent
         ref={content}
         data-slot="dialog-content"
         aria-modal="true"
@@ -46,12 +44,10 @@ export function Dialog({ title, children, footer, onClose, fallbackFocusRef }: {
           const target = usableFocusTarget(trigger.current) ? trigger.current : fallbackFocusRef?.current;
           if (usableFocusTarget(target)) target.focus();
         }}
-        className="fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100%_-_2rem)] min-w-0 max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-outline bg-panel p-0 text-ink shadow-xl outline-none"
       >
-        <header className="border-b border-outline px-4 py-3"><DialogPrimitive.Title asChild><h2 className="m-0 break-all text-lg font-semibold">{title}</h2></DialogPrimitive.Title></header>
+        <header className="border-b border-border px-4 py-3"><DialogTitle>{title}</DialogTitle></header>
         <div className="min-h-0 overflow-y-auto overscroll-contain p-4">{children}</div>
-        <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-outline bg-panel p-4">{footer}</footer>
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>}
-  </DialogPrimitive.Root>;
+        <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-card p-4">{footer}</footer>
+      </DialogContent>}
+  </DialogRoot>;
 }

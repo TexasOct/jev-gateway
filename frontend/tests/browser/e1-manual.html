@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E1 原生菜单 Escape 交互验收</title>
+    <style>
+      .e1-page { max-width: 1120px; margin: 0 auto; padding: 40px 24px 120px; }
+      .e1-page h1 { font-size: clamp(24px, 4vw, 36px); line-height: 1.25; margin: 0 0 16px; }
+      .e1-page h2 { font-size: 20px; margin: 0 0 16px; }
+      .e1-page p, .e1-page li { line-height: 1.7; }
+      .e1-section { border-top: 1px solid var(--border); padding: 28px 0; }
+      .e1-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+      .e1-muted { color: var(--text-muted); }
+      .e1-page table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+      .e1-page td, .e1-page th { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+      .e1-page select { display: block; width: 240px; max-width: 100%; margin-top: 8px; }
+      .e1-page textarea { display: block; width: 100%; min-height: 110px; margin-top: 8px; }
+      .e1-report-label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+      #e1-live { position: fixed; left: 12px; bottom: 12px; width: 260px; max-width: calc(100vw - 24px); padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); z-index: 60; pointer-events: none; font-size: 13px; box-shadow: 0 2px 16px #0002; }
+      #e1-live dl { margin: 10px 0 0; display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
+      #e1-live dd { margin: 0; overflow-wrap: anywhere; }
+      #e1-live p { margin: 10px 0 0; line-height: 1.5; }
+      #e1-last { white-space: pre-wrap; font-size: 12px; }
+      #e1-log { max-height: 230px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+      @media (max-width: 1320px) { body[data-e1-dialog="open"] #e1-live { visibility: hidden; } }
+      @media (max-width: 640px) { .e1-page { padding: 24px 16px 180px; } .e1-page td, .e1-page th { padding: 8px 4px; } }
+    </style>
+  </head>
+  <body>
+    <main class="e1-page">
+      <p class="e1-muted">shadcn B 迁移 · E1 手动验收</p>
+      <h1>第一次 Esc 收起菜单，第二次 Esc 处理模型弹窗</h1>
+      <p>待确认的是菜单展开时的关闭顺序。模型弹窗里的“工具调用”使用浏览器原生下拉菜单。菜单展开后，先按一次 Esc：菜单应收起，弹窗、字段值和当前焦点应保留。</p>
+      <p class="e1-muted">本页复用当前源码中的真实 ModelDialog、ModelFields、NativeSelect 和 Radix Dialog。示例数据与保存回调只在页面内存中运行，不连接网关或写入配置。纯 HTML 对照位于下方。建议将窗口展开到 1320px 以上，便于同时查看弹窗与左下角状态；窄屏会隐藏浮动状态板，记录仍会保留。</p>
+
+      <section class="e1-section">
+        <h2>预期关闭顺序</h2>
+        <table>
+          <thead><tr><th>场景</th><th>第一次 Esc（菜单展开）</th><th>第二次 Esc（菜单已收起）</th></tr></thead>
+          <tbody>
+            <tr><td>没有修改字段</td><td>菜单收起；弹窗保留；焦点在下拉框；字段值不变</td><td>弹窗关闭；焦点返回打开按钮</td></tr>
+            <tr><td>已经修改字段</td><td>菜单收起；弹窗和草稿保留；不出现放弃确认</td><td>弹窗保留并出现放弃修改确认；“继续编辑”应保留草稿</td></tr>
+            <tr><td>保存中（补充边界）</td><td>字段禁用，不能打开菜单</td><td>Esc 不关闭弹窗</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="e1-section">
+        <h2>操作真实模型弹窗</h2>
+        <div id="e1-react-root"></div>
+        <ol>
+          <li>打开干净草稿。页面会先定位到“工具调用”字段。</li>
+          <li>用鼠标点击下拉框，确认屏幕上真的出现“未知 / 支持 / 不支持”选项。只获得焦点或看到向下箭头不算展开。</li>
+          <li>按一次实体键盘 Esc，观察菜单是否收起。检查弹窗仍在、字段值没变，焦点仍在下拉框。</li>
+          <li>再按一次 Esc，检查弹窗关闭后焦点是否回到原打开按钮。</li>
+          <li>重试“未保存草稿”：先修改显示名称，再滚动到“工具调用”打开菜单。第一次 Esc 不应出现放弃确认；第二次 Esc 才出现确认。选择“继续编辑”，检查修改还在。</li>
+        </ol>
+      </section>
+
+      <section class="e1-section">
+        <h2>纯 HTML 原生菜单对照</h2>
+        <p>先关闭模型弹窗，再操作这个原生 select。它没有 React 事件处理，也没有 Radix 或外层弹窗。展开菜单后按一次 Esc，应收起菜单并保留字段值。</p>
+        <label for="e1-plain">能力状态</label>
+        <select id="e1-plain"><option value="">未知</option><option value="true">支持</option><option value="false">不支持</option></select>
+      </section>
+
+      <section class="e1-section">
+        <h2>记录本次人工观察</h2>
+        <p>勾选项由操作人确认。原生菜单可能消耗 Esc，网页未必能收到 keydown；日志里没有 Esc 不代表没有按键。本页不会自动把 E1 标为通过。</p>
+        <label class="e1-report-label"><input type="checkbox" id="e1-clean" />干净草稿：菜单先收起，弹窗后关闭，值与焦点符合预期</label>
+        <label class="e1-report-label"><input type="checkbox" id="e1-dirty" />未保存草稿：第一次 Esc 保留草稿，第二次 Esc 出现放弃确认</label>
+        <label class="e1-report-label"><input type="checkbox" id="e1-control" />纯 HTML 对照：Esc 收起原生菜单，值与焦点保留</label>
+        <label for="e1-note">观察说明（例如在哪一步没有达到预期）</label>
+        <textarea id="e1-note" placeholder="请写下实际看到的菜单、弹窗、草稿和焦点变化。"></textarea>
+        <div class="e1-actions"><button type="button" id="e1-export">下载观察 JSON</button></div>
+        <p class="e1-muted">导出包含浏览器环境、源码绑定、人工勾选和被动状态记录。组件页结果用于补充 E1 的直接观察；完整应用的 API 写入、认证和外层编辑器守卫仍由原验收证据承担。</p>
+        <pre id="e1-log"></pre>
+      </section>
+    </main>
+
+    <aside id="e1-live" aria-label="被动观察状态">
+      <strong>实时观察（不拦截按键）</strong>
+      <dl><dt>模型弹窗</dt><dd id="e1-modal">关闭</dd><dt>菜单</dt><dd id="e1-popup">未展开</dd><dt>工具调用</dt><dd id="e1-value">尚未打开模型</dd><dt>草稿</dt><dd id="e1-draft">未修改</dd><dt>当前焦点</dt><dd id="e1-focus">页面</dd><dt>内存保存</dt><dd id="e1-saves">0</dd></dl>
+      <p>先打开选项，再按一次 Esc。关闭后的记录会保留在下方。</p>
+      <pre id="e1-last"></pre>
+    </aside>
+    <script type="module" src="./e1-manual.tsx"></script>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures/provider-browser";
-import { configuredModelEdit } from "../fixtures/open-provider-models";
+import { configuredModelEdit, openProviderModels } from "../fixtures/open-provider-models";
 import { installProviderFixture, providerFixture, type ProviderFixtureState } from "../fixtures/provider-management";
 
 test("acceptance: Settings owns gateway editing and one decision protects both drafts", async ({ page, context }) => {
@@ -23,6 +23,10 @@ test("acceptance: Settings owns gateway editing and one decision protects both d
   await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   expect(dialogs).toBe(2);
   await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-dashboard-view-nav] button[aria-pressed="true"]')).toHaveText("Suppliers");
+  const models = await openProviderModels(page, "fixture");
+  await expect(models).toHaveCount(1);
+  await expect(models).toHaveAttribute("data-provider-models", "fixture");
   await configuredModelEdit(page, "fixture", "existing").click();
   await expect(page.getByRole("button", { name: "Replace access key", exact: true })).toHaveCount(0);
   await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();

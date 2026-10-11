@@ -1,7 +1,8 @@
 # Shared dashboard controls
 
-Button, Card and Separator are adapted from shadcn/ui's `new-york-v4`
-registry source, retrieved on 2026-09-27:
+Registry components live in `primitives/`. Public adapters and re-exports live
+in this directory. Button, Card and Separator retain the accepted project
+adjustments to shadcn/ui's `new-york-v4` sources:
 
 - https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/button.tsx
 - https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/card.tsx
@@ -9,11 +10,10 @@ registry source, retrieved on 2026-09-27:
 
 The registry is MIT licensed: https://github.com/shadcn-ui/ui/blob/main/LICENSE.md.
 The copyright notice and license are retained in `LICENSE.shadcn.md`.
-We hand-added this small set because CLI initialization rewrites the CSS entry
-and adds aliases. This app already has Tailwind v4, a dynamic palette, and a
-single TypeScript config. No CLI, `components.json`, shadcn runtime,
-icon package, animation package, or remote resource is required. Dialog uses
-Radix's browser portal as described below.
+The project pins the development CLI in `frontend/package.json` and configures
+it through `frontend/components.json`. Follow [the maintenance workflow](./WORKFLOW.md)
+to inspect and add registry sources in a disposable copy. Dialog uses Radix's
+browser portal as described below.
 
 ## Adoption
 
@@ -24,6 +24,60 @@ merges conditional Tailwind classes.
 Feature owners adopt these controls through their existing props and handlers;
 the base controls do not load data or own editor, auth, locale, or theme state.
 Dialog's workspace and return-focus adapter is described below.
+
+Input, Textarea, Label, NativeSelect, Badge, Alert and Dialog use the
+`new-york` sources retrieved with the pinned CLI `4.21.4`. Original generated
+files and the adaptation receipt are retained under the Primitives task's
+`research/registry-generated/`. All registry imports use the local `cn` and
+focused Radix packages. Button variants stay in the existing separate module.
+
+## Fields and feedback
+
+Import `Input`, `Textarea`, `Label`, `NativeSelect`, `NativeSelectOption`,
+`NativeSelectOptGroup`, `Checkbox`, `Badge`, and `Alert` from the corresponding
+lowercase public modules. Import `Field` from `@/shared/ui/Field`. Text controls
+forward native events, names, values, refs and disabled/readonly attributes.
+They never parse numeric drafts or replace an empty value. Input and single
+NativeSelect default to 44px; Textarea retains native resizing and scrolling.
+Supply localized labels and caller-owned validation.
+
+```tsx
+<Field id="price" label={priceLabel} description={help} error={error}>
+  {(associations) => <Input {...associations} type="number" name="price"
+    value={draft} onChange={(event) => setDraft(event.target.value)} />}
+</Field>
+```
+
+Field's callback supplies the id, help/error description references, invalid
+state and optional required attribute. Spread those props onto the actual
+control. The callback leaves the caller's ref, event handling and draft intact.
+Help/error paragraphs are static; callers retain their announcement ownership.
+
+NativeSelect wraps a real select in a full-width, minimum-width-zero container.
+Its ref points to the select and its change handler receives the native select
+event. Keep all sentinel options, including empty strings, `null`, `true` and
+`false`. The native numeric `size` and `multiple` props remain available;
+listboxes render without the SVG chevron. A single select uses one current-color
+12px chevron at a 12px inset, with 36px right padding. The legacy CSS chevron
+excludes this component. Forced colors restores native appearance and hides
+the SVG. Layout classes passed as `className` affect the select; put grid or
+flex positioning on a surrounding field rather than assuming a bare select.
+
+Checkbox is a documented native compatibility adapter. It preserves
+`ChangeEvent<HTMLInputElement>`, `checked`, name/value submission, fieldset
+disablement and refs. Its `indeterminate` prop sets the native DOM property;
+it does not turn unknown model capabilities into unchecked booleans. Existing
+model capabilities continue to use tri-state selects. No Switch, Tabs,
+DropdownMenu or Tooltip is installed because the current mapped source has no
+matching generic consumer. Native details/summary and coordinate-owned canvas
+menus remain with their feature owners.
+
+Badge supports default, secondary, destructive and outline variants. Keep
+unknown/partial/conflict/source labels distinct at the call site. Destructive
+paint stays opaque and uses the accepted contrasting foreground. Alert exports
+Title and Description slots and supports default/destructive variants. Set
+`role="alert"` or `role="status"` and `aria-live` at the call site according to
+the existing feedback owner. The shared visual primitive supplies no live role.
 
 ```tsx
 import { Button } from "@/shared/ui/button";
@@ -101,11 +155,13 @@ describes the controlled Root and autofocus callbacks used here.
 shadcn roles to the existing JEV variables, and the dark variant reads
 `data-scheme="dark"`. `applyPalette` remains the theme authority. shadcn's
 subtle accent is represented with `panel-muted`; JEV's `--accent` stays the
-action color. Destructive buttons use a semantic foreground/border on a surface
-rather than assuming white text contrasts against every derived failure color.
+action color.
+Destructive buttons use the failure palette as their background and the panel
+surface as their foreground. This preserves label contrast independently of
+the primary action's seed-derived foreground.
 
-Registry defaults are adjusted to 8px cards, 6px controls, 13px control text,
-16px panel spacing, explicit solid borders, and no panel shadows. Button skin
+Registry defaults retain restrained card/control radii, 16px panel spacing,
+explicit solid borders, native text control sizing and no panel shadows. Button skin
 utilities use Tailwind v4's trailing `!` modifier where the shared base control
 rules would otherwise take precedence. This is limited to these owned controls;
 there is no global important mode or reset. Override those properties with
@@ -116,6 +172,6 @@ available for measurement and testing.
 
 Runtime dependencies are `class-variance-authority`, `clsx`, `tailwind-merge`,
 `@radix-ui/react-slot`, `@radix-ui/react-separator`, and
-`@radix-ui/react-dialog`. Targeted Radix packages
+`@radix-ui/react-dialog`, plus `@radix-ui/react-label` for Label. Targeted Radix packages
 avoid installing the full primitive collection. No new browser storage is used.
 The existing `/dashboard/` base, package output path and gateway CSP stay intact.

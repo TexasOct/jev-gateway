@@ -8,7 +8,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default: "border-primary bg-primary text-primary-foreground hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active aria-pressed:bg-primary-hover aria-pressed:text-primary-foreground",
-        destructive: "border-destructive! bg-destructive! text-destructive-foreground! hover:bg-destructive/90!",
+        destructive: "border-destructive! bg-destructive! text-destructive-foreground! hover:bg-destructive!",
         outline: "border-border bg-card text-foreground shadow-xs hover:border-primary hover:bg-panel-muted aria-pressed:bg-panel-muted aria-pressed:text-foreground",
         secondary: "border-border bg-secondary text-secondary-foreground shadow-xs hover:border-primary",
         ghost: "border-transparent bg-transparent text-foreground hover:bg-panel-muted aria-pressed:bg-panel-muted",

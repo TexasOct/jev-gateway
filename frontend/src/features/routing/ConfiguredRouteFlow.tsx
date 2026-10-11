@@ -7,6 +7,8 @@ import type { WorkflowEdge } from "./model/draft";
 import { messages } from "@/shared/i18n";
 import { selectionCaption } from "./model/selection";
 import { formatRouteLabel } from "@/shared/i18n/route-label";
+import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
 
 export interface ConfiguredRouteFlowProps {
   draft: RoutingDraft;
@@ -122,7 +124,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
   }
 
   function pool(branch: ConfiguredBranch) {
-    return <div className="min-w-0 rounded-xl border border-outline bg-panel-muted p-3">
+    return <div className="min-w-0 border-s border-outline ps-3">
       <span className="text-xs text-ink-muted">{text.pool}</span>
       <p className="mt-1 break-words text-sm font-semibold text-ink">{branch.label ?? text.unbound}</p>
       <p className="mt-1 text-xs text-ink-muted">{text.selection}: {selectionCaption(branch.selection, (key) => messages[locale][key])}</p>
@@ -133,13 +135,13 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
     </div>;
   }
 
-  return <section className="my-3 min-w-0 rounded-xl border border-outline bg-panel p-3 text-ink sm:p-4" aria-label={text.title}>
+  return <section className="my-3 min-w-0 border-t border-outline py-3 text-ink" aria-label={text.title}>
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <h3 className="text-sm font-semibold">{text.title}</h3>
-      <span className="rounded-md border border-outline bg-panel-muted px-2 py-1 text-xs text-ink-muted" aria-label={projection.changed ? text.draft : text.applied}>{projection.changed ? text.draft : text.applied}</span>
+      <Badge variant="outline" className="max-w-full whitespace-normal text-ink-muted" aria-label={projection.changed ? text.draft : text.applied}>{projection.changed ? text.draft : text.applied}</Badge>
     </div>
     <p className="mt-2 text-xs text-ink-muted">{text.note}</p>
-    <div className="mt-4 min-w-0 rounded-xl border border-outline bg-panel-muted p-3">
+    <div className="mt-4 min-w-0 border-b border-outline pb-3">
       <h4 className="text-xs font-semibold text-ink">{text.questions}</h4>
       {projection.questions.length ? <ul className="mt-2 flex flex-wrap gap-2">{projection.questions.map((question) => <li key={question.name} className="min-w-0 max-w-full rounded-md border border-outline bg-panel px-2 py-1 text-xs text-ink"><strong className="break-words">{question.name}</strong>{question.instructions && <span className="ml-2 break-words text-ink-muted">{question.instructions}</span>}<span className="block break-words text-ink-muted">{question.criteria.map((criterion) => `${criterion.name}: ${criterion.description}`).join(" · ")}</span></li>)}</ul> : <p className="mt-2 text-xs text-ink-muted">{text.noQuestions}</p>}
     </div>
@@ -147,11 +149,11 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
     <ol className="min-w-0">
       {projection.branches.map((branch, index) => <li key={branch.id} className="min-w-0">
         {branch.kind === "failure" && wire("questions", "fallback", "failure", text.failure)}
-        <div className={`my-2 grid min-w-0 gap-2 rounded-xl border p-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center ${active?.id === branch.id ? "border-primary bg-panel-muted" : "border-outline"}`}>
-          <button type="button" onClick={() => select(branch.id)} aria-pressed={active?.id === branch.id} className="min-h-10 min-w-0 rounded-md border border-outline bg-panel px-3 py-2 text-left text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        <div className={`my-2 grid min-w-0 gap-2 border-b p-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center ${active?.id === branch.id ? "border-primary bg-panel-muted" : "border-outline"}`}>
+          <Button variant="outline" type="button" onClick={() => select(branch.id)} aria-pressed={active?.id === branch.id} className="grid h-auto min-h-10 min-w-0 justify-items-start whitespace-normal px-3 py-2 text-left text-sm">
             <span className="font-semibold">{branch.kind === "failure" ? text.fallback : branch.kind === "default" ? text.default : `${text.rule} ${branch.order}`}</span>
             {branch.conditions.map(({ question, values }) => <span key={question} className="block break-words text-xs text-ink-muted">{question} = {values.join(" | ")}</span>)}
-          </button>
+          </Button>
           {branch.poolId ? (() => { const edge = branch.path.filter((edge) => edge.kind !== "default").at(-1)!; return wire(edge.from, edge.to, edge.kind, branch.kind === "default" ? edge.kind === "unmatched" ? text.fallbackNext : text.direct : text.match); })() : <span className="text-xs text-ink-muted">{text.missingPool}</span>}
           {pool(branch)}
         </div>
@@ -159,7 +161,7 @@ export default function ConfiguredRouteFlow({ draft, config, locale, initialSele
         {branch.kind === "rule" && projection.branches[index + 1]?.kind === "rule" && wire(branch.id, projection.branches[index + 1]!.id, "unmatched", text.unmatched)}
       </li>)}
     </ol>
-    <div className="mt-3 rounded-xl border border-outline bg-panel-muted p-3 text-xs leading-5 text-ink" role="status" aria-live="polite">
+    <div className="mt-3 border-s-2 border-outline ps-3 text-xs leading-5 text-ink" role="status" aria-live="polite">
       {active ? <>
         <p>{active.kind === "failure" ? text.failed : active.kind === "default" ? text.final : text.chosen}{active.label ? `: ${active.label}.` : "."}</p>
         {active.path.some((edge) => edge.kind === "unmatched") && <p>{text.skip}</p>}

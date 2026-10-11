@@ -2,7 +2,8 @@ import { useId, useRef, useState } from "react";
 import type { ProviderProfile } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
-import { controlClass } from "../shared/constants";
+import { Input } from "@/shared/ui/input";
+import { Field } from "@/shared/ui/Field";
 import { brandIcon, genericIcons, genericIconLabels, searchIcons } from "../shared/icons";
 import { ProviderIdentity } from "../shared/ProviderIdentity";
 
@@ -28,7 +29,7 @@ export function ProviderIconPicker({ provider, disabled, onChange, t }: Props) {
     {expanded && <div id={libraryID} className="grid min-w-0 gap-3">
       <p className="m-0 text-xs text-ink-muted">{t("pmIconIndependent")}</p>
       <div className="flex min-w-0 flex-wrap gap-2">{[null, ...genericIcons].map((choice) => <Button type="button" variant="outline" className="min-h-11 whitespace-normal aria-pressed:border-primary aria-pressed:bg-panel-muted aria-pressed:text-primary" key={choice ?? "automatic"} disabled={disabled} aria-pressed={choice === null ? !id : id === choice} onClick={() => onChange(choice)}>{t(choice === null ? "pmIconAutomatic" : genericIconLabels[choice])}</Button>)}</div>
-      <label className="grid min-w-0 gap-1 text-sm"><span>{t("pmIconSearch")}</span><input className={controlClass} type="search" value={search} disabled={disabled} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => setSearch(event.target.value)} /></label>
+      <Field id={`${libraryID}-search`} label={t("pmIconSearch")}>{(props) => <Input {...props} type="search" value={search} disabled={disabled} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => setSearch(event.target.value)} />}</Field>
       <div className="grid max-h-80 min-w-0 grid-cols-2 gap-2 overflow-y-auto p-1 sm:grid-cols-3" aria-label={t("pmIconLibrary")}>
         {icons.map((icon) => <Button type="button" key={icon.id} variant="outline" className="h-auto min-h-24 min-w-0 flex-col gap-2 whitespace-normal p-2 aria-pressed:border-primary aria-pressed:bg-panel-muted aria-pressed:text-primary" disabled={disabled} aria-label={icon.label} aria-pressed={id === icon.id} onClick={() => onChange(icon.id)}><ProviderIdentity provider={{ ...provider, icon_id: icon.id }} compact t={t} /><span className="w-full min-w-0 break-words text-xs">{icon.label}</span></Button>)}
       </div>

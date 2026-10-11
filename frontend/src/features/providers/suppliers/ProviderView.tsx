@@ -15,7 +15,11 @@ import { newSupplierIdentity, transportReference } from "./supplierIdentity";
 import { TransportCredentialFields } from "./TransportCredentialFields";
 import { submittedCredentialDraft, transportActions, transportFields, validTransportValue, type TransportDraft } from "./transportCredentials";
 import { useSupplierConnection } from "./useSupplierConnection";
-import { controlClass } from "../shared/constants";
+import { Input } from "@/shared/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { Field } from "@/shared/ui/Field";
+import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { ProviderIconPicker } from "./ProviderIconPicker";
 import { ProviderIdentity } from "../shared/ProviderIdentity";
 import { AssetCredits } from "../shared/AssetCredits";
@@ -348,10 +352,8 @@ export function ProviderView({ manager, t }: Props) {
     locked = false,
     disabledField = false,
   ) => (
-    <label className="grid min-w-0 gap-1 text-sm" key={name}>
-      <span>{t(label)}</span>
-      <input
-        className={controlClass}
+    <Field id={`supplier-${name}`} label={t(label)} required={required} key={name}>{(props) => <Input
+        {...props}
         name={name}
         required={required}
         readOnly={locked}
@@ -359,8 +361,7 @@ export function ProviderView({ manager, t }: Props) {
         value={String(editor?.draft[name] ?? "")}
         autoComplete="off"
         onChange={(event) => change(name, event.target.value)}
-      />
-    </label>
+      />}</Field>
   );
   const candidateSelector: ProviderSelector | null = writableProfile
     ? { provider: writableProfile, credential, ...(kind === "llm" && transportCredentials && Object.keys(transportCredentials).length ? { transport_credentials: transportCredentials } : {}) }
@@ -407,7 +408,7 @@ export function ProviderView({ manager, t }: Props) {
         </p>
       )}
       {operationError !== null && (
-        <div role="alert" className="grid min-w-0 gap-2 text-sm text-ink-muted">
+        <Alert role="alert" variant="destructive"><AlertDescription>
           <span>{errorText(operationError)}</span>
           <Button
             className="min-h-11 justify-self-start"
@@ -417,7 +418,7 @@ export function ProviderView({ manager, t }: Props) {
           >
             {t("pmReload")}
           </Button>
-        </div>
+        </AlertDescription></Alert>
       )}
       {config && !config.write_available && (
         <p role="status" className="m-0 text-sm text-ink-muted">
@@ -445,7 +446,7 @@ export function ProviderView({ manager, t }: Props) {
       {editor ? (
         <>
           <div data-provider-editor={editor.draft.id} className="flex min-w-0 flex-wrap items-center gap-3">
-            <ProviderIdentity provider={editor.draft} t={t} />
+            <ProviderIdentity provider={editor.draft} compact t={t} />
             <p className="m-0 min-w-0 flex-1 break-words text-base font-semibold">
               {t(editor.original ? "pmEdit" : "pmAdd")}: {editor.draft.display_name || editor.draft.id}
             </p>
@@ -498,10 +499,8 @@ export function ProviderView({ manager, t }: Props) {
                 </Button>
               </div>
               <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
-                <label className="grid min-w-0 gap-1 text-sm">
-                  <span>{t(kind === "llm" ? "pmType" : "pmProtocol")}</span>
-                  <select
-                    className={controlClass}
+                <Field id="supplier-transport" label={t(kind === "llm" ? "pmType" : "pmProtocol")} required>{(props) => <NativeSelect
+                    {...props}
                     required
                     value={
                       kind === "llm" ? editor.draft.type : editor.draft.protocol
@@ -513,14 +512,13 @@ export function ProviderView({ manager, t }: Props) {
                       )
                     }
                   >
-                    <option value="">{t("pmUnknown")}</option>
+                    <NativeSelectOption value="">{t("pmUnknown")}</NativeSelectOption>
                     {options.map((option) => (
-                      <option key={option} value={option}>
+                      <NativeSelectOption key={option} value={option}>
                         {option === "system_one" ? "System One" : option}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
-                </label>
+                  </NativeSelect>}</Field>
                 <div className="sm:row-start-2">{field("display_name", "pmName", true)}</div>
                 <div className="grid min-w-0 content-start gap-1 sm:col-start-2 sm:row-start-1">
                   {field(
@@ -532,8 +530,7 @@ export function ProviderView({ manager, t }: Props) {
                   )}
                   {kind === "llm" && (
                     <label className="flex min-h-11 items-center gap-2 text-sm text-ink-muted">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         disabled={template?.api_base === ""}
                         checked={editor.draft.api_base === null}
                         onChange={(event) =>
@@ -552,11 +549,9 @@ export function ProviderView({ manager, t }: Props) {
                     {field("model", "pmModel")}
                   </>
                 )}
-                {!platformCredential && <label className="grid min-w-0 gap-1 text-sm">
-                  <span>{t("pmCredential")}</span>
-                  <select
+                {!platformCredential && <Field id="supplier-credential-action" label={t("pmCredential")}>{(props) => <NativeSelect
+                    {...props}
                     data-primary-action
-                    className={controlClass}
                     value={credentialAction}
                     onChange={(event) =>
                       changeCredential(
@@ -565,17 +560,14 @@ export function ProviderView({ manager, t }: Props) {
                       )
                     }
                   >
-                    <option value="keep">{t("pmKeep")}</option>
-                    <option value="set">{t("pmSet")}</option>
-                    <option value="clear">{t("pmClear")}</option>
-                  </select>
-                </label>}
+                    <NativeSelectOption value="keep">{t("pmKeep")}</NativeSelectOption>
+                    <NativeSelectOption value="set">{t("pmSet")}</NativeSelectOption>
+                    <NativeSelectOption value="clear">{t("pmClear")}</NativeSelectOption>
+                  </NativeSelect>}</Field>}
                 {!platformCredential && credentialAction !== "clear" && (
-                  <label className="grid min-w-0 gap-1 text-sm">
-                    <span>{t("pmSecret")}</span>
-                    <input
+                  <Field id="supplier-secret" label={t("pmSecret")}>{(props) => <Input
+                      {...props}
                       data-primary-secret
-                      className={controlClass}
                       type="password"
                       value={secret}
                       placeholder={t("spKeepBlank")}
@@ -584,8 +576,7 @@ export function ProviderView({ manager, t }: Props) {
                       onChange={(event) =>
                         changeCredential(event.target.value ? "set" : "keep", event.target.value)
                       }
-                    />
-                  </label>
+                    />}</Field>
                 )}
                 <p className="m-0 text-xs text-ink-muted sm:col-span-2">
                   {t(platformCredential ? "spPlatformCredentials" : "pmSecretNote")}
@@ -602,11 +593,9 @@ export function ProviderView({ manager, t }: Props) {
                 )}
               </div>
               {!!cloudFields.length && template && <>
-                <label className="grid min-w-0 gap-1 text-sm"><span>{t("spAuthMethod")}</span>
-                  <select className={controlClass} value={authMethod} onChange={(event) => { connection.reset(); manager.cancelQuery(); setAuthMethod(event.target.value as typeof authMethod); }}>
-                    <option value="server">{t("spServerAuth")}</option><option value="direct">{t("spDirectAuth")}</option>
-                  </select>
-                </label>
+                <Field id="supplier-auth-method" label={t("spAuthMethod")}>{(props) => <NativeSelect {...props} value={authMethod} onChange={(event) => { connection.reset(); manager.cancelQuery(); setAuthMethod(event.target.value as typeof authMethod); }}>
+                    <NativeSelectOption value="server">{t("spServerAuth")}</NativeSelectOption><NativeSelectOption value="direct">{t("spDirectAuth")}</NativeSelectOption>
+                  </NativeSelect>}</Field>
                 <p className="m-0 text-xs text-ink-muted">{t(authMethod === "server" ? "spServerAuthNote" : "pmSecretNote")}</p>
                 {authMethod === "direct" && <TransportCredentialFields preset={template} profile={editor.original ?? editor.draft} drafts={transportDrafts} onChange={changeTransport} />}
                 {directIncomplete && <p role="status" className="m-0 text-sm text-ink-muted">{t(template.type === "bedrock" ? "spAWSPair" : "spVertexRequired")}</p>}
@@ -643,7 +632,7 @@ export function ProviderView({ manager, t }: Props) {
                     {t("pmPreserved")}
                   </p>
                   {kind === "llm" && <div className="grid gap-1 sm:col-span-2">
-                    <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={editor.draft.allow_private_network === true} onChange={(event) => change("allow_private_network", event.target.checked)} />{t("pmPrivate")}</label>
+                    <label className="flex min-h-11 items-center gap-3 text-sm"><Checkbox checked={editor.draft.allow_private_network === true} onChange={(event) => change("allow_private_network", event.target.checked)} />{t("pmPrivate")}</label>
                     <p className="m-0 text-xs text-ink-muted">{t("pmPrivateNote")}</p>
                   </div>}
                   <div className="sm:col-span-2"><ProviderIconPicker provider={editor.draft} t={t} disabled={disabled} onChange={(id) => change("icon_id", id)} /></div>
@@ -711,15 +700,12 @@ export function ProviderView({ manager, t }: Props) {
               {t("pmCancel")}
             </Button>
           </div>
-          <label className="grid min-w-0 gap-1 text-sm">
-            <span>{t("pmSupplierSearch")}</span>
-            <input
-              className={controlClass}
+          <Field id="supplier-preset-search" label={t("pmSupplierSearch")}>{(props) => <Input
+              {...props}
               type="search"
               value={supplierSearch}
               onChange={(event) => setSupplierSearch(event.target.value)}
-            />
-          </label>
+            />}</Field>
           <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {searchProfiles(presets, supplierSearch).map((preset) => (
               <Button
@@ -728,7 +714,7 @@ export function ProviderView({ manager, t }: Props) {
                 variant="outline"
                 onClick={() => openEditor(null, preset)}
               >
-                <ProviderIdentity provider={preset} t={t} />
+                <ProviderIdentity provider={preset} compact t={t} />
                 <span className="min-w-0 break-words">
                   {preset.display_name || preset.id}
                   <span className="block break-all text-xs text-ink-muted">
@@ -753,10 +739,8 @@ export function ProviderView({ manager, t }: Props) {
       ) : (
         <>
           <div className="flex min-w-0 flex-wrap items-end gap-2">
-            <label className="grid min-w-0 flex-1 gap-1 text-sm">
-              <span>{t("pmSearch")}</span>
-              <input
-                className={controlClass}
+            <div className="min-w-0 flex-1"><Field id="supplier-search" label={t("pmSearch")}>{(props) => <Input
+                {...props}
                 type="search"
                 value={search}
                 disabled={manager.pending}
@@ -767,8 +751,7 @@ export function ProviderView({ manager, t }: Props) {
                   if (hidesGroup && navigationGuardRef.current?.() === false) return;
                   setSearch(next);
                 }}
-              />
-            </label>
+              />}</Field></div>
             <Button
               data-provider-add
               className="min-h-11"
@@ -788,10 +771,10 @@ export function ProviderView({ manager, t }: Props) {
                 aria-label={profile.display_name || profile.id}
                 data-supplier-id={profile.id}
                 key={profile.id}
-                className="grid min-w-0 gap-3 border-b border-outline pb-4"
+                className="grid min-w-0 gap-3 border-b border-outline py-4"
               >
               <div
-                className="flex min-w-0 flex-wrap items-center gap-3 border-b border-outline py-3"
+                className="flex min-w-0 flex-wrap items-center gap-3"
               >
                 <ProviderIdentity provider={profile} t={t} />
                 <div className="min-w-0 flex-1">

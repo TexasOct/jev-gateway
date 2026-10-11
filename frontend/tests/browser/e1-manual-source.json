@@ -1,0 +1,28 @@
+{
+  "kind": "E1 unchanged production component source binding",
+  "captured": "2026-10-11T08:11:09.297Z",
+  "head": "8352e4b0818c73c5f2dee6a98345e655b85a1cba",
+  "frozenManifest": ".trellis/tasks/10-06-shadcn-ui-adoption/research/reconciled-frozen-source.json",
+  "frozenManifestSHA256": "91c5fc7d9630d45f6e2be04bfd31d02e062646d765287fa8f2aea9d72030829d",
+  "frozenFiles": 462,
+  "sourceMismatches": [],
+  "sourceSHA256": {
+    "frontend/src/features/providers/models/ModelDialog.tsx": "cf37e7fdefc06577c3fc89eb6251b65abbb9da54f12e53d8ccfcbcc2b66db884",
+    "frontend/src/features/providers/models/ModelFields.tsx": "6d43239ba901121aefa95e7890109d167ec2f6ed8cceefc74c6bf8f880d33597",
+    "frontend/src/features/providers/models/model.ts": "d0d40f48c5c9e67aec9403116a51b1f745d8b2135bb72e0d9edeaf8744cad50d",
+    "frontend/src/shared/ui/Dialog.tsx": "864d0c7ed2ea44f224bab90065643c28bf66eaa70843c7289cee450b21d4c457",
+    "frontend/src/shared/ui/primitives/dialog.tsx": "724088e04957c0622466fa7d70e373a0be9d75e58eb63d06bdcdb85af0399668",
+    "frontend/src/shared/ui/primitives/native-select.tsx": "64e64a40938db32abcc2bcdda07a2af2e8efa435491f406cdaee621c32e5c9eb",
+    "frontend/src/styles/index.css": "3ebeacaad4c3e6b601b39805205964f8ade385d22d570b956cbc0e87446fe0a7"
+  },
+  "installedVersions": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "@radix-ui/react-dialog": "1.2.0",
+    "vite": "8.3.0",
+    "@playwright/test": "1.63.0"
+  },
+  "E1": "UNVERIFIED until human native-popup evidence is reviewed",
+  "fixtureOnly": true,
+  "persistentGatewayWrites": false
+}

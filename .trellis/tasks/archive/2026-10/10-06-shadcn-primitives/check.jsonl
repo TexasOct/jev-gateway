@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required lint/type/unit/browser checks."}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Native selects, modal auth and CSS/geometry compatibility."}
+{"file":".trellis/tasks/archive/2026-10/10-06-shadcn-ui-adoption/research/component-migration-map.md","reason":"Field/form/tri-state/modal acceptance matrix."}
+{"file": ".trellis/tasks/archive/2026-10/10-06-shadcn-ui-adoption/construction.md", "reason": "User-approved B presentation, current baseline, exclusive ownership and preserved behavior."}
+{"file": ".trellis/tasks/archive/2026-10/10-06-shadcn-ui-adoption/research/current-cli-reference.md", "reason": "Retrieved current CLI version, supported setup flags, component configuration and official references."}

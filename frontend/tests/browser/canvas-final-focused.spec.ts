@@ -7,7 +7,13 @@ import { en } from "../../src/shared/i18n/en";
 
 const policy = "/v1/routing/configuration", layoutPath = "/v1/dashboard/canvas-layout";
 const layout = { version: 1 as const, nodes: { questions: { x: 50, y: 80 }, "rule-0": { x: 420, y: 80 }, fallback: { x: 420, y: 300 } }, viewport: { x: 0, y: 0 } };
-async function enter(page: Page, target: Locator) { await expect(target).toBeEnabled(); await target.focus(); await page.keyboard.press("Enter"); }
+async function enter(page: Page, target: Locator) {
+  await expect(target).toBeEnabled();
+  const opensInspector = await target.getAttribute("data-canvas-node", { timeout: 5000 }) !== null;
+  await target.focus();
+  await page.keyboard.press("Enter");
+  if (opensInspector) await expect(page.locator(".workflow-inspector > header").getByRole("button")).toBeFocused();
+}
 async function frames(page: Page) { await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); }
 async function open(page: Page) {
   await page.setViewportSize({ width: 1280, height: 900 });

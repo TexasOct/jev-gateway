@@ -20,6 +20,9 @@ import { CanvasModelEditor } from "@/features/providers/models/CanvasModelEditor
 import { ConnectionPage } from "./ConnectionPage";
 import { GlobalDefaultModel } from "@/features/settings/GlobalDefaultModel";
 import { AccessSecurity } from "@/features/settings/AccessSecurity";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { NativeSelect } from "@/shared/ui/native-select";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 type FormatDateTime = ReturnType<typeof useLocale>["formatDateTime"];
@@ -204,7 +207,7 @@ export function AppShell({
   }
   if (setup?.required) {
     return <main className="min-h-dvh bg-page p-4 text-ink">
-      <Card className="mx-auto grid w-full min-w-0 max-w-3xl gap-3 p-4">
+      <Card className="mx-auto grid w-full min-w-0 max-w-3xl gap-3 rounded-none border-0 bg-transparent p-4 shadow-none">
         <h1 className="m-0 text-lg font-semibold">{t("settings")}</h1>
         <section aria-label={t("accessSecurity")} className="grid gap-3">
         <h2 className="m-0 text-sm font-semibold">{t("accessSecurity")}</h2>
@@ -213,15 +216,14 @@ export function AppShell({
         <p className="m-0 text-sm text-ink-muted">{t("gwDashboardRole")}</p>
         <p className="m-0 text-sm text-ink-muted">{t("gwSupplierRole")}</p>
         <p className="m-0 text-sm text-ink-muted">{t("gwInitializeEffects")}</p>
-        <label className="flex items-center gap-2">{t("language")}
-          <select value={locale} onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}>
+        <div className="grid min-w-0 gap-2"><Label htmlFor="setup-language">{t("language")}</Label>
+          <NativeSelect id="setup-language" value={locale} onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}>
             <option value="en">English</option><option value="zh-CN">简体中文</option>
-          </select>
-        </label>
+          </NativeSelect>
+        </div>
         {setup.local_setup_available ? <form className="grid gap-3" onSubmit={onSetup}>
-          <label htmlFor="setup-key">{t("apiKey")}</label>
-          <input id="setup-key" type="password" autoComplete="new-password" minLength={16} maxLength={8192} required disabled={setupPending}
-            className="min-h-9 min-w-0 rounded-lg border border-outline bg-panel px-3 text-ink"
+          <Label htmlFor="setup-key">{t("apiKey")}</Label>
+          <Input id="setup-key" type="password" autoComplete="new-password" minLength={16} maxLength={8192} required disabled={setupPending}
             value={keyDraft} onChange={(event) => onKeyDraftChange(event.target.value)} aria-describedby="setup-key-note" />
           <p id="setup-key-note" className="m-0 text-ink-muted">{t("setupKeyNote")}</p>
           <Button type="submit" disabled={setupPending}>{t(setupPending ? "loading" : "setupSubmit")}</Button>
@@ -270,7 +272,7 @@ export function AppShell({
         </div>
         <nav
           data-dashboard-view-nav
-          className="col-span-2 row-start-2 flex w-fit max-w-full min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:thin] rounded-lg border border-outline bg-panel-muted p-1 lg:col-span-1 lg:row-start-1"
+          className="col-span-2 row-start-2 flex w-fit max-w-full min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:thin] rounded-md p-1 lg:col-span-1 lg:row-start-1"
           aria-label={t("views")}
           onFocusCapture={(event) => {
             const nav = event.currentTarget, target = event.target;
@@ -298,7 +300,7 @@ export function AppShell({
               size="sm"
               aria-pressed={view === target}
               disabled={navigationPending}
-              className="min-w-0 max-w-40 shrink-0 truncate rounded-md px-3 aria-pressed:border-outline aria-pressed:bg-panel aria-pressed:text-primary aria-pressed:shadow-xs"
+              className="min-w-0 max-w-40 shrink-0 truncate rounded-md px-3 aria-pressed:bg-panel-muted aria-pressed:text-primary"
               onClick={() => onOpenView(target)}
             >
               {label}
@@ -394,7 +396,7 @@ export function AppShell({
         ) : view === "settings" ? (
           <section className="mx-auto grid w-full min-w-0 max-w-3xl gap-4" aria-label={t("settings")}>
             <div className="flex min-w-0 flex-wrap items-center gap-3 border-b border-outline pb-4">
-              <h2 className="m-0 w-full text-sm font-semibold text-ink">
+              <h2 className="m-0 w-full text-xl font-semibold tracking-tight text-ink">
                 {t("settings")}
               </h2>
             </div>

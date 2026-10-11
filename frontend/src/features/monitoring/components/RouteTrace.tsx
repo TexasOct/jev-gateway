@@ -6,6 +6,8 @@ import { adjacentEvidenceLinks, locateRouteProgress } from "../model/route-trace
 import { playbackStages } from "../model/route-playback";
 import { useLocale } from "@/shared/i18n";
 import { formatRouteLabel, routeLabelContext } from "@/shared/i18n/route-label";
+import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
 
 type StageKey = "request" | "decision" | "upstream_request" | "outcome";
 type Stage = { key: StageKey; value: Record<string, unknown> | null };
@@ -268,7 +270,7 @@ export function RouteTrace({ item, policyCatalog }: Props) {
           <h3 className="m-0 text-[0.95rem]">{t("traceTitle")}</h3>
           <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">{item ? String(item.request["request_id"] ?? t("unknownRequest")) : t("traceChooseRequest")}</p>
         </div>
-        <span data-outcome={status} className={`trace-outcome shrink-0 rounded-md border border-outline px-[0.45rem] py-[0.2rem] text-xs ${status === "success" ? "text-positive" : status === "failure" ? "text-negative" : "text-ink-muted"}`}>{outcomeLabel}</span>
+        <Badge variant="outline" data-outcome={status} className={`trace-outcome ${status === "success" ? "text-positive" : status === "failure" ? "text-negative" : "text-ink-muted"}`}>{outcomeLabel}</Badge>
       </div>
       <div className={`trace-stage-area relative isolate mt-[0.65rem] min-h-[8.8rem] overflow-hidden p-2 max-[720px]:min-h-[21rem] max-[720px]:overflow-visible max-[720px]:[.request-card.selected_&]:min-h-64 ${reducedMotion ? "motion-reduce:transition-none" : ""}`} data-trace-motion={reducedMotion ? "reduced" : "full"}>
         <svg ref={svgRef} className="trace-connections pointer-events-none absolute inset-0 z-0 size-full overflow-visible max-[720px]:z-[2]" width={geometry.width} height={geometry.height} viewBox={`0 0 ${geometry.width} ${geometry.height}`} aria-hidden="true">
@@ -299,11 +301,11 @@ export function RouteTrace({ item, policyCatalog }: Props) {
       </div>
       <div className="trace-toolbar mt-[0.65rem] flex items-start justify-between gap-3 max-[720px]:flex-col">
         <div className="trace-controls flex flex-wrap gap-[0.35rem] [&_button]:min-h-9">
-          <button type="button" className="trace-primary border-primary bg-primary text-on-primary hover:enabled:bg-primary-hover" disabled={!item || playbackState === "playing"} onClick={replay}>
+          <Button type="button" className="trace-primary" disabled={!item || playbackState === "playing"} onClick={replay}>
             {playbackState === "paused" ? t("traceResume") : playbackState === "completed" ? t("traceReplayAgain") : t("traceReplay")}
-          </button>
-          <button type="button" disabled={!item || playbackState !== "playing"} onClick={pause}>{t("tracePause")}</button>
-          <button type="button" disabled={!item || playbackState === "ready"} onClick={reset}>{t("traceReset")}</button>
+          </Button>
+          <Button variant="outline" type="button" disabled={!item || playbackState !== "playing"} onClick={pause}>{t("tracePause")}</Button>
+          <Button variant="outline" type="button" disabled={!item || playbackState === "ready"} onClick={reset}>{t("traceReset")}</Button>
         </div>
         <p className="trace-live-status m-0 text-xs text-ink-muted" role="status" aria-live="polite" aria-atomic="true">{statusText}</p>
       </div>

@@ -40,6 +40,10 @@ import type { RuleLayoutMutation } from "./model/canvas";
 import type { ConfigurationPayload, LabelRow, RoutingOverlayPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select";
+import { Textarea } from "@/shared/ui/textarea";
+import { Checkbox } from "@/shared/ui/checkbox";
 import {
   addCriterion, addQuestion, addRule, diffSummary, draftFromConfiguration, incompleteLabels, invalidQuestions, labelMembers,
   moveRule, removeCriterion, removeQuestion, removeRule, renameCriterion, renameQuestion,
@@ -117,12 +121,12 @@ function ChoiceFields({ choice, labels, selections, onChoice }: {
 }) {
   const { t } = useTranslation();
   return <>
-    <label>{t("label")}<select value={matrixChoiceLabel(choice, labels[0]?.name) ?? ""} onChange={(event) => onChoice({ label: event.target.value })}>
-      <option value="">{t("unboundLabel")}</option>{labels.map((label) => <option key={label.name} value={label.name}>{label.name}</option>)}
-    </select></label>
-    <details className="border-t border-outline pt-2"><summary className="cursor-pointer text-xs text-ink-muted">{t("canvasAdvancedChoice")}</summary><label>{t("selection")}<select value={choice.selection ?? ""} onChange={(event) => onChoice({ selection: event.target.value || undefined })}>
-      <option value="">{t("inheritedSelection")}</option>{selections.map((value) => <option key={value} value={value}>{selectionCaption(value, t)}</option>)}
-    </select></label></details>
+    <label>{t("label")}<NativeSelect value={matrixChoiceLabel(choice, labels[0]?.name) ?? ""} onChange={(event) => onChoice({ label: event.target.value })}>
+      <NativeSelectOption value="">{t("unboundLabel")}</NativeSelectOption>{labels.map((label) => <NativeSelectOption key={label.name} value={label.name}>{label.name}</NativeSelectOption>)}
+    </NativeSelect></label>
+    <details className="border-t border-outline pt-2"><summary className="cursor-pointer text-xs text-ink-muted">{t("canvasAdvancedChoice")}</summary><label>{t("selection")}<NativeSelect value={choice.selection ?? ""} onChange={(event) => onChoice({ selection: event.target.value || undefined })}>
+      <NativeSelectOption value="">{t("inheritedSelection")}</NativeSelectOption>{selections.map((value) => <NativeSelectOption key={value} value={value}>{selectionCaption(value, t)}</NativeSelectOption>)}
+    </NativeSelect></label></details>
   </>;
 }
 
@@ -170,50 +174,50 @@ function RuleRow({
       <span className="rule-condition">{describeRule(rule, t)}</span>
       <label>
         {t("label")}
-        <select
+        <NativeSelect
           value={matrixChoiceLabel(rule.select, labels[0]?.name) ?? ""}
           disabled={disabled}
           onChange={(event) => onChoice({ label: event.target.value })}
         >
           {labels.map((label) => (
-            <option key={label.name} value={label.name}>
+            <NativeSelectOption key={label.name} value={label.name}>
               {label.name}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label>
         {t("selection")}
-        <select
+        <NativeSelect
           value={rule.select.selection ?? ""}
           disabled={disabled}
           onChange={(event) => onChoice({ selection: event.target.value })}
         >
-          <option value="">{t("defaultSelection")}</option>
+          <NativeSelectOption value="">{t("defaultSelection")}</NativeSelectOption>
           {selections.map((name) => (
-            <option key={name} value={name}>
+            <NativeSelectOption key={name} value={name}>
         {selectionCaption(name, t)}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <span className="flex gap-1">
-        <button
+        <Button variant="outline" size="icon"
           type="button"
           disabled={disabled || index === 0}
           onClick={() => onMove(index - 1)}
           aria-label={t("moveRuleEarlier").replace("{index}", String(index + 1))}
         >
           <span className="inline-flex w-[11px] items-center justify-center align-middle"><ArrowUp className="pointer-events-none size-4 shrink-0" aria-hidden="true" focusable="false" /></span>
-        </button>
-        <button
+        </Button>
+        <Button variant="outline" size="icon"
           type="button"
           disabled={disabled || index === total - 1}
           onClick={() => onMove(index + 1)}
           aria-label={t("moveRuleLater").replace("{index}", String(index + 1))}
         >
           <span className="inline-flex w-[11px] items-center justify-center align-middle"><ArrowDown className="pointer-events-none size-4 shrink-0" aria-hidden="true" focusable="false" /></span>
-        </button>
+        </Button>
       </span>
     </li>
   );
@@ -258,23 +262,23 @@ function ModelChip({
       </button>
       <label>
         {t("addToLabel")}
-        <select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink"
+        <NativeSelect
           value=""
           disabled={disabled || membershipLocked}
           aria-label={t("addModelToLabel").replace("{model}", model.id)}
           onChange={(event) => onMembership(event.target.value, true)}
         >
-          <option value="">{t("chooseLabel")}</option>
+          <NativeSelectOption value="">{t("chooseLabel")}</NativeSelectOption>
           {config.labels.filter((label) => label.resolution === "tag" && !model.tags.includes(label.tag)).map((label) => (
-            <option key={label.tag} value={label.tag}>{label.name}</option>
+            <NativeSelectOption key={label.tag} value={label.tag}>{label.name}</NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       {source === POOL_ID ? null : (
-        <button className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink hover:border-primary" type="button" disabled={disabled || membershipLocked} onClick={() => onMembership(source, false)}
+        <Button variant="outline" type="button" disabled={disabled || membershipLocked} onClick={() => onMembership(source, false)}
           aria-label={t("removeModelFromLabel").replace("{model}", model.id).replace("{label}", source)}>
           {t("remove")}
-        </button>
+        </Button>
       )}
       {foreign.length === 0 ? null : (
         <span className="break-words text-xs text-ink-muted" title={t("otherStrategyTags")}>
@@ -283,7 +287,7 @@ function ModelChip({
       )}
       <label className="flex items-center gap-2 text-xs text-ink-muted">
         {t("priority")}
-        <input className="min-h-8 w-20 rounded-md border border-outline bg-panel px-2 text-ink"
+        <Input className="w-20"
           type="number"
           value={model.priority}
           disabled={disabled}
@@ -696,10 +700,10 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {policyRecovery !== null && <div className="notice warn" role="status"><span>{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
-      {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <button type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</button></div>}
-      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <button type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</button>{reason === "type" && <button type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</button>}</div>)}
+      {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</Button></div>}
+      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</Button>{reason === "type" && <Button variant="outline" size="sm" type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</Button>}</div>)}
       {config.overlay.error === null ? null : (
-        <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <button type="button" disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || review !== null} onClick={() => { setResetReview(true); openDrawerAt("review"); }}>{t("resetBaseline")}</button></div>
+        <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <Button variant="outline" size="sm" type="button" disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || review !== null} onClick={() => { setResetReview(true); openDrawerAt("review"); }}>{t("resetBaseline")}</Button></div>
       )}
       {writeDisabled ? (
         <div className="notice warn">
@@ -745,8 +749,30 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
         <div className="inspector-body min-h-0 flex-1 overflow-y-auto p-3 text-[13px] text-ink">
         <p className="mb-3 border-s-2 border-primary bg-panel-muted p-2 text-xs text-ink-muted">{t("reviewChanges")} · {diff.changed ? t("pendingChanges") : t("noPendingChanges")}</p>
         <p className="mb-3 text-xs text-ink-muted">{selectedRuleExists ? t("ruleOrderFirstMatch") : selectedNode === "questions" ? t("canvasQuestionEntry") : selectedNode === "fallback" ? t("unmatchedFallback") : selectedNode.startsWith("zone::") ? t("modelPool") : t("priority")}</p>
-        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&>fieldset]:border-0 [&>fieldset]:p-0 [&_fieldset_fieldset]:border-0 [&_fieldset_fieldset]:p-0 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_label:has(input[type=checkbox])]:flex [&_label:has(input[type=checkbox])]:items-center [&_label:has(input[type=checkbox])]:gap-2 [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" aria-live="polite">
-          {selectedNode === "questions" ? <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" disabled={editDisabled}><legend>{t("questionDefinitions")}</legend>{Object.entries(draft.questions).map(([name, question]) => <div key={name}><label>{t("questionName")}<input value={questionNames[name] ?? name} onChange={(event) => setQuestionNames((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setDraft((current) => renameQuestion(current, name, questionNames[name]!)); setQuestionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(draft.questions).length <= 1 || draft.rules.some((rule) => Object.hasOwn(rule.when, name) && Object.keys(rule.when).length === 1)} onClick={() => setDraft((current) => removeQuestion(current, name))}>{t("remove")}</button><label>{t("instructions")}<textarea value={question.instructions} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, instructions: event.target.value }))} /></label><div>{Object.entries(question.criteria).map(([criterion, description]) => <div key={criterion}><label>{t("criterionKey")}<input value={criterionNames[`${name}::${criterion}`] ?? criterion} onChange={(event) => setCriterionNames((current) => ({ ...current, [`${name}::${criterion}`]: event.target.value }))} /></label><button type="button" disabled={!criterionNames[`${name}::${criterion}`] || (criterionNames[`${name}::${criterion}`] !== criterion && Object.hasOwn(question.criteria, criterionNames[`${name}::${criterion}`] ?? ""))} onClick={() => { setDraft((current) => renameCriterion(current, name, criterion, criterionNames[`${name}::${criterion}`]!)); setCriterionNames({}); }}>{t("rename")}</button><button type="button" disabled={Object.keys(question.criteria).length <= 2 || draft.rules.some((rule) => { const value = rule.when[name]; return (Array.isArray(value) ? value.length === 1 && value[0] === criterion : value === criterion) && Object.keys(rule.when).length === 1; })} onClick={() => setDraft((current) => removeCriterion(current, name, criterion))}>{t("remove")}</button><label>{t("criterionDescription")}<input value={description} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, criteria: { ...question.criteria, [criterion]: event.target.value } }))} /></label></div>)}</div><label>{t("newCriterion")}<input value={newCriteria[name] ?? ""} onChange={(event) => setNewCriteria((current) => ({ ...current, [name]: event.target.value }))} /></label><button type="button" onClick={() => { setDraft((current) => addCriterion(current, name, newCriteria[name] ?? "")); setNewCriteria((current) => ({ ...current, [name]: "" })); }}>{t("add")}</button></div>)}<label>{t("newQuestion")}<input value={newQuestion} onChange={(event) => setNewQuestion(event.target.value)} /></label><button type="button" onClick={() => { setDraft((current) => addQuestion(current, newQuestion)); setNewQuestion(""); }}>{t("add")}</button></fieldset> : null}
+        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&>fieldset]:border-0 [&>fieldset]:p-0 [&_fieldset_fieldset]:border-0 [&_fieldset_fieldset]:p-0 [&_label]:grid [&_label]:gap-2 [&_label]:text-xs [&_label]:text-ink-muted [&_label:has(input[type=checkbox])]:flex [&_label:has(input[type=checkbox])]:items-center [&_label:has(input[type=checkbox])]:gap-2" aria-live="polite">
+          {selectedNode === "questions" ? <fieldset className="grid min-w-0 gap-3 border-0 p-0 disabled:opacity-70" disabled={editDisabled}>
+            <legend>{t("questionDefinitions")}</legend>
+            {Object.entries(draft.questions).map(([name, question]) => <div key={name} className="grid gap-3 border-b border-outline pb-3">
+              <label>{t("questionName")}<Input value={questionNames[name] ?? name} onChange={(event) => setQuestionNames((current) => ({ ...current, [name]: event.target.value }))} /></label>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setDraft((current) => renameQuestion(current, name, questionNames[name]!)); setQuestionNames({}); }}>{t("rename")}</Button>
+                <Button variant="outline" type="button" disabled={Object.keys(draft.questions).length <= 1 || draft.rules.some((rule) => Object.hasOwn(rule.when, name) && Object.keys(rule.when).length === 1)} onClick={() => setDraft((current) => removeQuestion(current, name))}>{t("remove")}</Button>
+              </div>
+              <label>{t("instructions")}<Textarea value={question.instructions} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, instructions: event.target.value }))} /></label>
+              <div className="grid gap-3">{Object.entries(question.criteria).map(([criterion, description]) => <div key={criterion} className="grid gap-2">
+                <label>{t("criterionKey")}<Input value={criterionNames[`${name}::${criterion}`] ?? criterion} onChange={(event) => setCriterionNames((current) => ({ ...current, [`${name}::${criterion}`]: event.target.value }))} /></label>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" type="button" disabled={!criterionNames[`${name}::${criterion}`] || (criterionNames[`${name}::${criterion}`] !== criterion && Object.hasOwn(question.criteria, criterionNames[`${name}::${criterion}`] ?? ""))} onClick={() => { setDraft((current) => renameCriterion(current, name, criterion, criterionNames[`${name}::${criterion}`]!)); setCriterionNames({}); }}>{t("rename")}</Button>
+                  <Button variant="outline" type="button" disabled={Object.keys(question.criteria).length <= 2 || draft.rules.some((rule) => { const value = rule.when[name]; return (Array.isArray(value) ? value.length === 1 && value[0] === criterion : value === criterion) && Object.keys(rule.when).length === 1; })} onClick={() => setDraft((current) => removeCriterion(current, name, criterion))}>{t("remove")}</Button>
+                </div>
+                <label>{t("criterionDescription")}<Input value={description} onChange={(event) => setDraft((current) => setQuestion(current, name, { ...question, criteria: { ...question.criteria, [criterion]: event.target.value } }))} /></label>
+              </div>)}</div>
+              <label>{t("newCriterion")}<Input value={newCriteria[name] ?? ""} onChange={(event) => setNewCriteria((current) => ({ ...current, [name]: event.target.value }))} /></label>
+              <Button variant="outline" type="button" onClick={() => { setDraft((current) => addCriterion(current, name, newCriteria[name] ?? "")); setNewCriteria((current) => ({ ...current, [name]: "" })); }}>{t("add")}</Button>
+            </div>)}
+            <label>{t("newQuestion")}<Input value={newQuestion} onChange={(event) => setNewQuestion(event.target.value)} /></label>
+            <Button variant="outline" type="button" onClick={() => { setDraft((current) => addQuestion(current, newQuestion)); setNewQuestion(""); }}>{t("add")}</Button>
+          </fieldset> : null}
           {selectedNode === "fallback" && <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
             <legend>{t("unmatchedFallback")}</legend>
             <ChoiceFields choice={draft.fallback} labels={config.labels} selections={selections} onChoice={(patch) => setDraft((current) => setFallback(current, patch))} />
@@ -755,21 +781,21 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
             const index = selectedRuleIndex, rule = draft.rules[index]!;
             return <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
               <legend>{t("rule")} {index + 1}</legend>
-              <button type="button" disabled={editDisabled} onClick={() => applyRuleRemoval(index)}>{t("deleteRule")}</button>
+              <Button variant="outline" type="button" disabled={editDisabled} onClick={() => applyRuleRemoval(index)}>{t("deleteRule")}</Button>
               <section aria-label={t("canvasConditions")} className="space-y-2"><h4 className="text-xs font-semibold">{t("canvasConditions")}</h4>{Object.entries(draft.questions).map(([question, definition]) => {
                 const selected = rule.when[question], values = selected === undefined ? [] : Array.isArray(selected) ? selected : [selected];
                 return <fieldset key={question} className="min-w-0 space-y-2"><legend className="mb-2 text-xs font-semibold">{question}</legend>
-                  <label><input type="checkbox" checked={selected !== undefined} disabled={editDisabled || (selected !== undefined && Object.keys(rule.when).length === 1)} onChange={(event) => setDraft((current) => toggleRuleQuestion(current, index, question, event.target.checked))} />{t("includeQuestion")}</label>
-                  {Object.keys(definition.criteria).map((criterion) => <label key={criterion}><input type="checkbox" disabled={editDisabled || selected === undefined} checked={values.includes(criterion)} onChange={(event) => setDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} />{criterion}</label>)}
+                  <label><Checkbox checked={selected !== undefined} disabled={editDisabled || (selected !== undefined && Object.keys(rule.when).length === 1)} onChange={(event) => setDraft((current) => toggleRuleQuestion(current, index, question, event.target.checked))} />{t("includeQuestion")}</label>
+                  {Object.keys(definition.criteria).map((criterion) => <label key={criterion}><Checkbox disabled={editDisabled || selected === undefined} checked={values.includes(criterion)} onChange={(event) => setDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} />{criterion}</label>)}
                 </fieldset>;
               })}</section>
               <section aria-label={t("canvasDestination")} className="space-y-2 border-t border-outline pt-2"><h4 className="text-xs font-semibold">{t("canvasDestination")}</h4><ChoiceFields choice={rule.select} labels={config.labels} selections={selections} onChoice={(patch) => setDraft((current) => setRuleChoice(current, index, patch))} /></section>
-              <button type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</button>
-              <button type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</button>
+              <Button variant="outline" type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</Button>
+              <Button variant="outline" type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</Button>
             </fieldset>;
           })()}
-          {selectedNode.startsWith("model::") ? (() => { const model = draft.models[selectedNode.slice(7)]; return model ? <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" disabled={editDisabled}><legend>{t("model")} {model.id}</legend><label>{t("priority")}<input type="number" value={model.priority} onChange={(event) => { const priority = Number.parseInt(event.target.value, 10); if (Number.isFinite(priority)) setDraft((current) => setPriority(current, model.id, priority)); }} /></label>{config.labels.map((label) => <label key={label.tag}><input type="checkbox" disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(model.id) : model.tags.includes(label.tag)} onChange={(event) => updateMembership(model.id, label.tag, event.target.checked)} />{label.name}{label.resolution === "models" ? ` (${t("explicitModelsReadOnly")})` : ""}</label>)}</fieldset> : null; })() : null}
-          {selectedNode.startsWith("zone::") ? (() => { const label = config.labels.find((item) => zoneId(item.tag) === selectedNode); return label ? <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70 [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_input:not([type=checkbox])]:min-h-9 [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border [&_input:not([type=checkbox])]:border-outline [&_input:not([type=checkbox])]:bg-panel [&_input:not([type=checkbox])]:px-2 [&_textarea]:min-h-20 [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-outline [&_textarea]:bg-panel [&_textarea]:p-2 [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" disabled={editDisabled}><legend>{tr("labelPool", { label: label.name })}</legend>{label.resolution === "models" ? <p>{t("explicitModelsReadOnly")}</p> : null}{config.models.map((item) => <label key={item.id}><input type="checkbox" disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(item.id) : draft.models[item.id]?.tags.includes(label.tag) ?? false} onChange={(event) => updateMembership(item.id, label.tag, event.target.checked)} />{item.id}</label>)}</fieldset> : null; })() : null}
+          {selectedNode.startsWith("model::") ? (() => { const model = draft.models[selectedNode.slice(7)]; return model ? <fieldset className="grid min-w-0 gap-3 border-0 p-0 disabled:opacity-70" disabled={editDisabled}><legend>{t("model")} {model.id}</legend><label>{t("priority")}<Input type="number" value={model.priority} onChange={(event) => { const priority = Number.parseInt(event.target.value, 10); if (Number.isFinite(priority)) setDraft((current) => setPriority(current, model.id, priority)); }} /></label>{config.labels.map((label) => <label key={label.tag}><Checkbox disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(model.id) : model.tags.includes(label.tag)} onChange={(event) => updateMembership(model.id, label.tag, event.target.checked)} />{label.name}{label.resolution === "models" ? ` (${t("explicitModelsReadOnly")})` : ""}</label>)}</fieldset> : null; })() : null}
+          {selectedNode.startsWith("zone::") ? (() => { const label = config.labels.find((item) => zoneId(item.tag) === selectedNode); return label ? <fieldset className="grid min-w-0 gap-3 border-0 p-0 disabled:opacity-70" disabled={editDisabled}><legend>{tr("labelPool", { label: label.name })}</legend>{label.resolution === "models" ? <p>{t("explicitModelsReadOnly")}</p> : null}{config.models.map((item) => <label key={item.id}><Checkbox disabled={editDisabled || label.resolution === "models"} checked={label.resolution === "models" ? label.models.includes(item.id) : draft.models[item.id]?.tags.includes(label.tag) ?? false} onChange={(event) => updateMembership(item.id, label.tag, event.target.checked)} />{item.id}</label>)}</fieldset> : null; })() : null}
         </div>}</div></aside>}
       <section className="workflow-drawer absolute bottom-0 left-0 right-0 z-[8] grid max-h-[min(48%,36rem)] grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)] border-t border-outline bg-panel shadow-[0_-3px_14px_color-mix(in_srgb,var(--text)_10%,transparent)] max-[900px]:grid-cols-[minmax(0,1fr)] max-[900px]:grid-rows-[auto_minmax(0,1fr)_auto] max-[600px]:max-h-[min(44%,20rem)] max-[600px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] max-[600px]:grid-rows-[auto_minmax(0,1fr)] [&>.workflow-toolbar]:max-[900px]:col-start-1 [&>.workflow-toolbar]:max-[900px]:row-start-3 [&>.workflow-toolbar]:max-[900px]:border-t [&>.workflow-toolbar]:max-[600px]:col-start-2 [&>.workflow-toolbar]:max-[600px]:row-start-1 [&>.workflow-drawer-heading>span]:max-[900px]:hidden [&>.workflow-drawer-heading>span]:max-[600px]:hidden" data-canvas-occlusion="bottom" aria-label={t("canvasInformation")}>
         <div className="workflow-drawer-heading flex min-w-0 items-center gap-2 border-b border-outline bg-panel p-2 max-[600px]:min-h-12 max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:overscroll-x-contain max-[600px]:[scrollbar-width:thin] max-[600px]:p-[0.2rem_0.45rem] [&>span]:truncate [&>span]:max-[900px]:hidden [&>button]:flex-none max-[900px]:[&>button]:col-span-1 max-[600px]:[&>button]:min-h-10 max-[600px]:[&>button]:w-full max-[600px]:[&>button]:min-w-0 max-[600px]:[&>button]:[overflow-wrap:anywhere]">
@@ -782,47 +808,47 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
         <ConfiguredRouteFlow draft={draft} config={config} locale={locale} />
         <div className="text-xs text-ink-muted">{t("strategy")} <code>{config.strategy}</code> {t("from")} <code className="rounded bg-panel-muted px-1 text-ink">{config.baseline_source}</code></div>
         <div className="text-xs text-ink-muted">{config.overlay.applied ? tr("overlayApplied", { path: config.overlay.path }) : t("noOverlay")}</div>
-        <div className="my-3 rounded-xl border border-outline bg-panel-muted p-3">
+        <div className="my-3 border-t border-outline py-3">
           <h3 className="text-sm font-semibold text-ink">{t("workflowNodes")}</h3>
           <p className="my-1 text-xs text-ink-muted">{t("firstMatch")}</p>
           <nav className="flex flex-wrap gap-2 overflow-x-auto py-2" aria-label={t("workflowNodes")}>
-          <button type="button" onClick={() => selectEditorNode("questions")}>{t("editQuestions")}</button>
-          {draft.rules.map((_rule, index) => <button type="button" key={ruleId(index)} onClick={() => selectEditorNode(ruleId(index))}>{t("editRule")} {index + 1}</button>)}
-          <button type="button" onClick={() => selectEditorNode("fallback")}>{t("editFallback")}</button>
-          {config.labels.map((label) => <button type="button" key={label.tag} onClick={() => selectEditorNode(zoneId(label.tag))}>{`${t("editLabelPool")}: ${label.name}`}</button>)}
+          <Button variant="outline" type="button" onClick={() => selectEditorNode("questions")}>{t("editQuestions")}</Button>
+          {draft.rules.map((_rule, index) => <Button variant="outline" type="button" key={ruleId(index)} onClick={() => selectEditorNode(ruleId(index))}>{t("editRule")} {index + 1}</Button>)}
+          <Button variant="outline" type="button" onClick={() => selectEditorNode("fallback")}>{t("editFallback")}</Button>
+          {config.labels.map((label) => <Button variant="outline" className="h-auto whitespace-normal" type="button" key={label.tag} onClick={() => selectEditorNode(zoneId(label.tag))}>{`${t("editLabelPool")}: ${label.name}`}</Button>)}
           </nav>
         </div>
-        <details className="my-3 rounded-xl border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]">
+        <details className="my-3 border-t border-outline py-3">
           <summary className="cursor-pointer font-[620] text-[13px] font-semibold text-ink hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{t("advancedFallback")}</summary>
         <ol className="ml-5 list-decimal space-y-3" aria-label={t("orderedWorkflow")}>
-          {draft.rules.map((rule, index) => <li key={`workflow-${index}`}><button type="button" onClick={() => selectEditorNode(ruleId(index))}><strong>{t("rule")} {index + 1}</strong><span>{describeRule(rule, t)}</span></button><div className="my-2 flex flex-wrap gap-2">{edges.filter((edge) => edge.from === ruleId(index)).map((edge) => <WorkflowConnection key={`${edge.kind}-${edge.to}`} edge={edge} onSelect={selectEditorNode} target={edge.to.startsWith("zone::") ? config.labels.find((label) => zoneId(label.tag) === edge.to)?.name ?? t("unboundLabel") : `${t("rule")} ${index + 2}`} />)}</div><div className="workflow-edit-actions"><button type="button" onClick={() => selectEditorNode(ruleId(index))}>{t("editRule")}</button><button type="button" onClick={() => selectEditorNode("questions")}>{t("editQuestions")}</button></div></li>)}
-          <li><button type="button" onClick={() => selectEditorNode("fallback")}><strong>{t("fallback")}</strong><span>{draft.fallback.label || t("unboundLabel")} ({selectionCaption(draft.fallback.selection, t)})</span></button><div className="my-2 flex flex-wrap gap-2">{edges.filter((edge) => edge.from === "fallback").map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={draft.fallback.label || t("unboundLabel")} />)}</div><div className="workflow-edit-actions"><button type="button" onClick={() => selectEditorNode("fallback")}>{t("editFallback")}</button></div></li>
+          {draft.rules.map((rule, index) => <li key={`workflow-${index}`}><Button variant="outline" className="h-auto whitespace-normal" type="button" onClick={() => selectEditorNode(ruleId(index))}><strong>{t("rule")} {index + 1}</strong><span>{describeRule(rule, t)}</span></Button><div className="my-2 flex flex-wrap gap-2">{edges.filter((edge) => edge.from === ruleId(index)).map((edge) => <WorkflowConnection key={`${edge.kind}-${edge.to}`} edge={edge} onSelect={selectEditorNode} target={edge.to.startsWith("zone::") ? config.labels.find((label) => zoneId(label.tag) === edge.to)?.name ?? t("unboundLabel") : `${t("rule")} ${index + 2}`} />)}</div><div className="workflow-edit-actions flex flex-wrap gap-2"><Button variant="outline" type="button" onClick={() => selectEditorNode(ruleId(index))}>{t("editRule")}</Button><Button variant="outline" type="button" onClick={() => selectEditorNode("questions")}>{t("editQuestions")}</Button></div></li>)}
+          <li><Button variant="outline" className="h-auto whitespace-normal" type="button" onClick={() => selectEditorNode("fallback")}><strong>{t("fallback")}</strong><span>{draft.fallback.label || t("unboundLabel")} ({selectionCaption(draft.fallback.selection, t)})</span></Button><div className="my-2 flex flex-wrap gap-2">{edges.filter((edge) => edge.from === "fallback").map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={draft.fallback.label || t("unboundLabel")} />)}</div><div className="workflow-edit-actions"><Button variant="outline" type="button" onClick={() => selectEditorNode("fallback")}>{t("editFallback")}</Button></div></li>
         </ol>
-        <div className="my-3 grid gap-3 border-s-2 border-outline ps-3">{config.labels.map((label) => <div key={label.tag}><button type="button" onClick={() => selectEditorNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</button>{edges.filter((edge) => edge.from === zoneId(label.tag)).map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={edge.to.slice("model::".length)} />)}</div>)}</div>
+        <div className="my-3 grid gap-3 border-s-2 border-outline ps-3">{config.labels.map((label) => <div key={label.tag}><Button variant="outline" className="h-auto whitespace-normal" type="button" onClick={() => selectEditorNode(zoneId(label.tag))}>{tr("labelPool", { label: label.name })}</Button>{edges.filter((edge) => edge.from === zoneId(label.tag)).map((edge) => <WorkflowConnection key={edge.to} edge={edge} onSelect={selectEditorNode} target={edge.to.slice("model::".length)} />)}</div>)}</div>
         </details>
-        <fieldset className="rule-add grid min-w-0 gap-3 rounded-xl border border-outline bg-panel p-3 text-ink [&_label]:grid [&_label]:gap-1 [&_label]:text-xs [&_label]:text-ink-muted [&_select]:min-h-9 [&_select]:rounded-md [&_select]:border [&_select]:border-outline [&_select]:bg-panel [&_select]:px-2" ref={ruleFormRef} disabled={editDisabled}>
+        <fieldset className="rule-add grid min-w-0 gap-3 rounded-md border border-outline bg-panel p-3 text-ink [&_label]:grid [&_label]:gap-2 [&_label]:text-xs [&_label]:text-ink-muted" ref={ruleFormRef} disabled={editDisabled}>
           <legend>{t("addRule")}</legend>
           <p className="text-xs text-ink-muted">{t("ruleOrderFirstMatch")}</p>
           {addableQuestions.length === 0 || addableLabels.length === 0 ? <p className="text-xs text-ink-muted">{t("noValidRuleOptions")}</p> : null}
-          <label className="grid gap-1 text-xs text-ink-muted">{t("questionName")}<select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink" value={newRuleQuestion} onChange={(event) => { setNewRuleQuestion(event.target.value); setNewRuleCriterion(""); }}>
-            <option value="">{t("chooseQuestion")}</option>{addableQuestions.map(([name]) => <option key={name} value={name}>{name}</option>)}
-          </select></label>
-          <label className="grid gap-1 text-xs text-ink-muted">{t("criterionKey")}<select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink" value={newRuleCriterion} disabled={!newRuleQuestion} onChange={(event) => setNewRuleCriterion(event.target.value)}>
-            <option value="">{t("chooseCriterion")}</option>{Object.keys(draft.questions[newRuleQuestion]?.criteria ?? {}).map((name) => <option key={name} value={name}>{name}</option>)}
-          </select></label>
-          <label className="grid gap-1 text-xs text-ink-muted">{t("label")}<select className="min-h-9 rounded-md border border-outline bg-panel px-2 text-ink" value={newRuleLabel} onChange={(event) => setNewRuleLabel(event.target.value)}>
-            <option value="">{t("chooseLabel")}</option>{addableLabels.map((label) => <option key={label.tag} value={label.name}>{label.name}</option>)}
-          </select></label>
-          <button type="button" disabled={editDisabled || !newRuleQuestion || !newRuleCriterion || !newRuleLabel} onClick={() => {
+          <label className="grid gap-1 text-xs text-ink-muted">{t("questionName")}<NativeSelect value={newRuleQuestion} onChange={(event) => { setNewRuleQuestion(event.target.value); setNewRuleCriterion(""); }}>
+            <NativeSelectOption value="">{t("chooseQuestion")}</NativeSelectOption>{addableQuestions.map(([name]) => <NativeSelectOption key={name} value={name}>{name}</NativeSelectOption>)}
+          </NativeSelect></label>
+          <label className="grid gap-1 text-xs text-ink-muted">{t("criterionKey")}<NativeSelect value={newRuleCriterion} disabled={!newRuleQuestion} onChange={(event) => setNewRuleCriterion(event.target.value)}>
+            <NativeSelectOption value="">{t("chooseCriterion")}</NativeSelectOption>{Object.keys(draft.questions[newRuleQuestion]?.criteria ?? {}).map((name) => <NativeSelectOption key={name} value={name}>{name}</NativeSelectOption>)}
+          </NativeSelect></label>
+          <label className="grid gap-1 text-xs text-ink-muted">{t("label")}<NativeSelect value={newRuleLabel} onChange={(event) => setNewRuleLabel(event.target.value)}>
+            <NativeSelectOption value="">{t("chooseLabel")}</NativeSelectOption>{addableLabels.map((label) => <NativeSelectOption key={label.tag} value={label.name}>{label.name}</NativeSelectOption>)}
+          </NativeSelect></label>
+          <Button variant="outline" type="button" disabled={editDisabled || !newRuleQuestion || !newRuleCriterion || !newRuleLabel} onClick={() => {
             const index = draft.rules.length;
             const next = addRule(draft, config, newRuleQuestion, newRuleCriterion, newRuleLabel);
             if (next === draft) return;
             updateRuleDraft(next, { kind: "insert", index });
             setInfoOpen(false);
             selectEditorNode(`rule-${index}`);
-          }}>{t("addRule")}</button>
+          }}>{t("addRule")}</Button>
         </fieldset>
-        <details className="my-3 rounded-xl border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]">
+        <details className="my-3 border-t border-outline py-3">
           <summary className="cursor-pointer font-[620] text-[13px] font-semibold text-ink hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{t("advancedEditors")}</summary>
         <h3 className="my-2 text-sm font-semibold text-ink">{t("ruleOrderFirstMatch")}</h3>
         <SortableContext
@@ -906,7 +932,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
           ))}
         </div>
         </details>
-      <details className="my-3 rounded-xl border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]">
+      <details className="my-3 border-t border-outline py-3">
         <summary className="cursor-pointer font-[620] text-[13px] font-semibold text-ink hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{t("advancedPoolOrder")}</summary>
       <h3 className="my-2 text-sm font-semibold text-ink">{t("savedPoolOrder")}</h3>
       <p className="meta">
@@ -938,7 +964,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
       </div>
 
       </details>
-      <details className="my-3 rounded-xl border border-outline bg-panel p-3 border-t border-outline py-[0.4rem]">
+      <details className="my-3 border-t border-outline py-3">
       <summary className="cursor-pointer font-[620] text-[13px] font-semibold text-ink hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{t("pendingChanges")}</summary>
       {diff.changed ? (
         <DiffList diff={diff} t={t} />
@@ -947,7 +973,7 @@ export default function RoutingEditor({ config, error, onReloaded, onError, info
       )}
       </details>
       <div ref={reviewRef} tabIndex={-1}>
-      {review === null ? null : <div className="notice" role="status"><h4>{t("reviewChanges")}</h4><DiffList diff={review.diff} t={t} />{review.warnings.map((warning) => <div className="notice warn" key={warning}>{warning}</div>)}{review.warnings.length > 0 ? <label><input type="checkbox" disabled={writeDisabled || busy} checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t("acknowledgeWarnings")}</label> : null}</div>}
+      {review === null ? null : <div className="notice" role="status"><h4>{t("reviewChanges")}</h4><DiffList diff={review.diff} t={t} />{review.warnings.map((warning) => <div className="notice warn" key={warning}>{warning}</div>)}{review.warnings.length > 0 ? <label><Checkbox disabled={writeDisabled || busy} checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t("acknowledgeWarnings")}</label> : null}</div>}
       {resetReview ? <div className="notice warn" role="status">{t("resetReviewPrompt")}</div> : null}
       </div>
       </div>
