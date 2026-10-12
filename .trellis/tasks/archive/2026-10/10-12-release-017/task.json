@@ -24,13 +24,14 @@
   "notes": "User authorized stable 0.1.7 publication with all 33 current tracked metadata and UI modifications. Frozen admission and recovery: /Users/texas/Workspace/jev-release-017-safety-20261012T012734Z. Parent owns source/publication; fresh checker owns validation. Operator installation remains separate.",
   "meta": {
     "closure": {
-      "disposition": "published_bookkeeping_pending",
-      "acceptance_complete": false,
+      "disposition": "published_and_recorded",
+      "acceptance_complete": true,
       "source_verdict": "PASS",
       "publication_verdict": "PASS",
       "tag": "v0.1.7",
       "tag_object": "91d86b04293f98d450de72c8add5a07f94b66b7f",
       "workflow_run": "38204431529",
+      "archive_commit": "f1f33aa84e693145b0ed8b8bef671435fe22f162",
       "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.7"
     }
   }

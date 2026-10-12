@@ -316,3 +316,43 @@ Stable v0.1.6 published from the accepted signed commit. Workflow38178580657 pas
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: JEV Gateway 0.1.7 publication and task archival
+<!-- trellis-session: v=2 fp=e5e5341e3a4d52f9 -->
+
+**Date**: 2026-10-12
+**Task**: JEV Gateway 0.1.7 publication and task archival
+**Branch**: `main`
+
+### Summary
+
+Published stable 0.1.7 with the accepted generic metadata and workflow UI changes, verified the hosted/public artifacts and isolated installer, and archived the source/release records. The operator installation remains 0.1.6.
+
+### Main Changes
+
+- Delivered 39 product/version paths in three signed commits; signed v0.1.7 remains pinned to 87d27245f00072913bf78a67b831f83f4efe4589.
+- Generic model prices and explicit parameters fill by selected source brand, exact upstream ID, and compatible transport independently of serving host; manual values and native OpenRouter endpoint ownership remain intact.
+- Archived metadata before its release owner; repaired the archived cross-task context and retained original failures, reports, native runs, and private evidence.
+- Kept the operator installation, daemon, credentials/configuration and unrelated prompt material unchanged.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `da122333df853f21cdeeff4430cc501a11bd2d60` | fix(metadata): auto-fill generic model facts on custom endpoints |
+| `3df249b148d90bbe7fd860bd381cd5c0e8d2e831` | feat(dashboard): simplify workflow controls and refresh translations |
+| `87d27245f00072913bf78a67b831f83f4efe4589` | chore(release): prepare 0.1.7 |
+| `f1f33aa84e693145b0ed8b8bef671435fe22f162` | chore(task): archive accepted 0.1.7 source and release tasks |
+
+### Testing
+
+- [OK] Independent combined-source PASS: 787 unique browser identities passed with both real isolated credential modes; frontend 422 and backend 3310 passed, with two historical capture skips and separate captured-body replay evidence.
+- [OK] Formal run 38204431529 succeeded on attempt 1; Ubuntu/macOS each passed 169 checks on the same hosted/public wheel 33aa25b3663c517eb767f8a5cca5f3d998a26626eb1bccc7f7f3393b9cca8147.
+- [OK] All four pinned public assets match hosted bytes, API sizes/digests and SHA sidecars; stable/latest source/tag and previous v0.1.6 preservation verified.
+- [OK] Downloaded public installer smoke exited 0 and passed 169 checks using one reversible private nine-tool PATH tuple replacement; assertions, deadlines and no-Node guard unchanged.
+- [OK] Both archived context validators and archive commit signature verification passed; NativeSelect retains its prior manual acceptance and automated-failure history.
+
+### Status
+
+[OK] **Completed**

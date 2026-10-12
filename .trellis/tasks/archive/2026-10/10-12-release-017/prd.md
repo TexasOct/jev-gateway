@@ -22,7 +22,7 @@ Publish all frozen metadata and workflow UI changes as stable 0.1.7, verifying c
 - [x] A5: The existing formal release workflow succeeds on that source; Ubuntu and macOS smoke consume the same hosted wheel.
 - [x] A6: The public stable Release is latest, non-draft and non-prerelease; all four pinned asset bytes, sizes, digests, sidecars and version identities agree.
 - [x] A7: The downloaded public installer passes the existing isolated smoke, including reinstall preservation, using only the documented reversible PATH seam if needed.
-- [ ] A8: Release/task records preserve the original acceptance boundaries and failures, final bookkeeping is committed/pushed, and operator installation/runtime remain untouched.
+- [x] A8: Release/task records preserve the original acceptance boundaries and failures, final bookkeeping is committed/pushed, and operator installation/runtime remain untouched.
 
 ## Authorization
 

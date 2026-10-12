@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-10-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~318 | Active |
+| `journal-1.md` | ~358 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-10-12 | JEV Gateway 0.1.7 publication and task archival | `da122333df853f21cdeeff4430cc501a11bd2d60`, `3df249b148d90bbe7fd860bd381cd5c0e8d2e831`, `87d27245f00072913bf78a67b831f83f4efe4589`, `f1f33aa84e693145b0ed8b8bef671435fe22f162` | `main` |
 | 12 | 2026-10-12 | 0.1.6 stable publication verified | `06e246dec9229eb6eef9aa148d376eadbfdd90e1` | `main` |
 | 11 | 2026-10-12 | 0.1.6 construction accepted and release prepared | - | `main` |
 | 10 | 2026-10-11 | Publish 0.1.5 and upgrade operator installation | `c3e6c8355a353aebd664d158e177502f42bcc668`, `69cf58501ecba3bc95d8dbdf9bad64fb29412347` | `main` |

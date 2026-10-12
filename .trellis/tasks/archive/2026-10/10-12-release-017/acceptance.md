@@ -2,9 +2,9 @@
 
 Independent combined-source and publication reviews returned PASS.
 [Stable v0.1.7](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.7)
-is published, latest, non-draft, and non-prerelease. This record closes A1
-through A7. A8 remains pending the separate signed archive/journal commits,
-their main push, and the final preservation check.
+is published, latest, non-draft, and non-prerelease. A1 through A7 have actual
+source/package/publication evidence. This final journal/closure commit closes
+A8 with its signed main push and final preservation check.
 
 ## Source and signed delivery
 
@@ -108,3 +108,19 @@ Context validation passed with existing specification injection-size warnings.
 Direct-main/no-PR archive validation is supported by signed product commits and
 the published tag. The operator's installed package remains `0.1.6`; publication
 performed no operator upgrade, credential/configuration edit, or daemon restart.
+
+## Final bookkeeping
+
+Signed archive commit `f1f33aa84e693145b0ed8b8bef671435fe22f162` records
+the two completed tasks and their 18 public metadata files. The normal Git index
+bytes, entries, and flags stayed unchanged during that temporary-index commit,
+then the normal index was reconciled to its new HEAD. Both archived contexts
+validate. The original broken cross-task validation remains a separate receipt;
+the corrected archive path preserves its reason field.
+
+Session 13 records publication and the four preceding signed commits with exact
+subjects. The previous 14324-byte journal prefix is unchanged. This separate
+signed journal/closure commit contains only the two workspace documents and
+three release acceptance/metadata files. Final main/tag/payload/prompt checks
+and push receipts are retained in the private `final-bookkeeping/` directory.
+`v0.1.7` stays on the product release commit while bookkeeping advances main.
