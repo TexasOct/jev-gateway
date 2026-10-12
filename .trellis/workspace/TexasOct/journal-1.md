@@ -356,3 +356,43 @@ Published stable 0.1.7 with the accepted generic metadata and workflow UI change
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: Repair legacy workflow editing and publish 0.1.8
+<!-- trellis-session: v=2 fp=9fb3a7b99b653984 -->
+
+**Date**: 2026-10-13
+**Task**: Repair legacy workflow editing and publish 0.1.8
+**Branch**: `main`
+
+### Summary
+
+Restored optional baseline-policy compatibility and published signed stable 0.1.8 after independent source/public PASS. Both OS wheel checks and the public installer passed; the operator's 0.1.7 installation is preserved.
+
+### Main Changes
+
+Restored workflow editing for legacy wrapped catalogs with absent or null global policy. V2 overlay merge now uses each workflow's own policy while retaining explicit-invalid and compact-catalog rejection. Synthetic regressions cover validation, saving, migration, reload, baseline preservation and workflow isolation.
+
+Independent source and hosted/public reviews returned PASS. Local and hosted backend results were 3326 passes with two existing capture skips; frontend units passed 422 parameter rows. Full project types/Pyright, build, packaging, lock and release checks passed; four existing lint warnings remain. The unchanged frontend/browser scope reuses the accepted v0.1.7 evidence. Editor import-resolution and historical manual acceptance limits remain in the task record.
+
+Signed fix/version commits and annotated v0.1.8 were published through formal run 38281763280, attempt 1. Build, Ubuntu smoke, macOS smoke and release succeeded. All four pinned public assets match hosted bytes, API digests and sidecars. The actual hosted/public wheel SHA256 is `58a46521b71c54d9f1e2e5bc2a72683238356b6c241e628dd47b7305758cfe7d`. Both hosted wheel smokes and the separate ordinary public installer smoke passed 169 checks each; owned process/port cleanup passed.
+
+Archived nine public task records after publication acceptance and validated their contexts. Product/version and archive signatures verified. The final workspace closure preserves previous journal bytes/history and keeps v0.1.8 on its signed product commit as main advances. Raw evidence and settled native sessions stay private; original failures and custody limits remain explicit in the archived recovery record.
+
+Read-only operator verification confirms a healthy 0.1.7 service running on port 8000 and eight configuration/credential files with unchanged bytes/permissions. This task performs no operator upgrade or data migration.
+
+Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.8
+Acceptance: .trellis/tasks/archive/2026-10/10-12-routing-policy-release-018/acceptance.md
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6b5580eb98d62995eec21b913a292188f50493ce` | fix(routing): preserve optional baseline policies in workflow edits |
+| `ea34e794840d9b96e92b2e2c25ebc9229bd56d6c` | chore(release): prepare 0.1.8 |
+| `412b7659f936487ed0402e88252de831e6f564dd` | chore(trellis): archive verified 0.1.8 release |
+
+### Status
+
+[OK] **Completed**

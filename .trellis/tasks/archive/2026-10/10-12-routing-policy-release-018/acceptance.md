@@ -1,6 +1,6 @@
 # Release 0.1.8 acceptance
 
-Stable [v0.1.8](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.8) is published and latest. Independent source and hosted/public reviews returned PASS. The parent verified the actual reports, sealed artifacts and native receipts. Final archive/journal reconciliation remains pending.
+Stable [v0.1.8](https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.8) is published and latest. Independent source and hosted/public reviews returned PASS. The parent verified the actual reports, sealed artifacts and native receipts. The task is archived and recorded in workspace session 14.
 
 ## Accepted behavior
 
@@ -52,8 +52,10 @@ This is ordinary installer acceptance under `docs/releasing.md`. Historical brow
 
 The operator remains healthy on 0.1.7, running on port 8000. Parent read-only status/version checks passed, and eight configuration/credential files retain their original bytes and permissions. This release task uses synthetic homes and performs no operator installation or data migration.
 
-## Evidence and remaining gates
+## Evidence and closure
 
 Private evidence root: `/Users/texas/.local/state/jev-gateway/release-0.1.8-20261012T155829Z`. Source reports, original native failures, receipts, inventories, wheel, index copies and retained sessions stay outside commits. [Recovery record](recovery.md) preserves the stream failure, report settlement and fixture corrections. The original rejected acceptance remains unchanged.
 
-A1 through A7 are verified. A8 awaits final archive/journal commits, push and reconciliation. Original source checker run/event/output artifacts and the settled complete source/publication session are retained privately. The source checker's pre-publication complete session length/hash was not anchored, so no retrospective unchanged-prefix claim is made. The writer's separately anchored recovery prefix remains verified.
+Archive commit `412b7659f936487ed0402e88252de831e6f564dd` contains nine public task records. Archived contexts validate (8 implement entries and 7 check entries); large-spec injection warnings remain explicit, with complete native reads reused. Workspace session 14 preserves the prior 16892-byte journal prefix, ten history rows and both existing workspace file modes. Final signed closure records the session and completion metadata; main advances through these bookkeeping commits while the product tag stays fixed. A1 through A8 are verified by the retained source, publication and parent reconciliation receipts.
+
+Original source checker run/event/output artifacts and the settled complete source/publication session are retained privately. The source checker's pre-publication complete session length/hash was not anchored, so no retrospective unchanged-prefix claim is made. The writer's separately anchored recovery prefix remains verified.

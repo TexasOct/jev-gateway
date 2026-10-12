@@ -21,7 +21,7 @@ Restore validation and saving for legacy wrapped strategies with an optional glo
 - [x] A5: Version records agree on 0.1.8 and third-party dependency records are unchanged.
 - [x] A6: Signed product commits and annotated v0.1.8 tag are published; the hosted build and both OS wheel checks succeed.
 - [x] A7: Four pinned public assets match their checksums and hosted bytes, and the public installer passes isolated acceptance.
-- [ ] A8: Task/archive/journal records are truthful; local and remote main agree, prior release refs remain unchanged, and the operator installation is untouched.
+- [x] A8: Task/archive/journal records are truthful; local and remote main agree, prior release refs remain unchanged, and the operator installation is untouched.
 
 ## Notes
 

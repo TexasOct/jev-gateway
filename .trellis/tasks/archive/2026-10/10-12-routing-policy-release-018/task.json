@@ -29,10 +29,12 @@
     "jev_gateway/__init__.py",
     "uv.lock"
   ],
-  "notes": "Stable v0.1.8 published after independent source and hosted/public PASS. Exact candidate transferred to signed main commits; direct-main archival uses skip-branch-validation because the isolated candidate branch retains its verified dirty construction. Operator remains on healthy 0.1.7. Final bookkeeping is pending.",
+  "notes": "Stable v0.1.8 published after independent source and hosted/public PASS, archived and recorded in workspace session 14. Exact candidate transferred to signed main commits; direct-main archival uses skip-branch-validation because the isolated candidate branch retains its verified dirty construction. Operator remains on healthy 0.1.7. Original failures and session custody limits are preserved in recovery.md.",
   "meta": {
-    "closure": "published_pending_bookkeeping",
-    "acceptance_complete": false,
+    "closure": "published_and_recorded",
+    "acceptance_complete": true,
+    "archive_commit": "412b7659f936487ed0402e88252de831e6f564dd",
+    "workspace_session": 14,
     "release_tag": "v0.1.8",
     "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.8",
     "release_id": 410837578,
