@@ -1,0 +1,50 @@
+{
+  "id": "generic-model-metadata",
+  "name": "generic-model-metadata",
+  "title": "Generic model metadata automatic fill",
+  "description": "Automatically fill generic model prices and explicit parameters by exact brand and upstream model ID regardless of endpoint host.",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "provider-metadata",
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-12",
+  "completedAt": "2026-10-12",
+  "branch": "fix/generic-model-metadata",
+  "base_branch": "main",
+  "worktree_path": "/Users/texas/Workspace/jev-gateway-generic-metadata",
+  "commit": "da122333df853f21cdeeff4430cc501a11bd2d60",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "jev_gateway/model_metadata.py",
+    "tests/test_model_metadata.py",
+    "tests/test_model_metadata_business_oracles.py",
+    "tests/test_provider_onboarding_integration.py",
+    "tests/test_metadata_cache_failure_privacy.py",
+    "frontend/src/features/providers/__tests__/evidence-regression.test.ts",
+    "frontend/src/features/providers/__tests__/model-source-values.test.ts",
+    "frontend/src/features/providers/__tests__/model.test.ts",
+    "frontend/tests/browser/supplier-models.spec.ts",
+    ".trellis/spec/backend/provider-configuration.md",
+    "docs/http-api.md",
+    "docs/models-config.md",
+    "docs/admin-experience.md"
+  ],
+  "notes": "AC1-AC6 passed for source delivery. Final independent documentation recheck returned PASS. Thirteen reviewed files were transferred with matching hashes while preserving 20 then-unrelated modified files and the exact Git index. The user subsequently authorized publishing ALL current changes as 0.1.7 through .trellis/tasks/archive/2026-10/10-12-release-017. The metadata commit and stable publication are complete. Original source acceptance and failure history remain in acceptance.md and private verification/. Operator installation remains separate.",
+  "meta": {
+    "closure": {
+      "disposition": "implemented_and_released",
+      "acceptance_complete": true,
+      "source_verdict": "PASS",
+      "publication_verdict": "PASS",
+      "version": "0.1.7",
+      "release_commit": "87d27245f00072913bf78a67b831f83f4efe4589",
+      "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.7"
+    }
+  }
+}

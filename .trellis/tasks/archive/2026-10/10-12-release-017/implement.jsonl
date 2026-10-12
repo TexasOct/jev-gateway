@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Version/dependency and package validation contract"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Final UI contract and browser interaction boundaries"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Accepted generic catalog applicability"}
+{"file":"docs/releasing.md","reason":"Exact public release workflow and smoke requirements"}

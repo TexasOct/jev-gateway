@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/index.md","reason":"Review applicable backend quality gates."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Review generic applicability and retained provenance/manual ownership."}
+{"file":".trellis/spec/backend/provider-identities.md","reason":"Verify exact brand identity and prevent cosmetic matching."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Review source-bound test evidence and required type checks."}
+{"file":".trellis/spec/guides/index.md","reason":"Check cross-layer consistency and reuse."}
+{"file":".trellis/tasks/10-12-generic-model-metadata/design.md","reason":"Review the admitted diagnosis and task boundaries."}

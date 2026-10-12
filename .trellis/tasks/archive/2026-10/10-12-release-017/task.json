@@ -1,0 +1,37 @@
+{
+  "id": "release-017",
+  "name": "release-017",
+  "title": "Publish JEV Gateway 0.1.7 with all current changes",
+  "description": "Publish all frozen metadata and workflow UI changes as stable 0.1.7, verifying combined source, signed tag, hosted artifacts and isolated public installation.",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "release",
+  "package": null,
+  "priority": "P2",
+  "creator": "TexasOct",
+  "assignee": "TexasOct",
+  "createdAt": "2026-10-12",
+  "completedAt": "2026-10-12",
+  "branch": "release/0.1.7",
+  "base_branch": "main",
+  "worktree_path": "/Users/texas/Workspace/jev-gateway-release-017",
+  "commit": "87d27245f00072913bf78a67b831f83f4efe4589",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "User authorized stable 0.1.7 publication with all 33 current tracked metadata and UI modifications. Frozen admission and recovery: /Users/texas/Workspace/jev-release-017-safety-20261012T012734Z. Parent owns source/publication; fresh checker owns validation. Operator installation remains separate.",
+  "meta": {
+    "closure": {
+      "disposition": "published_bookkeeping_pending",
+      "acceptance_complete": false,
+      "source_verdict": "PASS",
+      "publication_verdict": "PASS",
+      "tag": "v0.1.7",
+      "tag_object": "91d86b04293f98d450de72c8add5a07f94b66b7f",
+      "workflow_run": "38204431529",
+      "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.7"
+    }
+  }
+}

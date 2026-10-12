@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development and quality gates."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Keep metadata behavior in the existing owner module."}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Update the old endpoint applicability contract while preserving evidence and ownership."}
+{"file":".trellis/spec/backend/provider-identities.md","reason":"Distinguish selected source brand from display name and icon identity."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Typed Python, isolated network-free tests and required full verification."}
+{"file":".trellis/spec/guides/index.md","reason":"Shared reasoning and cross-layer boundary guidance."}
+{"file":".trellis/tasks/10-12-generic-model-metadata/design.md","reason":"Original symptom, superseding product requirement and single-writer ownership."}

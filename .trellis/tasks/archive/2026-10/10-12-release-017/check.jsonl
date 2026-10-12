@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Package conventions and complete quality scope"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Combined checks, package parity, version records and release gates"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Current workflow controls, occlusion geometry, native browser owners and policy/layout boundaries"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Accepted generic metadata applicability and manual/source ownership"}
+{"file":"docs/releasing.md","reason":"Local wheel, same-wheel OS smoke and four public asset contracts"}
+{"file":".trellis/tasks/archive/2026-10/10-12-generic-model-metadata/acceptance.md","reason":"Retained independent metadata acceptance and source boundaries"}
+{"file":".trellis/tasks/archive/2026-10/10-12-release-017/acceptance.md","reason":"Final source/publication evidence, historical limits and bookkeeping closure"}
