@@ -24,7 +24,7 @@ from jev_gateway.strategy import StrategyRegistry
 from jev_gateway.strategy.contracts import RoutingRequest, SetupIncompleteError
 from tests.helpers import LARGE_MODEL_ID, SMALL_MODEL_ID
 from tests.test_gateway import matrix_config, request
-from tests.test_routing_overlay import matrix_document
+from tests.test_routing_overlay import matrix_document, wrapped_matrix_document
 
 AUTH = {"Authorization": "Bearer client-key"}
 CONFIGURATION = "/v1/routing/configuration"
@@ -32,6 +32,87 @@ CONFIGURATION = "/v1/routing/configuration"
 
 def workflow_write(surface: dict[str, Any]) -> dict[str, Any]:
     return {"version": 2, "strategy": surface["strategy"], "selected_models": surface["selected_models"], "definition": surface["definition"]}
+
+
+@pytest.mark.parametrize("global_policy", ["absent", "null"])
+@pytest.mark.parametrize("existing_overlay", ["none", "v1", "v2"])
+def test_wrapped_optional_policy_validate_apply_reload_preserves_workflows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, global_policy: str, existing_overlay: str,
+) -> None:
+    monkeypatch.setenv("TEST_WRAPPED_GATEWAY_KEY", "client-key")
+    config = matrix_config(tmp_path)
+    try:
+        document = wrapped_matrix_document(global_policy)
+        document["gateway"] = {"api_key_env": "TEST_WRAPPED_GATEWAY_KEY"}
+        config.models_file.write_text(json.dumps(document, indent=2) + "\n")
+        baseline_bytes = config.models_file.read_bytes()
+        legacy = {"version": 1, "strategy": "task_aware", "rules": [],
+                  "fallback": {"label": "simple"},
+                  "models": {SMALL_MODEL_ID: {"priority": 73, "tags": ["foreign/keep"]}}}
+        if existing_overlay != "none":
+            write_overlay(config.models_file, legacy)
+        effective = load_catalog_with_overlay(config.models_file)
+        if existing_overlay == "v2":
+            write_overlay(config.models_file, migrate_overlay(legacy, effective))
+        config.engine.reload_catalog(effective)
+        app = create_app(config)
+        other_before = request(app, "GET", CONFIGURATION + "?strategy=alternate", headers=AUTH).json()
+        automatic_before = next(item for item in effective.strategies if item.name == "automatic").as_dict()
+        body = workflow_write(request(app, "GET", CONFIGURATION, headers=AUTH).json())
+        body["selected_models"] = [SMALL_MODEL_ID]
+        body["definition"]["policy"] = {"selection": "quality_first", "labels": {"routine": {"models": [SMALL_MODEL_ID]}}}
+        body["definition"]["options"].update(rules=[], fallback={"label": "routine"})
+        body["definition"]["options"]["questions"]["scale"]["instructions"] = "Edited workflow only."
+        overlay_before = overlay_path(config.models_file).read_bytes() if existing_overlay != "none" else None
+        snapshot_before = config.engine.policy_snapshot()
+        validated = request(app, "POST", CONFIGURATION + "/validate", headers=AUTH, json=body)
+        assert validated.status_code == 200, validated.text
+        assert validated.json()["valid"] is True
+        assert config.engine.policy_snapshot() == snapshot_before
+        assert (overlay_path(config.models_file).read_bytes() if overlay_path(config.models_file).exists() else None) == overlay_before
+        applied = request(app, "PUT", CONFIGURATION, headers=AUTH, json=body)
+        assert applied.status_code == 200, applied.text
+        state, error = read_overlay(config.models_file)
+        assert error is None and state["version"] == 2
+        assert state["models"] == (legacy["models"] if existing_overlay != "none" else {})
+        assert state["strategies"]["task_aware"] == {"definition": body["definition"], "selected_models": [SMALL_MODEL_ID]}
+        assert state["strategies"]["alternate"] == {"definition": other_before["definition"], "selected_models": [LARGE_MODEL_ID]}
+        assert state["deleted_strategies"] == []
+        saved_bytes = overlay_path(config.models_file).read_bytes()
+        reloaded = request(app, "POST", "/v1/routing/reload", headers=AUTH)
+        assert reloaded.status_code == 200, reloaded.text
+        for catalog in (config.engine.catalog, load_catalog_with_overlay(config.models_file)):
+            definitions = {item.name: item for item in catalog.strategies}
+            assert definitions["task_aware"].policy.selected_models == (SMALL_MODEL_ID,)
+            assert definitions["task_aware"].policy.selection == "quality_first"
+            assert definitions["task_aware"].policy.labels["routine"].models == (SMALL_MODEL_ID,)
+            assert definitions["task_aware"].as_dict()["options"] == body["definition"]["options"]
+            assert definitions["alternate"].policy.selected_models == (LARGE_MODEL_ID,)
+            assert definitions["alternate"].policy.selection == "cheapest_adequate"
+            assert definitions["alternate"].policy.labels["review"].models == (LARGE_MODEL_ID,)
+            assert definitions["automatic"].as_dict() == automatic_before
+            profile = catalog.by_name(SMALL_MODEL_ID)
+            assert profile is not None
+            if existing_overlay != "none":
+                assert profile.priority == 73 and profile.tags == ("foreign/keep",)
+            assert catalog.by_name(LARGE_MODEL_ID) == effective.by_name(LARGE_MODEL_ID)
+        other_after = request(app, "GET", CONFIGURATION + "?strategy=alternate", headers=AUTH).json()
+        assert other_after["definition"] == other_before["definition"]
+        assert other_after["selected_models"] == [LARGE_MODEL_ID]
+        assert config.models_file.read_bytes() == baseline_bytes
+        assert overlay_path(config.models_file).read_bytes() == saved_bytes
+        rejected_body = copy.deepcopy(body)
+        rejected_body["selected_models"] = ["missing/model"]
+        snapshot = config.engine.policy_snapshot()
+        for method, path in [("POST", CONFIGURATION + "/validate"), ("PUT", CONFIGURATION)]:
+            rejected = request(app, method, path, headers=AUTH, json=rejected_body)
+            assert rejected.status_code == 400, rejected.text
+            assert rejected.json()["error"]["code"] == "invalid_configuration"
+            assert config.engine.policy_snapshot() == snapshot
+            assert config.models_file.read_bytes() == baseline_bytes
+            assert overlay_path(config.models_file).read_bytes() == saved_bytes
+    finally:
+        config.engine.close()
 
 
 @pytest.mark.parametrize("selector", ["", "?strategy=task_aware"])

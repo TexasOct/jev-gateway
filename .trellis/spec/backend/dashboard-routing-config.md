@@ -141,6 +141,14 @@ recovery assertions remain required.
 After migration, nonempty v1 `models` edits reject before replacement; v1 options
 can still edit the selected workflow. Existing global overrides remain read-only.
 
+V2 merge follows the catalog parser's optional global-policy contract. Wrapped
+`strategies.default/definitions` catalogs may omit the top-level `policy` or set
+it to null; each definition retains its own policy. Pass `None` as the base policy
+in those cases. Parse every explicit non-null global policy strictly, including
+empty objects. Compact strategy catalogs still require a valid top-level policy.
+This invariant applies to validation, v1 migration, apply and reload; editing one
+workflow preserves other workflows, legacy model overrides and baseline bytes.
+
 Required tests cover v1 seeding/override preservation, partial-model selection,
 strict names/shapes/references, default/tombstone guards, independent policy/layout
 round trips, source-preserving local removal, auth-before-malformed-body guards,

@@ -11,6 +11,7 @@ import pytest
 
 from jev_gateway.catalog import catalog_from_document, load_catalog
 from jev_gateway.routing_overlay import (
+    empty_workflow,
     load_catalog_with_overlay,
     merge_overlay,
     merge_warnings,
@@ -20,7 +21,7 @@ from jev_gateway.routing_overlay import (
     validate_overlay_shape,
     write_overlay,
 )
-from tests.helpers import SMALL_MODEL_ID, catalog_document
+from tests.helpers import LARGE_MODEL_ID, SMALL_MODEL_ID, catalog_document
 
 
 def matrix_document() -> dict[str, Any]:
@@ -40,6 +41,85 @@ def matrix_document() -> dict[str, Any]:
         },
     }
     return document
+
+
+def wrapped_matrix_document(global_policy: str) -> dict[str, Any]:
+    document = matrix_document()
+    policy = document.pop("policy")
+    task = document["strategies"]["task_aware"]
+    task["policy"] = policy
+    alternate = {
+        "kind": "decision_matrix",
+        "policy": {"selection": "cheapest_adequate", "selected_models": [LARGE_MODEL_ID],
+                   "labels": {"review": {"models": [LARGE_MODEL_ID]}}},
+        "options": {"questions": copy.deepcopy(task["options"]["questions"]),
+                    "rules": [], "fallback": {"label": "review"}},
+    }
+    document["strategies"] = {"default": "task_aware", "definitions": {
+        "task_aware": task, "alternate": alternate,
+        "automatic": {"kind": "auto", "policy": {
+            "selection": "balanced", "labels": {"automated": {"models": [LARGE_MODEL_ID]}},
+        }},
+    }}
+    if global_policy == "null":
+        document["policy"] = None
+    return document
+
+
+@pytest.mark.parametrize("global_policy", ["absent", "null"])
+def test_v2_merge_accepts_wrapped_optional_global_policy(global_policy: str) -> None:
+    document = wrapped_matrix_document(global_policy)
+    original = copy.deepcopy(document)
+    baseline = catalog_from_document(document, "wrapped baseline")
+    entry = empty_workflow("task_aware")
+    entry["selected_models"] = [SMALL_MODEL_ID]
+    entry["definition"]["policy"]["labels"]["routine"]["models"] = [SMALL_MODEL_ID]
+    state = {"version": 2, "strategies": {"task_aware": entry},
+             "deleted_strategies": [], "models": {SMALL_MODEL_ID: {"priority": 73}}}
+    catalog = catalog_from_document(merge_overlay(document, state), "wrapped overlay")
+    definitions = {item.name: item for item in catalog.strategies}
+    assert catalog.default_strategy == "task_aware"
+    assert definitions["task_aware"].policy.selected_models == (SMALL_MODEL_ID,)
+    assert definitions["task_aware"].policy.labels["routine"].models == (SMALL_MODEL_ID,)
+    assert definitions["alternate"].policy.selected_models == (LARGE_MODEL_ID,)
+    assert definitions["alternate"].policy.selection == "cheapest_adequate"
+    assert definitions["alternate"].policy.labels["review"].models == (LARGE_MODEL_ID,)
+    assert definitions["automatic"].kind == "auto"
+    for name in ("alternate", "automatic"):
+        assert definitions[name].as_dict() == next(item for item in baseline.strategies if item.name == name).as_dict()
+    profile = catalog.by_name(SMALL_MODEL_ID)
+    assert profile is not None and profile.priority == 73
+    assert document == original
+    assert state["strategies"]["task_aware"] == entry
+
+
+@pytest.mark.parametrize("policy,message", [
+    ({}, "missing tiers"), ([], "policy must be an object"),
+    (False, "policy must be an object"), ("invalid", "policy must be an object"),
+    ({"unknown": True}, "policy has unknown keys"),
+    ({"labels": {}}, "labels must be a non-empty object"),
+])
+def test_v2_merge_rejects_explicit_invalid_global_policy(policy: Any, message: str) -> None:
+    document = wrapped_matrix_document("absent")
+    document["policy"] = policy
+    state = {"version": 2, "strategies": {}, "deleted_strategies": [], "models": {}}
+    for parse in (lambda: catalog_from_document(document, "baseline"),
+                  lambda: merge_overlay(document, state)):
+        with pytest.raises((TypeError, ValueError), match=message):
+            parse()
+
+
+@pytest.mark.parametrize("global_policy", ["absent", "null"])
+def test_v2_merge_keeps_compact_global_policy_required(global_policy: str) -> None:
+    document = matrix_document()
+    document.pop("policy")
+    if global_policy == "null":
+        document["policy"] = None
+    state = {"version": 2, "strategies": {}, "deleted_strategies": [], "models": {}}
+    for parse in (lambda: catalog_from_document(document, "baseline"),
+                  lambda: merge_overlay(document, state)):
+        with pytest.raises(ValueError, match="compact strategies require a top-level policy"):
+            parse()
 
 
 def test_rules_replacement_preserves_questions_and_fallback() -> None:

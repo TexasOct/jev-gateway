@@ -214,7 +214,9 @@ def merge_overlay(document: dict[str, Any], overlay: dict[str, Any]) -> dict[str
     if not changes:
         return merged
     if changes["version"] == 2:
-        definitions, default = strategies_from_document(merged, "baseline", base_policy=policy_from_dict(merged.get("policy", {}), "baseline"))
+        policy_value = merged.get("policy")
+        base_policy = policy_from_dict(policy_value, "baseline") if policy_value is not None else None
+        definitions, default = strategies_from_document(merged, "baseline", base_policy=base_policy)
         bodies = {item.name: {key: val for key, val in item.as_dict().items() if key != "name"} for item in definitions}
         for body in bodies.values():
             body["policy"].pop("tier_models", None)
