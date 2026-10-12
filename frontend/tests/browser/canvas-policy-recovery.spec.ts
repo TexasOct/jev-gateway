@@ -86,7 +86,7 @@ for (const [locale, width] of [["en", 1280], ["zh-CN", 320]] as const) test(`com
   await page.getByRole("button", { name: words.reviewChanges, exact: true }).press("Enter");
   expect(puts).toBe(1);
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("quality");
-  const retry = page.getByRole("button", { name: locale === "en" ? "Retry configuration read" : "重试读取配置", exact: true });
+  const retry = page.getByRole("button", { name: words.routingRetryRead, exact: true });
   await expect(retry).toBeEnabled();
   await activate(page, retry);
   await expect(page.getByRole("alert")).toContainText("Saved snapshot read failed twice");
@@ -207,7 +207,7 @@ test("successful apply and reset render fresh snapshots and reset history bounda
   await activate(page, page.locator('[data-canvas-node="fallback"]'));
   await page.getByRole("complementary", { name: words.nodeInspector }).getByRole("combobox", { name: words.label, exact: true }).selectOption("default");
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-  await activate(page, page.locator(".workflow-toolbar").getByRole("button", { name: words.cancel, exact: true }));
+  await activate(page, page.locator(".workflow-toolbar").getByRole("button", { name: words.discardChanges, exact: true }));
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("quality");
   await expect(page.getByRole("button", { name: words.canvasUndo, exact: true })).toBeDisabled();
   await activate(page, page.getByRole("button", { name: words.resetBaseline, exact: true }));
@@ -240,6 +240,8 @@ test("failed policy apply retains draft and history for explicit retry", async (
   await expect(page.getByRole("alert")).toContainText("Policy rejected before commit");
   expect(mockApi.appliedConfiguration).toBeUndefined();
   await activate(page, page.getByRole("button", { name: words.backToEditing, exact: true }));
+  await expect(page.getByRole("dialog", { name: words.reviewChanges, exact: true })).toHaveCount(0);
+  await expect(page.locator(".canvas-policy-controls select")).toBeFocused();
   await page.locator(".routing-canvas-scroll").focus(); await page.keyboard.press("ControlOrMeta+z");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
   await page.keyboard.press("ControlOrMeta+Shift+z");

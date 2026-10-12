@@ -23,7 +23,7 @@ it.each(["en", "zh-CN"] as const)("shows an untagged inherited model as configur
   }
   const html = renderToStaticMarkup(<LocaleProvider><View cleared={false} /></LocaleProvider>);
   expect(html).toContain('data-route-target="p/global"');
-  expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 继承全局模型");
+  expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 使用全局默认模型");
   expect(html).toContain(locale === "en" ? "Configured · no sessions" : "已配置 · 无会话");
   expect(html).toContain('data-route-target="p/literal"');
   const cleared = renderToStaticMarkup(<LocaleProvider><View cleared /></LocaleProvider>);

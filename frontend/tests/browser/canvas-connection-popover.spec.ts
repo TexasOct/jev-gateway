@@ -1,9 +1,11 @@
 import type { Locator, Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
 import type { MockApiState } from "../setup/mock-api";
 import { workflowConfiguration as configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
+import { settledCanvasGeometry } from "./canvas-wave3-focus";
 
 function setup(state: MockApiState) {
   state.appliedConfiguration = structuredClone(configuration);
@@ -15,7 +17,8 @@ function setup(state: MockApiState) {
 }
 
 async function frames(page: Page) {
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  // Layout restoration completes through three native animation frames.
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
 }
 
 async function open(page: Page, locale: "en" | "zh-CN" = "en") {
@@ -27,7 +30,9 @@ async function open(page: Page, locale: "en" | "zh-CN" = "en") {
   const words = locale === "en" ? en : zhCN;
   await page.getByRole("button", { name: words.strategyEditor, exact: true }).click();
   await expect(page.locator('[data-output-node="questions"]').first()).toBeVisible();
+  await expect(page.locator(".canvas-policy-controls").getByRole("status").filter({ hasText: words.loading })).toHaveCount(0);
   await frames(page);
+  await settledCanvasGeometry(page, words);
   return words;
 }
 
@@ -210,20 +215,59 @@ for (const width of [1280, 320]) {
   for (const corner of ["top-left", "top-right", "bottom-left", "bottom-right"]) {
     test(`connection port near ${corner} keeps the card visible at ${width}px`, async ({ page, mockApi }) => {
       setup(mockApi);
-      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - 210 : -171, y: corner.includes("bottom") ? (width === 320 ? 180 : 250) : 0 };
+      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - 210 : -171, y: 0 };
       await page.setViewportSize({ width, height: 740 }); await open(page);
       const output = page.locator('[data-output-node="rule-0"][data-canvas-output="match"]');
       const panel = page.getByRole("region", { name: en.canvasConnectionActions });
-      const point = await output.evaluate((element) => {
+      // Position the fixture against the measured free area, including wrapped chrome.
+      const y = await output.evaluate((element, bottom) => {
+        const box = element.getBoundingClientRect();
+        const content = document.querySelector(".routing-canvas-content")!.getBoundingClientRect();
+        const canvas = document.querySelector(".routing-canvas-scroll")!.getBoundingClientRect();
+        const chrome = document.querySelector(".workspace-chrome")!.getBoundingClientRect();
+        const tools = document.querySelector(".canvas-tools")!.getBoundingClientRect();
+        const target = bottom ? Math.min(innerHeight, canvas.bottom, tools.top) - 14 : Math.max(canvas.top, chrome.bottom) + 14;
+        return Math.round(target - content.top - (box.top + box.height / 2 - content.top));
+      }, corner.includes("bottom"));
+      mockApi.canvasLayout!.nodes["rule-0"]!.y = y;
+      await open(page);
+      const readPoint = () => output.evaluate((element) => {
         const box = element.getBoundingClientRect(), x = box.left + box.width / 2, y = box.top + box.height / 2;
-        return { x, y, hit: document.elementFromPoint(x, y) === element };
+        const canvas = document.querySelector(".routing-canvas-scroll")!.getBoundingClientRect();
+        const chrome = document.querySelector(".workspace-chrome")!.getBoundingClientRect();
+        const tools = document.querySelector(".canvas-tools")!.getBoundingClientRect();
+        const hit = document.elementFromPoint(x, y);
+        return { x, y, top: Math.max(canvas.top, chrome.bottom), bottom: Math.min(innerHeight, canvas.bottom, tools.top), hit: hit === element, hitHtml: hit?.outerHTML, scroll: element.closest(".routing-canvas-scroll")?.scrollTop };
       });
-      expect(point.hit).toBe(true);
+      let lastPoint: Awaited<ReturnType<typeof readPoint>> | undefined;
+      try {
+        await expect.poll(async () => {
+          const point = lastPoint = await readPoint();
+          return point.hit && point.y >= point.top && point.y <= point.bottom &&
+            (corner.includes("right") ? width - point.x : point.x) <= 20 &&
+            (corner.includes("bottom") ? point.bottom - point.y : point.y - point.top) <= 20;
+        }).toBe(true);
+      } finally {
+        await writeFile(test.info().outputPath("corner-fixture.json"), JSON.stringify({ fixture: mockApi.canvasLayout, point: lastPoint }, null, 2));
+      }
+      const point = await readPoint();
+      expect(point.scroll).toBe(0);
+      expect(point.hit, JSON.stringify(point)).toBe(true);
+      expect(point.y).toBeGreaterThanOrEqual(point.top);
+      expect(point.y).toBeLessThanOrEqual(point.bottom);
       expect(corner.includes("right") ? width - point.x : point.x).toBeLessThanOrEqual(20);
+      expect(corner.includes("bottom") ? point.bottom - point.y : point.y - point.top).toBeLessThanOrEqual(20);
       await page.mouse.click(point.x, point.y);
       await assertVisibleCard(panel, width, 740);
       await page.keyboard.press("Escape");
-      await expect(output).toBeFocused();
+      const returnedFocus = await output.evaluate((element) => ({
+        port: element.getBoundingClientRect().toJSON(),
+        tools: document.querySelector(".canvas-tools")!.getBoundingClientRect().toJSON(),
+        chrome: document.querySelector(".workspace-chrome")!.getBoundingClientRect().toJSON(),
+        canvas: document.querySelector(".routing-canvas-scroll")!.getBoundingClientRect().toJSON(),
+        focused: document.activeElement?.getAttribute("aria-label"),
+      }));
+      await expect(output, JSON.stringify(returnedFocus)).toBeFocused();
       await expect(output).toHaveAttribute("data-output-connected", "true");
       expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);
     });

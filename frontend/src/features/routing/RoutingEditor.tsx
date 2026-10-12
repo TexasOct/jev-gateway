@@ -1,6 +1,6 @@
 /** Named workflow drafts, protected policy writes, and node inspection. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Check, GitBranch, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 import { api, ApiError } from "@/shared/api/client";
 import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
@@ -45,7 +45,6 @@ interface EditorProps {
 }
 
 const actionButtonClass = "min-h-9 rounded-md border-outline bg-panel px-3 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
-const primaryButtonClass = "min-h-9 rounded-md px-3";
 
 function zoneId(tag: string): string { return `zone::${tag}`; }
 
@@ -450,19 +449,20 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
 
   const heading = <>
       {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
-      <div className="strategy-controls flex max-w-[min(680px,100%)] flex-wrap items-end gap-2 rounded-lg border border-outline bg-panel p-2">
-        <label className="grid min-w-[140px] flex-1 gap-1 text-xs text-ink-muted">{t("strategy")}
-          <NativeSelect ref={strategySelectRef} value={config.strategy} disabled={busy || layoutDirty || policyRecovery !== null || !active} onChange={(event) => changeStrategy(event.target.value)}>
+      <div className="strategy-controls flex min-w-0 items-center gap-1">
+        <label className="flex min-w-0 flex-1 items-center gap-2 pl-2">
+          <GitBranch className="size-4 shrink-0 text-ink-muted" aria-hidden="true" focusable="false" />
+          <span className="sr-only">{t("strategy")}</span>
+          <NativeSelect className="border-transparent bg-transparent font-semibold shadow-none hover:bg-panel-muted" ref={strategySelectRef} value={config.strategy} disabled={busy || layoutDirty || policyRecovery !== null || !active} onChange={(event) => changeStrategy(event.target.value)}>
             {!strategies.some((item) => item.name === config.strategy) && <NativeSelectOption value={config.strategy}>{config.strategy}</NativeSelectOption>}
             {strategies.filter((item) => item.editable).map((item) => <NativeSelectOption key={item.name} value={item.name}>{item.name}</NativeSelectOption>)}
           </NativeSelect>
         </label>
-        <Button variant="outline" disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null} onClick={() => setStrategyAction("create")}>{t("workflowCreate")}</Button>
-        <Button variant="outline" disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null || !config.deletable} title={!config.deletable ? t("workflowDefaultProtected") : undefined} onClick={() => setStrategyAction("delete")}>{t("workflowDelete")}</Button>
-        <Button variant="outline" disabled={editDisabled} onClick={() => setModelChooser(true)}>{t("workflowAddModel")}</Button>
+        <Button variant="ghost" size="icon" aria-label={t("workflowCreate")} title={t("workflowCreate")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null} onClick={() => setStrategyAction("create")}><Plus aria-hidden="true" focusable="false" /></Button>
+        <Button variant="ghost" size="icon" className="text-ink-muted" aria-label={t("workflowDelete")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null || !config.deletable} title={!config.deletable ? t("workflowDefaultProtected") : t("workflowDelete")} onClick={() => setStrategyAction("delete")}><Trash2 aria-hidden="true" focusable="false" /></Button>
       </div>
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
-      {policyRecovery !== null && <div className="notice warn bg-panel text-ink" role="status"><span>{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
+      {policyRecovery !== null && <div className="notice warn bg-panel text-ink" role="status"><span className="block">{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
       {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</Button></div>}
       {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</Button>{reason === "type" && <Button variant="outline" size="sm" type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setEditableDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</Button>}</div>)}
@@ -489,13 +489,14 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
       )}
   </>;
 
-  const actions = <div className="workflow-toolbar flex flex-wrap items-center justify-end gap-2 p-1 [&>button]:min-h-10" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
-    <Button className={primaryButtonClass} type="button" onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}>{t("reviewChanges")}</Button>
-    <Button variant="outline" className={actionButtonClass} type="button" onClick={() => {
+  const actions = <div className="workflow-toolbar flex flex-nowrap items-center gap-1 border-t border-outline pt-1 [&>button]:min-h-10" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
+    <Button variant="ghost" className="mr-auto px-2 text-ink-muted has-[>svg]:px-2 max-[600px]:size-10 max-[600px]:p-0 max-[600px]:has-[>svg]:px-0" aria-label={t("workflowAddModel")} title={t("workflowAddModel")} disabled={editDisabled} onClick={() => setModelChooser(true)}><Plus aria-hidden="true" focusable="false" /><span className="max-[600px]:sr-only">{t("workflowAddModel")}</span></Button>
+    <Button className="h-10 px-2 has-[>svg]:px-2 disabled:border-transparent disabled:bg-panel-muted disabled:text-ink-muted disabled:opacity-100" type="button" aria-label={t("reviewChanges")} onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}><Check aria-hidden="true" focusable="false" />{t("reviewChanges")}</Button>
+    <Button variant="ghost" size="icon" className="text-ink-muted" type="button" aria-label={t("discardChanges")} title={t("discardChanges")} onClick={() => {
       setDraft(draftFromConfiguration(config)); setHistoryBoundary((value) => value + 1); setDiscardBoundary((value) => value + 1);
       setQuestionNames({}); setCriterionNames({}); setNewCriteria({}); setNewQuestion(""); selectLayoutNodes([]); setNotice(null); setReview(null);
-    }} disabled={writeDisabled || busy || policyRecovery !== null || review !== null || !dirty}>{t("cancel")}</Button>
-    <Button variant="outline" className={actionButtonClass} type="button" onClick={() => setResetReview(true)} disabled={writeDisabled || policyReadOnly || busy || policyRecovery !== null || layoutDirty || review !== null || !config.overlay.applied}>{t("resetBaseline")}</Button>
+    }} disabled={writeDisabled || busy || policyRecovery !== null || review !== null || !dirty}><X aria-hidden="true" focusable="false" /></Button>
+    <Button variant="ghost" size="icon" className="text-ink-muted" type="button" aria-label={t("resetBaseline")} title={t("resetBaseline")} onClick={() => setResetReview(true)} disabled={writeDisabled || policyReadOnly || busy || policyRecovery !== null || layoutDirty || review !== null || !config.overlay.applied}><RotateCcw aria-hidden="true" focusable="false" /></Button>
   </div>;
 
   return (

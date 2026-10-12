@@ -73,7 +73,9 @@ for (const { width, locale, font } of scenarios) {
       await expectDecorativeIcon(tool(words.canvasAddNode), words.canvasAddNode);
       await expect(tool(words.canvasAddNode)).toHaveCSS("height", "40px");
       await expect(tool(words.canvasZoomReset)).toHaveText("1:1");
-      await expect(tool(words.canvasZoomFit)).toHaveText(words.canvasZoomFit);
+      await expectDecorativeIcon(tool(words.canvasZoomFit), words.canvasZoomFit);
+      await expect(tool(words.canvasZoomFit)).toHaveCSS("width", "40px");
+      await expect(tool(words.canvasZoomFit)).toHaveCSS("height", "40px");
       await expect(tool(words.canvasSelectTool)).toHaveAttribute("aria-pressed", "true");
       await tool(words.canvasSelectTool).focus();
       await page.keyboard.press("ArrowRight");

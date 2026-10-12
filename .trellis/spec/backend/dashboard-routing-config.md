@@ -114,8 +114,24 @@ The full supplier library remains in the configuration response. Model-node
 inspection uses the shared supplier ModelDialog and never edits global priority
 or tags through a workflow payload.
 
-Review/discard/reset and canvas tools share one measured bottom-right floating
-panel. The tool row scrolls horizontally on narrow screens; policy actions wrap.
+Review/discard/reset belong to the top-left strategy controls. Canvas tools form
+a separate bottom-centered panel with a 12px gap to the canvas bottom edge.
+The tool row scrolls horizontally on narrow screens; policy actions stay together
+on one row. Below 600px the model-add action uses its labeled icon to keep the
+review and recovery controls exposed.
+The policy card is bounded to 400px on desktop: a native strategy selector with
+icon create/delete actions above model addition and review/discard/reset actions.
+Canvas tools are bounded to 600px and grouped by selection, editing and zoom.
+Use ghost controls and group dividers instead of a border around each button.
+Icon actions retain localized accessible names, native title hints and 40px hit
+targets. The selector retains its 44px native-control geometry. Disabled review
+uses a neutral surface; enabled review uses the primary action color.
+The `.workspace-chrome[data-canvas-occlusion="top"]` measures the strategy card;
+`.canvas-tools[data-canvas-occlusion="bottom"]` measures the tool panel. Both
+bounds feed canvas origin, Fit, reveal and inspector placement. Layout menus open
+above the tools and stay within the available canvas area. Reserve bottom space
+from the measured tool bounds; do not position tools from the free rectangle they
+themselves occlude.
 Review/reset/create/delete/model selection use the existing webpage Dialog and
 native controls. Errors, repair and GET-only recovery retain their owners. The
 information drawer, advanced editors, original footer and heading/source/status

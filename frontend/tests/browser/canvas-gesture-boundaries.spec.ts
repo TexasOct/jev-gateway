@@ -51,7 +51,7 @@ for (const gesture of ["node", "connection"] as const) for (const mechanism of [
       await page.keyboard.press(mechanism === "undo" ? "ControlOrMeta+z" : "ControlOrMeta+Shift+z");
     }
     if (mechanism === "discard") {
-      const cancel = page.locator(".workflow-toolbar").getByRole("button", { name: en.cancel, exact: true });
+      const cancel = page.locator(".workflow-toolbar").getByRole("button", { name: en.discardChanges, exact: true });
       await cancel.focus(); await page.keyboard.press("Enter");
     }
     if (mechanism === "hash-refresh") {
@@ -100,7 +100,7 @@ test("Chinese desktop semantic discard restores draft without a layout write", a
   await page.locator('[data-canvas-node="fallback"]').focus(); await page.keyboard.press("Enter");
   await page.getByRole("complementary", { name: zhCN.nodeInspector }).getByRole("combobox", { name: zhCN.label, exact: true }).selectOption("quality");
   await page.getByRole("button", { name: zhCN.closeInspector, exact: true }).click();
-  const cancel = page.locator(".workflow-toolbar").getByRole("button", { name: zhCN.cancel, exact: true });
+  const cancel = page.locator(".workflow-toolbar").getByRole("button", { name: zhCN.discardChanges, exact: true });
   await expect(cancel).toBeEnabled(); await cancel.focus(); await page.keyboard.press("Enter");
   await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.getByRole("button", { name: zhCN.canvasUndo, exact: true })).toBeDisabled();

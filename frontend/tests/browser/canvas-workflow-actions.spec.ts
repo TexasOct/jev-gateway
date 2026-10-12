@@ -4,6 +4,7 @@ import { configuration, editableConfiguration } from "../fixtures/configuration"
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 import type { CanvasLayout } from "../../src/shared/api/types";
+import { settledCanvasGeometry } from "./canvas-wave3-focus";
 
 async function frames(page: Page) {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
@@ -21,7 +22,7 @@ async function blankPoint(page: Page, nearEdge = false) {
 }
 
 async function wirePoint(page: Page, selector: string) {
-  await frames(page);
+  await settledCanvasGeometry(page, en);
   return page.locator(selector).evaluate((element) => {
     const path = element as SVGPathElement, matrix = path.getScreenCTM()!;
     for (const fraction of [0.2, 0.3, 0.5, 0.7, 0.8]) {
@@ -141,7 +142,9 @@ test("native zoom/pan add, input-safe deletion, combined history, review and sav
   await menu.getByRole("menuitem", { name: en.canvasAddQuestion }).click();
   await expect(inspector).toBeVisible();
   const input = inspector.getByRole("textbox", { name: en.instructions, exact: true }).last();
-  await input.fill("New routing question"); await input.press("Backspace");
+  await input.fill("New routing question");
+  await expect(input).toHaveValue("New routing question"); await frames(page);
+  await input.press("End"); await input.press("Backspace");
   await expect(added).toHaveCount(1);
   await expect(input).toHaveValue("New routing questio");
   await page.getByRole("button", { name: en.closeInspector, exact: true }).click();
@@ -182,7 +185,7 @@ test("deleting a middle rule remaps its successor and cancelling restores the or
   await page.getByRole("menuitem", { name: en.remove, exact: true }).click();
   await expect(page.locator('[data-canvas-node="rule-2"]')).toHaveCount(0);
   await expect.poll(() => mockApi.canvasLayout?.nodes["rule-1"]).toEqual(positions["rule-2"]);
-  await page.getByRole("button", { name: en.cancel, exact: true }).click();
+  await page.getByRole("button", { name: en.discardChanges, exact: true }).click();
   await expect(page.locator('[data-canvas-node="rule-2"]')).toHaveCount(1);
   await expect.poll(() => mockApi.canvasLayout?.nodes).toEqual(positions);
   await expect(page.getByRole("button", { name: en.canvasUndo, exact: true })).toBeDisabled();

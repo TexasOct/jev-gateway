@@ -204,8 +204,8 @@ test("C21 cancel preserves semantic edits, selection and accessible focus", asyn
   await activate(page, page.locator('[data-canvas-node="questions"]'));
   await expect(field).toHaveValue("C21 cancel-preserved edit");
   await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-  // The toolbar Cancel button discards the draft and the selection as a separate boundary.
-  await activate(page, page.locator(".workflow-toolbar").getByRole("button", { name: words.cancel, exact: true }));
+  // The policy discard action restores the draft and clears the selection.
+  await activate(page, page.locator(".workflow-toolbar").getByRole("button", { name: words.discardChanges, exact: true }));
   await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   await activate(page, page.locator('[data-canvas-node="questions"]'));
   await expect(field).toHaveValue(configuration.questions.intent!.instructions);
@@ -265,11 +265,15 @@ for (const [locale, width, height, scheme] of [
 
     // R4 removes the drawer. Current floating actions remain inside the native viewport.
     await expect(page.locator(".workflow-info, .workflow-drawer, .workflow-advanced, .workflow-footer")).toHaveCount(0);
-    const floating = page.locator(".canvas-tools[data-canvas-occlusion='bottom']");
-    await expect(floating).toBeVisible();
-    const controlsBox = (await floating.boundingBox())!;
-    expect(controlsBox.x).toBeGreaterThanOrEqual(0); expect(controlsBox.x + controlsBox.width).toBeLessThanOrEqual(width + 1);
-    expect(controlsBox.y).toBeGreaterThanOrEqual(0); expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(height + 1);
+    const controlsBox = (await page.locator(".workspace-chrome").boundingBox())!;
+    const toolsBox = (await page.locator(".canvas-tools").boundingBox())!;
+    for (const selector of [".workspace-chrome[data-canvas-occlusion='top']", ".canvas-tools[data-canvas-occlusion='bottom']"]) {
+      const floating = page.locator(selector);
+      await expect(floating).toBeVisible();
+      const controlsBox = (await floating.boundingBox())!;
+      expect(controlsBox.x).toBeGreaterThanOrEqual(0); expect(controlsBox.x + controlsBox.width).toBeLessThanOrEqual(width + 1);
+      expect(controlsBox.y).toBeGreaterThanOrEqual(0); expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(height + 1);
+    }
     const pageAfterDrawer = await page.evaluate(() => ({ documentHeight: document.documentElement.scrollHeight, inner: window.innerHeight }));
     expect(pageAfterDrawer.documentHeight).toBeLessThanOrEqual(pageAfterDrawer.inner + 24);
 
@@ -297,7 +301,7 @@ for (const [locale, width, height, scheme] of [
     await expect(page.getByRole("status").filter({ hasText: words.canvasQuestionInstructionsError })).toBeVisible();
     await expect(page.getByRole("button", { name: words.reviewChanges, exact: true })).toBeDisabled();
     await activate(page, page.getByRole("button", { name: words.closeInspector, exact: true }));
-    await writeFile(info.outputPath("c22-geometry.json"), JSON.stringify({ locale, width, height, scheme, canvasBox, header, menuBox, controlsBox, inspectorBox, overflow, requests: mockApi.requests }, null, 2));
+    await writeFile(info.outputPath("c22-geometry.json"), JSON.stringify({ locale, width, height, scheme, canvasBox, header, menuBox, controlsBox, toolsBox, inspectorBox, overflow, requests: mockApi.requests }, null, 2));
     await page.screenshot({ path: info.outputPath("c22-state.png") });
   });
 }

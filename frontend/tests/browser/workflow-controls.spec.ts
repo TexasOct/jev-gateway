@@ -155,10 +155,12 @@ for (const width of [1280, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     await expect(extra).toHaveCount(1);
     const geometry = await page.locator(".canvas-tools").evaluate((panel) => {
       const bounds = panel.getBoundingClientRect(), canvas = document.querySelector(".routing-canvas-scroll")!.getBoundingClientRect();
-      return { left: bounds.left, right: bounds.right, bottom: bounds.bottom, canvasRight: canvas.right, canvasBottom: canvas.bottom, overflow: document.documentElement.scrollWidth > innerWidth };
+      return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, canvasLeft: canvas.left, canvasRight: canvas.right, canvasBottom: canvas.bottom, overflow: document.documentElement.scrollWidth > innerWidth };
     });
     expect(geometry.left).toBeGreaterThanOrEqual(0); expect(geometry.right).toBeLessThanOrEqual(width);
-    expect(Math.abs(geometry.canvasRight - geometry.right - 12)).toBeLessThan(2); expect(Math.abs(geometry.canvasBottom - geometry.bottom - 12)).toBeLessThan(2); expect(geometry.overflow).toBe(false);
+    expect(Math.abs((geometry.left + geometry.right) / 2 - (geometry.canvasLeft + geometry.canvasRight) / 2)).toBeLessThan(2);
+    expect(Math.abs(geometry.canvasBottom - geometry.bottom - 12)).toBeLessThan(2);
+    expect(geometry.overflow).toBe(false);
     await page.screenshot({ path: info.outputPath("floating-controls.png"), fullPage: true });
   });
 }
@@ -405,7 +407,7 @@ test("canceled dirty departure preserves history while confirmed discard and dep
   page.once("dialog", (dialog) => dialog.dismiss()); await selector.selectOption("balanced"); await expect(selector).toHaveValue("Other");
   await expect(page.getByRole("button", { name: en.canvasUndo, exact: true })).toBeEnabled();
   await expect(page.locator('[data-canvas-node="model::' + EXTRA + '"]')).toBeVisible();
-  await page.getByRole("button", { name: en.cancel, exact: true }).click();
+  await page.getByRole("button", { name: en.discardChanges, exact: true }).click();
   await expect(page.locator('[data-canvas-node="model::' + EXTRA + '"]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: en.canvasUndo, exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: en.canvasRedo, exact: true })).toBeDisabled();

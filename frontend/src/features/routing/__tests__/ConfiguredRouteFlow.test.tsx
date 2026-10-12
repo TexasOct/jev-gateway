@@ -173,8 +173,8 @@ describe("configured route explanation markup", () => {
     const draft = draftFromConfiguration(config);
     const render = (payload: ConfigurationPayload) => renderToStaticMarkup(<ConfiguredRouteFlow draft={draft} config={payload} locale={locale} reducedMotion initialSelectedBranchId="rule-0" />);
     const html = render(config);
-    expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 继承全局模型");
-    expect(html).toContain(locale === "en" ? "not a pool member" : "不是模型池成员");
+    expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 使用全局默认模型");
+    expect(html).toContain(locale === "en" ? "not a pool member" : "默认模型不属于此分组");
     expect(html).toContain("missing");
     expect(html).toContain(">default</p>");
     expect(html).toContain("p/other");

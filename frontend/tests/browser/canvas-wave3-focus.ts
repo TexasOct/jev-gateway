@@ -3,6 +3,31 @@ import { expect } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
 
+export async function settledCanvasGeometry(page: Page, words: { loading: string; canvasSavingLayout: string }) {
+  const status = page.locator(".canvas-policy-controls").getByRole("status");
+  await expect(status.filter({ hasText: words.loading })).toHaveCount(0);
+  await expect(status.filter({ hasText: words.canvasSavingLayout })).toHaveCount(0);
+  return page.locator(".routing-canvas-scroll").evaluate(async (element, pendingText) => {
+    const canvas = element as HTMLElement;
+    let previous = "", stable = 0;
+    for (let frame = 0; frame < 120; frame++) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      const bounds = canvas.getBoundingClientRect();
+      const chrome = document.querySelector(".workspace-chrome")!.getBoundingClientRect();
+      const tools = document.querySelector(".canvas-tools")!.getBoundingClientRect();
+      const origin = Number.parseFloat(getComputedStyle(canvas).getPropertyValue("--canvas-origin-y"));
+      const geometry = { bounds: bounds.toJSON(), chrome: chrome.toJSON(), tools: tools.toJSON(), origin, scroll: { x: canvas.scrollLeft, y: canvas.scrollTop } };
+      const signature = JSON.stringify(geometry);
+      const coherent = Math.abs(origin - (Math.max(bounds.top, chrome.bottom) - bounds.top + 12)) < 1;
+      const pending = [...document.querySelectorAll(".canvas-policy-controls [role=status]")].some(el => pendingText.some(text => el.textContent?.includes(text)));
+      stable = !pending && coherent && signature === previous ? stable + 1 : 0;
+      previous = signature;
+      if (stable === 4) return geometry;
+    }
+    throw new Error(`Canvas geometry did not settle in 120 frames: ${previous}`);
+  }, [words.loading, words.canvasSavingLayout]);
+}
+
 export async function fieldVisibility(target:Locator) {
   await target.scrollIntoViewIfNeeded();
   const state=await target.evaluate(el=>{const b=el.getBoundingClientRect();return{bounds:b.toJSON(),disabled:el.matches(":disabled"),focused:el===document.activeElement,hits:[b.left+2,b.left+b.width/2,b.right-2].map(x=>el.contains(document.elementFromPoint(x,b.top+b.height/2))),viewport:{width:innerWidth,height:innerHeight}};});

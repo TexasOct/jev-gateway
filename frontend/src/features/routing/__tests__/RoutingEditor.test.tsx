@@ -11,6 +11,7 @@ const config: ConfigurationPayload = {
   models: [...configuration.models, { id: "p/unselected", provider: "p", upstream_model: "unselected", priority: 0, baseline_priority: 0, tags: [], baseline_tags: [] }],
 };
 const renderEditor = (payload = config, error?: string) => renderToStaticMarkup(<LocaleProvider><RoutingEditor config={payload} error={error} onError={() => undefined} onReloaded={async () => undefined} /></LocaleProvider>);
+const buttonMarkup = (html: string, name: string) => html.match(/<button\b[^>]*>.*?<\/button>/g)!.find((button) => button.includes(name))!;
 afterEach(() => vi.unstubAllGlobals());
 
 describe("named workflow presentation", () => {
@@ -20,7 +21,7 @@ describe("named workflow presentation", () => {
     expect(html).toContain('class="strategy-controls');
     expect(html).toContain(`>${words.strategy}<`);
     expect(html).toContain('value="balanced" selected=""');
-    for (const name of [words.workflowCreate, words.workflowDelete, words.workflowAddModel, words.reviewChanges, words.cancel, words.resetBaseline]) expect(html).toContain(name);
+    for (const name of [words.workflowCreate, words.workflowDelete, words.workflowAddModel, words.reviewChanges, words.discardChanges, words.resetBaseline]) expect(html).toContain(name);
     for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasAddNode, words.canvasZoomOut, words.canvasZoomIn, words.canvasLayoutTools]) {
       const button = html.match(/<button\b[^>]*>.*?<\/button>/g)!.find((item) => item.includes(`aria-label="${name}"`))!;
       expect(button).toBeDefined();
@@ -36,16 +37,20 @@ describe("named workflow presentation", () => {
     expect(html).toContain('aria-label="' + words.canvasZoomReset + '"');
     expect(html).toContain('>1:1</button>');
   });
-  it("removes the information, advanced editors, source/header copy and footer while retaining floating policy actions", () => {
+  it("groups policy actions at the top left and separates canvas tools at the bottom center", () => {
     const html = renderEditor();
     for (const marker of ["workflow-info", "workflow-drawer", "workspace-heading", "workspace-status", "routing-information", "Canvas help", "Advanced editors", "fixture</code>"]) expect(html).not.toContain(marker);
     expect(html).not.toContain('class="workflow-inspector');
-    const panel = html.indexOf('class="canvas-tools absolute bottom-3 right-3');
+    const chrome = html.indexOf('class="workspace-chrome absolute left-3 right-3 top-3');
+    const policy = html.indexOf('class="canvas-policy-controls');
     const actions = html.indexOf('class="workflow-toolbar');
+    const panel = html.indexOf('class="canvas-tools');
     const tools = html.indexOf('class="canvas-tool-buttons');
-    expect(panel).toBeGreaterThan(0); expect(actions).toBeGreaterThan(panel); expect(tools).toBeGreaterThan(actions);
+    expect(chrome).toBeGreaterThan(0); expect(policy).toBeGreaterThan(chrome);
+    expect(actions).toBeGreaterThan(policy); expect(panel).toBeGreaterThan(actions); expect(tools).toBeGreaterThan(panel);
+    expect(html).toContain('data-canvas-occlusion="bottom"');
     expect(html).toContain('data-policy-draft="unchanged"');
-    expect(html).toMatch(/disabled=""[^>]*>Review changes<\/button>/);
+    expect(buttonMarkup(html, messages.en.reviewChanges)).toContain('disabled=""');
   });
   it("explicit empty selection mounts no model node while preserving the chooser library", () => {
     const html = renderEditor({ ...config, selected_models: [] });
@@ -58,7 +63,7 @@ describe("named workflow presentation", () => {
     expect(html).toContain('role="alert">Failed to validate');
     expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf('class="canvas-frame'));
     expect(html).toMatch(/aria-label="Add node"[^>]*disabled=""/);
-    expect(html).toMatch(/disabled=""[^>]*>Create strategy<\/button>/);
+    expect(buttonMarkup(html, messages.en.workflowCreate)).toContain('disabled=""');
     expect(html).toContain('aria-label="Pan canvas (H)"');
     expect(html).toMatch(/aria-label="Layout tools"[^>]*disabled=""/);
     expect(html).toContain('aria-label="Select nodes (V)" aria-pressed="true"');
@@ -69,8 +74,8 @@ describe("named workflow presentation", () => {
     else delete payload.definition;
     expect(payload.write_available).toBe(true);
     const html = renderEditor(payload);
-    expect(html).toMatch(/disabled=""[^>]*>Add model<\/button>/);
-    expect(html).not.toMatch(/disabled=""[^>]*>Create strategy<\/button>/);
+    expect(buttonMarkup(html, messages.en.workflowAddModel)).toContain('disabled=""');
+    expect(buttonMarkup(html, messages.en.workflowCreate)).not.toContain('disabled=""');
     expect(html).toContain('data-policy-draft="unchanged"');
     expect(html).toContain('data-canvas-edge=');
   });

@@ -25,10 +25,36 @@ for (const { width, height } of [{ width: 1280, height: 900 }, { width: 1430, he
       }
       const geometry = await toolbar.evaluate((element) => {
         const buttons = [...element.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
-        return { rows: Math.max(...buttons.map((box) => box.top)) - Math.min(...buttons.map((box) => box.top)), height: element.getBoundingClientRect().height };
+        return { rows: Math.max(...buttons.map((box) => box.top)) - Math.min(...buttons.map((box) => box.top)), height: element.getBoundingClientRect().height, contentWidth: element.scrollWidth, visibleWidth: element.clientWidth };
       });
       expect(geometry.rows).toBeLessThanOrEqual(1);
       expect(geometry.height).toBeLessThanOrEqual(60);
+      if (width >= 1280) expect(geometry.contentWidth).toBeLessThanOrEqual(geometry.visibleWidth + 1);
+      const placement = await page.locator(".workspace-chrome").evaluate((chrome) => {
+        const policy = chrome.querySelector(".canvas-policy-controls")!.getBoundingClientRect();
+        const toolsElement = document.querySelector(".canvas-tools")!;
+        const tools = toolsElement.getBoundingClientRect();
+        const canvas = document.querySelector(".routing-canvas-scroll")!.getBoundingClientRect();
+        return { policy: policy.toJSON(), tools: tools.toJSON(), canvas: canvas.toJSON(), reviewInPolicy: !!chrome.querySelector(".canvas-policy-controls .workflow-toolbar"), toolsContainPolicy: !!toolsElement.querySelector(".workflow-toolbar"), toolsInTopChrome: chrome.contains(toolsElement), toolsOcclusion: toolsElement.getAttribute("data-canvas-occlusion") };
+      });
+      expect(placement.reviewInPolicy).toBe(true);
+      expect(placement.toolsContainPolicy).toBe(false);
+      expect(Math.abs(placement.policy.left - placement.canvas.left - 12)).toBeLessThan(2);
+      expect(placement.toolsInTopChrome).toBe(false);
+      expect(placement.toolsOcclusion).toBe("bottom");
+      expect(Math.abs((placement.tools.left + placement.tools.right) / 2 - (placement.canvas.left + placement.canvas.right) / 2)).toBeLessThan(2);
+      expect(Math.abs(placement.canvas.bottom - placement.tools.bottom - 12)).toBeLessThan(2);
+      expect(placement.tools.top).toBeGreaterThanOrEqual(placement.policy.bottom + 11);
+      expect(placement.policy.width).toBeLessThanOrEqual(400);
+      expect(placement.tools.width).toBeLessThanOrEqual(600);
+      expect(placement.policy.height).toBeLessThanOrEqual(116);
+      const policyActions = await page.locator(".workflow-toolbar").evaluate((element) => {
+        const buttons = [...element.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
+        return { rows: Math.max(...buttons.map((box) => box.top)) - Math.min(...buttons.map((box) => box.top)), minHeight: Math.min(...buttons.map((box) => box.height)), overflow: element.scrollWidth > element.clientWidth };
+      });
+      expect(policyActions.rows).toBeLessThanOrEqual(1);
+      expect(policyActions.minHeight).toBeGreaterThanOrEqual(40);
+      expect(policyActions.overflow).toBe(false);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath("toolbar.png"), fullPage: true });
 
@@ -51,7 +77,12 @@ for (const { width, height } of [{ width: 1280, height: 900 }, { width: 1430, he
       const menuBox = await menu.boundingBox(), toolbarBox = await toolbar.boundingBox();
       expect(menuBox!.x).toBeGreaterThanOrEqual(8);
       expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width - 8);
-      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(toolbarBox!.y);
+      const chromeBox = (await page.locator(".workspace-chrome").boundingBox())!;
+      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(toolbarBox!.y - 8);
+      expect(menuBox!.y).toBeGreaterThanOrEqual(chromeBox.y + chromeBox.height);
+      const toolsBox = (await page.locator(".canvas-tools").boundingBox())!;
+      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(toolsBox.y - 8);
+      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(height - 8);
       await page.screenshot({ path: testInfo.outputPath("layout-menu.png"), fullPage: true });
       await page.keyboard.press("Escape");
       await expect(menu).toHaveCount(0);

@@ -37,17 +37,25 @@ for (const state of ["uneditable", "missing-definition"] as const) for (const wi
   await page.getByRole("button", { name: en.closeInspector, exact: true }).click();
   await rule.focus(); await page.keyboard.press("Delete"); await page.keyboard.press("Backspace");
   await expect(rule).toHaveCount(1);
+  // Revealing the inspector can persist a viewport change on a narrow canvas.
+  await expect(page.getByRole("button", { name: en.workflowCreate, exact: true })).toBeEnabled();
+  const revealed = { ...layout, viewport: structuredClone(mockApi.canvasLayout!.viewport) };
+  expect(mockApi.canvasLayout!.nodes).toEqual(layout.nodes);
+  const writesBeforeMove = mockApi.canvasWrites?.length ?? 0;
+  const requestsBeforeMove = mockApi.requests.filter(({ method }) => method !== "GET").length;
   await page.keyboard.press("Alt+ArrowRight");
-  const moved = { ...layout, nodes: { ...layout.nodes, "rule-0": { x: layout.nodes["rule-0"]!.x + 20, y: layout.nodes["rule-0"]!.y } } };
+  const moved = { ...revealed, nodes: { ...layout.nodes, "rule-0": { x: layout.nodes["rule-0"]!.x + 20, y: layout.nodes["rule-0"]!.y } } };
   await expect.poll(() => mockApi.canvasLayout).toEqual(moved);
   await page.getByRole("button", { name: en.canvasUndo, exact: true }).click();
-  await expect.poll(() => mockApi.canvasLayout).toEqual(layout);
+  await expect.poll(() => mockApi.canvasLayout).toEqual(revealed);
   await page.getByRole("button", { name: en.canvasRedo, exact: true }).click();
   await expect.poll(() => mockApi.canvasLayout).toEqual(moved);
   await expect(page.locator('.workflow-toolbar[data-policy-draft]')).toHaveAttribute("data-policy-draft", "unchanged");
   expect(mockApi.appliedConfiguration).toEqual(readonly);
-  expect(mockApi.canvasWrites).toEqual([moved, layout, moved]);
-  expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual(Array.from({ length: 3 }, () => ({ method: "PUT", path: "/v1/dashboard/canvas-layout?strategy=balanced" })));
+  expect(mockApi.canvasWrites?.slice(writesBeforeMove)).toEqual([moved, revealed, moved]);
+  const mutations = mockApi.requests.filter(({ method }) => method !== "GET");
+  expect(mutations.slice(requestsBeforeMove)).toEqual(Array.from({ length: 3 }, () => ({ method: "PUT", path: "/v1/dashboard/canvas-layout?strategy=balanced" })));
+  expect(mutations.every(({ method, path }) => method === "PUT" && path === "/v1/dashboard/canvas-layout?strategy=balanced")).toBe(true);
   await info.attach("readonly-policy-independent-layout-ledger", { contentType: "application/json", body: JSON.stringify({ readonly, layout, moved, requests: mockApi.requests, layoutWrites: mockApi.canvasWrites }, null, 2) });
 });
 
@@ -95,7 +103,7 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
     await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
     await page.goto("/dashboard/");
     const target = page.locator('[data-route-target="fixture/global"]');
-    await expect(target).toContainText(zh ? "默认 · 继承全局模型" : "Default · inherited global model");
+    await expect(target).toContainText(zh ? "默认 · 使用全局默认模型" : "Default · inherited global model");
     await expect(target).toContainText(zh ? "已配置 · 无会话" : "Configured · no sessions");
     await page.getByRole("button", { name: zh ? "策略工作流" : "Strategy workflow", exact: true }).click();
     const inheritedEdge = page.locator('path[data-workflow-edge="default"]');
@@ -124,7 +132,7 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
       expect(modelLines).toBeLessThanOrEqual(3);
     }
     await page.keyboard.press("Escape"); await expect(card).toHaveCount(0);
-    await expect(page.getByRole("button", { name: zh ? "审阅草稿" : "Review changes", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: words.reviewChanges, exact: true })).toBeDisabled();
     expect(writes).toEqual([]);
     expect(validations).toEqual([]);
 
@@ -183,7 +191,7 @@ for (const locale of ["en", "zh-CN"] as const) for (const width of [1280, 320]) 
       await page.keyboard.press("Escape");
       await expect(branch).toHaveAttribute("aria-pressed", "false");
     }
-    await expect(page.getByRole("button", { name: zh ? "审阅草稿" : "Review changes", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: words.reviewChanges, exact: true })).toBeDisabled();
     expect(writes).toBe(0);
     expect(config.models[0]!.tags).toEqual([]);
     expect(mockApi.requests.filter(({ method }) => method !== "GET")).toEqual([]);

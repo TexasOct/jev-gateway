@@ -25,9 +25,9 @@ test("native route branches retain selection and endpoints with and without redu
   await page.getByRole("button", { name: "Strategy workflow" }).click();
   await expect(page.locator(".workflow-drawer, .workflow-info, [data-flow-state], [data-flow-motion]")).toHaveCount(0);
   const edges = page.locator("[data-canvas-edge]");
-  const endpoints = await edges.evaluateAll(elements => elements.map(element => ({ from: element.getAttribute("data-edge-from"), kind: element.getAttribute("data-edge-kind"), to: element.getAttribute("data-edge-to") })));
   const fallbackBranch = page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="unmatched"]');
   await expect(fallbackBranch).toHaveAttribute("data-edge-to", "zone::balanced/default");
+  const endpoints = await edges.evaluateAll(elements => elements.map(element => ({ from: element.getAttribute("data-edge-from"), kind: element.getAttribute("data-edge-kind"), to: element.getAttribute("data-edge-to") })));
   await focusEdge(fallbackBranch); await page.keyboard.press("Enter");
   await expect(page.getByRole("region", { name: en.canvasConnectionActions })).toContainText("default");
   const activePath = fallbackBranch.locator("..").locator("[data-workflow-edge]");
@@ -97,8 +97,8 @@ test("routing draft validates before review, requires warning acknowledgement, t
   await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("quality");
   await expect(page.locator('[data-canvas-edge][data-edge-from="fallback"]')).toHaveAttribute("data-edge-to", "zone::balanced/quality");
-  await page.getByRole("button", { name: "Reset to baseline" }).click();
-  await expect(page.getByText("Remove the overlay and restore the baseline configuration?")).toBeVisible();
+  await page.getByRole("button", { name: en.resetBaseline }).click();
+  await expect(page.getByText(en.resetReviewPrompt)).toBeVisible();
   expect(mockApi.requests.filter(({ method, path }) => method === "DELETE" && path === "/v1/routing/configuration?strategy=balanced")).toHaveLength(0);
   await page.getByRole("button", { name: "Confirm reset" }).click();
   await expect.poll(() => mockApi.requests.filter(({ method, path }) => method === "DELETE" && path === "/v1/routing/configuration?strategy=balanced").length).toBe(1);

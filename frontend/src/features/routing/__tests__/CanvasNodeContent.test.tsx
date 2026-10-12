@@ -47,11 +47,11 @@ describe("canvas node content", () => {
     const before = JSON.stringify({ draft, payload });
     const html = renderNode("zone::task_aware/craft", "craft", locale, draft, payload);
     expect(html).toContain('title="craft">craft</span>');
-    expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 继承全局模型");
+    expect(html).toContain(locale === "en" ? "Default · inherited global model" : "默认 · 使用全局默认模型");
     expect(html).not.toContain(locale === "en" ? "1 model" : "1 个模型");
     expect(JSON.stringify({ draft, payload })).toBe(before);
     const cleared = renderNode("zone::task_aware/craft", "craft", locale, draft, { ...payload, defaults: { default_model: null } });
-    expect(cleared).not.toContain(locale === "en" ? "Default · inherited global model" : "默认 · 继承全局模型");
+    expect(cleared).not.toContain(locale === "en" ? "Default · inherited global model" : "默认 · 使用全局默认模型");
   });
   it.each<Locale>(["en", "zh-CN"])("renders all six localized types with decorative library icons and current summaries in %s", (locale) => {
     const words = messages[locale];

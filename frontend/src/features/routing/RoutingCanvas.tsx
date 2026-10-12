@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
 import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { Ellipsis, Hand, Minus, MousePointer2, Plus, Undo2, Redo2 } from "lucide-react";
+import { Ellipsis, Hand, Maximize2, Minus, MousePointer2, Plus, Undo2, Redo2 } from "lucide-react";
 import { api, ApiError } from "@/shared/api/client";
 import type { CanvasLayout, ConfigurationPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
@@ -13,7 +13,6 @@ import type { ConnectionIntent, ConnectionReason, RuleLayoutMutation } from "./m
 import type { Position } from "./model/canvas";
 import { Button } from "@/shared/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select";
-import { ToolButton } from "@/shared/ui/ToolButton";
 import { NODE_CARD_BASE_HEIGHT, NODE_CARD_OUTPUT_HEIGHT, NODE_CARD_WIDTH, nodeCardCenter, nodeCardPorts } from "./model/node-card";
 import { canvasDimensions, canvasOutputs } from "./model/outputs";
 import type { CanvasOutput } from "./model/outputs";
@@ -144,7 +143,6 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
   const [pointerCandidate, setPointerCandidate] = useState("");
   const [keyboardTarget, setKeyboardTarget] = useState("");
   const surface = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
   const originY = useRef(0);
   const restoringViewport = useRef(false);
   const viewportRestoreFrame = useRef<number | null>(null);
@@ -176,20 +174,11 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
     const canvas = surface.current;
     if (!canvas) return;
     const viewport = canvas.getBoundingClientRect();
-    const visible = canvasAvailableRect(canvas, false);
-    const toolbar = toolbarRef.current;
-    if (toolbar && viewport) {
-      toolbar.style.visibility = visible && visible.bottom - visible.top > 24 ? "visible" : "hidden";
-      if (visible) {
-        originY.current = visible.top - viewport.top + 12;
-        canvas.style.setProperty("--canvas-origin-y", `${originY.current}px`);
-        canvas.style.setProperty("--canvas-end-space", `${viewport.bottom - visible.bottom + toolbar.offsetHeight + 36}px`);
-        const width = Math.max(0, Math.min(560, visible.right - visible.left - 24));
-        toolbar.style.left = `${visible.right - viewport.left - width - 12}px`;
-        toolbar.style.width = `${width}px`;
-        toolbar.style.bottom = `${viewport.bottom - visible.bottom + 12}px`;
-        toolbar.style.maxHeight = `${Math.max(0, visible.bottom - visible.top - 24)}px`;
-      }
+    const visible = canvasAvailableRect(canvas);
+    if (visible) {
+      originY.current = visible.top - viewport.top + 12;
+      canvas.style.setProperty("--canvas-origin-y", `${originY.current}px`);
+      canvas.style.setProperty("--canvas-end-space", `${viewport.bottom - visible.bottom + 24}px`);
     }
   }, []);
   const reportAnchor = useCallback(() => {
@@ -277,6 +266,8 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
       measureChrome();
       viewportRestoreFrame.current = requestAnimationFrame(() => {
         if (!activeRef.current) return;
+        // Loading chrome can reflow between frames; restore against its current origin.
+        measureChrome();
         const canvas = surface.current;
         if (canvas) {
           const next = restoreCanvasViewport(saved, zoomRef.current, viewportReference(canvas, originY.current));
@@ -483,8 +474,9 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
     menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
     const boundMenu = () => {
       const element = menuRef.current; if (!element) return;
-      const anchor = menu.layoutTools && origin ? { x: origin.getBoundingClientRect().left, y: origin.getBoundingClientRect().top - element.offsetHeight - 8 } : { x: menu.x, y: menu.y };
-      positionFloatingCard(element, anchor);
+      const originBounds = origin?.getBoundingClientRect();
+      const anchor = menu.layoutTools && originBounds ? { x: originBounds.left, y: originBounds.top - element.getBoundingClientRect().height - 8 } : { x: menu.x, y: menu.y };
+      positionFloatingCard(element, anchor, menu.layoutTools ? surface.current : null);
     };
     boundMenu(); window.addEventListener("resize", boundMenu);
     window.visualViewport?.addEventListener("resize", boundMenu);
@@ -957,18 +949,19 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
       </>}
       <Button variant="outline" type="button" onClick={cancelConnection}>{t("cancel")}</Button>
     </div>}
-    <div className="workspace-chrome absolute left-3 right-3 top-3 z-[9] pointer-events-none [&>*]:pointer-events-auto" data-canvas-occlusion="top">
+    <div className="workspace-chrome absolute left-3 right-3 top-3 z-[9] grid max-w-[400px] min-w-0 pointer-events-none [&>*]:pointer-events-auto" data-canvas-occlusion="top">
+    <div className="canvas-policy-controls grid min-w-0 gap-1 rounded-xl border border-outline bg-panel p-1.5 shadow-sm">
     {heading}
+    {actions}
     {(!loaded || layoutSaving) && <p className="min-h-4 text-xs text-ink-muted" role="status">{!loaded ? t("loading") : t("canvasSavingLayout")}</p>}
     {layoutError && <p className="notice warn" role="status">{layoutError === "unreadable" ? t("canvasLayoutUnreadable") : layoutError}{active && !loaded && <Button variant="outline" size="sm" type="button" onClick={() => setReadRetry((value) => value + 1)}>{t("canvasRetryLayoutRead")}</Button>}{canEdit && <Button variant="outline" size="sm" type="button" onClick={() => { setLayoutError(null); persist(layoutRef.current); }}>{t("canvasRetryLayout")}</Button>}{loaded && <Button variant="outline" size="sm" type="button" onClick={discardLayout}>{t("canvasDiscardLayout")}</Button>}</p>}
     {feedback && <p className="notice warn" role="status">{feedback}</p>}
     {pointerReason && <p className="notice" role="status">{connectionReasonText(t, pointerReason)}</p>}
     {fitMode && <div className="meta" role="status">{t(fitMode === "board" ? "canvasFitBoardStatus" : fitMode === "group" ? "canvasFitGroupStatus" : "canvasFitNodeStatus")}</div>}
     </div>
-    <div className="canvas-frame absolute inset-0 min-w-0">
-    <div className="canvas-tools absolute bottom-3 right-3 z-[7] grid w-[min(560px,calc(100%-24px))] gap-1 rounded-lg border border-outline bg-panel p-1 shadow-lg" data-canvas-occlusion="bottom" ref={toolbarRef}>
-    {actions}
-    <div className="canvas-tool-buttons flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden p-1 [scrollbar-width:thin] [touch-action:pan-x]" role="toolbar" aria-label={t("canvasTools")} onFocusCapture={(event) => {
+    </div>
+    <div className="canvas-tools absolute bottom-3 left-1/2 z-[9] grid w-[calc(100%-24px)] max-w-[600px] min-w-0 -translate-x-1/2 rounded-xl border border-outline bg-panel p-1.5 shadow-sm" data-canvas-occlusion="bottom">
+    <div className="canvas-tool-buttons flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden p-0.5 [scrollbar-width:thin] [touch-action:pan-x]" role="toolbar" aria-label={t("canvasTools")} onFocusCapture={(event) => {
       const toolbar = event.currentTarget, target = event.target;
       requestAnimationFrame(() => {
         if (!activeRef.current || document.activeElement !== target) return;
@@ -985,25 +978,30 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
       event.preventDefault();
       buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
     }}>
-      <Button variant={tool === "select" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasSelectTool")} aria-label={t("canvasSelectTool")} aria-pressed={tool === "select"} onClick={() => chooseTool("select")}><MousePointer2 aria-hidden="true" focusable="false" /></Button>
-      <Button variant={tool === "pan" ? "default" : "outline"} size="icon" className="min-h-10 min-w-10" type="button" title={t("canvasPanTool")} aria-label={t("canvasPanTool")} aria-pressed={tool === "pan"} onClick={() => chooseTool("pan")}><Hand aria-hidden="true" focusable="false" /></Button>
-      <Button variant="outline" className="min-h-10" type="button" aria-label={t("canvasAddNode")} disabled={!canEditPolicy} onClick={(event) => { const rect = surface.current && canvasAvailableRect(surface.current); if (rect) openMenu({ clientX: (rect.left + rect.right) / 2, clientY: (rect.top + rect.bottom) / 2, preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }); }}><Plus aria-hidden="true" focusable="false" />{t("canvasAddNode")}</Button>
-      <Button variant="outline" size="icon" type="button" title={t("canvasUndo")} aria-label={t("canvasUndo")} disabled={!canEdit || !historyAvailability.undo} onClick={() => travelHistory(false)}><Undo2 aria-hidden="true" focusable="false" /></Button>
-      <Button variant="outline" size="icon" type="button" title={t("canvasRedo")} aria-label={t("canvasRedo")} disabled={!canEdit || !historyAvailability.redo} onClick={() => travelHistory(true)}><Redo2 aria-hidden="true" focusable="false" /></Button>
-      <div className="canvas-zoom flex flex-none items-center gap-[0.3rem] border-l border-outline pl-2 max-[600px]:gap-[0.2rem]" role="group" aria-label={t("canvasZoom")}>
-        <Button variant="outline" size="icon" type="button" title={t("canvasZoomOut")} aria-label={t("canvasZoomOut")} disabled={zoom <= MIN_ZOOM} onClick={() => zoomTo(zoom - 0.25)}><Minus aria-hidden="true" focusable="false" /></Button>
-        <output className="min-w-12 text-center tabular-nums" role="status" aria-live="polite" aria-atomic="true" title={dragPosition ? t("canvasLayoutOnly") : t("canvasZoom")} aria-label={dragPosition ? `${t("canvasLayoutOnly")} · x: ${dragPosition.x}, y: ${dragPosition.y}` : t("canvasZoom")}>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : `${Math.round(zoom * 100)}%`}</output>
-        <Button variant="outline" size="icon" type="button" title={t("canvasZoomIn")} aria-label={t("canvasZoomIn")} disabled={zoom >= 1.75} onClick={() => zoomTo(zoom + 0.25)}><Plus aria-hidden="true" focusable="false" /></Button>
-        <ToolButton className="min-h-10 min-w-10" type="button" onClick={() => zoomTo(1)} title={t("canvasZoomReset")} aria-label={t("canvasZoomReset")}>1:1</ToolButton>
-        <ToolButton className="min-h-10" type="button" onClick={fitBoard}>{t("canvasZoomFit")}</ToolButton>
+      <div className="flex shrink-0 items-center gap-0.5">
+      <Button variant="ghost" size="icon" className="aria-pressed:border-transparent aria-pressed:bg-primary/10 aria-pressed:text-primary" type="button" title={t("canvasSelectTool")} aria-label={t("canvasSelectTool")} aria-pressed={tool === "select"} onClick={() => chooseTool("select")}><MousePointer2 aria-hidden="true" focusable="false" /></Button>
+      <Button variant="ghost" size="icon" className="aria-pressed:border-transparent aria-pressed:bg-primary/10 aria-pressed:text-primary" type="button" title={t("canvasPanTool")} aria-label={t("canvasPanTool")} aria-pressed={tool === "pan"} onClick={() => chooseTool("pan")}><Hand aria-hidden="true" focusable="false" /></Button>
       </div>
-      <Button variant="outline" size="icon" className="ml-auto" type="button" title={t("canvasLayoutTools")} aria-label={t("canvasLayoutTools")} aria-haspopup="menu" aria-expanded={!!menu?.layoutTools} aria-controls={menu?.layoutTools ? menuId : undefined} disabled={!canEdit} onClick={(event) => {
+      <div className="flex shrink-0 items-center gap-0.5 border-l border-outline pl-1">
+      <Button variant="ghost" className="min-h-10 px-2" type="button" aria-label={t("canvasAddNode")} disabled={!canEditPolicy} onClick={(event) => { const rect = surface.current && canvasAvailableRect(surface.current); if (rect) openMenu({ clientX: (rect.left + rect.right) / 2, clientY: (rect.top + rect.bottom) / 2, preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }); }}><Plus aria-hidden="true" focusable="false" />{t("canvasAddNode")}</Button>
+      <Button variant="ghost" size="icon" type="button" title={t("canvasUndo")} aria-label={t("canvasUndo")} disabled={!canEdit || !historyAvailability.undo} onClick={() => travelHistory(false)}><Undo2 aria-hidden="true" focusable="false" /></Button>
+      <Button variant="ghost" size="icon" type="button" title={t("canvasRedo")} aria-label={t("canvasRedo")} disabled={!canEdit || !historyAvailability.redo} onClick={() => travelHistory(true)}><Redo2 aria-hidden="true" focusable="false" /></Button>
+      </div>
+      <div className="canvas-zoom flex flex-none items-center gap-0.5 border-l border-outline pl-1" role="group" aria-label={t("canvasZoom")}>
+        <Button variant="ghost" size="icon" type="button" title={t("canvasZoomOut")} aria-label={t("canvasZoomOut")} disabled={zoom <= MIN_ZOOM} onClick={() => zoomTo(zoom - 0.25)}><Minus aria-hidden="true" focusable="false" /></Button>
+        <output className="min-w-12 text-center tabular-nums" role="status" aria-live="polite" aria-atomic="true" title={dragPosition ? t("canvasLayoutOnly") : t("canvasZoom")} aria-label={dragPosition ? `${t("canvasLayoutOnly")} · x: ${dragPosition.x}, y: ${dragPosition.y}` : t("canvasZoom")}>{dragPosition ? `${dragPosition.x}, ${dragPosition.y}` : `${Math.round(zoom * 100)}%`}</output>
+        <Button variant="ghost" size="icon" type="button" title={t("canvasZoomIn")} aria-label={t("canvasZoomIn")} disabled={zoom >= 1.75} onClick={() => zoomTo(zoom + 0.25)}><Plus aria-hidden="true" focusable="false" /></Button>
+        <Button variant="ghost" size="icon" type="button" onClick={() => zoomTo(1)} title={t("canvasZoomReset")} aria-label={t("canvasZoomReset")}>1:1</Button>
+        <Button variant="ghost" size="icon" type="button" onClick={fitBoard} title={t("canvasZoomFit")} aria-label={t("canvasZoomFit")}><Maximize2 aria-hidden="true" focusable="false" /></Button>
+      </div>
+      <Button variant="ghost" size="icon" className="ml-auto" type="button" title={t("canvasLayoutTools")} aria-label={t("canvasLayoutTools")} aria-haspopup="menu" aria-expanded={!!menu?.layoutTools} aria-controls={menu?.layoutTools ? menuId : undefined} disabled={!canEdit} onClick={(event) => {
         if (menu?.layoutTools) { setMenu(null); return; }
         const rect = event.currentTarget.getBoundingClientRect();
-        openMenu({ clientX: rect.left, clientY: rect.top - 8, preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }, undefined, undefined, true);
+        openMenu({ clientX: rect.left, clientY: rect.top, preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }, undefined, undefined, true);
       }}><Ellipsis aria-hidden="true" focusable="false" /></Button>
     </div>
     </div>
+    <div className="canvas-frame absolute inset-0 min-w-0">
     <div className={`routing-canvas-scroll absolute inset-0 max-w-full min-h-0 overflow-auto overscroll-contain [touch-action:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${tool === "pan" ? "tool-pan" : "tool-select"}`} ref={surface} tabIndex={0} aria-label={t("routingCanvas")}
       onContextMenu={(event) => { if (event.target instanceof Element && event.target.closest("[data-canvas-node], [data-canvas-input], [data-canvas-output], [data-canvas-edge]")) return; openMenu(event); }}
       onPointerDown={(event) => { if (event.button !== 0 || marqueeRef.current) return; if (event.target instanceof Element && event.target.closest("[data-canvas-node], [data-canvas-input], [data-canvas-output], [data-canvas-edge]")) return; if (tool === "pan") { panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }; event.currentTarget.setPointerCapture(event.pointerId); return; } if (intent) return; const point = pointerOnBoard(event); marqueeRef.current = { pointerId: event.pointerId, start: point, end: point, additive: event.shiftKey }; event.currentTarget.setPointerCapture(event.pointerId); setMarquee({ start: point, end: point }); }}

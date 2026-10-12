@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { en } from "../../src/shared/i18n/en";
 import { configuredModelEdit, openProviderModels } from "../fixtures/open-provider-models";
 import { configuration } from "../fixtures/configuration";
 import { test as providerTest } from "../fixtures/provider-browser";
@@ -98,7 +99,7 @@ test("settings permits theme writes while provider and routing writes remain una
   await page.getByRole("button", { name: "Strategy workflow", exact: true }).click();
   await expect(page.locator(".routing-canvas-scroll")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add node", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Reset to baseline", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: en.resetBaseline, exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Suppliers", exact: true }).click();
   await expect(page.getByRole("button", { name: "Add provider", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Settings", exact: true }).click();

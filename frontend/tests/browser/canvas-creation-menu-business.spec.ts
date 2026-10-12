@@ -4,6 +4,7 @@ import { test, expect } from "./fixtures";
 import { configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
+import { settledCanvasGeometry } from "./canvas-wave3-focus";
 
 test.use({ hasTouch: true });
 
@@ -38,7 +39,9 @@ async function setup(page: Page, width: number, locale: "en" | "zh-CN", editable
   const words = locale === "en" ? en : zhCN;
   await page.getByRole("button", { name: words.strategyEditor, exact: true }).click();
   const add = page.getByRole("button", { name: words.canvasAddNode, exact: true });
-  if (editable) await expect(add).toBeEnabled(); else await expect(add).toBeDisabled(); await frames(page); return words;
+  if (editable) await expect(add).toBeEnabled(); else await expect(add).toBeDisabled();
+  if (editable) await settledCanvasGeometry(page, words); else await frames(page);
+  return words;
 }
 async function blankGeometry(page: Page, corner = "center") {
   return page.locator(".routing-canvas-scroll").evaluate((element, corner) => {
@@ -359,7 +362,7 @@ for (const kind of ["rule", "question"] as const) for (const width of [1280, 320
   const records: unknown[] = [];
   for (const stage of ["original", "resized", "original-again"]) {
     await page.setViewportSize({ width: stage === "resized" ? (width === 320 ? 390 : 1024) : width, height: 1000 });
-    await frames(page);
+    await settledCanvasGeometry(page, words);
     const captured = await blankGeometry(page); expect(captured.document.height).toBeLessThanOrEqual(1000); expect(captured.page.y).toBe(0);
     await page.mouse.click(captured.x, captured.y, { button: "right" }); await page.getByRole("menuitem", { name: kind === "rule" ? words.addRule : words.canvasAddQuestion, exact: true }).click();
     const node = await created(page, kind, words), id = kind === "rule" ? `rule-${configuration.rules.length}` : "questions";
