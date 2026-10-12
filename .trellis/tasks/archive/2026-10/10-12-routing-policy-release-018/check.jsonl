@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Full backend verification requirements"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Review regression independence and required checks"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Review parser, migration, baseline preservation and workflow isolation"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Explicit invalid inputs remain rejected"}
+{"file":".trellis/spec/backend/cli-lifecycle.md","reason":"Isolated installed-wheel release prerequisite"}
+{"file":".trellis/spec/guides/index.md","reason":"Review contract propagation"}
+{"file":"docs/releasing.md","reason":"Version, packaging, hosted and public release verification"}

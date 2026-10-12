@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend ownership and required verification"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Existing catalog and overlay module ownership"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Preserve strict validation and secret-free errors"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Meaningful regression and typing conventions"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Overlay migration and configuration transaction contracts"}
+{"file":".trellis/spec/guides/index.md","reason":"Shared change-boundary guidance"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the catalog optional-policy semantics"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace parser compatibility through validation/apply/reload"}
