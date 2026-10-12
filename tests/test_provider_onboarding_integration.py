@@ -206,7 +206,7 @@ def test_discovery_confirmation_import_preserves_overlay_and_runtime_identity(
 def test_metadata_http_keeps_serving_applicability_and_source_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, official: bool
 ) -> None:
-    """Public suggestions stay transient and cannot certify a custom proxy."""
+    """Generic public suggestions apply to both addresses and stay transient."""
     document = catalog_document()
     document["gateway"] = {"api_key_env": "ONBOARDING_GATEWAY_KEY"}
     monkeypatch.setenv("ONBOARDING_GATEWAY_KEY", "fixture-gateway-key")
@@ -274,14 +274,14 @@ def test_metadata_http_keeps_serving_applicability_and_source_evidence(
             item = response.json()["items"][0]
             assert item["upstream_model"] == "fixture-model"
             fields = item["fields"]
-            assert fields["input_per_million"] == (2.0 if official else None)
-            assert fields["output_per_million"] == (8.0 if official else None)
-            assert fields["tools"] is (False if official else None)
+            assert fields["input_per_million"] == 2.0
+            assert fields["output_per_million"] == 8.0
+            assert fields["tools"] is False
             assert fields["vision"] is None
             assert fields["json_mode"] is None
             source = item["sources"][0]
             assert source["source"] == "models_dev"
-            assert source["applicable"] is official
+            assert source["applicable"] is True
             assert source["source_updated_at"] == "2026-09-30"
             assert source["fields"]["input_per_million"]["source_unit"] == "USD/M tokens"
             assert source["fields"]["structured_output"]["value"] is True
@@ -294,9 +294,6 @@ def test_metadata_http_keeps_serving_applicability_and_source_evidence(
                 model_metadata.SOURCE_URLS["models_dev"],
                 model_metadata.SOURCE_URLS["models_dev_catalog"],
             }
-            if not official:
-                return
-
             metadata = copy.deepcopy(item["metadata"])
             assert metadata["version"] == 1
             normalized_source = metadata["sources"][0]

@@ -69,7 +69,7 @@ describe("provider import confirmation", () => {
     expect(next.values.input_per_million).toBe(""); expect(next.values.context_window).toBe(""); expect(next.values.temperature).toBe("");
     expect(next.sources).toHaveLength(1); expect(next.warnings).toEqual(["conflict"]);
   });
-  it("keeps custom serving reference-only sources from prefilling and retains their extra evidence", () => {
+  it("keeps genuine reference-only sources from prefilling and retains their extra evidence", () => {
     const source = { source: "fixture", source_provider: "openai", source_model: "m", fetched_at: "2026-09-30", applicable: false, fields: { input_per_million: { value: 2, source_field: "pricing.input", unit: "USD/M tokens", source_unit: "USD/token" }, max_input_tokens: { value: 10000, source_field: "max_input_tokens" } }, pricing: { tiers: [{ input: 2 }] } };
     const draft = prefillMetadata(emptyModelDraft(), { upstream_model: "m", fields: { input_per_million: 2 }, sources: [source], warnings: [] });
     expect(draft.values.input_per_million).toBe(""); expect(draft.sources).toEqual([source]);

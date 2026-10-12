@@ -9,6 +9,23 @@ function item(values: Array<number | boolean | string[] | null>, applicable = tr
 }
 
 describe("provider evidence regressions", () => {
+  it("prefills exact generic model facts on custom hosts and preserves manual ownership", () => {
+    const fields = { input_per_million: 2, output_per_million: 10, cache_read_per_million: 0.1, cache_write_per_million: 2.5, context_window: 1050000, max_output_tokens: 128000, tools: true, vision: true, reasoning: true, temperature: false, reasoning_effort: ["low", "medium", "high", "xhigh", "max"], json_mode: null };
+    const source = { source: "models_dev", fetched_at: "2026-10-12", applicable: true, fields: Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, { value, source_field: name }])) };
+    const evidence: MetadataItem = { upstream_model: "gpt-6.1-sol", fields, sources: [{ ...source, source_provider: "openai", source_model: "gpt-6.1-sol" }], warnings: [], metadata: { version: 1, sources: [{ ...source, id: "generic", provider_id: "openai", model_id: "gpt-6.1-sol" }] } };
+    let draft = prefillMetadata(emptyModelDraft(), evidence);
+    for (const [name, value] of Object.entries(fields)) {
+      expect(draft.values[name as keyof typeof draft.values]).toBe(value === null ? "" : Array.isArray(value) ? JSON.stringify(value) : String(value));
+    }
+    draft.values.input_per_million = "9";
+    draft.touched.input_per_million = true;
+    draft = prefillMetadata(draft, evidence);
+    expect(draft.values.input_per_million).toBe("9");
+    expect(draft.values.output_per_million).toBe("10");
+    const saved = withConfirmedMetadata(confirmedModel("gpt-6.1-sol", draft)!, draft, "2026-10-12");
+    expect(saved.metadata?.fields?.input_per_million).toMatchObject({ method: "manual", value: 9 });
+    expect(saved.metadata?.fields?.output_per_million).toMatchObject({ method: "source", value: 10 });
+  });
   it("ignores unknown sources when a known applicable value exists and retains raw null evidence", () => {
     const evidence = item([null, 1]);
     expect(metadataFieldState(evidence, "input_per_million")).toBe("known");

@@ -307,7 +307,8 @@ def test_candidate_listing_and_public_metadata_have_distinct_privacy_boundaries(
             response = request(app, "POST", "/v1/provider-metadata", headers=headers(config), json={**selector, "upstream_models": ["vendor/only"]})
             assert response.status_code == 200
             item = response.json()["items"][0]
-            assert item["fields"]["input_per_million"] == (None if channel == "openai" else 3)
+            assert item["fields"]["input_per_million"] == 3
+            assert all(source["applicable"] for source in item["sources"])
             assert all(value not in response.text + discovery.text + caplog.text for value in CANARIES)
             assert_preserved(app, config, before, confirmed)
         assert len(calls) == (4 if channel == "openai" else 6)

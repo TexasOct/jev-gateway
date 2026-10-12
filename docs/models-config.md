@@ -118,7 +118,7 @@ LLM 模型发现支持 OpenAI 兼容、Anthropic 和 DeepSeek transport；不支
 
 管理导入接口只要求供应商归属、`upstream_model` 和用户确认。输入和输出价格、`tools`、`vision`、`json_mode`、`reasoning`、`temperature` 五项能力、`reasoning_effort` 列表，以及 `context_window` 和 `max_output_tokens` 均可省略。已填写的能力须为布尔值，effort 须为合法列表，价格须为有限非负数，两个 limit 须为正整数或 `null`；缓存价格也可为 `null`。省略值保留为未知，不会填入零价格、默认能力或确认记录。`false`、`0`、空 effort 列表和显式 `null` 分别保留。后续编辑仍可保存不完整记录；完整记录更新中省略原有事实会清除该事实，其确认记录须同步改为未确认。管理读取和编辑不把字段表中的运行兼容默认值当作已存事实。
 
-在线元数据建议按实际服务商和 upstream model 精确匹配。Models.dev 的价格已经是 USD/百万 token；OpenRouter 和 LiteLLM 的 per-token 数据在查询中转换为该单位。OpenRouter 的服务价格只适用于对应 OpenRouter 实例，不能套用到任意代理。缓存、时段和上下文分段报价需要用户选择适用估算值；检索时间与来源声明的更新时间分别显示。查询不会覆盖已经确认或手工修改的值，也不会改写路由标签。
+在线元数据建议按选定的来源品牌/服务商和 upstream model ID 精确匹配。Models.dev 和 LiteLLM 的通用价格及明确声明的参数在传输类型兼容时自动填入，不受 `api_base` 的主机、路径或端口影响；这些价格作为路由估算，不保证代理的实际账单。Models.dev 的价格已经是 USD/百万 token；OpenRouter 和 LiteLLM 的 per-token 数据在查询中转换为该单位。OpenRouter 原生公开源仍按严格端点规则选择。canonical 模型仅补充缺失的非价格信息，服务商声明优先；仅有 structured_output 声明不会填入 json_mode。缓存、时段和上下文分段报价需要用户选择适用估算值；检索时间与来源声明的更新时间分别显示。查询不会覆盖已经确认或手工修改的值，也不会改写路由标签。
 
 发现默认要求公网 HTTPS。`allow_private_network: true` 允许 localhost/私网的 HTTP 或 HTTPS；重定向、link-local、云 metadata、未指定地址和组播仍被拒绝，HTTPS 证书校验保持开启。公共元数据查询使用固定公开源，不接收用户的上游密钥或自定义地址。
 

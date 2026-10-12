@@ -610,8 +610,11 @@ Fields use `input_per_million`, `output_per_million`, optional
 `json_mode`, `reasoning`, `temperature`, `reasoning_effort`, `context_window`, and
 `max_output_tokens`. Missing fields remain unknown. Prices are USD per million
 tokens; conditional prices require review before import. Sources are matched to
-the actual serving provider and exact model ID, so a proxy does not inherit
-another provider's price by sharing a model name or brand.
+the selected source brand/provider and exact upstream model ID. Generic
+Models.dev and LiteLLM prices and explicitly declared parameters automatically
+apply with a compatible transport regardless of the serving address's host,
+path or port. These prices are routing estimates; they do not certify a proxy's
+billing. Native OpenRouter retrieval retains its strict endpoint selection.
 
 Public metadata sources are fixed and receive no provider credential. Source
 responses are bounded to 16 MiB; cached suggestions can remain available for up
@@ -628,8 +631,11 @@ source_updated_at`, `schema_revision`, `canonical_model_id`, original effort
 declarations, and projected `pricing` conditions. Native-listing evidence contains
 no endpoint or credential. Source evidence can retain facts such as input-only
 limits or structured-output support that cannot directly fill a routing field.
-An `applicable: false` source is reference information for a different serving
-channel and does not prefill confirmed values.
+An `applicable: false` source retains reference evidence, including incompatible
+transports and overridden canonical facts, and does not automatically prefill values.
+Canonical rows fill only absent nonprice facts. Structured-output support alone
+leaves `json_mode` unknown. Independent source disagreements retain null automatic
+values and their source references.
 
 The normalized version 1 envelope gives each source a unique `id`, maps
 `source_provider` to `provider_id` and `source_model` to `model_id`, and retains

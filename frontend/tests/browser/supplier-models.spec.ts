@@ -230,12 +230,43 @@ test("read-only supplier models remain inspectable through their editor", async 
   expect(state.writes).toEqual([]);
 });
 
+test("generic metadata on a custom host prefills automatically and preserves manual prices", async ({ page, context }) => {
+  const state = fixture();
+  state.configuration.providers[0]!.api_base = "https://custom.example:8443/proxy/v1";
+  state.configuration.models[0]!.upstream_model = "gpt-6.1-sol";
+  state.configuration.models[0]!.name = "fixture/gpt-6.1-sol";
+  state.configuration.models[0]!.cost = { input_per_million: 1 };
+  state.configuration.models[0]!.capabilities = {};
+  delete state.configuration.models[0]!.context_window;
+  delete state.configuration.models[0]!.max_output_tokens;
+  const values = { input_per_million: 2, output_per_million: 10, cache_read_per_million: 0.1, cache_write_per_million: 2.5, context_window: 1050000, max_output_tokens: 128000, tools: true, vision: true, reasoning: true, temperature: false, reasoning_effort: ["low", "medium", "high", "xhigh", "max"], json_mode: null };
+  const source = { source: "models_dev", source_provider: "openai", source_model: "gpt-6.1-sol", fetched_at: "2026-10-12", applicable: true, fields: Object.fromEntries(Object.entries(values).map(([field, value]) => [field, { value, source_field: field }])) };
+  state.metadataEvidence = { upstream_model: "gpt-6.1-sol", fields: values, sources: [source], warnings: [], metadata: { version: 1, sources: [{ ...source, id: "generic", provider_id: "openai", model_id: "gpt-6.1-sol" }] } };
+  await installProviderFixture(context, state); await open(page); await models(page);
+  await group(page).getByRole("button", { name: "Edit model", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#model-dialog-input_per_million").fill("9");
+  await dialog.getByRole("button", { name: "Refresh metadata sources", exact: true }).click();
+  await expect.poll(() => state.metadataCalls).toBe(1);
+  await expect(dialog.locator("#model-dialog-input_per_million")).toHaveValue("9");
+  await expect(dialog.locator("#model-dialog-output_per_million")).toHaveValue("10");
+  await expect(dialog.locator("#model-dialog-cache_read_per_million")).toHaveValue("0.1");
+  await expect(dialog.locator("#model-dialog-cache_write_per_million")).toHaveValue("2.5");
+  await expect(dialog.locator("#model-dialog-context_window")).toHaveValue("1050000");
+  await expect(dialog.locator("#model-dialog-max_output_tokens")).toHaveValue("128000");
+  await expect(dialog.locator("#model-dialog-temperature")).toHaveValue("false");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.configuration.models[0]!.metadata?.fields?.input_per_million).toMatchObject({ method: "manual", value: 9 });
+  expect(state.configuration.models[0]!.metadata?.fields?.output_per_million).toMatchObject({ method: "source", value: 10 });
+});
+
 for (const mode of ["configured", "import"] as const) test(`reference source values can be adopted and saved from ${mode} models`, async ({ page, context }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   const state = fixture();
   const values = { tools: false, vision: false, json_mode: true, reasoning: false, temperature: true, reasoning_effort: [], input_per_million: 1.5, output_per_million: 3, context_window: 100000, max_output_tokens: 1000 };
   const source = { source: "models_dev", fetched_at: "2026-10-10T00:00:00Z", applicable: false, fields: Object.fromEntries(Object.entries(values).map(([field, value]) => [field, { value, source_field: field }])) };
-  state.metadataEvidence = { upstream_model: "existing", fields: {}, sources: [{ ...source, source_provider: "openai", source_model: "exact" }], warnings: ["reference_only", "serving_endpoint_unmatched"], metadata: { version: 1, sources: [{ ...source, id: "reference", provider_id: "openai", model_id: "exact" }] } };
+  state.metadataEvidence = { upstream_model: "existing", fields: {}, sources: [{ ...source, source_provider: "openai", source_model: "exact" }], warnings: ["reference_only", "serving_transport_unmatched"], metadata: { version: 1, sources: [{ ...source, id: "reference", provider_id: "openai", model_id: "exact" }] } };
   await installProviderFixture(context, state); await open(page); await models(page, false, mode === "import");
   const primary = group(page);
   if (mode === "import") {

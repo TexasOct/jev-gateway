@@ -9,7 +9,7 @@ function reference(): MetadataItem {
 }
 
 describe("explicit model source choices", () => {
-  it("offers proxy reference values without automatically accepting them", () => {
+  it("offers genuine reference values without automatically accepting them", () => {
     const item = reference();
     const draft = prefillMetadata(emptyModelDraft(), item);
     expect(draft.values.input_per_million).toBe("");

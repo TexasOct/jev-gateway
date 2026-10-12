@@ -425,9 +425,10 @@ class MetadataClient:
             return {"items": [], "fetched_at": None, "stale": False}
         if not source_provider:
             return {"items": [{"upstream_model": model, "fields": _empty_fields(), "sources": [], "warnings": ["metadata_not_found"]} for model in dict.fromkeys(upstream_models)], "fetched_at": None, "stale": False}
-        applicable = _serving_matches(provider, source_provider)
+        applicable = _transport_matches(provider, source_provider)
+        native_applicable = _serving_matches(provider, source_provider)
         source_names = ["models_dev", "models_dev_catalog"]
-        if source_provider == "openrouter" and applicable:
+        if source_provider == "openrouter" and native_applicable:
             source_names.insert(0, "openrouter")
         entries: dict[str, _CacheEntry] = {}
         warnings: list[str] = []
@@ -451,7 +452,7 @@ class MetadataClient:
             sources: list[dict[str, Any]] = []
             notes = list(warnings)
             native = _find_openrouter(entries, model)
-            if native is not None and source_provider == "openrouter" and applicable:
+            if native is not None and source_provider == "openrouter" and native_applicable:
                 row, date = native
                 sources.append(_openrouter(row, model, date))
             for source, row, date in _find_models_dev(entries, source_provider, model):
@@ -468,7 +469,7 @@ class MetadataClient:
                         source_fact.pop("pricing", None)
                         # Provider fields override base_model facts in Models.dev.
                         # Keep overridden facts for review without making them
-                        # competing automatic suggestions for this endpoint.
+                        # competing automatic suggestions for this provider row.
                         overrides = {name for name, field in serving_fact["fields"].items() if _automatic_metadata_value(name, field["value"]) is not None}
                         reference_fields = {name: field for name, field in source_fact["fields"].items() if name in overrides}
                         source_fact["fields"] = {name: field for name, field in source_fact["fields"].items() if name not in overrides}
@@ -487,18 +488,23 @@ class MetadataClient:
             if not sources:
                 notes.append("metadata_not_found")
             if not applicable:
-                notes.append("serving_endpoint_unmatched")
+                notes.append("serving_transport_unmatched")
             merged = _merge_candidates(sources, notes)
             items.append({"upstream_model": model, **merged})
         dates = [entry.fetched_at for entry in entries.values()]
         return {"items": items, "fetched_at": max(dates) if dates else None, "stale": stale}
 
 
+def _transport_matches(provider: Mapping[str, Any], source_provider: str) -> bool:
+    transport = provider.get("type")
+    compatible = {"openai": {"openai"}, "anthropic": {"anthropic"}, "deepseek": {"deepseek", "openai"}, "openrouter": {"openrouter", "openai"}}
+    return isinstance(transport, str) and transport in compatible.get(source_provider, set())
+
+
 def _serving_matches(provider: Mapping[str, Any], source_provider: str) -> bool:
     defaults = {"anthropic": "https://api.anthropic.com", "deepseek": "https://api.deepseek.com", "openrouter": "https://openrouter.ai/api/v1"}
     transport = provider.get("type")
-    compatible = {"openai": {"openai"}, "anthropic": {"anthropic"}, "deepseek": {"deepseek", "openai"}, "openrouter": {"openrouter", "openai"}}
-    if not isinstance(transport, str) or transport not in compatible.get(source_provider, set()):
+    if not _transport_matches(provider, source_provider):
         return False
     base = provider.get("api_base") or defaults.get(transport if isinstance(transport, str) else "", "")
     try:

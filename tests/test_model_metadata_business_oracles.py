@@ -67,12 +67,12 @@ def test_explicit_canonical_facts_retain_association_without_serving_prices(cont
 
 @pytest.mark.parametrize("channel,transport,endpoint,applicable", [
     ("openai", "openai", "https://api.openai.com/v1", True), ("openai", "openai", "https://api.openai.com:443/v1/", True),
-    ("openai", "openai", None, False), ("anthropic", "anthropic", None, True), ("deepseek", "deepseek", None, True), ("openrouter", "openrouter", None, True),
+    ("openai", "openai", None, True), ("anthropic", "anthropic", None, True), ("deepseek", "deepseek", None, True), ("openrouter", "openrouter", None, True),
     ("deepseek", "openai", "https://api.deepseek.com/v1", True), ("openrouter", "openai", "https://openrouter.ai/api/v1", True),
     ("openai", "anthropic", "https://api.openai.com/v1", False), ("anthropic", "openai", "https://api.anthropic.com/v1", False),
-    ("openai", "openai", "https://proxy.example/v1", False), ("openai", "openai", "http://api.openai.com/v1", False),
-    ("openai", "openai", "https://api.openai.com:8443/v1", False), ("openai", "openai", "https://api.openai.com/custom/v1", False),
-    ("openai", "openai", "https://api.openai.com:/v1", False), ("openai", "openai", "https://api.openai.com/v1?key=x", False),
+    ("openai", "openai", "https://proxy.example/v1", True), ("openai", "openai", "http://api.openai.com/v1", True),
+    ("openai", "openai", "https://api.openai.com:8443/v1", True), ("openai", "openai", "https://api.openai.com/custom/v1", True),
+    ("openai", "openai", "https://api.openai.com:/v1", True), ("openai", "openai", "https://api.openai.com/v1?key=x", True),
 ])
 def test_effective_serving_channel_controls_applicability(channel: str, transport: str, endpoint: Any, applicable: bool) -> None:
     provider = {"id": "instance", "brand_id": channel, "type": transport, "api_base": endpoint, "display_name": "Official-looking", "icon_id": "openai", "allow_private_network": True}
@@ -92,7 +92,7 @@ def test_openrouter_billing_is_its_own_channel() -> None:
     assert {s["source_provider"] for s in item["sources"]} == {"openrouter"}
     assert "metadata_conflict" not in item["warnings"]
     proxy = client_for(api=api, router={"data": [{"id": "vendor/exact", "pricing": {"prompt": "0.000002"}}]}).lookup({**provider, "api_base": "https://proxy.example/v1"}, ["vendor/exact"])["items"][0]
-    assert proxy["fields"]["input_per_million"] is None and all(s["applicable"] is False for s in proxy["sources"])
+    assert proxy["fields"]["input_per_million"] == 2 and all(s["applicable"] is True for s in proxy["sources"])
     assert all(s["source"] != "openrouter" for s in proxy["sources"])
 
 
@@ -268,11 +268,12 @@ def test_merge_state_and_canonical_references_agree(name: str, first: Any, secon
     assert ("metadata_conflict" in candidate["warnings"]) is (relation == "conflict")
 
 
-def test_cosmetic_brand_changes_never_authenticate_proxy_rates() -> None:
+def test_source_brand_and_transport_control_generic_proxy_rates() -> None:
     client = client_for(api={"openai": {"models": {"exact": {"cost": {"input": 2}}}}, "anthropic": {"models": {"exact": {"cost": {"input": 7}}}}})
     for brand, label, icon in [("openai", "OpenAI", "openai"), ("openai", "Renamed", "server"), ("anthropic", "Anthropic", "anthropic")]:
         item = client.lookup({"type": "openai", "api_base": "https://proxy.example/v1", "brand_id": brand, "display_name": label, "icon_id": icon}, ["exact"])["items"][0]
-        assert item["fields"]["input_per_million"] is None and item["sources"][0]["applicable"] is False
+        assert item["fields"]["input_per_million"] == (2 if brand == "openai" else None)
+        assert item["sources"][0]["applicable"] is (brand == "openai")
         assert item["sources"][0]["fields"]["input_per_million"]["value"] == (2 if brand == "openai" else 7)
 
 

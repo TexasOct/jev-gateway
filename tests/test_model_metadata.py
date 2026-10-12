@@ -45,6 +45,15 @@ def client_for(api: Any = None, catalog: Any = None, router: Any = None, snapsho
     return metadata.MetadataClient(fetch=fetch, snapshot_loader=lambda: snapshot or {}, **kwargs)
 
 
+def test_gpt_6_1_sol_custom_host_generic_metadata() -> None:
+    row = {"id": "gpt-6.1-sol", "cost": {"input": 2, "output": 10, "cache_read": 0.1, "cache_write": 2.5}, "limit": {"context": 1050000, "output": 128000}, "tool_call": True, "modalities": {"input": ["text", "image"]}, "reasoning": True, "temperature": False, "structured_output": True, "reasoning_options": [{"type": "effort", "values": ["low", "medium", "high", "xhigh", "max"]}]}
+    client = client_for(api={"openai": {"models": {"gpt-6.1-sol": row}}})
+    item = client.lookup({**PROVIDER, "brand_id": "openai", "api_base": "https://custom.example:8443/proxy/v1"}, ["gpt-6.1-sol"])["items"][0]
+    assert item["fields"] == {"input_per_million": 2, "output_per_million": 10, "cache_read_per_million": 0.1, "cache_write_per_million": 2.5, "context_window": 1050000, "max_output_tokens": 128000, "tools": True, "vision": True, "reasoning": True, "temperature": False, "reasoning_effort": ["low", "medium", "high", "xhigh", "max"], "json_mode": None}
+    assert item["sources"][0]["applicable"] is True
+    assert "serving_endpoint_unmatched" not in item["warnings"]
+
+
 def test_models_dev_prices_are_usd_per_million_and_unknown_false_stay_distinct() -> None:
     client = client_for(api={"openai": {"models": {"exact": {"id": "exact", "cost": {"input": 0, "output": 8, "cache_read": 0.2, "tiers": [{"tier": {"type": "context", "size": 300000}, "input": 4}]}, "tool_call": False, "reasoning": None, "temperature": False, "structured_output": True, "limit": {"context": 128000, "output": None}, "last_updated": "2024-01-01", "benchmarks": {"quality": 99}}}}})
     result = client.lookup(PROVIDER, ["exact"])
@@ -75,18 +84,19 @@ def test_openrouter_serving_conversion_and_supported_parameter_evidence() -> Non
 
 
 @pytest.mark.parametrize("endpoint", ["https://custom.example/v1", "https://api.openai.com/custom/v1", "http://api.openai.com/v1", "https://api.openai.com:8443/v1"])
-def test_native_prices_and_capabilities_are_reference_only_for_custom_endpoints(endpoint: str) -> None:
+def test_generic_prices_and_capabilities_apply_to_custom_endpoints(endpoint: str) -> None:
     client = client_for(api={"openai": {"models": {"exact": {"cost": {"input": 2, "output": 8}, "tool_call": True}}}})
     item = client.lookup({**PROVIDER, "api_base": endpoint}, ["exact"])["items"][0]
-    assert item["fields"]["input_per_million"] is None and item["fields"]["tools"] is None
-    assert item["sources"][0]["applicable"] is False
+    assert item["fields"]["input_per_million"] == 2 and item["fields"]["tools"] is True
+    assert item["sources"][0]["applicable"] is True
     assert item["sources"][0]["fields"]["input_per_million"]["value"] == 2
-    assert "reference_only" in item["warnings"]
+    assert "reference_only" not in item["warnings"]
 
 
-def test_matching_is_exact_and_canonical_links_are_explicit() -> None:
+@pytest.mark.parametrize("endpoint", ["https://api.openai.com/v1", "https://custom.example:8443/prefix/v1"])
+def test_matching_is_exact_and_canonical_links_are_explicit(endpoint: str) -> None:
     client = client_for(catalog={"providers": {"openai": {"models": {"alias": {"id": "alias", "canonical_model_id": "vendor/base"}, "exact": {"cost": {"input": 2}}}}}, "models": {"vendor/base": {"limit": {"context": 64000}, "cost": {"input": 99, "cache_read": 9, "cache_write": 99}}}})
-    result = client.lookup(PROVIDER, ["alias", "exa", "exact"])
+    result = client.lookup({**PROVIDER, "api_base": endpoint}, ["alias", "exa", "exact"])
     assert result["items"][0]["fields"]["context_window"] == 64000
     assert result["items"][0]["fields"]["input_per_million"] is None
     assert result["items"][0]["fields"]["cache_read_per_million"] is None
@@ -95,9 +105,10 @@ def test_matching_is_exact_and_canonical_links_are_explicit() -> None:
     assert result["items"][2]["fields"]["input_per_million"] == 2
 
 
-def test_source_conflicts_keep_both_candidates_and_null_field() -> None:
+@pytest.mark.parametrize("endpoint", ["https://api.openai.com/v1", "https://custom.example:8443/prefix/v1"])
+def test_source_conflicts_keep_both_candidates_and_null_field(endpoint: str) -> None:
     client = client_for(api={"openai": {"models": {"exact": {"cost": {"input": 2}, "tool_call": True}}}}, catalog={"providers": {"openai": {"models": {"exact": {"cost": {"input": 3}, "tool_call": False}}}}})
-    item = client.lookup(PROVIDER, ["exact"])["items"][0]
+    item = client.lookup({**PROVIDER, "api_base": endpoint}, ["exact"])["items"][0]
     assert item["fields"]["input_per_million"] is None and item["fields"]["tools"] is None
     assert len(item["sources"]) == 2 and "metadata_conflict" in item["warnings"]
 
@@ -122,9 +133,10 @@ def test_serving_overrides_canonical_facts_without_losing_reference_evidence() -
     assert serving["limit"]["output"] == 393216 and canonical["limit"]["output"] == 384000
 
 
-def test_litellm_backup_fallback_has_no_implicit_zero_or_total_input_window() -> None:
+@pytest.mark.parametrize("endpoint", ["https://api.openai.com/v1", "https://custom.example:8443/prefix/v1"])
+def test_litellm_backup_fallback_has_no_implicit_zero_or_total_input_window(endpoint: str) -> None:
     client = client_for(snapshot={"openai/exact": {"litellm_provider": "openai", "input_cost_per_token": 0.000002, "input_cost_per_token_above_272k_tokens_priority": 0.000004, "cache_creation_input_token_cost_above_1hr_above_200k_tokens": 0.000001, "input_dbu_cost_per_token": 99, "max_input_tokens": 128000, "max_output_tokens": 4096, "supports_function_calling": False}, "other": {"litellm_provider": "anthropic", "input_cost_per_token": 0}})
-    result = client.lookup(PROVIDER, ["exact", "other"])
+    result = client.lookup({**PROVIDER, "api_base": endpoint}, ["exact", "other"])
     item = result["items"][0]
     assert item["fields"]["input_per_million"] == 2
     assert item["fields"]["output_per_million"] is None

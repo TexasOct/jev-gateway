@@ -313,10 +313,12 @@ Each lookup item adds normalized `metadata` for operator confirmation and import
 map raw `source_provider`/`source_model` to `provider_id`/`model_id` and keep source
 IDs when confirming fields. Omission of metadata on old models does not certify
 them or create invented provenance.
-Public source requests receive no upstream credentials. Exact serving-provider
-and upstream-ID matching controls price applicability; brand or name similarity
-does not certify a proxy's billing or capabilities. Match the actual transport,
-channel and endpoint before a native retail source can supply automatic prices.
+Public source requests receive no upstream credentials. Generic Models.dev and
+LiteLLM suggestions match the selected source brand/provider and exact upstream
+ID with a compatible transport, independently of api_base host, path and port.
+Prices are generic routing estimates and do not certify proxy billing. Display
+names and icons do not identify the source. Native OpenRouter source selection
+retains strict transport and endpoint matching.
 
 Models.dev costs are already USD/million tokens. OpenRouter and LiteLLM per-token
 costs require multiplication by one million. Keep conditional/cache/tier evidence
@@ -433,7 +435,7 @@ the PUT automatically. Do not validate against the stale saved snapshot first.
   precedence and nonmutation; C4's real-HTTP supplement checks the fixed-code
   vocabulary at the authenticated endpoint. Complete empty listings remain
   successful with count zero and `generation_unverified`.
-- Metadata: exact serving match, units, false/null distinction, conditional prices,
+- Metadata: exact source identity and compatible transport, units, false/null distinction, conditional prices,
   source dates, static LiteLLM lookup without import, caching, refresh, and source
   failure independent of routing.
   Assert nested confirmation controls at validate/import/update, native effort
@@ -470,9 +472,9 @@ then restore the variable. Other requests can resolve the temporary credential.
 Correct: construct an immutable candidate environment mapping and inject it into
 the candidate parser and prepared registry.
 
-Wrong: use a supplier's public price for a custom proxy with a similarly named
-model. Correct: match the serving channel and exact upstream ID, retain source
-evidence, and require operator confirmation of the effective routing estimate.
+Wrong: use a supplier's public price for a similarly named model. Correct: match
+the selected source provider and exact upstream ID with compatible transport,
+automatically suggest generic estimates on custom hosts, and retain source evidence.
 
 ## Scenario: bounded Model evidence and semantic draft reversion
 
@@ -875,15 +877,14 @@ continue to prefill normally; manual values stay protected on later refreshes.
 | Provider capability false, canonical true | Provider false wins |
 | Provider field absent/null | Canonical nonprice fact can fill it |
 | Independent serving sources disagree | Null automatic value; explicit valid source choices |
-| Custom proxy has original-provider prices | No automatic billing claim; adoption is manual |
+| Custom host has exact selected-provider generic prices and compatible transport | Automatically suggest the generic routing estimate |
 | Source failed or supplied an invalid value | No adoption button for that value |
 
 ### 5. Good / base / bad cases
 
-Good: adopt a proxy reference price of 2, save it as manual confirmation and
-retain the original source. Base: a native applicable quote prefills as before.
-Bad: merge a canonical default as a competing serving override or automatically
-certify a proxy's billing using its brand.
+Good: generic price 2 prefills on a custom host and retains its source. Genuine
+reference evidence remains available for manual adoption. Bad: merge a canonical
+default as a competing provider override or infer actual proxy billing.
 
 ### 6. Tests required
 
