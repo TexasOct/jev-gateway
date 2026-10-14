@@ -241,7 +241,7 @@ test("failed policy apply retains draft and history for explicit retry", async (
   expect(mockApi.appliedConfiguration).toBeUndefined();
   await activate(page, page.getByRole("button", { name: words.backToEditing, exact: true }));
   await expect(page.getByRole("dialog", { name: words.reviewChanges, exact: true })).toHaveCount(0);
-  await expect(page.locator(".canvas-policy-controls select")).toBeFocused();
+  await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toBeFocused();
   await page.locator(".routing-canvas-scroll").focus(); await page.keyboard.press("ControlOrMeta+z");
   await expect(page.locator('[data-canvas-node="fallback"]')).toContainText("default");
   await page.keyboard.press("ControlOrMeta+Shift+z");

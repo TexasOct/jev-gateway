@@ -128,7 +128,7 @@ def _usage_int(usage: dict[str, Any] | None, key: str) -> int:
 def _optional_usage_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
-    parsed = coerce_int(value)
+    parsed = coerce_int(value, default=-1)
     return parsed if parsed >= 0 else None
 
 

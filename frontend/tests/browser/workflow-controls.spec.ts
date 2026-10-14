@@ -424,6 +424,7 @@ test("canceled dirty departure preserves history while confirmed discard and dep
   page.once("dialog", (dialog) => dialog.accept()); await page.getByRole("button", { name: en.monitoring, exact: true }).click();
   await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
   await expect(selector).toHaveValue("Other"); await expect(page.locator('[data-canvas-node="model::' + EXTRA + '"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: en.canvasAddNode, exact: true })).toBeEnabled();
   await expect(page.getByRole("button", { name: en.canvasUndo, exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: en.canvasRedo, exact: true })).toBeDisabled();
   await keyboardTarget(page, question); await page.keyboard.press("Alt+ArrowRight");

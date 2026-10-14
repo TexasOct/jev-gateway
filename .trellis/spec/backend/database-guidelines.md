@@ -165,6 +165,55 @@ migration, and update any view that exposes the field. Drop and recreate views
 when their selected columns change because `CREATE VIEW IF NOT EXISTS` does not
 update an existing view. Add migration coverage to `tests/test_records.py`.
 
+## Scenario: nullable upstream cache usage evidence
+
+### 1. Scope / trigger
+
+Completed upstream responses can report cache-read and cache-write token counts.
+These are evidence about billed/provider usage, not reductions in model context.
+
+### 2. Signatures
+
+`OutcomeRecord.cache_read_tokens` and `OutcomeRecord.cache_write_tokens` are
+optional integers. `_migrate_outcome_columns()` adds missing nullable outcome
+columns and rebuilds `decision_evidence`; decision and session evidence project
+both values through the existing writer-owned queries.
+
+### 3. Contracts
+
+Keep absent values as SQL NULL / API null, preserving explicit zero. Normalize
+supported OpenAI cached-token detail objects and Anthropic read/creation counts
+at the routing outcome boundary. Do not mutate the upstream response body,
+subtract cached tokens from context pressure, or change the existing prompt /
+completion cost calculation. Preserve best-effort record delivery.
+
+### 4. Validation & error matrix
+
+| Input / state | Required result |
+| --- | --- |
+| Reported nonnegative integer | Preserve the count, including zero |
+| Missing, negative, boolean or unparseable count | Unknown remains null |
+| Legacy database without columns | Add nullable columns, preserve rows and refresh the view |
+| Record-store failure | Preserve normal chat availability |
+
+### 5. Good / base / bad cases
+
+Good: a reported OpenAI cached prompt count is stored with the full prompt count.
+Base: absent cache usage remains unknown. Bad: replacing absent evidence with
+zero or subtracting cache reads from context occupancy.
+
+### 6. Tests required
+
+Cover OpenAI and Anthropic supported shapes, unknown/zero/invalid values,
+non-streaming and streaming outcomes, decision/session projections, legacy
+database migration and unchanged context/cost behavior in `test_decision.py`,
+`test_records.py` and `test_stream_evidence.py`.
+
+### 7. Wrong vs correct
+
+Wrong: turn missing usage into a fabricated cache miss. Correct: retain nullable
+provider evidence and let each agent own its local compaction decision.
+
 ## Scenario: retained provider observations
 
 ### 1. Scope / trigger

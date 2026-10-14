@@ -256,6 +256,9 @@ def test_sessions_without_an_id_are_not_remembered(catalog, make_engine) -> None
         ({}, (None, None)),
         ({"cache_read_input_tokens": -1}, (None, None)),
         ({"cache_read_input_tokens": True}, (None, None)),
+        ({"cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}, (0, 0)),
+        ({"cache_read_input_tokens": None, "cache_creation_input_tokens": "unavailable"}, (None, None)),
+        ({"prompt_tokens_details": {"cached_tokens": "unavailable"}}, (None, None)),
     ],
 )
 def test_normalize_cache_usage(usage, expected) -> None:

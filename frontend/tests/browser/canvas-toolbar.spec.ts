@@ -47,7 +47,9 @@ for (const { width, height } of [{ width: 1280, height: 900 }, { width: 1430, he
       expect(placement.tools.top).toBeGreaterThanOrEqual(placement.policy.bottom + 11);
       expect(placement.policy.width).toBeLessThanOrEqual(400);
       expect(placement.tools.width).toBeLessThanOrEqual(600);
-      expect(placement.policy.height).toBeLessThanOrEqual(116);
+      await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toBeVisible();
+      await expect(page.getByRole("combobox", { name: words.workflowDecisionProvider, exact: true })).toBeVisible();
+      await expect(page.getByText(words.workflowDecisionProviderNote, { exact: true })).toBeVisible();
       const policyActions = await page.locator(".workflow-toolbar").evaluate((element) => {
         const buttons = [...element.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
         return { rows: Math.max(...buttons.map((box) => box.top)) - Math.min(...buttons.map((box) => box.top)), minHeight: Math.min(...buttons.map((box) => box.height)), overflow: element.scrollWidth > element.clientWidth };

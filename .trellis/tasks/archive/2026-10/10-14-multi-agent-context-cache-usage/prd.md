@@ -21,3 +21,13 @@ Enable local coding agents to use accurate active-model context-window limits an
 - Claude Code and Codex support claims are documented with per-agent configuration source, update timing, reversibility, and verified limitations; no claim of cross-agent hot reload absent proof.
 - Existing OpenAI-compatible behavior and all relevant backend tests pass.
 - Documentation explains data ownership: JEV owns catalog limits and upstream usage; each agent owns its local conversation state and compaction decision.
+
+## Accepted delivery boundary
+
+The user reviewed the completed gateway-only implementation and explicitly
+authorized committing it and publishing 0.1.9. This task closes the metadata,
+selected-route headers, nullable cache evidence, compatibility migrations and
+agent integration documentation. There is no product-owned Pi extension in this
+repository. Native compaction and direct local-agent configuration writers are
+deferred to a separately owned adapter package; their original acceptance items
+are not claimed delivered by this gateway release.
