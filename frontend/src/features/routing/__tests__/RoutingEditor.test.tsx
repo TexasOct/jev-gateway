@@ -37,6 +37,16 @@ describe("named workflow presentation", () => {
     expect(html).toContain('aria-label="' + words.canvasZoomReset + '"');
     expect(html).toContain('>1:1</button>');
   });
+  it("shows the strategy-scoped decision provider selector and configured model", () => {
+    const payload = structuredClone(config);
+    payload.definition = { kind: "decision_matrix", policy: { labels: { routine: {} } }, options: { questions: {}, rules: [], fallback: { label: "routine" } } };
+    payload.decision_providers = [{ id: "provider-a", display_name: "Provider A", model: "decision-model" }];
+    const html = renderEditor(payload);
+    expect(html).toContain(`aria-label="${messages.en.workflowDecisionProvider}"`);
+    expect(html).toContain(`Provider A · decision-model`);
+    expect(html).toContain(messages.en.workflowDecisionProviderDefault);
+  });
+
   it("groups policy actions at the top left and separates canvas tools at the bottom center", () => {
     const html = renderEditor();
     for (const marker of ["workflow-info", "workflow-drawer", "workspace-heading", "workspace-status", "routing-information", "Canvas help", "Advanced editors", "fixture</code>"]) expect(html).not.toContain(marker);

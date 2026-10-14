@@ -3,6 +3,9 @@ type Messages = Record<string, string>;
 export const zhCN = {
   workflowCreate: "新建策略",
   workflowDelete: "删除策略",
+  workflowDecisionProvider: "决策供应商",
+  workflowDecisionProviderDefault: "使用已配置的默认项",
+  workflowDecisionProviderNote: "请先在供应商 → 决策供应商中启用外部分流。此处选择供应商不会开启调用；所选供应商失败时使用当前策略的备用路径。",
   workflowName: "策略名称",
   workflowDeletePrompt: "删除此策略及其已保存的布局？供应商模型和其他策略将保留。",
   workflowDefaultProtected: "默认策略正在使用，不能删除。",

@@ -6,8 +6,11 @@
 ## Overview
 
 Named workflow management uses the v2 contract below. Its explicit local model
-references supersede v1 tag-mutation and installation-wide layout rules for new
-workflow writes. V1 data and request compatibility remain documented separately.
+references and optional `decision_provider` references supersede v1 tag-mutation and
+installation-wide layout rules for new workflow writes. Decision-provider selection
+stores only the configured provider ID per strategy; the provider's own configuration,
+credentials, and model remain provider-owned. V1 data and request compatibility remain
+documented separately.
 
 The dashboard is a Vite + React + TypeScript app in `frontend/`. Generated output
 lives at `jev_gateway/static/` during local/release builds and is served by the

@@ -122,6 +122,38 @@ def test_v2_merge_keeps_compact_global_policy_required(global_policy: str) -> No
             parse()
 
 
+def test_v2_workflow_persists_selected_decision_provider_without_provider_configuration() -> None:
+    baseline = matrix_document()
+    baseline["decision"] = {"enabled": True, "default_provider": "default", "timeout_seconds": 2, "providers": [
+        {"id": "default", "protocol": "system_one", "api_base": "https://default.example/decision", "api_key_env": "DEFAULT_KEY", "model": "default-model"},
+        {"id": "selected", "protocol": "system_one", "api_base": "https://selected.example/decision", "api_key_env": "SELECTED_KEY", "model": "selected-model"},
+    ]}
+    state = {"version": 2, "strategies": {"task_aware": {
+        "definition": {"kind": "decision_matrix", "policy": {"labels": {"routine": {"models": [SMALL_MODEL_ID]}}},
+                       "options": {"questions": baseline["strategies"]["task_aware"]["options"]["questions"], "rules": [], "fallback": {"label": "routine"}},
+                       "decision_provider": "selected"},
+        "selected_models": [SMALL_MODEL_ID],
+    }}, "deleted_strategies": [], "models": {}}
+    catalog = catalog_from_document(merge_overlay(baseline, state), "test selected decision provider")
+    selected = next(item for item in catalog.strategies if item.name == "task_aware")
+    assert selected.decision_provider == "selected"
+    assert selected.as_dict()["decision_provider"] == "selected"
+    assert catalog.decision.providers[1].model == "selected-model"
+
+    state["strategies"]["task_aware"]["definition"]["decision_provider"] = "unknown"
+    with pytest.raises(ValueError, match="not configured"):
+        merge_overlay(baseline, state)
+
+
+def test_v2_unselected_workflow_accepts_null_decision_settings() -> None:
+    baseline = matrix_document()
+    baseline["decision"] = None
+    state = {"version": 2, "strategies": {"task_aware": empty_workflow("task_aware")}, "deleted_strategies": [], "models": {}}
+    catalog = catalog_from_document(merge_overlay(baseline, state), "null decision fixture")
+    assert catalog.decision.enabled is False
+    assert catalog.strategies[0].decision_provider is None
+
+
 def test_rules_replacement_preserves_questions_and_fallback() -> None:
     baseline = matrix_document()
     original = copy.deepcopy(baseline)

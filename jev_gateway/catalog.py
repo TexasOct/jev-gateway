@@ -513,6 +513,7 @@ class StrategyDefinition:
     description: str | None = None
     kind: str = "auto"
     options: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
+    decision_provider: str | None = None
 
     def __post_init__(self) -> None:
         """Keep a private immutable snapshot when definitions are built directly."""
@@ -530,6 +531,7 @@ class StrategyDefinition:
             "description": self.description,
             "options": _json_value_as_dict(self.options),
             "policy": self.policy.as_dict(),
+            **({"decision_provider": self.decision_provider} if self.decision_provider is not None else {}),
         }
 
 
@@ -1768,7 +1770,7 @@ def strategies_from_document(
             raise TypeError(f"{source} {label}[{clean_name!r}] must be an object.")
 
         if legacy:
-            body_unknown = set(body) - {"description", "kind", "options", "policy"}
+            body_unknown = set(body) - {"description", "kind", "options", "policy", "decision_provider"}
             if body_unknown:
                 raise ValueError(
                     f"{source} {label}[{clean_name!r}] has unknown keys: "
@@ -1783,7 +1785,7 @@ def strategies_from_document(
             policy_value = {
                 key: value
                 for key, value in body.items()
-                if key not in {"description", "kind", "options"}
+                if key not in {"description", "kind", "options", "decision_provider"}
             }
 
         description_value = body.get("description")
@@ -1806,6 +1808,10 @@ def strategies_from_document(
                 ),
                 description=description or None,
                 kind=kind_value.strip(),
+                decision_provider=(
+                    _required_text(body["decision_provider"], f"{source} {label}[{clean_name!r}].decision_provider")
+                    if "decision_provider" in body else None
+                ),
                 options=(
                     _strategy_options_from_document(
                         body["options"], f"{source} {label}[{clean_name!r}]"
@@ -1846,6 +1852,12 @@ def _build_catalog(
         )
         for profile in profiles
     ]
+    decision_provider_ids = {provider.name for provider in decision.providers}
+    for definition in strategies:
+        if definition.decision_provider is not None and definition.decision_provider not in decision_provider_ids:
+            raise ValueError(
+                f"Strategy {definition.name!r} decision_provider {definition.decision_provider!r} is not configured."
+            )
     catalog = Catalog(
         profiles=tuple(resolved_profiles),
         providers=tuple(providers),

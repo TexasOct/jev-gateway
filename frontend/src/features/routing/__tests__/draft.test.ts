@@ -22,6 +22,7 @@ import {
   setFallback,
   setQuestion,
   toOverlayPayload,
+  toWorkflowPayload,
   toggleRuleCriterion,
   toggleRuleQuestion,
   unassignedModels,
@@ -76,6 +77,7 @@ function configuration(overrides: Partial<ConfigurationPayload> = {}): Configura
       { index: 1, when: { scale: "large" }, select: { label: "ultra", selection: "quality_first" } },
     ],
     labels: [CRAFT, ULTRA],
+    decision_providers: [{ id: "selected", display_name: "Selected", model: "reasoner-v1" }],
     models: [
       model("openai/gpt-6-luna", ["quality/routine", "task_aware/craft"], 10, ["quality/routine", "task_aware/craft"], 10),
       model("openai/gpt-6-astra", ["task_aware/ultra"], 5, [], 20),
@@ -87,9 +89,26 @@ function configuration(overrides: Partial<ConfigurationPayload> = {}): Configura
 }
 
 describe("draft construction", () => {
+  it("round-trips the strategy's decision provider reference", () => {
+    const config = configuration({ definition: {
+      kind: "decision_matrix", decision_provider: "chosen-provider",
+      policy: { labels: { craft: {} } },
+      options: { questions: {}, rules: [], fallback: { label: "craft" } },
+    }, decision_providers: [{ id: "chosen-provider", display_name: "Chosen", model: "decision-model" }] });
+    const draft = draftFromConfiguration(config);
+    expect(draft.decisionProvider).toBe("chosen-provider");
+    expect(toWorkflowPayload(draft, config).definition.decision_provider).toBe("chosen-provider");
+    const changed = { ...draft, decisionProvider: undefined };
+    expect(diffSummary(changed, config).changed).toBe(true);
+    expect(toWorkflowPayload(changed, config).definition).not.toHaveProperty("decision_provider");
+    expect(config.definition?.decision_provider).toBe("chosen-provider");
+    expect(diffSummary(draft, config).changed).toBe(false);
+  });
+
   it("copies the loaded rules and models", () => {
     const draft = draftFromConfiguration(configuration());
     expect(draft.rules).toHaveLength(2);
+    expect(draft.decisionProvider).toBeUndefined();
     expect(draft.models["openai/gpt-6-luna"]?.tags).toEqual([
       "quality/routine",
       "task_aware/craft",

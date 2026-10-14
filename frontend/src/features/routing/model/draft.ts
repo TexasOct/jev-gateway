@@ -29,6 +29,7 @@ export interface ModelDraft {
 }
 
 export interface RoutingDraft {
+  decisionProvider?: string;
   selectedModels?: string[];
   pools?: Record<string, string[]>;
   questions: Record<string, Question>;
@@ -55,6 +56,7 @@ export function draftFromConfiguration(config: ConfigurationPayload): RoutingDra
     models[model.id] = { id: model.id, tags: [...model.tags], priority: model.priority };
   }
   return {
+    ...(config.definition?.decision_provider ? { decisionProvider: config.definition.decision_provider } : {}),
     ...(config.selected_models !== undefined ? {
       selectedModels: [...config.selected_models],
       pools: Object.fromEntries(config.labels.map((label) => [label.tag, (label.resolution === "models" ? label.models : config.models.filter((model) => model.tags.includes(label.tag)).map((model) => model.id)).filter((id) => config.selected_models!.includes(id))])),
@@ -175,6 +177,7 @@ export function removeModelNode(draft: RoutingDraft, config: ConfigurationPayloa
 export function toWorkflowPayload(draft: RoutingDraft, config: ConfigurationPayload): WorkflowWritePayload {
   if (!config.definition) throw new Error("The gateway must provide the workflow definition.");
   const definition = structuredClone(config.definition);
+  delete definition.decision_provider;
   const selected = selectedModelIds(draft, config);
   const labels = Object.fromEntries(config.labels.map((label) => {
     const prior = definition.policy.labels[label.name] ?? {};
@@ -184,7 +187,9 @@ export function toWorkflowPayload(draft: RoutingDraft, config: ConfigurationPayl
     return [label.name, { ...metadata, models: [...members] }];
   }));
   return { version: 2, strategy: config.strategy, selected_models: [...selected], definition: {
-    ...definition, policy: { ...definition.policy, labels },
+    ...definition,
+    ...(draft.decisionProvider ? { decision_provider: draft.decisionProvider } : {}),
+    policy: { ...definition.policy, labels },
     options: { questions: structuredClone(draft.questions), rules: structuredClone(draft.rules), fallback: { ...draft.fallback } },
   } };
 }
@@ -483,6 +488,7 @@ export interface DraftChange {
 
 export interface DraftDiff {
   changed: boolean;
+  decisionProvider: DraftChange[];
   questions: DraftChange[];
   rules: DraftChange[];
   fallback: DraftChange[];
@@ -518,6 +524,10 @@ export function diffSummary(draft: RoutingDraft, config: ConfigurationPayload): 
     fallback.push({ subject: "fallback", before: JSON.stringify(config.fallback), after: JSON.stringify(draft.fallback) });
   }
 
+  const decisionProvider: DraftChange[] = [];
+  if ((draft.decisionProvider ?? "") !== (config.definition?.decision_provider ?? "")) {
+    decisionProvider.push({ subject: "decision provider", before: config.definition?.decision_provider ?? "default", after: draft.decisionProvider ?? "default" });
+  }
   const models: DraftChange[] = [];
   if (draft.selectedModels !== undefined && !sameTags(draft.selectedModels, config.selected_models ?? selectedModelIds(draftFromConfiguration(config), config))) {
     models.push({ subject: "selected models", before: (config.selected_models ?? []).join(", "), after: draft.selectedModels.join(", ") });
@@ -540,5 +550,5 @@ export function diffSummary(draft: RoutingDraft, config: ConfigurationPayload): 
       models.push({ subject: model.id, before: String(model.priority), after: String(current.priority) });
     }
   }
-  return { changed: questions.length > 0 || rules.length > 0 || fallback.length > 0 || models.length > 0, questions, rules, fallback, models };
+  return { changed: decisionProvider.length > 0 || questions.length > 0 || rules.length > 0 || fallback.length > 0 || models.length > 0, decisionProvider, questions, rules, fallback, models };
 }

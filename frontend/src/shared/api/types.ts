@@ -70,6 +70,7 @@ export interface ConfigurationPayload {
   rules: Rule[];
   labels: LabelRow[];
   models: ModelRow[];
+  decision_providers?: Array<{ id: string; display_name: string | null; model: string | null }>;
   warnings: ConfigurationWarning[];
 }
 
@@ -213,6 +214,7 @@ export interface OverlayRulePayload {
 
 export interface WorkflowDefinition {
   kind: "decision_matrix";
+  decision_provider?: string;
   description?: string | null;
   policy: Record<string, unknown> & { labels: Record<string, { models?: string[]; tag?: string; description?: string; reasoning_effort?: string | null }> };
   options: { questions: Record<string, Question>; rules: OverlayRulePayload[]; fallback: RuleChoice };

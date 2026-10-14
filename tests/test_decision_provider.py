@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import httpx
+import pytest
 
 from jev_gateway.catalog import DecisionProvider, DecisionSettings
 from jev_gateway.strategy import DecisionMaker
@@ -41,6 +43,72 @@ def test_system_one_sends_only_configured_model_and_normalizes_answer(monkeypatc
 
     DecisionClient(settings(model="routing-model")).evaluate("prompt", QUESTIONS)
     assert seen[1]["json"]["model"] == "routing-model"
+
+
+def test_strategy_selected_provider_is_exclusive_and_uses_its_model(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_PRIMARY_KEY", "primary-token")
+    monkeypatch.setenv("TEST_SECONDARY_KEY", "secondary-token")
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        calls.append((url, kwargs["json"]))
+        return httpx.Response(200, request=httpx.Request("POST", url), json={"answers": {"risk": {"choice": "low"}}})
+
+    monkeypatch.setattr(httpx, "post", post)
+    configured = settings()
+    configured = replace(configured, providers=(
+        replace(configured.providers[0], model="primary-model"),
+        replace(configured.providers[1], model="configured-model"),
+    ))
+    result = DecisionClient(configured, "secondary").evaluate("prompt", QUESTIONS)
+    assert result is not None and result.provider == "secondary"
+    assert calls == [("https://secondary.example/decision", {"state": "prompt", "questions": QUESTIONS, "model": "configured-model"})]
+
+    assert DecisionClient(settings(), "missing").evaluate("prompt", QUESTIONS) is None
+
+
+@pytest.mark.parametrize("failure", ["transport", "malformed", "invalid_choice", "missing_key", "disabled"])
+def test_strategy_selection_never_calls_another_provider_after_failure(monkeypatch, failure: str) -> None:
+    monkeypatch.setenv("TEST_PRIMARY_KEY", "primary-token")
+    monkeypatch.setenv("TEST_SECONDARY_KEY", "secondary-token")
+    calls: list[str] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        calls.append(url)
+        if "primary" in url:
+            if failure == "transport":
+                raise httpx.ConnectError("synthetic provider failure")
+            answers = {"risk": "bad"} if failure == "malformed" else {"risk": {"choice": "other"}}
+        else:
+            answers = {"risk": {"choice": "low"}}
+        return httpx.Response(200, request=httpx.Request("POST", url), json={"answers": answers})
+
+    monkeypatch.setattr(httpx, "post", post)
+    if failure == "missing_key":
+        monkeypatch.delenv("TEST_PRIMARY_KEY")
+    configured = replace(settings(), enabled=failure != "disabled")
+    result = DecisionClient(configured, "primary").evaluate(
+        "prompt", QUESTIONS, valid=lambda answers: answers["risk"]["choice"] in {"low", "high"},
+    )
+    assert result is None
+    assert calls == ([] if failure in {"missing_key", "disabled"} else ["https://primary.example/decision"])
+
+
+def test_global_default_keeps_legacy_failover(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_PRIMARY_KEY", "primary-token")
+    monkeypatch.setenv("TEST_SECONDARY_KEY", "secondary-token")
+    calls: list[str] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        calls.append(url)
+        if "secondary" in url:
+            raise httpx.ConnectError("synthetic default failure")
+        return httpx.Response(200, request=httpx.Request("POST", url), json={"answers": {"risk": {"choice": "low"}}})
+
+    monkeypatch.setattr(httpx, "post", post)
+    result = DecisionClient(settings(preferred="secondary")).evaluate("prompt", QUESTIONS)
+    assert result is not None and result.provider == "primary"
+    assert calls == ["https://secondary.example/decision", "https://primary.example/decision"]
 
 
 def test_client_reports_enabled_state_and_a_secret_free_description(monkeypatch) -> None:

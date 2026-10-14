@@ -35,7 +35,9 @@ def _validate_v2(value: dict[str, Any]) -> dict[str, Any]:
         body = entry["definition"]
         if not isinstance(body, dict):
             raise ValueError("Workflow definition must be an object.")
-        _unknown_keys(body, {"kind", "description", "policy", "options"}, "Workflow definition")
+        _unknown_keys(body, {"kind", "description", "policy", "options", "decision_provider"}, "Workflow definition")
+        if "decision_provider" in body and (not isinstance(body["decision_provider"], str) or not body["decision_provider"].strip()):
+            raise ValueError("Workflow decision_provider must be a non-empty provider id when supplied.")
         if body.get("kind") != "decision_matrix" or not isinstance(body.get("policy"), dict) or not isinstance(body.get("options"), dict):
             raise ValueError("Workflow definition requires decision_matrix, policy and options.")
         if "description" in body and body["description"] is not None and not isinstance(body["description"], str):
@@ -233,6 +235,11 @@ def merge_overlay(document: dict[str, Any], overlay: dict[str, Any]) -> dict[str
             if any(model not in known_models for model in entry["selected_models"]):
                 raise ValueError("Workflow selected_models references unknown model ids.")
             body = copy.deepcopy(entry["definition"])
+            decision_provider = body.get("decision_provider")
+            if decision_provider is not None:
+                known_decision_providers = {item.get("id") for item in (merged.get("decision") or {}).get("providers", []) if isinstance(item, dict)}
+                if decision_provider not in known_decision_providers:
+                    raise ValueError(f"Workflow decision_provider {decision_provider!r} is not configured.")
             body["policy"]["selected_models"] = entry["selected_models"]
             for route in body["policy"].get("labels", {}).values():
                 if any(model not in entry["selected_models"] for model in route.get("models", [])):

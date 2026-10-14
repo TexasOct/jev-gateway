@@ -3,6 +3,9 @@ type Messages = Record<string, string>;
 export const en = {
   workflowCreate: "Create strategy",
   workflowDelete: "Delete strategy",
+  workflowDecisionProvider: "Decision provider",
+  workflowDecisionProviderDefault: "Use configured default",
+  workflowDecisionProviderNote: "Enable external decisions under Suppliers → Decision providers. Selecting a provider here does not enable calls. A selected provider's failure uses this strategy's fallback.",
   workflowName: "Strategy name",
   workflowDeletePrompt: "Delete this strategy and its saved layout? Supplier models and other strategies will remain.",
   workflowDefaultProtected: "The runtime default strategy cannot be deleted.",

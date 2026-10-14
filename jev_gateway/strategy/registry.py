@@ -31,11 +31,17 @@ def _policy_factory(
     )
 
 
+def _decision_client(definition: StrategyDefinition, catalog: Catalog) -> DecisionClient:
+    if definition.decision_provider is None:
+        return DecisionClient(catalog.decision)
+    return DecisionClient(catalog.decision, preferred_provider=definition.decision_provider)
+
+
 def _decision_factory(definition: StrategyDefinition, catalog: Catalog) -> RoutingStrategy:
     return DecisionStrategy(
         definition.name,
         definition.policy,
-        DecisionClassifier(DecisionClient(catalog.decision)),
+        DecisionClassifier(_decision_client(definition, catalog)),
         definition.description,
     )
 
@@ -44,7 +50,7 @@ def build_decision_matrix_strategy(
     definition: StrategyDefinition, catalog: Catalog
 ) -> DecisionMatrixStrategy:
     return DecisionMatrixStrategy(
-        definition.name, definition.policy, DecisionClient(catalog.decision),
+        definition.name, definition.policy, _decision_client(definition, catalog),
         definition.options, definition.description,
     )
 

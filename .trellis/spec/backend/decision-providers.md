@@ -11,13 +11,13 @@ Use this contract when changing decision-engine configuration, adding a decision
 - `registered_protocols() -> tuple[str, ...]` lists the adapter registry's supported protocol identifiers.
 - `DecisionAdapter.evaluate(provider, api_key, timeout_seconds, state, questions) -> DecisionResult | None` in `jev_gateway/strategy/decision_provider/base.py` owns one protocol's request and response handling.
 - `DecisionMaker.evaluate(state, questions, *, valid=None) -> DecisionResult | None` is the strategy-facing protocol; it also exposes `enabled` and a safe `describe() -> dict[str, Any]`. A fake decision maker can satisfy this contract without provider settings.
-- `DecisionClient.evaluate(state, questions, *, valid=None) -> DecisionResult | None` implements the protocol, owns ordered failover, and calls a strategy-specific answer validator before accepting a result. Only `strategy/registry.py` constructs it for strategies.
+- `DecisionClient.evaluate(state, questions, *, valid=None) -> DecisionResult | None` implements the protocol, owns ordered failover, and calls a strategy-specific answer validator before accepting a result. Only `strategy/registry.py` constructs it for strategies. An optional strategy-scoped preferred provider makes that configured provider exclusive; no provider selection retains the catalog default and failover behavior.
 
 ## 3. Contracts
 
 Decision protocol contracts and adapters live in `jev_gateway/strategy/decision_provider/`; the former `jev_gateway/decision_provider/` Python import path has been removed. Keep protocol discovery lazy from catalog validation to avoid package initialization cycles.
 
-Canonical `models.json` uses `decision: {enabled, default_provider, timeout_seconds, providers}`. Each `providers[]` entry has `id`, explicit `protocol`, full `api_base` request URL, `api_key_env`, and optional `model`. Initially only `protocol: "system_one"` is registered. Omitted `model` is `None` and is omitted from the outgoing request; no vendor model is inferred. Gateway-loaded settings retain the declared credential resolved from JSON > local dotenv > captured process values; direct non-injected decision clients retain call-time environment compatibility. `DecisionProvider.as_dict()` exposes only `api_key_env` and `has_api_key`, never the resolved secret. See [credential configuration](./credential-configuration.md).
+Canonical `models.json` uses `decision: {enabled, default_provider, timeout_seconds, providers}`. A workflow may carry an optional `decision_provider` provider ID in its strategy definition; it references a member of `decision.providers` and never copies credentials or model configuration. Each `providers[]` entry has `id`, explicit `protocol`, full `api_base` request URL, `api_key_env`, and optional `model`. Initially only `protocol: "system_one"` is registered. Omitted `model` is `None` and is omitted from the outgoing request; no vendor model is inferred. Gateway-loaded settings retain the declared credential resolved from JSON > local dotenv > captured process values; direct non-injected decision clients retain call-time environment compatibility. `DecisionProvider.as_dict()` exposes only `api_key_env` and `has_api_key`, never the resolved secret. See [credential configuration](./credential-configuration.md).
 
 `DecisionResult` contains the provider ID and normalized typed-choice answers. The System One adapter sends `state` and `questions`, plus `model` only when configured, and accepts an `answers` object whose entries contain string `choice` values. The strategy checks required question names and allowed criteria before using the result. `decision_matrix` currently has no score or boolean rule vocabulary.
 
@@ -29,8 +29,10 @@ The old top-level `jev` key and its Python helpers `JevSettings`, `JevSource`, `
 | --- | --- |
 | Legacy `jev` top-level key (alone or alongside `decision`) | Reject as an unknown key before startup/reload state replacement. |
 | Missing or unsupported canonical protocol, duplicate provider ID, unknown key, invalid timeout/default provider | Raise a descriptive static configuration error. |
-| Missing resolved value for the declared `api_key_env` | Skip that provider and try the next one. |
-| HTTP error, invalid JSON, malformed typed answer, or strategy-invalid choice | Try the next provider; return `None` if exhausted. |
+| Missing resolved value for the declared `api_key_env` | Without strategy selection, skip and try the next provider. With an explicit selection, return `None` and use strategy fallback. |
+| HTTP error, invalid JSON, malformed typed answer, or strategy-invalid choice | Without strategy selection, try the next provider; return `None` if exhausted. With selection, never call another provider. |
+| Global `decision.enabled` is false | Do not call providers, including an explicitly selected provider. |
+| Selected provider cleared in a workflow draft | Omit `decision_provider` from the persisted replacement definition; restore legacy default resolution. |
 | No accepted decision result | Use the first-label classifier fallback or the matrix's configured fallback; when its label is omitted, the matrix also uses the first label. |
 | Removed `jev` or `jev_matrix` strategy kind | Reject at registry construction as an unknown kind, before replacing live state. |
 | Manual model or cached matrix continuation | Do not call the decision provider. |

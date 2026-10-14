@@ -1161,6 +1161,10 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                 ],
                 "labels": labels,
                 "models": models,
+                "decision_providers": [
+                    {"id": provider.name, "display_name": provider.display_name, "model": provider.model}
+                    for provider in catalog.decision.providers
+                ],
                 "warnings": merge_warnings(baseline, overlay, catalog) if overlay else [],
             }
 

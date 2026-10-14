@@ -49,8 +49,9 @@ const actionButtonClass = "min-h-9 rounded-md border-outline bg-panel px-3 text-
 function zoneId(tag: string): string { return `zone::${tag}`; }
 
 function DiffList({ diff, t }: { diff: DraftDiff; t: ReturnType<typeof useTranslation>["t"] }) {
-  const { questions, rules, fallback, models } = diff;
+  const { decisionProvider, questions, rules, fallback, models } = diff;
   return <ul className="my-2 ml-5 list-disc space-y-1 text-ink-muted [overflow-wrap:anywhere]">
+    {decisionProvider.map((change) => <li key="decision-provider">{t("workflowDecisionProvider")}: {change.before} → {change.after}</li>)}
     {questions.map((change) => <li key={`question-${change.subject}`}>{t("questions")}: {change.subject}: {change.before || t("none")} → {change.after || t("none")}</li>)}
     {rules.map((change, index) => <li key={`rule-${index}`}>{change.subject === "rule count" ? t("ruleOrderFirstMatch") : `${t("rule")} ${change.subject}`}: {change.before || t("none")} → {change.after || t("none")}</li>)}
     {fallback.map((change) => <li key={change.subject}>{t("fallback")}: {change.before || t("none")} → {change.after || t("none")}</li>)}
@@ -461,6 +462,13 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
         <Button variant="ghost" size="icon" aria-label={t("workflowCreate")} title={t("workflowCreate")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null} onClick={() => setStrategyAction("create")}><Plus aria-hidden="true" focusable="false" /></Button>
         <Button variant="ghost" size="icon" className="text-ink-muted" aria-label={t("workflowDelete")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null || !config.deletable} title={!config.deletable ? t("workflowDefaultProtected") : t("workflowDelete")} onClick={() => setStrategyAction("delete")}><Trash2 aria-hidden="true" focusable="false" /></Button>
       </div>
+      {config.definition && <div className="grid min-w-0 gap-1 text-xs text-ink-muted"><label className="flex min-w-0 items-center gap-2">
+        <span>{t("workflowDecisionProvider")}</span>
+        <NativeSelect aria-label={t("workflowDecisionProvider")} value={draft.decisionProvider ?? ""} disabled={editDisabled} onChange={(event) => setEditableDraft((current) => ({ ...current, decisionProvider: event.target.value || undefined }))}>
+          <NativeSelectOption value="">{t("workflowDecisionProviderDefault")}</NativeSelectOption>
+          {(config.decision_providers ?? []).map((provider) => <NativeSelectOption key={provider.id} value={provider.id}>{provider.display_name || provider.id}{provider.model ? ` · ${provider.model}` : ""}</NativeSelectOption>)}
+        </NativeSelect>
+      </label><p className="m-0">{t("workflowDecisionProviderNote")}</p></div>}
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {policyRecovery !== null && <div className="notice warn bg-panel text-ink" role="status"><span className="block">{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}

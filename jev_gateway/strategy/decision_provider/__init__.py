@@ -26,8 +26,9 @@ def registered_protocols() -> tuple[str, ...]:
 class DecisionClient:
     """Try configured providers in order and return normalized choice answers."""
 
-    def __init__(self, settings: DecisionSettings) -> None:
+    def __init__(self, settings: DecisionSettings, preferred_provider: str | None = None) -> None:
         self.settings = settings
+        self.preferred_provider = preferred_provider
 
     @property
     def enabled(self) -> bool:
@@ -47,8 +48,12 @@ class DecisionClient:
         if not self.settings.enabled:
             return None
         providers = self.settings.providers
-        preferred = self.settings.default_provider
-        if preferred is not None:
+        if self.preferred_provider is not None:
+            providers = tuple(provider for provider in providers if provider.name == self.preferred_provider)
+        elif self.settings.default_provider is not None:
+            preferred = self.settings.default_provider
+            if all(provider.name != preferred for provider in providers):
+                return None
             providers = (
                 *(provider for provider in providers if provider.name == preferred),
                 *(provider for provider in providers if provider.name != preferred),
