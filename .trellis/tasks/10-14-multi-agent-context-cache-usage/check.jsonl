@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend quality checklist"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Review storage and migration correctness"}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Review model metadata contract"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Required verification gates"}

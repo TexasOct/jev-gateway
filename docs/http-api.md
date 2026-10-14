@@ -41,6 +41,9 @@ models can be configured after entering the console.
 | `GET` | `/v1/setup` | Initialization status and optional configuration progress. |
 | `POST` | `/v1/setup` | Set the first management key through local bootstrap. |
 | `GET` | `/v1/models` | OpenAI model list: registered strategy names first, then enabled concrete catalog model IDs. |
+| `GET` | `/v1/jev/models/metadata` | Confirmed active concrete-model context/output limits for agent adapters; unknown values are null. |
+| `GET` | `/v1/jev/agent-integrations` | Describes available JEV metadata surfaces and explicitly uninstalled Agent adapters. |
+| `GET` | `/v1/jev/agent-integrations` | Agent adapter support levels and configuration/update constraints. |
 | `GET` | `/v1/routing/policy` | Active policy snapshot plus `session_strategy`. |
 | `GET` | `/v1/routing/strategies` | Registered strategies and their policies. |
 | `POST` | `/v1/routing/preview` | Route a chat request through one or more strategies without serving it. |
@@ -70,6 +73,14 @@ models can be configured after entering the console.
 | `PUT` | `/v1/dashboard/theme` | Store one hex seed for the dashboard palette. |
 | `DELETE` | `/v1/dashboard/theme` | Remove the stored seed and return to the default palette. |
 | `POST` | `/v1/chat/completions` | OpenAI-compatible chat completion, routed through a strategy. |
+
+The Bearer-protected `GET /v1/jev/agent-integrations` reports available integration surfaces without claiming that Agent-specific adapters are installed or can compact at runtime.
+
+The Bearer-protected `GET /v1/jev/models/metadata` returns enabled and disabled concrete catalog models with `context_window` and `max_output_tokens`; it excludes strategy names because strategies can route to different model windows. Values are read from the active catalog after configuration reload, and unknown limits remain `null`. The OpenAI-compatible `/v1/models` schema is unchanged.
+
+Successful chat responses include `X-JEV-Context-Window` and `X-JEV-Max-Output-Tokens`, corresponding to the concrete model selected for that request; unknown values are the literal `unknown`. These headers are optional JEV metadata for agent adapters, not a standard OpenAI contract. Each agent remains responsible for its local conversation accounting and compaction.
+
+Recorded outcomes preserve cache-read/cache-write token counts when recognized from upstream usage. Missing or unrecognized cache usage remains `null`; cache-hit tokens are still input context and are not subtracted from context pressure. Cache prices remain metadata and do not alter cost estimates in this release.
 
 `GET /healthz` returns HTTP `200` with `status: "degraded"` when the record store
 has an error; `storage.error` carries the message and serving continues. This is

@@ -302,6 +302,14 @@ def decision_headers(decision: Decision) -> dict[str, str]:
         "X-JEV-Route": decision.route_name,
         "X-JEV-Provider": decision.provider,
         "X-JEV-Model": decision.model,
+        "X-JEV-Context-Window": (
+            str(decision.context_window) if decision.context_window is not None else "unknown"
+        ),
+        "X-JEV-Max-Output-Tokens": (
+            str(decision.max_output_tokens)
+            if decision.max_output_tokens is not None
+            else "unknown"
+        ),
         "X-JEV-Route-Label": decision.label,
         "X-JEV-Task-Type": decision.tier,
         "X-JEV-Mode": decision.mode,
@@ -662,6 +670,54 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     for name in active.engine.catalog.names()
                     if (profile := active.engine.catalog.by_name(name)) is not None and profile.enabled
                 ],
+            ],
+        }
+
+    @app.get("/v1/jev/agent-integrations")
+    def jev_agent_integrations(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Describe integration surfaces without claiming agent runtime support."""
+        require_gateway_key(active.gateway_api_key, authorization)
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "agent": "pi",
+                    "status": "gateway_metadata_available",
+                    "runtime_compaction": False,
+                },
+                {
+                    "agent": "claude_code",
+                    "status": "configuration_adapter_not_installed",
+                    "runtime_compaction": "agent_owned",
+                },
+                {
+                    "agent": "codex",
+                    "status": "configuration_adapter_not_installed",
+                    "runtime_compaction": "agent_owned",
+                },
+            ],
+        }
+
+    @app.get("/v1/jev/models/metadata")
+    def jev_model_metadata(
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List active model limits without changing the OpenAI model schema."""
+        require_gateway_key(active.gateway_api_key, authorization)
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "id": profile.name,
+                    "provider": profile.provider,
+                    "model": profile.model,
+                    "context_window": profile.context_window,
+                    "max_output_tokens": profile.max_output_tokens,
+                    "enabled": profile.enabled,
+                }
+                for profile in active.engine.catalog.profiles
             ],
         }
 

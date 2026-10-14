@@ -24,7 +24,7 @@ from tests.test_gateway import make_stored_config, request
 class SDKChunk(BaseModel):
     model: str = "native-returned-model"
     choices: list[dict[str, Any]]
-    usage: dict[str, int] | None = None
+    usage: dict[str, Any] | None = None
 
 
 class SDKIterator:
@@ -94,7 +94,10 @@ def sdk_chunks(reason: str = "stop") -> list[SDKChunk]:
             "content": "complete.", "reasoning_content": "complete.",
         }}]),
         SDKChunk(choices=[{"index": 0, "delta": {}, "finish_reason": reason}]),
-        SDKChunk(choices=[], usage={"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}),
+        SDKChunk(choices=[], usage={
+            "prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
+            "prompt_tokens_details": {"cached_tokens": 5},
+        }),
     ]
 
 
@@ -141,6 +144,8 @@ def test_completed_stream_persists_metadata_and_replays_after_reopen(
         assert outcome["finish_reason"] == reason
         assert outcome["returned_model"] == "native-returned-model"
         assert (outcome["prompt_tokens"], outcome["completion_tokens"], outcome["total_tokens"]) == (11, 7, 18)
+        assert outcome["cache_read_tokens"] == 5
+        assert outcome["cache_write_tokens"] is None
         assert outcome["cost_usd"] is not None
         assert outcome["latency_ms"] >= 0
         session = config.engine.store.get(session_id)

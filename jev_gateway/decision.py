@@ -34,8 +34,8 @@ from jev_gateway.records import (
     UpstreamRequestRecord,
     build_config_hash,
 )
-from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.request_facts import RequestFacts, extract_request_facts
+from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.strategy import (
     RoutingRequest,
     SetupIncompleteError,
@@ -50,6 +50,7 @@ __all__ = [
     "UnknownModelError",
     "SetupIncompleteError",
     "UnknownStrategyError",
+    "normalize_cache_usage",
 ]
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,8 @@ class Decision:
     candidates: tuple[str, ...]
     created_at: float
     defaulted: bool = False
+    context_window: int | None = None
+    max_output_tokens: int | None = None
 
     @property
     def label(self) -> str:
@@ -99,6 +102,8 @@ class Decision:
             "route": self.route_name,
             "provider": self.provider,
             "model": self.model,
+            "context_window": self.context_window,
+            "max_output_tokens": self.max_output_tokens,
             "label": self.label,
             "tier": self.tier,
             "defaulted": self.defaulted,
@@ -118,6 +123,47 @@ def _usage_int(usage: dict[str, Any] | None, key: str) -> int:
     if not isinstance(usage, dict):
         return 0
     return coerce_int(usage.get(key, 0))
+
+
+def _optional_usage_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    parsed = coerce_int(value)
+    return parsed if parsed >= 0 else None
+
+
+def normalize_cache_usage(
+    usage: dict[str, Any] | None,
+) -> tuple[int | None, int | None]:
+    """Normalize known OpenAI and Anthropic cache token fields."""
+    if not isinstance(usage, dict):
+        return None, None
+
+    read_tokens = next((
+        _optional_usage_int(usage[field])
+        for field in ("cache_read_input_tokens", "cached_input_tokens")
+        if field in usage
+    ), None)
+    write_tokens = next((
+        _optional_usage_int(usage[field])
+        for field in ("cache_creation_input_tokens", "cache_write_input_tokens")
+        if field in usage
+    ), None)
+    for details_key in ("prompt_tokens_details", "input_tokens_details"):
+        details = usage.get(details_key)
+        if not isinstance(details, dict):
+            continue
+        if read_tokens is None:
+            for field in ("cached_tokens", "cache_read_tokens", "cache_read_input_tokens"):
+                if field in details:
+                    read_tokens = _optional_usage_int(details[field])
+                    break
+        if write_tokens is None:
+            for field in ("cache_creation_tokens", "cache_write_tokens", "cache_creation_input_tokens"):
+                if field in details:
+                    write_tokens = _optional_usage_int(details[field])
+                    break
+    return read_tokens, write_tokens
 
 
 class RoutingEngine:
@@ -330,6 +376,8 @@ class RoutingEngine:
             "route": outcome.model,
             "provider": profile.provider,
             "upstream_model": profile.model,
+            "context_window": profile.context_window,
+            "max_output_tokens": profile.max_output_tokens,
             "label": outcome.tier,
             "tier": outcome.tier,
             "defaulted": outcome.defaulted,
@@ -389,6 +437,7 @@ class RoutingEngine:
             _usage_int(usage, "completion_tokens") if has_usage else None
         )
         total_tokens = _usage_int(usage, "total_tokens") if has_usage else None
+        cache_read_tokens, cache_write_tokens = normalize_cache_usage(usage)
         cost_usd = (
             profile.estimated_cost(
                 prompt_tokens or 0, completion_tokens or 0
@@ -404,6 +453,8 @@ class RoutingEngine:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
             cost_usd=cost_usd,
             latency_ms=latency_ms,
             returned_model=returned_model,
@@ -637,6 +688,8 @@ class RoutingEngine:
             reasoning_effort_source=reasoning_effort_source,
             candidates=tuple(item.name for item in self.catalog.profiles),
             created_at=self._clock(),
+            context_window=profile.context_window,
+            max_output_tokens=profile.max_output_tokens,
         )
 
     def _persist(self, decision: Decision, session: SessionState | None) -> None:

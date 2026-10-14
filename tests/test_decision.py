@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from jev_gateway.decision import UnknownModelError
+from jev_gateway.decision import UnknownModelError, normalize_cache_usage
 from tests.helpers import (
     COMPLEX_PROMPT,
     SIMPLE_PROMPT,
@@ -247,6 +247,21 @@ def test_sessions_without_an_id_are_not_remembered(catalog, make_engine) -> None
     assert len(engine.store) == 0
 
 
+@pytest.mark.parametrize(
+    ("usage", "expected"),
+    [
+        ({"prompt_tokens_details": {"cached_tokens": 7}}, (7, None)),
+        ({"input_tokens_details": {"cache_read_tokens": 8, "cache_creation_tokens": 2}}, (8, 2)),
+        ({"cache_read_input_tokens": 9, "cache_creation_input_tokens": 3}, (9, 3)),
+        ({}, (None, None)),
+        ({"cache_read_input_tokens": -1}, (None, None)),
+        ({"cache_read_input_tokens": True}, (None, None)),
+    ],
+)
+def test_normalize_cache_usage(usage, expected) -> None:
+    assert normalize_cache_usage(usage) == expected
+
+
 def test_record_outcome_tracks_cost_failures_and_truncation(
     catalog, make_engine
 ) -> None:
@@ -257,12 +272,18 @@ def test_record_outcome_tracks_cost_failures_and_truncation(
         decision,
         ok=True,
         finish_reason="length",
-        usage={"prompt_tokens": 1_000_000, "completion_tokens": 1_000_000},
+        usage={
+            "prompt_tokens": 1_000_000,
+            "completion_tokens": 1_000_000,
+            "prompt_tokens_details": {"cached_tokens": 700_000},
+        },
     )
     state = engine.store.get("s7")
 
     assert decision.route_name == SMALL_ID
     assert state.cost_usd == pytest.approx(0.75)
+    assert decision.context_window == catalog.by_name(SMALL_ID).context_window
+    assert decision.max_output_tokens == catalog.by_name(SMALL_ID).max_output_tokens
     assert state.consecutive_truncations == 1
 
     engine.record_outcome(decision, ok=True, finish_reason="stop")

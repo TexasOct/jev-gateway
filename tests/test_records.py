@@ -100,7 +100,8 @@ def test_store_joins_request_decision_outcome_and_config(tmp_path: Path) -> None
     store.record_outcome(
         OutcomeRecord(
             "dec-req-1", "req-1", True, finish_reason="stop",
-            prompt_tokens=3, completion_tokens=5, cost_usd=0.001, latency_ms=12,
+            prompt_tokens=3, completion_tokens=5, cache_read_tokens=2,
+            cache_write_tokens=1, cost_usd=0.001, latency_ms=12,
         )
     )
     assert store.counts() == {
@@ -116,10 +117,84 @@ def test_store_joins_request_decision_outcome_and_config(tmp_path: Path) -> None
             "SELECT route, strategy, ok, signals_json FROM decision_evidence"
         ).fetchone()
         assert (route, strategy, ok) == ("provider/model", "quality", 1)
+        assert db.execute(
+            "SELECT cache_read_tokens, cache_write_tokens FROM decision_evidence"
+        ).fetchone() == (2, 1)
         assert json.loads(stored_signals) == {}
         assert db.execute("SELECT prompt FROM requests").fetchone()[0] == "secret prompt"
         assert db.execute("SELECT catalog_json FROM config_versions").fetchone()[0]
     store.close()
+
+
+def test_existing_database_adds_cache_usage_columns_and_preserves_outcomes(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(path) as database:
+        database.executescript("""
+            CREATE TABLE requests (
+                request_id TEXT PRIMARY KEY, received_at REAL NOT NULL,
+                session_id TEXT, strategy TEXT, requested_model TEXT,
+                endpoint TEXT NOT NULL, client TEXT, user_agent TEXT,
+                stream INTEGER NOT NULL DEFAULT 0, max_tokens INTEGER,
+                has_tools INTEGER NOT NULL DEFAULT 0, has_vision INTEGER NOT NULL DEFAULT 0,
+                wants_json INTEGER NOT NULL DEFAULT 0, prompt_chars INTEGER NOT NULL DEFAULT 0,
+                prompt_tokens INTEGER NOT NULL DEFAULT 0, conversation_tokens INTEGER NOT NULL DEFAULT 0,
+                turn_index INTEGER NOT NULL DEFAULT 0, capture_content INTEGER NOT NULL DEFAULT 0,
+                prompt_digest TEXT, prompt TEXT, messages_json TEXT, tools_json TEXT,
+                response_format_json TEXT
+            );
+            CREATE TABLE decisions (
+                decision_id TEXT PRIMARY KEY, request_id TEXT, session_id TEXT,
+                strategy TEXT NOT NULL, config_hash TEXT, route TEXT NOT NULL,
+                provider TEXT NOT NULL, upstream_model TEXT NOT NULL, tier TEXT NOT NULL,
+                reason TEXT NOT NULL, mode TEXT NOT NULL, turn_index INTEGER NOT NULL,
+                switched_from TEXT, blocked_by TEXT, reasoning_effort TEXT,
+                reasoning_effort_source TEXT, candidates_json TEXT NOT NULL,
+                signals_json TEXT NOT NULL, created_at REAL NOT NULL
+            );
+            CREATE TABLE outcomes (
+                decision_id TEXT PRIMARY KEY, request_id TEXT, ok INTEGER NOT NULL,
+                finish_reason TEXT, prompt_tokens INTEGER, completion_tokens INTEGER,
+                total_tokens INTEGER, cost_usd REAL, latency_ms REAL, returned_model TEXT,
+                error_type TEXT, error_message TEXT, recorded_at REAL NOT NULL
+            );
+            INSERT INTO outcomes VALUES ('d1','r1',1,'stop',10,3,13,0.1,4,'m',NULL,NULL,100);
+            CREATE VIEW decision_evidence AS SELECT decision_id FROM outcomes;
+        """)
+        database.execute(
+            "CREATE TABLE legacy_preserved (id INTEGER PRIMARY KEY, note TEXT)"
+        )
+        database.execute("INSERT INTO legacy_preserved VALUES (1, 'keep')")
+
+    store = SqliteRecordStore(StorageSettings(enabled=True, path=str(path)))
+    try:
+        assert store.session_request_evidence("no-session") == []
+        with sqlite3.connect(path) as database:
+            before = database.execute(
+                "SELECT prompt_tokens, completion_tokens, total_tokens, cost_usd FROM outcomes"
+            ).fetchone()
+            assert before == (10, 3, 13, 0.1)
+        store.record_outcome(OutcomeRecord("d1", "r1", True, cache_read_tokens=8))
+        store.flush()
+        with sqlite3.connect(path) as database:
+            columns = {
+                row[1] for row in database.execute("PRAGMA table_info(outcomes)")
+            }
+            assert {"cache_read_tokens", "cache_write_tokens"} <= columns
+            assert database.execute(
+                "SELECT cache_read_tokens, cache_write_tokens FROM outcomes"
+            ).fetchone() == (8, None)
+            view_columns = {
+                row[1]
+                for row in database.execute("PRAGMA table_info(decision_evidence)")
+            }
+            assert {"cache_read_tokens", "cache_write_tokens"} <= view_columns
+            assert database.execute(
+                "SELECT note FROM legacy_preserved WHERE id = 1"
+            ).fetchone() == ("keep",)
+    finally:
+        store.close()
 
 
 def test_existing_database_adds_upstream_request_table(tmp_path: Path) -> None:

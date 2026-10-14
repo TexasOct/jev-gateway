@@ -222,6 +222,8 @@ def test_first_turn_routes_and_reports_the_decision(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.headers["x-jev-route"] == SMALL_ID
+    assert response.headers["x-jev-context-window"] == "8000"
+    assert response.headers["x-jev-max-output-tokens"] == "2000"
     assert response.headers["x-jev-task-type"] == "simple"
     assert response.headers["x-jev-reason"] == "first_turn_simple"
     assert response.headers["x-jev-mode"] == "auto"
@@ -1955,6 +1957,30 @@ def test_model_list_entries_match_the_openai_schema(monkeypatch) -> None:
         assert set(entry) == {"id", "object", "created", "owned_by"}
         assert isinstance(entry["created"], int)
         assert entry["object"] == "model"
+
+
+def test_jev_agent_integration_capabilities_are_explicit(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+    response = request(app, "GET", "/v1/jev/agent-integrations")
+    assert response.status_code == 200
+    data = {item["agent"]: item for item in response.json()["data"]}
+    assert data["pi"]["runtime_compaction"] is False
+    assert data["codex"]["status"] == "configuration_adapter_not_installed"
+
+
+def test_jev_model_metadata_exposes_active_context_limits(monkeypatch) -> None:
+    install_completion(monkeypatch)
+    app = gateway.create_app(make_config())
+
+    response = request(app, "GET", "/v1/jev/models/metadata")
+
+    assert response.status_code == 200
+    data = {item["id"]: item for item in response.json()["data"]}
+    assert data[SMALL_ID]["context_window"] == 8000
+    assert data[SMALL_ID]["max_output_tokens"] == 2000
+    assert set(data) == {SMALL_ID, LARGE_ID}
+    assert all(item["enabled"] is True for item in data.values())
 
 
 def test_auth_failure_uses_the_openai_error_shape(monkeypatch) -> None:

@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS outcomes (
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
     total_tokens INTEGER,
+    cache_read_tokens INTEGER,
+    cache_write_tokens INTEGER,
     cost_usd REAL,
     latency_ms REAL,
     returned_model TEXT,
@@ -195,6 +197,8 @@ SELECT
     o.finish_reason,
     o.completion_tokens,
     o.total_tokens,
+    o.cache_read_tokens,
+    o.cache_write_tokens,
     o.cost_usd,
     o.latency_ms,
     o.error_type
@@ -213,6 +217,11 @@ _DECISION_COLUMN_MIGRATIONS = {
     "reasoning_effort_source": (
         "ALTER TABLE decisions ADD COLUMN reasoning_effort_source TEXT"
     ),
+}
+
+_OUTCOME_COLUMN_MIGRATIONS = {
+    "cache_read_tokens": "ALTER TABLE outcomes ADD COLUMN cache_read_tokens INTEGER",
+    "cache_write_tokens": "ALTER TABLE outcomes ADD COLUMN cache_write_tokens INTEGER",
 }
 
 
@@ -329,6 +338,8 @@ class OutcomeRecord:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     total_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
     cost_usd: float | None = None
     latency_ms: float | None = None
     returned_model: str | None = None
@@ -744,6 +755,30 @@ class _UnavailableRecordStore:
         return None
 
 
+def _migrate_outcome_columns(connection: sqlite3.Connection) -> None:
+    """Add normalized cache usage columns and rebuild the evidence view."""
+    existing = {row[1] for row in connection.execute("PRAGMA table_info(outcomes)")}
+    if not existing:
+        return
+    missing = [name for name in _OUTCOME_COLUMN_MIGRATIONS if name not in existing]
+    if not missing:
+        return
+    for name in missing:
+        connection.execute(_OUTCOME_COLUMN_MIGRATIONS[name])
+
+    view_info = list(connection.execute("PRAGMA table_info(decision_evidence)"))
+    view_columns = {row[1] for row in view_info}
+    required_columns = {
+        "reasoning_effort",
+        "reasoning_effort_source",
+        "cache_read_tokens",
+        "cache_write_tokens",
+    }
+    if not required_columns <= view_columns:
+        connection.execute("DROP VIEW IF EXISTS decision_evidence")
+        connection.executescript(DECISION_EVIDENCE_VIEW)
+
+
 def _migrate_requested_model(connection: sqlite3.Connection) -> None:
     """Rebuild legacy requests tables so invalid input can retain a NULL model."""
     columns = {row[1]: row for row in connection.execute("PRAGMA table_info(requests)")}
@@ -879,6 +914,8 @@ def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
             "prompt_tokens": row["outcome_prompt_tokens"],
             "completion_tokens": row["completion_tokens"],
             "total_tokens": row["total_tokens"],
+            "cache_read_tokens": row["cache_read_tokens"],
+            "cache_write_tokens": row["cache_write_tokens"],
             "cost_usd": row["cost_usd"],
             "latency_ms": row["latency_ms"],
             "returned_model": row["returned_model"],
@@ -929,6 +966,7 @@ class _SqliteBackend:
             connection.execute("PRAGMA synchronous=FULL")
             connection.executescript(SCHEMA)
             _migrate_decision_columns(connection)
+            _migrate_outcome_columns(connection)
             _migrate_requested_model(connection)
             connection.commit()
         except Exception:
@@ -1025,8 +1063,9 @@ class _SqliteBackend:
             connection.execute(
                 "INSERT OR REPLACE INTO outcomes ("
             "decision_id, request_id, ok, finish_reason, prompt_tokens, completion_tokens, "
-            "total_tokens, cost_usd, latency_ms, returned_model, error_type, "
-            "error_message, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "total_tokens, cache_read_tokens, cache_write_tokens, cost_usd, "
+            "latency_ms, returned_model, error_type, error_message, recorded_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 record.decision_id,
                 record.request_id,
@@ -1035,6 +1074,8 @@ class _SqliteBackend:
                 record.prompt_tokens,
                 record.completion_tokens,
                 record.total_tokens,
+                record.cache_read_tokens,
+                record.cache_write_tokens,
                 record.cost_usd,
                 record.latency_ms,
                 record.returned_model,
@@ -1171,7 +1212,8 @@ class _SqliteBackend:
                     u.capture_content AS submitted_capture_content,
                     u.payload_json, u.created_at AS submitted_at,
                     o.ok, o.finish_reason, o.prompt_tokens AS outcome_prompt_tokens,
-                    o.completion_tokens, o.total_tokens, o.cost_usd, o.latency_ms,
+                    o.completion_tokens, o.total_tokens, o.cache_read_tokens,
+                    o.cache_write_tokens, o.cost_usd, o.latency_ms,
                     o.returned_model, o.error_type, o.recorded_at
                 FROM requests r
                 LEFT JOIN decisions d ON d.rowid = (
