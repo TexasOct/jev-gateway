@@ -20,10 +20,10 @@ Publish scoped agent metadata/cache support and the integrated decision routing 
 - [x] A2: Full backend/frontend/type/build gates pass on isolated release inputs.
 - [x] A3: Versioned wheel, installer and sidecars pass release validation.
 - [x] A4: Isolated macOS installed-wheel smoke passes.
-- [ ] A5: Signed release commit and annotated tag target exact reviewed source.
-- [ ] A6: Hosted build and Ubuntu/macOS same-wheel smoke pass.
-- [ ] A7: Four pinned public assets and latest identity verified.
-- [ ] A8: Isolated public-installer smoke passes; closure archived without moving the release tag.
+- [x] A5: Signed release commit and annotated tag target exact reviewed source.
+- [x] A6: Hosted build and Ubuntu/macOS same-wheel smoke pass.
+- [x] A7: Four pinned public assets and latest identity verified.
+- [x] A8: Isolated public-installer smoke passes; closure archived without moving the release tag.
 
 ## Notes
 

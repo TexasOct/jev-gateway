@@ -396,3 +396,38 @@ Acceptance: .trellis/tasks/archive/2026-10/10-12-routing-policy-release-018/acce
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: Publish stable 0.1.9
+<!-- trellis-session: v=2 fp=d05ea5a76812fbe0 -->
+
+**Date**: 2026-10-15
+**Task**: Publish stable 0.1.9
+**Branch**: `work/release-0.1.9`
+
+### Summary
+
+Published 0.1.9 stable/latest; exact tagged source and four public assets verified, both hosted same-wheel smokes and isolated public installer passed.
+
+### Main Changes
+
+- Agent model limits and nullable cache usage; explicit decision enablement and exclusive per-strategy provider selection.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `049b8bf80ac873d9f4a9ff11fbee723332a13374` | feat: expose model limits and cache usage for agent integrations |
+| `400b13d2040a0b31380f51beb5e1ce967e44bddf` | chore: prepare 0.1.9 release |
+
+### Testing
+
+- [OK] Backend 3362/2 skipped; frontend432; browser784/2 skipped plus9 cloud; Pyright0/0; four installed smokes169 each.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Operator runtime upgrade and valid decision supplier configuration remain separate authorized work.
