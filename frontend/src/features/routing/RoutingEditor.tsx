@@ -1,6 +1,6 @@
 /** Named workflow drafts, protected policy writes, and node inspection. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, GitBranch, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, GitBranch, LoaderCircle, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 import { api, ApiError } from "@/shared/api/client";
 import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
@@ -499,7 +499,7 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
 
   const actions = <div className="workflow-toolbar flex flex-nowrap items-center gap-1 border-t border-outline pt-1 [&>button]:min-h-10" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
     <Button variant="ghost" className="mr-auto px-2 text-ink-muted has-[>svg]:px-2 max-[600px]:size-10 max-[600px]:p-0 max-[600px]:has-[>svg]:px-0" aria-label={t("workflowAddModel")} title={t("workflowAddModel")} disabled={editDisabled} onClick={() => setModelChooser(true)}><Plus aria-hidden="true" focusable="false" /><span className="max-[600px]:sr-only">{t("workflowAddModel")}</span></Button>
-    <Button className="h-10 px-2 has-[>svg]:px-2 disabled:border-transparent disabled:bg-panel-muted disabled:text-ink-muted disabled:opacity-100" type="button" aria-label={t("reviewChanges")} onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}><Check aria-hidden="true" focusable="false" />{t("reviewChanges")}</Button>
+    <Button className="h-10 px-2 has-[>svg]:px-2 disabled:border-transparent disabled:bg-panel-muted disabled:text-ink-muted disabled:opacity-100" type="button" aria-label={t("reviewChanges")} onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}>{layoutDirty ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" focusable="false" /> : <Check aria-hidden="true" focusable="false" />}{layoutDirty ? t("canvasSavingLayout") : t("reviewChanges")}</Button>
     <Button variant="ghost" size="icon" className="text-ink-muted" type="button" aria-label={t("discardChanges")} title={t("discardChanges")} onClick={() => {
       setDraft(draftFromConfiguration(config)); setHistoryBoundary((value) => value + 1); setDiscardBoundary((value) => value + 1);
       setQuestionNames({}); setCriterionNames({}); setNewCriteria({}); setNewQuestion(""); selectLayoutNodes([]); setNotice(null); setReview(null);

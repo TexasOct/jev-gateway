@@ -460,7 +460,7 @@ export const zhCN = {
   canvasConditions: "条件配置",
   canvasDestination: "使用哪个模型分组",
   canvasAdvancedChoice: "高级选项：模型选择方式",
-  canvasSavingLayout: "正在自动保存布局。策略内容的修改需要另外检查并确认保存。",
+  canvasSavingLayout: "保存中",
   canvasInvalidState: "配置无效",
   canvasIncompleteState: "待配置",
   canvasOverlayRepair: "当前使用基础配置。请修复服务器上保存的修改配置，或确认恢复基础配置。",

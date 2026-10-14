@@ -61,6 +61,7 @@ describe("named workflow presentation", () => {
     expect(html).toContain('data-canvas-occlusion="bottom"');
     expect(html).toContain('data-policy-draft="unchanged"');
     expect(buttonMarkup(html, messages.en.reviewChanges)).toContain('disabled=""');
+    expect(html).not.toContain(messages.en.canvasSavingLayout);
   });
   it("explicit empty selection mounts no model node while preserving the chooser library", () => {
     const html = renderEditor({ ...config, selected_models: [] });

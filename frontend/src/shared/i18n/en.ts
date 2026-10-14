@@ -460,7 +460,7 @@ export const en = {
   canvasConditions: "Conditions",
   canvasDestination: "Routing destination",
   canvasAdvancedChoice: "Advanced: model selection",
-  canvasSavingLayout: "Saving layout automatically. Review and confirm strategy changes separately.",
+  canvasSavingLayout: "Saving…",
   canvasInvalidState: "Invalid configuration",
   canvasIncompleteState: "Needs configuration",
   canvasOverlayRepair: "The baseline is active. Repair the overlay JSON on the server, or review a reset to remove it.",

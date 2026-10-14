@@ -953,7 +953,7 @@ export default function RoutingCanvas({ historyScope, heading, actions, children
     <div className="canvas-policy-controls grid min-w-0 gap-1 rounded-xl border border-outline bg-panel p-1.5 shadow-sm">
     {heading}
     {actions}
-    {(!loaded || layoutSaving) && <p className="min-h-4 text-xs text-ink-muted" role="status">{!loaded ? t("loading") : t("canvasSavingLayout")}</p>}
+    {!loaded && <p className="min-h-4 text-xs text-ink-muted" role="status">{t("loading")}</p>}
     {layoutError && <p className="notice warn" role="status">{layoutError === "unreadable" ? t("canvasLayoutUnreadable") : layoutError}{active && !loaded && <Button variant="outline" size="sm" type="button" onClick={() => setReadRetry((value) => value + 1)}>{t("canvasRetryLayoutRead")}</Button>}{canEdit && <Button variant="outline" size="sm" type="button" onClick={() => { setLayoutError(null); persist(layoutRef.current); }}>{t("canvasRetryLayout")}</Button>}{loaded && <Button variant="outline" size="sm" type="button" onClick={discardLayout}>{t("canvasDiscardLayout")}</Button>}</p>}
     {feedback && <p className="notice warn" role="status">{feedback}</p>}
     {pointerReason && <p className="notice" role="status">{connectionReasonText(t, pointerReason)}</p>}
