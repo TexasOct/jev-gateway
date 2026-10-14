@@ -207,6 +207,8 @@ JSON 值始终按字面解析，包括 `${NAME}`。未标记的旧 `.env` 赋值
 
 紧凑格式中，`strategies` 的每个同级键都是策略名和 OpenAI API 的虚拟模型名。`strategies.task_aware` 必须存在，并且是默认虚拟模型；例如 `model: "quality"` 选择 `strategies.quality`，`model: "task_aware"` 选择默认策略。provider 限定的具体模型 ID 仍表示手动指定。可以同时定义任意多个策略，每个策略只写与顶层策略不同的字段，并可声明自己的完整标签集合。每项还可选填 `description` 和 `kind`：显式类型为 `policy`、`decision` 或 `decision_matrix`，省略时使用 `auto`。请求只能通过 JSON body 的 `model` 字段选择策略；`?strategy=` 会返回 `400 unsupported_parameter`，`X-JEV-Strategy` 请求头不参与选择。已废除的 `auto`、`jev-auto` 仍是保留名称，不能配置为策略名；请求它们会返回 `404 model_not_found`。策略名也不得与具体模型 ID 重名。旧的 `default`/`definitions` 包装格式仍可读取，但默认项省略时使用 `task_aware`。
 
+策略定义可用 `decision_provider` 引用一个已配置的 `decision.providers[].id`；控制台在策略工作流中提供相同的选择。模型、端点、协议与凭证仍由供应商配置持有。显式选择只调用该供应商，失败时使用当前策略的 fallback；省略或清除选择后，恢复全局默认供应商和原有供应商故障切换顺序。选择供应商不会启用外部调用，仍须在供应商管理的决策供应商页开启 `decision.enabled`。
+
 本地提示词评分、模式检测和意图触发已移除。旧配置中的顶层 `signals`、`policy.scoring`、标签 `score` 以及依赖提示词检测的升级/推理字段会被严格解析器拒绝。请求文本仍可提供给决策提供方；工具、图片、JSON、上下文和输出限制仍作为结构约束使用。
 
 ### `escalation` 与 `hysteresis`
@@ -397,6 +399,10 @@ curl -s "$API_BASE/chat/completions" -H "Authorization: Bearer $KEY" \
 | `providers[].icon_id` | `null` | 可选本地图标标识，缺失或未知时显示中性回退。 |
 
 `jev_gateway/templates/models.example.json` 禁用外部决策，不包含决策提供方实例。启用时按实际端点填写地址和凭证引用；若端点要求模型名，再显式设置 `model`。密钥值只写入 `credentials.json` 或兼容的环境来源，不能放进 `models.json`。
+
+控制台的「供应商 → 决策供应商」显示外部分流状态，并提供「启用外部分流」和「停用外部分流」操作。先保存真实决策端点和凭证，再显式启用；仅添加供应商不会自动开启分流。没有供应商、没有可用凭证或外部分流关闭时，决策策略使用配置的备用路径，例如 `review`。启用只确认配置和凭证已就绪，不代表上游服务可用性已验证。
+
+对应配置操作为 `{ "action": "set_decision_enabled", "enabled": true }`，通过现有 `/v1/provider-configuration/validate` 和 `/v1/provider-configuration` 接口提交。`enabled` 必须为布尔值；启用要求至少一个已配置且具有可用凭证的决策供应商。停用、校验和保存沿用现有鉴权、版本检查和事务回滚机制，保留默认供应商、超时和策略备用路径。
 
 旧顶层键 `jev` 已移除，配置中必须使用 `decision`：将 `sources` 改为 `providers`、`default_source` 改为 `default_provider`，并为每个提供方显式填写 `protocol: "system_one"`。若旧端点依赖原先省略 `model` 时的默认值，还需显式填写 `model`；新配置不会代填。旧策略类型 `jev`、`jev_matrix` 也已移除，分别改用 `decision`、`decision_matrix`。旧分类器前缀 `jev:` 和矩阵前缀 `jev_matrix:` 分别改为 `decision:` 和 `decision_matrix:`；`X-JEV-Reason` 响应头名称不变。
 

@@ -120,6 +120,8 @@ export async function installProviderFixture(context: BrowserContext, state: Pro
     for (const operation of body.operations) {
       if (operation.action === "set_default_model") {
         candidate.defaults = { default_model: operation.model };
+      } else if (operation.action === "set_decision_enabled") {
+        candidate.decision.enabled = operation.enabled;
       } else if (operation.action === "upsert") {
         const list = operation.kind === "llm" ? candidate.providers : candidate.decision.providers;
         const index = list.findIndex((provider) => provider.id === operation.provider.id);

@@ -263,6 +263,13 @@ class ProviderConfiguration:
                         raise ValueError("Default model must be a nonempty string or null.")
                     candidate.setdefault("defaults", {})["default_model"] = model
                     continue
+                if action == "set_decision_enabled":
+                    if set(operation) != {"action", "enabled"} or type(operation["enabled"]) is not bool:
+                        raise ValueError("Invalid decision enable operation.")
+                    if candidate.get("decision") is None:
+                        candidate["decision"] = {}
+                    candidate.setdefault("decision", {})["enabled"] = operation["enabled"]
+                    continue
                 if action == "import":
                     if set(operation) != {"action", "provider_id", "models", "confirmed"} or operation["confirmed"] is not True:
                         raise ValueError("Import requires confirmed: true and explicit model records.")
@@ -359,6 +366,11 @@ class ProviderConfiguration:
             # Validate both baseline and effective catalog before preparing runtime state.
             catalog_from_document(candidate, str(self.models_file), env, allow_missing_credentials=True)
             catalog = catalog_from_document(merge_overlay(candidate, overlay), str(self.models_file), env, allow_missing_credentials=True)
+            if catalog.decision.enabled and any(
+                operation.get("action") == "set_decision_enabled" and operation["enabled"]
+                for operation in operations
+            ) and not any(env.get(provider.api_key_env) for provider in catalog.decision.providers):
+                raise ValueError("Enabling decisions requires at least one provider with a resolved credential.")
             for operation in operations:
                 if operation.get("action") == "set_default_model" and operation.get("model") is not None:
                     profile = catalog.by_name(operation["model"])

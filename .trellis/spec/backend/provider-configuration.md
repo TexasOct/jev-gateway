@@ -85,6 +85,7 @@ Validation and apply accept `{expected_revision, operations}`. Operations use:
 - `{action: "delete", kind: "llm"|"decision", id}`;
 - `{action: "import", provider_id, models, confirmed: true}`.
 - `{action: "set_default_model", model: string|null}`.
+- `{action: "set_decision_enabled", enabled: boolean}`.
 - `{action: "update_model", model_id: string, model: ImportModel}`.
 
 Whole-model updates accept the same optional runtime fields as imports and
@@ -898,3 +899,66 @@ rejection and native buttons through configured-model and import saves.
 Wrong: keep reference prices only in raw JSON, leaving the operator to copy them
 by hand. Correct: offer an explicit field choice with its source and preserve
 the manual confirmation boundary.
+
+## Scenario: explicit decision enablement
+
+### 1. Scope / Trigger
+
+Use when configuring decision suppliers or diagnosing every decision-matrix
+request landing in its fallback label. The shipped template disables decisions
+and has no decision suppliers. Adding a supplier alone preserves this choice.
+
+### 2. Signatures
+
+Provider validation/apply accepts exactly
+`{action: "set_decision_enabled", enabled: boolean}` within its existing
+`{expected_revision, operations}` transaction.
+
+### 3. Contracts
+
+Change only baseline `decision.enabled`, preserving provider order, default
+provider, timeout, overlays and credentials. Validate the completed candidate
+and resolve credentials after every operation, allowing provider SET plus enable
+in one transaction. Enabling requires at least one configured supplier with a
+resolved credential. Disabling does not require one. No upstream probe occurs.
+Keep existing authorization, revision checks, registry preparation and recovery.
+
+The decision-provider tab displays unconfigured, credential-missing, disabled
+or enabled state using the existing safe snapshot. Explicit enable/disable
+uses `manager.save`; block writes while pending/read-only and block enabling
+until a supplier has `has_api_key: true`. Keep disabling available after key
+loss. Do not show the control during a supplier draft. An enabled configuration
+does not certify upstream availability; actual failures retain local fallback.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Missing/extra fields or nonboolean enabled | Reject before write |
+| Enable without suppliers or resolved credentials | Reject before write/activation |
+| Upsert a supplier while disabled | Remain disabled |
+| Disable without credentials | Accept; no decision-provider call |
+| Validate enable | Candidate response only; current files/runtime unchanged |
+| Apply enable with valid typed answers | Activate classification and select matched local rule |
+| Stale revision or activation failure | Existing conflict/rollback contract |
+
+### 5. Good / Base / Bad Cases
+
+Good: configure a real supplier/key, then explicitly enable decisions and observe
+a provider-backed rule. Base: disabled decisions use the configured fallback.
+Bad: treating `decision_matrix:local:fallback` as a transport failure without
+checking the global switch and supplier list.
+
+### 6. Tests Required
+
+`tests/test_decision_enablement.py` covers real matrix behavior before enable,
+after enable and after disable, nonmutating validation, strict inputs, missing
+supplier/key and completed-candidate credentials. HTTP tests cover activation,
+revision conflicts and rollback. Frontend controls/native browser tests cover
+both locales, narrow screens, missing setup, read-only/pending and rejected writes.
+
+### 7. Wrong vs Correct
+
+Wrong: auto-enable when a decision supplier is saved, or change the matrix's
+fallback to hide missing setup. Correct: retain explicit opt-in and provide an
+operator control with truthful readiness, using the existing transaction owner.

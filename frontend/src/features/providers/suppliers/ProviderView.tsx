@@ -27,6 +27,7 @@ import { ProviderSetupFields } from "./ProviderSetupFields";
 import { initialSetupValues, missingSetupFields, setupForWrite } from "./setup";
 import { sameParameterReferences } from "./setupProjection";
 import { ModelManagementView } from "../models/ModelManagementView";
+import { DecisionRoutingControl } from "./DecisionRoutingControl";
 
 type Translate = ReturnType<typeof useLocale>["t"];
 type Props = { manager: ProviderManagement; t: Translate };
@@ -54,6 +55,7 @@ export function ProviderView({ manager, t }: Props) {
   const [transportDrafts, setTransportDrafts] = useState<Record<string, TransportDraft>>({});
   const [authMethod, setAuthMethod] = useState<"server" | "direct">("server");
   const [notice, setNotice] = useState(false);
+  const [decisionNotice, setDecisionNotice] = useState(false);
   const root = useRef<HTMLElement | null>(null);
   const scheduleFrame = useWorkspaceFrames(manager.active);
   const focusOwner = useRef({ generation: 0, focus: 0, frame: 0 });
@@ -430,6 +432,11 @@ export function ProviderView({ manager, t }: Props) {
           {t(refreshFailed ? "pmSaveRefreshFailed" : "pmSaved")}
         </p>
       )}
+      {decisionNotice && kind === "decision" && (
+        <p role="status" className="m-0 text-sm text-ink-muted">
+          {t(refreshFailed ? "pmSaveRefreshFailed" : "pmDecisionSaved")}
+        </p>
+      )}
       {refreshFailed && (
         <div role="alert" className="grid gap-2 text-sm text-ink-muted">
           <span>{t("pmRefreshFailed")}</span>
@@ -442,6 +449,19 @@ export function ProviderView({ manager, t }: Props) {
             {t("pmRetryCatalog")}
           </Button>
         </div>
+      )}
+      {kind === "decision" && config && !editor && !browsing && !manager.loading && (manager.errorOwner !== "read" || operationError === null) && (
+        <DecisionRoutingControl
+          decision={config.decision}
+          disabled={disabled}
+          t={t}
+          onToggle={() => {
+            if (disabled) return;
+            setNotice(false);
+            setDecisionNotice(false);
+            void manager.save([{ action: "set_decision_enabled", enabled: !config.decision.enabled }]).then(setDecisionNotice);
+          }}
+        />
       )}
       {editor ? (
         <>

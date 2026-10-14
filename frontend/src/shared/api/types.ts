@@ -304,6 +304,7 @@ export type GatewayCredentialResult = ProviderConfiguration & { valid: true; app
 export type ProviderOperation =
   | { action: "update_model"; model_id: string; model: ImportModel }
   | { action: "set_default_model"; model: string | null }
+  | { action: "set_decision_enabled"; enabled: boolean }
   | { action: "upsert"; kind: ProviderKind; provider: ProviderProfile; credential: CredentialChange; transport_credentials?: Record<string, CredentialChange> }
   | { action: "delete"; kind: ProviderKind; id: string }
   | { action: "import"; provider_id: string; models: ImportModel[]; confirmed: true };

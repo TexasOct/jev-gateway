@@ -6,7 +6,18 @@
 4. [x] Add workflow UI selector populated from safe configured-provider metadata, localization, draft/review/apply behavior and API typing.
 5. [x] Add backend persistence/validation tests, selected-provider runtime/model test, and frontend draft/UI round-trip tests.
 6. [x] Run focused and full backend tests, Pyright, frontend tests/build/lint and packaging check. Review diff and run Trellis quality checks.
-7. [ ] Commit only task changes on the isolated branch; verify main-worktree pre-existing changes and exact merge base/diff, then merge into main without staging or altering those changes. Verify final main state and report.
+7. [x] Commit only task changes on the isolated branch; verify main-worktree pre-existing changes and exact merge base/diff, then merge into main without staging or altering those changes. Verify final main state and report.
+
+Integrated as `ae2d4ccd52dbc53ddddb03ad1f873cef2b3601b6`. Both refs originally
+pointed at the same commit, so the isolated worktree's uncommitted implementation
+was scoped and committed before fast-forward integration. Three-way resolution
+keeps explicit strategy selection exclusive while retaining global default
+failover and the independent enablement control. Clearing a saved provider and
+legacy `decision: null` compatibility have red-first regression coverage.
+Final combined verification: backend 3359 passed / 2 skipped, frontend 432 passed,
+native browser 12 passed, Pyright/build/lint/package checks passed. The recovery
+bundle and both original dirty-source inventories are retained outside temporary
+sandbox storage. See the readiness task's `research/final-verification.md`.
 
 ## Validation commands
 
