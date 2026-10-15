@@ -431,3 +431,38 @@ Published 0.1.9 stable/latest; exact tagged source and four public assets verifi
 ### Next Steps
 
 - Operator runtime upgrade and valid decision supplier configuration remain separate authorized work.
+
+
+## Session 16: Complete routing session inspection for 0.1.11
+<!-- trellis-session: v=2 fp=696f9e1a6accbc28 -->
+
+**Date**: 2026-10-15
+**Task**: Complete routing session inspection for 0.1.11
+**Branch**: `feat/routing-session-inspector`
+
+### Summary
+
+Accepted routing evidence, retained sessions, readable context and explicit synthetic diagnostics. Task archived; stable 0.1.11 release and local overwrite installation authorized without backups.
+
+### Main Changes
+
+- Closed both independent P2 findings; preserved original REWORK and failure receipts.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3c3dc7caea6bdbc4188284f86867c128ce5986ef` | feat: explain routing decisions and inspect retained sessions |
+
+### Testing
+
+- [OK] Backend 3405 passed,2 skipped; frontend446 unit,212 preview,9 cloud; independent ownership recheck9 passed.
+- [OK] Versioned0.1.11 build/validator and isolated macOS installed-wheel smoke passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Publish0.1.11 through existing release workflow, then overwrite operator install without backups and verify preservation/health.
