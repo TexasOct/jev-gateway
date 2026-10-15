@@ -1,0 +1,10 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend ownership and development checklist"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Routing strategy and record-store module boundaries"}
+{"file":".trellis/spec/backend/decision-providers.md","reason":"Provider evaluation, selected-provider and compatibility contracts"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Writer-owned persistence, safe projections and best-effort evidence"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Session pagination, UI ownership, authentication and theme conventions"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Credential-safe synthetic decision diagnostics and management ownership"}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Safe structured errors without provider prose or credentials"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Python types, isolated tests and verification gates"}
+{"file":".trellis/spec/backend/routing-session-inspection.md","reason":"Implemented classifier evidence, retained sessions, diagnostics and UI lifecycle contracts"}
+{"file":".trellis/tasks/archive/2026-10/10-15-routing-session-inspector/acceptance.md","reason":"Public summary of approved scope, accepted implementation and explicit verification limits; raw research remains local"}

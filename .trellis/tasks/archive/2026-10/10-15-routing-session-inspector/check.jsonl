@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Final full-scope checklist"}
+{"file":".trellis/spec/backend/decision-providers.md","reason":"Evaluation, bypass, failover and secrets review"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Evidence preservation and history query review"}
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"UI consistency, signed pagination, authentication and responsive checks"}
+{"file":".trellis/spec/backend/provider-configuration.md","reason":"Diagnostic nonmutation and credential safety"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Integrated CLI and browser verification"}
+{"file":".trellis/spec/backend/routing-session-inspection.md","reason":"Implemented cross-layer evidence/history/diagnostic/ownership acceptance contracts"}
+{"file":".trellis/tasks/archive/2026-10/10-15-routing-session-inspector/acceptance.md","reason":"Public approved acceptance summary and independent repaired-source PASS; raw research remains local"}
