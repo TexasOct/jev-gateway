@@ -23,7 +23,7 @@ User approval: "开始实现", followed by emphasis on appropriate UI design. Th
 - [x] Independent integrated check; fix valid findings and rerun their affected gates.
 - [x] Update executable contracts/specs and report exact completed scope, validation, remaining installation/release state.
 
-Implementation accepted after independent recheck `6a7f1845-ad95-43e2-9de3-6e34ce58b137` (PASS) and committed as `3c3dc7caea6bdbc4188284f86867c128ce5986ef`. The user authorized task archival, stable0.1.11 publication and local overwrite installation without backups. The task is archived; publication/install observations follow in `acceptance.md`. Original detailed receipts remain under local `research/`.
+Implementation accepted after independent recheck `6a7f1845-ad95-43e2-9de3-6e34ce58b137` (PASS) and committed as `3c3dc7caea6bdbc4188284f86867c128ce5986ef`. The user authorized task archival, stable publication and local overwrite installation without backups. Firstv0.1.11 CI found two nonhermetic fixtures; repair `e24155a83ac48f8930d65aab760b381c27b9070b` and candidate0.1.12 received independent PASS `4995f0fc-4a6b-440f-9e7c-1fd0fe7848ab`. The task is archived; publication/install observations follow in `acceptance.md`. Original detailed receipts remain under local `research/`.
 
 ## Commands
 

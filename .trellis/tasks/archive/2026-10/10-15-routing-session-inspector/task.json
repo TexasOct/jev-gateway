@@ -15,20 +15,25 @@
   "branch": "feat/routing-session-inspector",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": "3c3dc7caea6bdbc4188284f86867c128ce5986ef",
+  "commit": "e24155a83ac48f8930d65aab760b381c27b9070b",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Implementation accepted and committed. User authorized archival, stable0.1.11 publication and local overwrite installation without backups. Publication/install remain pending at archival.",
+  "notes": "Original UI/runtime PASS preserved. CI fixture repair committed and independently accepted;43 inspector tests,Pyright,0.1.12 package validator and isolated installed-wheel smoke passed. Re-archiving for stable0.1.12 publication and local overwrite installation without backups. Failedv0.1.11 tag remains immutable with no release.",
   "meta": {
     "implementation_status": "accepted",
     "independent_review": "PASS",
     "review_run": "6a7f1845-ad95-43e2-9de3-6e34ce58b137",
     "evidence": "acceptance.md",
     "commit_pending": false,
-    "release_version": "0.1.11",
+    "release_version": "0.1.12",
+    "failed_release_tags": [
+      "v0.1.11"
+    ],
+    "release_repair_review": "PASS",
+    "release_repair_review_run": "4995f0fc-4a6b-440f-9e7c-1fd0fe7848ab",
     "publication_status": "pending",
     "local_installation_status": "pending",
     "backups_requested": false
