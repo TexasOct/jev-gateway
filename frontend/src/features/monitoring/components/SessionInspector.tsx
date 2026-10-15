@@ -1,14 +1,20 @@
-import type { PolicyCatalog, ProviderRow, ProvidersPayload, RetainedRequest, SessionRequestsPayload, SessionRow, SessionsPayload } from "@/shared/api/types";
+import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
+import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
+import { useRef } from "react";
+import { History, ChevronDown, ArrowUp } from "lucide-react";
+import type { PolicyCatalog, ProviderRow, ProvidersPayload, SessionScope, SessionRequestsPayload, SessionRow, SessionsPayload } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import { formatRouteLabel, routeLabelContext } from "@/shared/i18n/route-label";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
-import { Separator } from "@/shared/ui/separator";
-import { RouteTrace } from "./RouteTrace";
+import { RequestDetails } from "./RequestDetails";
+import { modelName, requestId, routingReason, text } from "../model/routing-reason";
 import { VirtualList } from "./VirtualList";
 
 interface Props {
   policyCatalog?: PolicyCatalog | null;
+  sessionScope?: SessionScope;
+  onScopeChange?: (scope: SessionScope) => void;
   locale: "en" | "zh-CN";
   providers: ProvidersPayload | null;
   sessions: SessionsPayload | null;
@@ -41,11 +47,11 @@ const PROVIDER_COLUMNS = ["provider", "key", "attempts", "completed", "successfu
 type Translate = ReturnType<typeof useLocale>["t"];
 type FormatDateTime = ReturnType<typeof useLocale>["formatDateTime"];
 
-function storageNote(payload: { evidence_available: boolean; storage: { error?: string | null } }, t: Translate): string {
+function storageNote(payload: { scope?: SessionScope; evidence_available: boolean; storage: { error?: string | null } }, t: Translate): string {
   if (payload.evidence_available) return t("evidenceAvailable");
   const error = payload.storage.error;
   return error === null || error === undefined
-    ? t("evidenceLiveOnly")
+    ? t(payload.scope === "retained" ? "evidenceUnavailable" : "evidenceLiveOnly")
     : `${t("evidenceUnavailable")}: ${error}`;
 }
 
@@ -73,39 +79,6 @@ function providerCells(row: ProviderRow, t: Translate, formatDateTime: FormatDat
   ];
 }
 
-function JsonBlock({ name, value, empty }: { name: string; value: unknown; empty: string }) {
-  return (
-    <details className="mt-[0.35rem] border-t border-outline py-[0.4rem]">
-      <summary className="cursor-pointer font-[620]">{name}</summary>
-      <pre className="max-h-28 max-w-full overflow-auto mt-[0.4rem] rounded-[0.35rem] bg-code p-[0.6rem] [white-space:pre-wrap] [overflow-wrap:anywhere]" tabIndex={0}>{value === null || value === undefined ? empty : JSON.stringify(value, null, 2)}</pre>
-    </details>
-  );
-}
-
-function RequestCard({ item, t, formatDateTime, selected, onSelect, policyCatalog }: { item: RetainedRequest; t: Translate; formatDateTime: FormatDateTime; selected: boolean; onSelect: () => void; policyCatalog?: PolicyCatalog | null }) {
-  const request = item.request;
-  const requestId = typeof request["request_id"] === "string" ? request["request_id"] : t("unknownRequest");
-  const receivedAt = typeof request["received_at"] === "number" ? request["received_at"] : null;
-  const outcome = item.outcome;
-  const status = outcome === null ? t("traceUnknown") : outcome["ok"] === true ? t("succeeded") : t("failed");
-  const statusClass = outcome === null ? "text-ink-muted" : outcome["ok"] === true ? "text-positive" : "text-negative";
-  return (
-    <article className={`request-card flex h-full min-w-0 flex-col overflow-auto rounded-md border border-outline bg-panel-muted p-3 ${selected ? "selected border-primary [box-shadow:inset_0_0_0_1px_var(--accent)]" : ""}`}>
-      <Button variant="ghost" type="button" className="request-select grid h-auto min-h-10 w-full gap-1 whitespace-normal rounded-md border border-transparent bg-transparent px-2 py-1 text-left text-ink hover:border-outline hover:bg-panel" aria-pressed={selected} onClick={onSelect}>
-        <span>{formatDateTime(receivedAt)}</span>
-        <span className="text-ink-muted">{requestId} · <span className={statusClass}>{status}</span></span>
-      </Button>
-      {selected ? <RouteTrace item={item} policyCatalog={policyCatalog} /> : null}
-      <div className="request-evidence mt-2 min-w-0">
-        <JsonBlock name={t("inboundRequest")} value={item.request} empty={t("notRecorded")} />
-        <JsonBlock name={t("routingDecision")} value={item.decision} empty={t("notRecorded")} />
-        <JsonBlock name={t("upstreamRequest")} value={item.upstream_request} empty={t("notRecorded")} />
-        <JsonBlock name={t("outcome")} value={item.outcome} empty={t("notRecorded")} />
-      </div>
-    </article>
-  );
-}
-
 function guidance(locale: "en" | "zh-CN", sessions: SessionsPayload | null, selected: SessionRow | null, detail: SessionRequestsPayload | null, t: Translate, monitoringError: boolean, detailError: boolean): string {
   if (monitoringError) return locale === "zh-CN" ? "无法读取当前会话。请重试。" : "Could not load current sessions. Try again.";
   if (sessions === null) return t("loading");
@@ -127,7 +100,7 @@ function guidance(locale: "en" | "zh-CN", sessions: SessionsPayload | null, sele
     : "The latest retained requests are listed below. Select one to inspect its route trace and recorded outcome.";
 }
 
-function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSelect, policyCatalog }: { session: SessionRow | null; isPreview: boolean; locale: "en" | "zh-CN"; t: Translate; formatDateTime: FormatDateTime; onSelect: () => void; policyCatalog?: PolicyCatalog | null }) {
+function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSelect }: { session: SessionRow | null; isPreview: boolean; locale: "en" | "zh-CN"; t: Translate; formatDateTime: FormatDateTime; onSelect: () => void; policyCatalog?: PolicyCatalog | null }) {
   if (session === null) return null;
   const latest = session.latest_request ?? null;
   const result = latest === null ? t("notRecorded") : latest.ok === true ? t("succeeded") : latest.ok === false ? t("failed") : t("traceUnknown");
@@ -135,13 +108,13 @@ function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSele
   return (
     <div className="monitoring-overview mt-3 flex min-w-0 items-center justify-between gap-4 rounded-md border border-outline bg-panel-muted p-3 max-[600px]:items-start max-[600px]:flex-col">
       <div className="monitoring-overview-copy grid min-w-0 gap-1.5">
-        <div className="monitoring-route break-words text-lg font-semibold text-primary">{session.route ?? t("routeUnavailable")}</div>
+        <div className="monitoring-route break-words text-lg font-semibold text-primary">{session.client ?? session.session_id}</div>
         <div className="monitoring-result flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{t("latestRecordedRequest")}: {latest?.received_at == null ? t("notRecorded") : formatDateTime(latest.received_at)}</span>
           <Badge variant="outline" className={resultClass}>{t("recordedResult")}: {result}</Badge>
         </div>
         <div className="monitoring-meta break-words text-xs text-ink-muted">
-          {[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session, policyCatalog)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}
+          {[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}
         </div>
         {isPreview ? <div className="monitoring-preview-hint text-xs text-ink-muted">{t("previewNotSelected")}</div> : null}
       </div>
@@ -151,121 +124,96 @@ function SessionOverview({ session, isPreview, locale, t, formatDateTime, onSele
     </div>
   );
 }
-export function SessionInspector({ locale, providers, sessions, selectedSessionId, detail, selectedRequestId, sessionPageError, detailPageError, sessionLoading, detailLoading, monitoringError, providerError = false, distributionComplete, detailError, sessionListEpoch, detailListEpoch, t, formatDateTime, onSelectSession, onLoadMoreSessions, onLoadMoreDetail, onRetrySessions, onRetryDetail, onRetryMonitoring, onRetrySelectedDetail, onSelectRequest, policyCatalog }: Props) {
+export function SessionInspector({ locale, providers, sessions, selectedSessionId, detail, selectedRequestId, sessionPageError, detailPageError, sessionLoading, detailLoading, monitoringError, providerError = false, distributionComplete, detailError, sessionListEpoch, detailListEpoch, t, formatDateTime, onSelectSession, onLoadMoreSessions, onLoadMoreDetail, onRetrySessions, onRetryDetail, onRetryMonitoring, onRetrySelectedDetail, onSelectRequest, sessionScope = "live", onScopeChange }: Props) {
+  const scheduleFrame = useWorkspaceFrames(useWorkspaceActive());
+  const root = useRef<HTMLElement>(null);
   const copy = (en: string, zh: string) => locale === "zh-CN" ? zh : en;
   const preview = selectedSessionId === null ? sessions?.data[0] ?? null : null;
-  const selectedRequestSession = detail?.session;
   const selectedSession = sessions?.data.find((session) => session.session_id === selectedSessionId)
-    ?? (selectedSessionId !== null ? {
-      session_id: selectedSessionId,
-      route: typeof selectedRequestSession?.["route"] === "string" ? selectedRequestSession["route"] : null,
-      provider: typeof selectedRequestSession?.["provider"] === "string" ? selectedRequestSession["provider"] : null,
-      upstream_model: typeof selectedRequestSession?.["upstream_model"] === "string" ? selectedRequestSession["upstream_model"] : null,
-      strategy: typeof selectedRequestSession?.["strategy"] === "string" ? selectedRequestSession["strategy"] : null,
-      label: typeof selectedRequestSession?.["label"] === "string" ? selectedRequestSession["label"] : null,
-      defaulted: typeof selectedRequestSession?.["defaulted"] === "boolean" ? selectedRequestSession["defaulted"] : undefined,
-      reason: typeof selectedRequestSession?.["reason"] === "string" ? selectedRequestSession["reason"] : null,
-      turn_count: typeof selectedRequestSession?.["turn_count"] === "number" ? selectedRequestSession["turn_count"] : undefined,
-      first_request_at: typeof selectedRequestSession?.["first_request_at"] === "number" ? selectedRequestSession["first_request_at"] : null,
-      latest_request: null,
-    } satisfies SessionRow : null);
-  const activeOverviewSession = monitoringError ? null : selectedSession ?? preview;
-  const activeRequestId = selectedRequestId ?? (detail?.requests[0]?.request["request_id"] == null ? null : String(detail.requests[0].request["request_id"]));
-  return (
-    <>
-    {providerError ? <p className="monitoring-attribution col-span-full mt-2 text-xs text-ink-muted" role="status">{copy("Provider observations are unavailable. Session routing results remain available.", "服务商观察记录暂不可用，会话路由结果仍可查看。")}</p> : null}
-      <details className="monitoring-secondary col-span-full min-w-0 border-t border-outline py-[0.4rem] [&>summary]:flex [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:items-center [&>summary]:font-semibold">
-        <summary>{copy("Inspect sessions, retained requests and provider observations", "查看会话、留存请求与服务商观察记录")}</summary>
-        <div className="monitoring-secondary-grid grid min-w-0 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-x-4 rounded-lg border border-outline bg-panel px-4 max-[899px]:grid-cols-1 max-[600px]:px-3">
-      <section className="monitoring-overview-panel col-span-full min-w-0 border-b border-outline py-4" aria-labelledby="monitoring-overview-title">
-        <div className="monitoring-overview-heading flex items-start justify-between gap-4 max-[600px]:gap-2">
-          <div className="max-w-[60ch] min-w-0">
-            <h2 id="monitoring-overview-title">{selectedSessionId === null ? (locale === "zh-CN" ? "网关活动" : "Gateway activity") : (locale === "zh-CN" ? "所选会话" : "Selected session")}</h2>
-            <p className="monitoring-guidance mt-1 text-sm text-ink-muted">{guidance(locale, sessions, selectedSession, detail, t, monitoringError, detailError)}</p>
-          </div>
-          {preview ? <Badge variant="outline" className="monitoring-preview-label text-ink-muted">{t("sessionPreview")}</Badge> : null}
-        </div>
+    ?? (selectedSessionId !== null ? { ...detail?.session, session_id: selectedSessionId } as SessionRow : null);
+  const activeRequestId = selectedRequestId ?? (detail?.requests[0] ? requestId(detail.requests[0]) : null);
+  const activeRequest = detail?.requests.find((item) => requestId(item) === activeRequestId) ?? null;
+  const heading = sessionScope === "retained" ? t("retainedSessions") : t("currentSessions");
+  const returnToList = (kind: "sessions" | "timeline", key: string | null, index: number, height: number) => {
+    const list = root.current?.querySelector<HTMLElement>(`.virtual-list.${kind}`);
+    if (!list || key === null) return;
+    list.scrollTop = index * height;
+    list.dispatchEvent(new Event("scroll", { bubbles: true }));
+    scheduleFrame(() => {
+      if (!list.isConnected || list.closest("[inert], [hidden]")) return;
+      const row = [...list.querySelectorAll<HTMLElement>(".virtual-row")].find((element) => element.dataset.key === key);
+      row?.querySelector<HTMLButtonElement>("button")?.focus();
+      list.scrollIntoView({ block: "center" });
+    });
+  };
+  return <section ref={root} className="session-workspace col-span-full min-w-0 rounded-lg border border-outline bg-panel" aria-labelledby="inspector-title">
+    <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-outline p-4 max-[600px]:p-3">
+      <div className="min-w-0"><h1 id="inspector-title" className="m-0 text-xl font-semibold tracking-tight">{t("inspectorTitle")}</h1><p className="mt-1 mb-0 text-sm text-ink-muted">{t("inspectorSubtitle")}</p></div>
+      <div className="flex max-w-full flex-wrap gap-1 rounded-md border border-outline bg-panel-muted p-1" aria-label={copy("Session scope", "会话范围")}>
+        {(["live", "retained"] as const).map((scope) => <Button key={scope} variant="ghost" size="sm" className={`min-h-10 whitespace-normal ${sessionScope === scope ? "bg-panel text-primary shadow-sm" : "text-ink-muted"}`} aria-pressed={sessionScope === scope} onClick={() => onScopeChange?.(scope)}>{scope === "retained" ? <History aria-hidden="true" className="size-3.5" /> : null}{t(scope === "live" ? "currentSessions" : "retainedSessions")}</Button>)}
+      </div>
+    </header>
+    <div className="grid min-w-0 grid-cols-[260px_minmax(0,1fr)] max-[899px]:grid-cols-1">
+      <aside className="monitoring-sessions-panel min-w-0 border-r border-outline p-3 max-[899px]:border-r-0 max-[899px]:border-b" aria-label={copy("Session selection", "会话选择")}>
+        <h2 className="m-0 text-sm font-semibold">{heading}</h2>
+        <p className="mt-1 mb-3 text-xs leading-5 text-ink-muted">{t(sessionScope === "retained" ? "historyScopeNote" : "liveScopeNote")}</p>
+        {monitoringError ? <p role="status" className="text-xs text-ink-muted">{copy("Could not load current sessions. Try again.", "无法读取当前会话。请重试。")}</p> : null}
         {monitoringError ? <Button variant="outline" onClick={onRetryMonitoring}>{t("retryPage")}</Button> : null}
-        {detailError && !monitoringError ? <Button variant="outline" onClick={onRetrySelectedDetail}>{t("retryPage")}</Button> : null}
-        <SessionOverview session={activeOverviewSession} isPreview={selectedSessionId === null && preview !== null} locale={locale} t={t} formatDateTime={formatDateTime} policyCatalog={policyCatalog} onSelect={() => { if (preview) onSelectSession(preview.session_id); }} />
-      </section>
-
-      <section className="monitoring-sessions-panel col-start-1 min-w-0 py-4 max-[899px]:col-start-1 max-[899px]:row-auto">
-        <h2>{t("currentSessions")}</h2>
-        <div className="text-ink-muted [overflow-wrap:anywhere]">{sessions === null ? (monitoringError ? t("evidenceUnavailable") : t("loading")) : storageNote(sessions, t)}</div>
-        <Separator />
-        <VirtualList
-          key={sessionListEpoch}
-          className="sessions"
-          label={t("currentSessions")}
-          items={sessions?.data ?? []}
-          rowHeight={132}
-          getKey={(session) => session.session_id}
-          hasMore={Boolean(sessions?.has_more && !sessionPageError)}
-          loading={sessionLoading}
-          onMore={onLoadMoreSessions}
-          footer={sessionPageError ? <Button variant="outline" onClick={onRetrySessions}>{t("retryPage")}</Button> : sessions?.data.length === 0 ? <div className="text-ink-muted [overflow-wrap:anywhere]">{distributionComplete ? t("noLiveSessions") : copy("No sessions loaded yet; the page walk is incomplete.", "尚未读取到会话；分页读取尚未完成。")}</div> : null}
-          render={(session: SessionRow) => {
-            const latest = session.latest_request ?? null;
-            const status = latest === null ? t("traceUnknown") : latest.ok === true ? t("succeeded") : latest.ok === false ? t("failed") : t("traceUnknown");
-            return <button type="button" className={`session${session.session_id === selectedSessionId ? " active" : ""} h-full w-full grid content-start gap-1 overflow-hidden rounded-md border bg-panel px-3 py-2 text-left text-xs [overflow-wrap:anywhere] ${session.session_id === selectedSessionId ? "border-primary bg-panel-muted" : "border-outline hover:border-primary hover:bg-panel-muted"}`} aria-pressed={session.session_id === selectedSessionId} onClick={() => onSelectSession(session.session_id)}>
-              <span className="route">{session.route ?? t("routeUnavailable")}</span>
-              <span className="text-ink-muted [overflow-wrap:anywhere]">{session.session_id}</span>
-              <span className="text-ink-muted [overflow-wrap:anywhere]">{session.first_request_at == null ? t("unknownFirstRequest") : formatDateTime(session.first_request_at)}</span>
-              <span className="text-ink-muted [overflow-wrap:anywhere]">{[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session, policyCatalog)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable"), `${session.turn_count ?? 0} ${t("turns")}`, status].join(" · ")}</span>
+        <VirtualList key={`${sessionScope}-${sessionListEpoch}`} className="sessions" label={heading} items={sessions?.data ?? []} rowHeight={132} getKey={(session) => session.session_id}
+          hasMore={Boolean(sessions?.has_more && !sessionPageError)} loading={sessionLoading} onMore={onLoadMoreSessions}
+          footer={sessionPageError ? <Button variant="outline" onClick={onRetrySessions}>{t("retryPage")}</Button> : sessions === null && !monitoringError ? <p role="status" className="p-2 text-xs text-ink-muted">{t("loading")}</p> : sessions?.evidence_available === false && sessionScope === "retained" ? <p role="status" className="p-2 text-xs text-ink-muted">{t("evidenceUnavailable")}</p> : sessions?.data.length === 0 ? <p className="p-2 text-xs text-ink-muted">{sessionScope === "retained" ? t("emptyHistory") : distributionComplete ? t("noLiveSessions") : copy("No sessions loaded yet; the page walk is incomplete.", "尚未读取到会话；分页读取尚未完成。")}</p> : null}
+          render={(session) => {
+            const latest = session.latest_request;
+            const count = session.request_count;
+            const last = session.latest_decision ?? session;
+            const fallback = session.routing_evidence?.rule_status === "classifier_fallback" || session.latest_decision?.routing_evidence?.rule_status === "classifier_fallback";
+            return <button type="button" className={`session${session.session_id === selectedSessionId ? " active" : ""} grid h-full w-full content-start gap-1 overflow-hidden rounded-md border px-3 py-2 text-left text-xs [overflow-wrap:anywhere] ${session.session_id === selectedSessionId ? "border-primary bg-panel-muted" : "border-outline bg-panel hover:border-primary hover:bg-panel-muted"}`} aria-pressed={session.session_id === selectedSessionId} onClick={() => onSelectSession(session.session_id)}>
+              <span className="flex min-w-0 items-center justify-between gap-2"><strong className="truncate">{session.client ?? session.session_id}</strong>{sessionScope === "retained" ? <span className="shrink-0 text-[10px] text-ink-muted">{session.in_memory === true ? t("inMemory") : session.in_memory === false ? t("retainedOnly") : t("evidenceUnknown")}</span> : null}</span>
+              {session.client ? <span className="truncate text-ink-muted">{session.session_id}</span> : null}
+              <span className="truncate text-ink-muted">{formatDateTime(latest?.received_at ?? session.last_request_at)}</span>
+              <span className="line-clamp-2 text-ink-muted">{[session.strategy ?? t("strategyUnavailable"), session.label == null ? t("labelUnavailable") : formatRouteLabel(session.label, t, routeLabelContext(session)), session.provider && session.upstream_model ? `${session.provider}/${session.upstream_model}` : t("providerUnavailable")].join(" · ")}</span>
+              <span className="flex min-w-0 justify-between gap-2 text-ink-muted"><span>{count === undefined ? session.turn_count === undefined ? t("countUnknown") : `${session.turn_count} ${t("turns")}` : `${count} ${t("requestCount")}`}</span><span className={fallback ? "text-caution" : ""}>{fallback ? t("fallbackRecorded") : last["ok"] === false || latest?.ok === false ? t("failed") : latest?.ok === true ? t("succeeded") : t("traceUnknown")}</span></span>
             </button>;
-          }}
-        />
-      </section>
-
-      <section className="monitoring-requests-panel col-start-2 min-w-0 py-4 max-[899px]:col-start-1 max-[899px]:row-auto max-[899px]:border-t max-[899px]:border-outline">
-        <h2>{selectedSessionId === null ? t("selectSession") : selectedSession?.route ?? selectedSessionId}</h2>
-        <div className="text-ink-muted [overflow-wrap:anywhere]">{detail === null ? (detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("noSessionSelected") : t("loadingRequests")) : storageNote(detail, t)}</div>
-        <Separator />
-        <VirtualList
-          key={`${selectedSessionId ?? "none"}-${detailListEpoch}`}
-          className="timeline"
-          label={t("selectSession")}
-          items={detail?.requests ?? []}
-          rowHeight={360}
-          getKey={(item) => String(item.request["request_id"])}
-          hasMore={Boolean(detail?.has_more && !detailPageError)}
-          loading={detailLoading}
-          onMore={onLoadMoreDetail}
-          footer={detailPageError ? <Button variant="outline" onClick={onRetryDetail}>{t("retryPage")}</Button> : detail === null ? <div className="text-ink-muted [overflow-wrap:anywhere]">{detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("inspectRequests") : t("loading")}</div> : detail.requests.length === 0 ? <div className="text-ink-muted [overflow-wrap:anywhere]">{t("noRetainedRequests")}</div> : null}
-          render={(item) => {
-            const requestId = String(item.request["request_id"]);
-            return <RequestCard item={item} t={t} formatDateTime={formatDateTime} selected={requestId === activeRequestId} policyCatalog={policyCatalog} onSelect={() => onSelectRequest(requestId)} />;
-          }}
-        />
-      </section>
-
-      <section className="monitoring-providers-panel col-span-full min-w-0 border-t border-outline py-4 max-[899px]:col-span-1 max-[899px]:col-start-1 max-[899px]:row-auto">
-        <h2>{t("retainedOutcomes")}</h2>
-        <p className="monitoring-provider-caveat text-ink-muted [overflow-wrap:anywhere]">{t("evidenceCaveat")}</p>
-        <details className="monitoring-provider-details border-0 p-0">
-          <summary className="cursor-pointer font-[620]">{locale === "zh-CN" ? "查看保留的服务商记录" : "Inspect recorded provider observations"}</summary>
-          <div className="my-2 text-ink-muted [overflow-wrap:anywhere]">{providers === null ? (monitoringError ? t("evidenceUnavailable") : t("loading")) : storageNote(providers, t)}</div>
-          <div className="table-wrap max-w-full overflow-x-auto [&_table]:min-w-[860px] max-[600px]:[&_table]:min-w-0 max-[720px]:[&_thead]:hidden max-[720px]:[&_tr]:block max-[720px]:[&_tr]:border-b max-[720px]:[&_tr]:border-outline max-[720px]:[&_tr]:py-[0.4rem] max-[720px]:[&_td]:flex max-[720px]:[&_td]:justify-between max-[720px]:[&_td]:gap-3 max-[720px]:[&_td]:border-0 max-[720px]:[&_td]:py-[0.15rem] max-[720px]:[&_td]:px-0 max-[720px]:[&_td]:before:content-[attr(data-label)] max-[720px]:[&_td]:before:text-ink-muted max-[720px]:[&_td]:before:font-semibold">
-            <table className="w-full border-collapse text-left text-xs">
-              <thead>
-                <tr>{PROVIDER_COLUMNS.map((key) => <th className="border-b border-outline p-2 text-ink-muted" key={key}>{t(key)}</th>)}</tr>
-              </thead>
-              <tbody>
-                {providers === null || providers.providers.length === 0 ? (
-                  <tr><td colSpan={PROVIDER_COLUMNS.length} className="border-b border-outline p-2 text-ink-muted">{providers === null ? (monitoringError ? t("evidenceUnavailable") : t("loading")) : t("noConfiguredProviders")}</td></tr>
-                ) : providers.providers.map((row) => (
-                  <tr key={row.id}>{providerCells(row, t, formatDateTime).map((cell, index) => (
-                    <td className="border-b border-outline p-2" key={PROVIDER_COLUMNS[index] ?? String(index)} data-label={t(PROVIDER_COLUMNS[index] ?? "provider")}>{cell}</td>
-                  ))}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </section>
-        </div>
+          }} />
+        {sessions?.display_limited && <p role="status" className="mt-2 text-xs text-ink-muted">{copy("Showing the first 1,000 retained sessions. Refresh to restart from the newest records.", "已显示前 1,000 个留存会话，刷新可从最新记录重新读取。")}</p>}
+        {sessions && <p className="mt-2 mb-0 text-xs text-ink-muted [overflow-wrap:anywhere]">{storageNote(sessions, t)}</p>}
+      </aside>
+      <div className="min-w-0 p-4 max-[600px]:p-3">
+        <section className="monitoring-overview-panel min-w-0 border-b border-outline pb-3" aria-labelledby="monitoring-overview-title">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="monitoring-overview-title" className="m-0 text-base">{selectedSessionId === null ? t("sessionPreview") : copy("Selected session", "所选会话")}</h2>{selectedSessionId !== null && <Button variant="ghost" size="sm" onClick={() => returnToList("sessions", selectedSessionId, Math.max(0, sessions?.data.findIndex((session) => session.session_id === selectedSessionId) ?? 0), 132)}><ArrowUp aria-hidden="true" className="size-3.5" />{t("backToSessions")}</Button>}</div>
+          <p className="monitoring-guidance mt-1 mb-0 text-xs text-ink-muted">{guidance(locale, sessions, selectedSession, detail, t, monitoringError, detailError)}</p>
+          {detailError && <Button variant="outline" onClick={onRetrySelectedDetail}>{t("retryPage")}</Button>}
+          <SessionOverview session={monitoringError ? null : selectedSession ?? preview} isPreview={selectedSessionId === null && preview !== null} locale={locale} t={t} formatDateTime={formatDateTime} onSelect={() => { if (preview) onSelectSession(preview.session_id); }} />
+        </section>
+        <section className="monitoring-requests-panel min-w-0 py-3" aria-label={copy("Requests", "请求列表")}>
+          <h3 className="mt-0 mb-1 text-sm">{copy("Requests", "请求列表")}{detail ? ` · ${detail.requests.length}${detail.has_more ? "+" : ""}` : ""}</h3>
+          <p role="status" className="mt-0 mb-2 text-xs text-ink-muted [overflow-wrap:anywhere]">{detail === null ? detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("noSessionSelected") : t("loadingRequests") : storageNote(detail, t)}</p>
+          <VirtualList key={`${selectedSessionId ?? "none"}-${detailListEpoch}`} className="timeline" label={t("selectSession")} items={detail?.requests ?? []} rowHeight={88} getKey={requestId}
+            hasMore={Boolean(detail?.has_more && !detailPageError)} loading={detailLoading} onMore={onLoadMoreDetail}
+            footer={detailPageError ? <Button variant="outline" onClick={onRetryDetail}>{t("retryPage")}</Button> : detail === null ? <p className="p-2 text-xs text-ink-muted">{detailError || monitoringError ? t("evidenceUnavailable") : selectedSessionId === null ? t("inspectRequests") : t("loading")}</p> : detail.evidence_available === false ? <p role="status" className="p-2 text-xs text-ink-muted">{t("evidenceUnavailable")}</p> : detail.requests.length === 0 ? <p className="p-2 text-xs text-ink-muted">{t("noRetainedRequests")}</p> : null}
+            render={(item) => {
+              const id = requestId(item);
+              const selected = id === activeRequestId;
+              return <Button type="button" variant="ghost" className={`request-select grid h-full min-h-10 w-full content-center justify-stretch gap-1 overflow-hidden whitespace-normal rounded-md border px-3 py-2 text-left text-xs ${selected ? "border-primary bg-panel-muted" : "border-outline hover:bg-panel-muted"}`} aria-pressed={selected} onClick={() => onSelectRequest(id)}>
+                <span className="flex min-w-0 items-center justify-between gap-2"><span className="truncate">{formatDateTime(typeof item.request["received_at"] === "number" ? item.request["received_at"] : null)} · {id}</span><span className={`shrink-0 ${item.outcome?.["ok"] === true ? "text-positive" : item.outcome?.["ok"] === false ? "text-negative" : "text-ink-muted"}`}>{item.outcome?.["ok"] === true ? t("succeeded") : item.outcome?.["ok"] === false ? t("failed") : t("traceUnknown")}</span></span>
+                <span className="truncate font-medium">{routingReason(item.decision, t, locale)}</span>
+                <span className="truncate text-ink-muted">{text(item.decision?.["label"]) ?? t("labelUnavailable")} · {modelName(item.decision) ?? t("notRecorded")}{typeof item.outcome?.["total_tokens"] === "number" ? ` · ${item.outcome["total_tokens"]} tokens` : ""}</span>
+              </Button>;
+            }} />
+          {detail?.display_limited && <p role="status" className="text-xs text-ink-muted">{copy("Showing the first 300 retained requests. Refresh to restart from the newest records.", "已显示前 300 次留存请求，刷新可从最新记录重新读取。")}</p>}
+          {detailLoading && <p role="status" className="text-xs text-ink-muted">{t("loading")}</p>}
+        </section>
+        {activeRequest ? <div className="min-w-0 border-t border-outline pt-4"><div className="mb-3 flex justify-end"><Button variant="ghost" size="sm" onClick={() => returnToList("timeline", activeRequestId, detail?.requests.findIndex((item) => requestId(item) === activeRequestId) ?? 0, 88)}><ArrowUp aria-hidden="true" className="size-3.5" />{t("backToRequests")}</Button></div><RequestDetails key={activeRequestId} item={activeRequest} /></div> : null}
+      </div>
+    </div>
+    <section className="monitoring-providers-panel min-w-0 border-t border-outline p-4 max-[600px]:p-3">
+      <p className="monitoring-provider-caveat text-xs leading-5 text-ink-muted">{t("evidenceCaveat")}</p>
+      <details className="monitoring-provider-details min-w-0"><summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><ChevronDown aria-hidden="true" className="size-4" />{copy("Inspect recorded provider observations", "查看保留的服务商记录")}</summary>
+        <h2 className="mt-3 text-sm">{t("retainedOutcomes")}</h2>
+        {providerError && <p role="status" className="text-xs text-ink-muted">{copy("Provider observations are unavailable. Session routing results remain available.", "服务商观察记录暂不可用，会话路由结果仍可查看。")}</p>}
+        <div className="my-2 text-xs text-ink-muted [overflow-wrap:anywhere]">{providers === null ? providerError ? t("evidenceUnavailable") : t("loading") : storageNote(providers, t)}</div>
+        <div className="table-wrap max-w-full overflow-x-auto [&_table]:min-w-[860px] max-[600px]:[&_table]:min-w-0 max-[720px]:[&_thead]:hidden max-[720px]:[&_tr]:block max-[720px]:[&_tr]:border-b max-[720px]:[&_tr]:border-outline max-[720px]:[&_tr]:py-[0.4rem] max-[720px]:[&_td]:flex max-[720px]:[&_td]:justify-between max-[720px]:[&_td]:gap-3 max-[720px]:[&_td]:border-0 max-[720px]:[&_td]:py-[0.15rem] max-[720px]:[&_td]:px-0 max-[720px]:[&_td]:before:content-[attr(data-label)] max-[720px]:[&_td]:before:text-ink-muted max-[720px]:[&_td]:before:font-semibold"><table className="w-full border-collapse text-left text-xs"><thead><tr>{PROVIDER_COLUMNS.map((key) => <th className="border-b border-outline p-2 text-ink-muted" key={key}>{t(key)}</th>)}</tr></thead><tbody>{providers === null || providers.providers.length === 0 ? <tr><td colSpan={PROVIDER_COLUMNS.length} className="border-b border-outline p-2 text-ink-muted">{providers === null ? t("evidenceUnavailable") : t("noConfiguredProviders")}</td></tr> : providers.providers.map((row) => <tr key={row.id}>{providerCells(row, t, formatDateTime).map((cell, index) => <td className="border-b border-outline p-2" key={index} data-label={t(PROVIDER_COLUMNS[index] ?? "provider")}>{cell}</td>)}</tr>)}</tbody></table></div>
       </details>
-    </>
-  );
+    </section>
+  </section>;
 }

@@ -967,7 +967,9 @@ setMenu({ ...at, point: pointerOnBoard(event), node, edge, draft });
 
 ### 1. Scope / Trigger
 
-Use when changing session or request monitoring list response sizes, pagination, or rendering behavior. Live session scope and retained evidence semantics remain unchanged.
+Use when changing session/request pagination or rendering. Omitted scope stays
+live; explicit retained scope and the session-workspace presentation follow
+[routing/session inspection](./routing-session-inspection.md).
 
 ### 2. Signatures
 
@@ -979,7 +981,11 @@ Use when changing session or request monitoring list response sizes, pagination,
 
 Cursor token contains version, endpoint, optional request `session_id`, and ordering key, signed with HMAC-SHA256 using a per-router secret. It is not an authorization credential; each page still uses the gateway Bearer check. Process restart invalidates cursors. Pagination is best-effort, with no cross-request snapshot. New/expired/updated sessions and retention pruning can shift pages; clients deduplicate stable IDs. Old callers that expect the whole list must follow `next_cursor`.
 
-Each monitoring list has its own fixed-height virtual window. `height`, `min-height`, and `max-height` are equal per viewport breakpoint; the request timeline gets more height than the session selector. Only visible rows plus overscan mount. Session selection/refresh resets the request cursor and ignores stale responses. Keep expanded request evidence readable inside its row.
+Session selection keeps its fixed-height virtual window. Request rows are compact
+and their timeline fits content between 88px and 264px; details render outside the
+virtual rows in a wide reading area. Only visible rows plus overscan mount.
+Selection/refresh resets request traversal and ignores stale responses. Keep
+focused rows mounted and disclose any bounded append truncation.
 
 ### 4. Validation & Error Matrix
 
@@ -987,20 +993,22 @@ Each monitoring list has its own fixed-height virtual window. `height`, `min-hei
 | --- | --- |
 | `limit` outside 1..100 | `400 invalid_limit` |
 | Malformed, tampered, wrong-endpoint, wrong-session or pre-restart cursor | `400 invalid_cursor` |
-| Detail request for a non-live session | `404 unknown_session` |
+| Detail request for a non-live session | Live scope: `404 unknown_session`; retained scope reads surviving records |
 | Storage unavailable | Preserve existing live-only/evidence-unavailable behavior |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: each cursor continues from the last returned compound key; a concurrent mutation may shift later pages and the UI deduplicates by stable IDs.
-- Base: empty pages still occupy the fixed-height window and display empty/loading states inside it.
+- Base: empty pages retain a visible explanatory state; short request timelines
+  shrink while session selection keeps its bounded viewport.
 - Bad: loading all retained request bodies and slicing in Python, returning prompt fields in sessions pages, or treating a cursor as a substitute for Bearer authorization.
 
 ### 6. Tests Required
 
 - `tests/test_records.py`: equal timestamps, rowid tie-break, `limit + 1`, next key, and no full-history decode before slicing.
 - `tests/test_gateway.py`: both endpoints' limits/cursors, HMAC tamper and endpoint/session scope, Bearer auth on every page, memory-only session pages, no context leakage and storage degradation.
-- Frontend tests: fixed-height values, overscan row bounds, next-page cursor calls, stable-ID dedupe, refresh/session-switch races, retry and expanded evidence.
+- Frontend tests: bounded session/timeline windows, overscan, cursor calls,
+  dedupe/cap disclosure, view/scope/selection ownership, retry and separate details.
 - Browser tests must use actual scroll actions and record follow-up network cursor requests; pure windowing tests are not pointer/scroll acceptance.
 
 ### 7. Wrong vs Correct
@@ -1011,7 +1019,8 @@ Wrong: `session_request_evidence(id)[:limit]` loads all retained evidence, then 
 
 ### 1. Scope / Trigger
 
-Use for changes to live-session listing, retained request pages or virtualized list rendering. Preserve live-only scope and evidence privacy.
+Use for current/retained session listing, request pages and virtualized rendering.
+Preserve live-only distribution defaults and evidence privacy.
 
 ### 2. Signatures
 
@@ -1039,21 +1048,23 @@ Cursors contain a version, endpoint, optional session ID, and ordering key. HMAC
 | --- | --- |
 | Limit outside 1..100 | `400 invalid_limit` |
 | Malformed, forged, other-endpoint/session, or pre-restart cursor | `400 invalid_cursor` |
-| Detail session expired/evicted | `404 unknown_session` |
+| Detail session expired/evicted | Live scope: 404; retained scope reads surviving evidence without creating live state |
 | Evidence disabled/degraded | Live session list remains; detail has no evidence rows |
 | Exhausted page | `has_more: false`, `next_cursor: null` |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: the next page follows the last compound key; the client ignores stale responses after session changes.
-- Base: an empty list keeps its fixed-height window and explanatory state.
+- Base: an empty list keeps its explanatory state; short timelines fit content.
 - Bad: offset paging over changing activity order, skipping authorization for a signed cursor, or treating best-effort traversal as a snapshot.
 
 ### 6. Tests Required
 
 - Backend: timestamp ties, page bounds, static traversal completeness, signed-token validation, cross-session rejection, slash session IDs, memory-only sessions and storage degradation.
-- Frontend: fixed `height == min-height == max-height`, virtual row bound, duplicate suppression, stale response rejection, refresh during next-page fetch, keyboard focus and visible retry controls.
-- Browser: scroll beyond the first page, inspect network cursor calls, expand request evidence and check that it remains accessible inside the fixed viewport.
+- Frontend: bounded windows/rows, duplicate suppression, truthful cap notices,
+  retired-view response rejection, refresh/page races, keyboard focus and retry.
+- Browser: scroll beyond page one, inspect cursor calls, select a request and read
+  its separate detail/context snapshot without expanding a virtual row.
 
 ### 7. Wrong vs Correct
 
@@ -1121,7 +1132,7 @@ The projection carries an opaque process instance ID, completeness flag and aggr
   reverse traversal while fields and footer actions are disabled, with focus
   inside the visible modal and never on a disabled control or outside guard.
 - Use progressive disclosure for dense operational detail: summarize the
-  selected live session and known recorded outcome first, then keep source
+  selected current/retained session and known recorded outcome first, then keep source
   evidence and provider observations available through accessible controls.
   Missing evidence remains unknown/unavailable and must not be relabeled as a
   live request. When a virtual list uses fixed-height rows, preserve its geometry
@@ -1283,7 +1294,14 @@ transition frame does not establish the final palette's contrast ratio.
 
 Component-specific static appearance belongs in JSX Tailwind utilities, including canvas geometry, SVG paint, pointer-hit rules, mobile provider-table transformation, and virtual-list dimensions. CSS holds the small shared element/control defaults, runtime theme variables, Tailwind configuration, and named keyframes (`node-drag-pulse`, `configured-route-trace`, `monitoring-route-flow`). Keep dynamic measured coordinates (`top`, `left`, overlay bounds), per-row inline position/height, SVG viewBox, and data-derived colors on their elements. A class name such as `trace-stage-missing` or `configured-flow-active` may remain as a test/query hook only; it must not be relied on for presentation unless a CSS rule is documented in the allowlist. Assert visual states using emitted Tailwind classes or browser computed styles, not selector-marker presence alone. Do not substitute `@apply` or a generic selector-to-class registry for component utilities.
 
-The session list viewport is 480px on desktop and 280px at widths of 720px or less; the request timeline is 480px on desktop and 62vh at those narrow widths. Session and request rows stay 132px and 360px respectively. Emit the 280px utilities only for session lists and the 62vh utilities only for timelines: Tailwind's generated ordering does not guarantee that two competing `max-[720px]` height utilities on one element resolve by class-string order. Keep all three viewport properties (`height`, `min-height`, `max-height`) equal. Preserve focused-row retention and cursor pagination while moving the static row positioning to utilities.
+The session list viewport stays 480px desktop/280px at 720px or less, with 132px
+rows. Request rows are 88px; the timeline uses intrinsic content height with 88px
+minimum and 264px maximum at every breakpoint. A single request must not reserve
+space for three rows. Selected details live outside that viewport. Do not emit
+competing breakpoint heights: Tailwind utility order does not follow class-string
+order. Preserve focused-row retention, cursor pagination and isolated long-list
+scrolling. The broader recorded-history and ownership contract is in
+[routing/session inspection](./routing-session-inspection.md).
 
 Check the emitted behavior with an isolated synthetic browser fixture: `getComputedStyle` of both list viewport types and rows at desktop/320px, `elementFromPoint` and real pointer drag on 190px-wide canvas nodes with output-driven heights, mobile provider `td[data-label]::before` with a populated provider fixture, keyboard focus, reduced-motion configured flow and request trace, and page overflow in both locales/schemes. Source-string tests alone do not detect utility precedence or missing pseudo-element labels.
 

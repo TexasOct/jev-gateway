@@ -582,6 +582,12 @@ class _FailingStore:
     ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
         return [], None, False
 
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
+        return [], None, False
+
     def provider_summary(
         self, *, window_start: float, window_end: float
     ) -> dict[str, dict[str, Any]]:

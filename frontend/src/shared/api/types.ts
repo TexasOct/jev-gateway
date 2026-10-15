@@ -88,6 +88,37 @@ export interface LatestRequest {
   ok?: boolean | null;
 }
 
+export type SessionScope = "live" | "retained";
+export type ClassificationStatus = "accepted" | "disabled" | "missing_provider" | "missing_key" | "http_error" | "timeout" | "network_error" | "invalid_json" | "invalid_envelope" | "invalid_answers" | "unsupported_protocol" | "unavailable" | "bypassed_manual" | "bypassed_session" | "not_applicable";
+export interface RoutingEvidence {
+  classification?: {
+    status: ClassificationStatus;
+    provider_id?: string | null;
+    answers?: Record<string, { choice: string }>;
+    attempts?: Array<{ provider_id: string; status: ClassificationStatus; http_status: number | null; elapsed_ms: number | null }>;
+  };
+  rule_status?: "policy" | "manual" | "session_reuse" | "classified" | "matched" | "accepted_unmatched" | "classifier_fallback";
+  matched_rule_index?: number | null;
+  pool?: { label: string | null; selection: string | null; source: "label_pool" | "widened_pool" | "global_default" | "session" | "manual" | null; candidates: string[] };
+}
+export type RecordedConfigContext = { status: "unavailable"; config_hash: string | null } | {
+  status: "available";
+  config_hash: string | null;
+  strategy: {
+    name: string | null; kind: string | null; mode: string | null; selection: string | null;
+    labels: Record<string, { description?: string | null; tag?: string | null; models: string[] }>;
+    selected_models: string[] | null;
+    questions: Record<string, { type: "choice"; instructions: string | null; criteria: Record<string, string | null> }>;
+    rules: Rule[]; fallback: RuleChoice;
+  };
+  defaults: { default_model: string | null };
+  decision_enabled: boolean | null;
+};
+export interface RecordedDecision extends EvidenceSection {
+  routing_evidence?: RoutingEvidence | null;
+  config_context?: RecordedConfigContext;
+  strategy_source?: "default" | "explicit" | "session";
+}
 export interface SessionRow {
   session_id: string;
   route?: string | null;
@@ -97,6 +128,13 @@ export interface SessionRow {
   label?: string | null;
   defaulted?: boolean;
   reason?: string | null;
+  routing_evidence?: RoutingEvidence | null;
+  latest_decision?: RecordedDecision | null;
+  in_memory?: boolean;
+  ok?: boolean | null;
+  request_count?: number;
+  last_request_at?: number;
+  client?: string | null;
   turn_count?: number;
   updated_at?: number;
   first_request_at?: number | null;
@@ -121,6 +159,9 @@ export interface RoutingActivityPayload {
 }
 
 export interface SessionsPayload {
+  /** Local traversal cap; never supplied as backend evidence. */
+  display_limited?: boolean;
+  scope?: SessionScope;
   storage: StorageState;
   evidence_available: boolean;
   data: SessionRow[];
@@ -157,13 +198,18 @@ export type EvidenceSection = Record<string, unknown>;
 
 export interface RetainedRequest {
   request: EvidenceSection;
-  decision: EvidenceSection | null;
+  decision: RecordedDecision | null;
   upstream_request: EvidenceSection | null;
   outcome: EvidenceSection | null;
 }
 
 export interface SessionRequestsPayload {
-  session: EvidenceSection;
+  /** Local traversal cap; never supplied as backend evidence. */
+  display_limited?: boolean;
+  scope?: SessionScope;
+  in_memory?: boolean;
+  memory_session?: EvidenceSection | null;
+  session: EvidenceSection | null;
   storage: StorageState;
   evidence_available: boolean;
   requests: RetainedRequest[];
@@ -376,4 +422,16 @@ export type SetupStatus = {
   has_models: boolean;
   routing_ready: boolean;
   next_step: "gateway_key" | "provider" | "model" | "routing" | "ready";
+};
+
+export type DecisionConnectionResult = {
+  provider_id: string;
+  scope: "decision_classification";
+  synthetic: true;
+  generation_tested: false;
+  decision_enabled: boolean;
+  status: "accepted" | "missing_key" | "unsupported_protocol" | "busy" | "http_error" | "timeout" | "network_error" | "invalid_json" | "invalid_envelope" | "invalid_answers" | "address_error" | "response_too_large";
+  http_status: number | null;
+  elapsed_ms: number;
+  answers: { connectivity?: { choice: "ready" | "unready" } };
 };

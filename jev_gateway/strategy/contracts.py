@@ -9,10 +9,11 @@ from typing import Any, Protocol
 from jev_gateway.catalog import Catalog, ModelProfile
 from jev_gateway.request_facts import RequestFacts
 from jev_gateway.sessions import SessionState
-from jev_gateway.strategy.decision_provider.base import DecisionResult
+from jev_gateway.strategy.decision_provider.base import ClassificationEvidence, DecisionResult
 
 __all__ = [
     "DecisionMaker",
+    "RoutingEvidence",
     "RoutingRequest",
     "RoutingStrategy",
     "SetupIncompleteError",
@@ -81,6 +82,25 @@ class RoutingRequest:
 
 
 @dataclass(frozen=True)
+class RoutingEvidence:
+    """Recorded classifier, local rule endpoint and actual model selection scope."""
+
+    classification: ClassificationEvidence = ClassificationEvidence("not_applicable")
+    rule_status: str = "policy"
+    matched_rule_index: int | None = None
+    pool_label: str | None = None
+    selection: str | None = None
+    pool_source: str | None = None
+    pool_candidates: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"classification": self.classification.as_dict(),
+                "rule_status": self.rule_status, "matched_rule_index": self.matched_rule_index,
+                "pool": {"label": self.pool_label, "selection": self.selection,
+                         "source": self.pool_source, "candidates": list(self.pool_candidates)}}
+
+
+@dataclass(frozen=True)
 class StrategyOutcome:
     """Every output a strategy must return."""
 
@@ -91,6 +111,7 @@ class StrategyOutcome:
     switched_from: str | None = None
     blocked_by: str | None = None
     defaulted: bool = False
+    evidence: RoutingEvidence | None = None
 
 
 class RoutingStrategy(Protocol):

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
 from jev_gateway.catalog import Catalog, RouteLabel, RoutingMode, RoutingPolicy
 from jev_gateway.request_facts import RequestFacts
 
-from .contracts import DecisionMaker, RoutingRequest, StrategyOutcome
+from .contracts import DecisionMaker, RoutingEvidence, RoutingRequest, StrategyOutcome
+from .decision_provider.base import ClassificationEvidence, evaluate_with_evidence
 from .policy import PolicyStrategy
 
 __all__ = ["DecisionClassifier", "DecisionStrategy"]
@@ -23,8 +25,9 @@ class DecisionClassifier:
 
     def refine(self, facts: RequestFacts) -> RequestFacts:
         """Return a provider-selected label, or the unchanged request facts."""
-        if not self.client.enabled:
-            return facts
+        return self.refine_with_evidence(facts)[0]
+
+    def refine_with_evidence(self, facts: RequestFacts) -> tuple[RequestFacts, ClassificationEvidence]:
         active = self.policy
         labels = active.labels if active is not None else {
             "simple": RouteLabel(description="Direct bounded work"),
@@ -32,7 +35,7 @@ class DecisionClassifier:
             "complex": RouteLabel(description="Deep analysis or architecture"),
         }
         if not labels:
-            return facts
+            return facts, ClassificationEvidence("not_applicable")
         questions = {
             "routing_tier": {
                 "type": "choice",
@@ -40,24 +43,22 @@ class DecisionClassifier:
                 "criteria": {name: route.description or name for name, route in labels.items()},
             }
         }
-        result = self.client.evaluate(
-            facts.prompt,
+        evaluation = evaluate_with_evidence(
+            self.client, facts.prompt,
             questions,
             valid=lambda answers: (
                 isinstance(answers.get("routing_tier"), dict)
                 and answers["routing_tier"].get("choice") in labels
             ),
         )
+        result = evaluation.result
         if result is None:
-            return facts
+            return facts, evaluation.evidence
         answer = result.answers.get("routing_tier")
-        tier = answer.get("choice") if isinstance(answer, dict) else None
+        tier = answer.get("choice") if isinstance(answer, Mapping) else None
         if tier not in labels:
-            return facts
-        return replace(
-            facts,
-            route_label=tier,
-        )
+            return facts, ClassificationEvidence("invalid_answers")
+        return replace(facts, route_label=tier), evaluation.evidence
 
 
 class DecisionStrategy(PolicyStrategy):
@@ -82,7 +83,24 @@ class DecisionStrategy(PolicyStrategy):
 
     def decide(self, request: RoutingRequest, catalog: Catalog) -> StrategyOutcome:
         """Classify cached sessions once; other modes retain per-turn behavior."""
-        facts = request.facts
-        if request.is_first_turn or self.policy.mode is not RoutingMode.CACHED:
-            facts = self.classifier.refine(facts)
-        return super().decide(replace(request, facts=facts), catalog)
+        if request.manual is not None or (
+            not request.is_first_turn and self.policy.mode is RoutingMode.CACHED
+        ):
+            outcome = super().decide(request, catalog)
+            evidence = outcome.evidence or RoutingEvidence()
+            return replace(outcome, evidence=replace(
+                evidence, classification=ClassificationEvidence(
+                    "bypassed_manual" if request.manual is not None else "bypassed_session"
+                ), rule_status="manual" if request.manual is not None else "session_reuse",
+            ))
+        if type(self.classifier).refine is not DecisionClassifier.refine:
+            # Preserve existing subclass overrides without inventing classifier details.
+            facts = self.classifier.refine(request.facts)
+            classification = ClassificationEvidence("unavailable")
+        else:
+            facts, classification = self.classifier.refine_with_evidence(request.facts)
+        outcome = super().decide(replace(request, facts=facts), catalog)
+        return replace(outcome, evidence=replace(
+            outcome.evidence or RoutingEvidence(), classification=classification,
+            rule_status="classified" if classification.status == "accepted" else "classifier_fallback",
+        ))

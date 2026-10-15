@@ -94,8 +94,16 @@ type Props = {
   onRetryMonitoring: () => void;
 };
 
-function RoutingWorkspace({ historyScope, strategyDiscardEpoch, configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized, onOpenModel }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized" | "onOpenCanvasModel" | "strategyDiscardEpoch"> & { historyScope: CanvasHistoryScope; configuration: ConfigurationPayload; onOpenModel?: (identity: { provider: string; upstream: string }) => boolean }) {
+function RoutingWorkspace({ historyScope, strategyDiscardEpoch, configuration, error, onReloadConfiguration, onError, onStrategyDirtyChange, onStrategyPendingChange, onUnauthorized, onOpenModel, providerManagement }: Pick<Props, "error" | "onReloadConfiguration" | "onError" | "onStrategyDirtyChange" | "onStrategyPendingChange" | "onUnauthorized" | "onOpenCanvasModel" | "strategyDiscardEpoch" | "providerManagement"> & { historyScope: CanvasHistoryScope; configuration: ConfigurationPayload; onOpenModel?: (identity: { provider: string; upstream: string }) => boolean }) {
   return <RoutingEditor
+    decisionConfiguration={providerManagement?.configuration}
+    decisionPending={providerManagement?.pending || providerManagement?.refreshingCatalog}
+    decisionReadError={providerManagement?.errorOwner === "read" && providerManagement.error !== null}
+    decisionWriteError={providerManagement?.errorOwner === "provider" && providerManagement.error !== null}
+    decisionRefreshFailed={providerManagement?.catalogRefreshFailed}
+    onRetryDecisionRead={() => void providerManagement?.load()}
+    onRetryDecisionCatalog={() => void providerManagement?.retryCatalogRefresh()}
+    onSetDecisionEnabled={providerManagement ? (enabled) => void providerManagement.save([{ action: "set_decision_enabled", enabled }]) : undefined}
     historyScope={historyScope}
     discardEpoch={strategyDiscardEpoch}
     key={`${configuration.strategy}:${configuration.config_hash}`}
@@ -368,6 +376,15 @@ export function AppShell({
         )}
         {setupLoading || setup?.required ? null : view === "monitoring" ? (
           <MonitoringView
+            sessionScope={monitoring.sessionScope}
+            onScopeChange={monitoring.selectScope}
+            inspectorSessions={monitoring.sessionScope === "retained" ? monitoring.history : monitoring.sessions}
+            inspectorLoading={monitoring.sessionScope === "retained" ? monitoring.historyLoading : monitoring.sessionLoading}
+            inspectorError={monitoring.sessionScope === "retained" ? monitoring.historyError : monitoring.monitoringError}
+            inspectorPageError={monitoring.sessionScope === "retained" ? monitoring.historyPageError : monitoring.sessionPageError}
+            inspectorEpoch={monitoring.sessionScope === "retained" ? monitoring.historyEpoch : monitoring.sessionListEpoch}
+            onLoadMoreInspector={monitoring.sessionScope === "retained" ? () => void monitoring.loadHistory(monitoring.history?.has_more === true) : undefined}
+            onRetryInspector={monitoring.sessionScope === "retained" ? () => void monitoring.loadHistory() : undefined}
             strategies={monitoring.strategies}
             policyCatalog={monitoring.policyCatalog}
             strategyError={monitoring.strategyError}
@@ -442,6 +459,7 @@ export function AppShell({
           </Card>
         ) : (
           <RoutingWorkspace
+            providerManagement={providerManagement}
             historyScope={historyScope}
             strategyDiscardEpoch={strategyDiscardEpoch}
             configuration={configuration}

@@ -2,10 +2,11 @@ import type { BrowserContext, Route } from "@playwright/test";
 import { activity, providers } from "../fixtures/activity";
 import { configuration, workflowConfiguration } from "../fixtures/configuration";
 import { emptyDetail, sessionDetail, sessionsPageOne, sessionsPageTwo, sessionRequestsPageOne, sessionRequestsPageTwo } from "../fixtures/sessions";
-import type { CanvasLayout, ProviderConfiguration, RoutingActivityPayload, SessionRequestsPayload, WorkflowWritePayload } from "@/shared/api/types";
+import type { CanvasLayout, ProviderConfiguration, RoutingActivityPayload, SessionsPayload, SessionRequestsPayload, WorkflowWritePayload } from "@/shared/api/types";
 import { policy, strategies } from "../fixtures/strategies";
 
 export interface MockApiState {
+  historyPages?: Record<string, SessionsPayload>;
   requests: Array<{ method: string; path: string }>;
   unexpected: string[];
   rejectNextSessionPage: boolean;
@@ -166,6 +167,12 @@ export async function installMockApi(context: BrowserContext, state: MockApiStat
     }
     if (url.pathname === "/v1/dashboard/canvas-layout") return fulfill(route, state.canvasLayout ?? { version: 1, nodes: {}, viewport: { x: 0, y: 0 } });
     if (url.pathname === "/v1/routing/sessions") {
+      if (url.searchParams.get("scope") === "retained") {
+        const page = state.historyPages?.[url.searchParams.get("cursor") ?? "first"];
+        if (page) return fulfill(route, page);
+        state.unexpected.push(`${method} ${url.pathname}${url.search}`);
+        return route.abort("blockedbyclient");
+      }
       const cursor = url.searchParams.get("cursor");
       if (cursor === "fixture-page-2") {
         if (state.rejectNextSessionPage) {

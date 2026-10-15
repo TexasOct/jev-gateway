@@ -71,6 +71,15 @@ def _page_size(limit: int) -> int:
     return limit
 
 
+def _session_scope(scope: str) -> str:
+    if scope not in {"live", "retained"}:
+        raise HTTPException(status_code=400, detail={"error": {
+            "message": "scope must be live or retained.", "type": "invalid_request_error",
+            "param": "scope", "code": "invalid_scope",
+        }})
+    return scope
+
+
 def _invalid_cursor() -> HTTPException:
     return HTTPException(status_code=400, detail={"error": {
         "message": "Invalid or mismatched pagination cursor.",
@@ -102,7 +111,7 @@ def _decode_cursor(
         key = decoded[3]
         if not isinstance(key, list) or len(key) != 3:
             raise ValueError("cursor key")
-        if endpoint == "sessions":
+        if endpoint in {"sessions", "sessions:retained"}:
             valid = type(key[0]) is int and key[0] in (0, 1) and isinstance(key[2], str)
         else:
             valid = type(key[2]) is int and key[2] > 0 and key[0] == "request" and key[1] is not None
@@ -186,12 +195,12 @@ def _observed_condition(row: dict[str, Any]) -> str:
     return "mixed_outcomes"
 
 
-def _unknown_session(session_id: str) -> HTTPException:
+def _unknown_session(session_id: str, scope: str = "live") -> HTTPException:
     return HTTPException(
         status_code=404,
         detail={
             "error": {
-                "message": f"No live session {session_id!r}.",
+                "message": f"No {scope} session {session_id!r}.",
                 "type": "invalid_request_error",
                 "param": None,
                 "code": "unknown_session",
@@ -373,10 +382,37 @@ def create_dashboard_router(
         authorization: str | None = Header(default=None),
         limit: int = Query(default=DEFAULT_PAGE_SIZE),
         cursor: str | None = Query(default=None),
+        scope: str = Query(default="live"),
     ) -> dict[str, Any]:
         authorize(state.gateway_api_key, authorization)
         size = _page_size(limit)
-        before = _decode_cursor(cursor_secret, cursor, "sessions", None)
+        _session_scope(scope)
+        endpoint = "sessions" if scope == "live" else "sessions:retained"
+        before = _decode_cursor(cursor_secret, cursor, endpoint, None)
+        if scope == "retained":
+            storage, evidence_available = _storage_state(state)
+            data: list[dict[str, Any]] = []
+            last_key: tuple[float, str] | None = None
+            has_more = False
+            if evidence_available:
+                try:
+                    rows, last_key, has_more = state.engine.record_store.retained_session_page(
+                        limit=size, before=(before[1], before[2]) if before is not None else None,
+                    )
+                    for row in rows:
+                        decision = row.pop("latest_decision", None)
+                        if isinstance(decision, dict):
+                            row.update(decision)
+                        row["in_memory"] = state.engine.store.snapshot(row["session_id"]) is not None
+                        data.append(row)
+                except (StorageUnavailableError, RuntimeError, ValueError):
+                    storage = {**storage, "error": "Retained evidence unavailable."}
+                    evidence_available = False
+            return {
+                "scope": scope, "storage": storage, "evidence_available": evidence_available,
+                "data": data, "page_size": size, "has_more": has_more,
+                "next_cursor": _encode_cursor(cursor_secret, endpoint, None, [1, *last_key]) if has_more and last_key is not None else None,
+            }
         snapshots = state.engine.store.snapshots()
         storage, evidence_available = _storage_state(state)
         evidence: dict[str, dict[str, Any]] = {}
@@ -418,6 +454,8 @@ def create_dashboard_router(
                 item["provider"] = profile.provider if profile is not None else None
                 item["upstream_model"] = profile.model if profile is not None else None
             item["latest_request"] = latest
+            item["in_memory"] = True
+            item["latest_decision"] = decision
             data.append(item)
         def order_key(item: dict[str, Any]) -> tuple[int, float, str]:
             latest = item["latest_request"]
@@ -437,6 +475,7 @@ def create_dashboard_router(
             if has_more else None
         )
         return {
+            "scope": scope,
             "storage": storage,
             "evidence_available": evidence_available,
             "data": data,
@@ -451,14 +490,28 @@ def create_dashboard_router(
         authorization: str | None = Header(default=None),
         limit: int = Query(default=DEFAULT_PAGE_SIZE),
         cursor: str | None = Query(default=None),
+        scope: str = Query(default="live"),
     ) -> dict[str, Any]:
         authorize(state.gateway_api_key, authorization)
         size = _page_size(limit)
-        before = _decode_cursor(cursor_secret, cursor, "requests", session_id)
+        _session_scope(scope)
+        endpoint = "requests" if scope == "live" else "requests:retained"
+        before = _decode_cursor(cursor_secret, cursor, endpoint, session_id)
         snapshot = state.engine.store.snapshot(session_id)
-        if snapshot is None:
-            raise _unknown_session(session_id)
+        in_memory = snapshot is not None
         storage, evidence_available = _storage_state(state)
+        retained_session = None
+        if scope == "live" and snapshot is None:
+            raise _unknown_session(session_id)
+        if scope == "retained" and evidence_available:
+            try:
+                summaries, _, _ = state.engine.record_store.retained_session_page(limit=1, before=None, session_id=session_id)
+                retained_session = summaries[0] if summaries else None
+                if retained_session is None:
+                    raise _unknown_session(session_id, "retained")
+            except (StorageUnavailableError, RuntimeError, ValueError):
+                storage = {**storage, "error": "Retained evidence unavailable."}
+                evidence_available = False
         retained: list[dict[str, Any]] = []
         last_key: tuple[float, int] | None = None
         has_more = False
@@ -472,14 +525,17 @@ def create_dashboard_router(
                 storage = {**storage, "error": str(error)}
                 evidence_available = False
         return {
-            "session": snapshot,
+            "scope": scope,
+            "session": snapshot if scope == "live" else retained_session,
+            "in_memory": in_memory,
+            "memory_session": snapshot,
             "storage": storage,
             "evidence_available": evidence_available,
             "requests": retained if evidence_available else [],
             "page_size": size,
             "has_more": has_more,
             "next_cursor": (
-                _encode_cursor(cursor_secret, "requests", session_id,
+                _encode_cursor(cursor_secret, endpoint, session_id,
                                ["request", last_key[0], last_key[1]])
                 if has_more and last_key is not None else None
             ),

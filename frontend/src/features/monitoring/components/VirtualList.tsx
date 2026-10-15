@@ -1,3 +1,5 @@
+import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
+import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode, UIEvent } from "react";
 
@@ -28,6 +30,7 @@ export function VirtualList<T>({
   onMore,
   footer,
 }: Props<T>) {
+  const scheduleFrame = useWorkspaceFrames(useWorkspaceActive());
   const container = useRef<HTMLDivElement>(null);
   const focusedKey = useRef<string | null>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export function VirtualList<T>({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (!className.split(/\s+/).includes("sessions")) return;
+    if (!className.split(/\s+/).some((name) => name === "sessions" || name === "timeline")) return;
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     const current = items.findIndex(
       (item) => getKey(item) === focusedKey.current,
@@ -108,7 +111,8 @@ export function VirtualList<T>({
     if (nextItem === undefined) return;
     focusedKey.current = getKey(nextItem);
     setFocusedRowKey(focusedKey.current);
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
+      if (!element.isConnected || element.closest("[inert], [hidden]")) return;
       const row = Array.from(
         element.querySelectorAll<HTMLElement>(".virtual-row"),
       ).find((candidate) => candidate.dataset.key === focusedKey.current);
@@ -121,7 +125,7 @@ export function VirtualList<T>({
   return (
     <div
       ref={container}
-      className={`${className} virtual-list h-[480px] min-h-[480px] max-h-[480px] overflow-y-auto overscroll-contain ${isTimeline ? "max-[720px]:h-[62vh] max-[720px]:min-h-[62vh] max-[720px]:max-h-[62vh]" : className.split(/\s+/).includes("sessions") ? "max-[720px]:h-[280px] max-[720px]:min-h-[280px] max-[720px]:max-h-[280px]" : ""}`}
+      className={`${className} virtual-list ${isTimeline ? "h-auto min-h-[88px] max-h-[264px]" : "h-[480px] min-h-[480px] max-h-[480px]"} overflow-y-auto overscroll-contain ${!isTimeline && className.split(/\s+/).includes("sessions") ? "max-[720px]:h-[280px] max-[720px]:min-h-[280px] max-[720px]:max-h-[280px]" : ""}`}
       aria-label={label}
       onScroll={onScroll}
       onKeyDown={onKeyDown}

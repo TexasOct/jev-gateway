@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from jev_gateway.catalog import Catalog, ModelProfile, RoutingMode, RoutingPolicy
 from jev_gateway.request_facts import RequestFacts
 from jev_gateway.sessions import SessionState
 
-from .contracts import RoutingRequest, SetupIncompleteError, StrategyOutcome
+from .contracts import RoutingEvidence, RoutingRequest, SetupIncompleteError, StrategyOutcome
+from .decision_provider.base import ClassificationEvidence
 
 __all__ = ["DEFAULT_OUTPUT_TOKENS", "PolicyStrategy"]
 
@@ -25,6 +26,8 @@ class Selection:
     tier: str
     relaxed: bool
     defaulted: bool = False
+    pool_source: str = "label_pool"
+    pool_candidates: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -75,8 +78,16 @@ class PolicyStrategy:
             request.session.tier != "default"
             and request.session.tier not in self.policy.labels
         ):
-            return self._initial(request, catalog)
-        return self._continuation(request, catalog, request.session)
+            outcome = self._initial(request, catalog)
+        else:
+            outcome = self._continuation(request, catalog, request.session)
+        if request.manual is not None:
+            outcome = replace(outcome, evidence=replace(
+                outcome.evidence or RoutingEvidence(),
+                classification=ClassificationEvidence("bypassed_manual"), rule_status="manual",
+                pool_source="manual", pool_candidates=(outcome.model,),
+            ))
+        return outcome
 
     # First turn and continuation
 
@@ -100,7 +111,7 @@ class PolicyStrategy:
             reason = f"first_turn_{effective_tier}"
         return self._outcome(
             selection.profile, effective_tier, reason, "auto",
-            defaulted=selection.defaulted,
+            defaulted=selection.defaulted, selection=selection,
         )
 
     def _continuation(
@@ -142,7 +153,7 @@ class PolicyStrategy:
             "auto",
             switched_from=switched_from,
             blocked_by=blocked_by,
-            defaulted=selection.defaulted,
+            defaulted=selection.defaulted, selection=selection,
         )
 
     def _continuation_selection(
@@ -248,7 +259,8 @@ class PolicyStrategy:
                     if event.get("type") == "decision"
                 )
             )
-        return Selection(current, session.tier, relaxed=False, defaulted=defaulted)
+        return Selection(current, session.tier, relaxed=False, defaulted=defaulted,
+                         pool_source="session", pool_candidates=(current.name,))
 
     def _escalation_candidate(
         self,
@@ -273,6 +285,8 @@ class PolicyStrategy:
                     tier=self._effective_tier(candidate),
                     relaxed=candidate.relaxed,
                     defaulted=candidate.defaulted,
+                    pool_source=candidate.pool_source,
+                    pool_candidates=candidate.pool_candidates,
                 )
             next_tier = self._raise_tier(tier)
             if next_tier in visited:
@@ -364,7 +378,8 @@ class PolicyStrategy:
             raise SetupIncompleteError(
                 "Configure the global default model for unassigned routing labels."
             )
-        return Selection(profile=profile, tier="default", relaxed=False, defaulted=True)
+        return Selection(profile=profile, tier="default", relaxed=False, defaulted=True,
+                         pool_source="global_default", pool_candidates=(profile.name,))
 
     def _tier_pool(self, tier: str, catalog: Catalog) -> list[ModelProfile]:
         """Return this strategy's candidates for one routing label."""
@@ -393,7 +408,7 @@ class PolicyStrategy:
             return self._default_model(catalog)
         tier_pool = self._tier_pool(tier, catalog)
         if not tier_pool:
-            return self._default_model(catalog)
+            return replace(self._default_model(catalog), tier=tier)
         required_context = max(self._required_context(facts), min_context or 0)
         required_output = self._output_requirement(facts)
         pools: list[tuple[list[ModelProfile], bool]] = []
@@ -422,6 +437,8 @@ class PolicyStrategy:
                         profile=self._order(candidates, facts)[0],
                         tier=tier,
                         relaxed=widened,
+                        pool_source="widened_pool" if widened else "label_pool",
+                        pool_candidates=tuple(item.name for item in candidates),
                     )
 
         fallback = [
@@ -435,6 +452,7 @@ class PolicyStrategy:
             profile=self._order(fallback, facts)[0],
             tier=tier,
             relaxed=True,
+            pool_source="widened_pool", pool_candidates=tuple(item.name for item in fallback),
         )
 
     def _order(
@@ -516,7 +534,9 @@ class PolicyStrategy:
 
     def _effective_tier(self, selection: Selection) -> str:
         """Report the selected model's configured tier after a relaxed fallback."""
-        if selection.defaulted or not selection.relaxed:
+        if selection.defaulted:
+            return "default"
+        if not selection.relaxed:
             return selection.tier
         return self._tier_for_profile(selection.profile, selection.tier)
 
@@ -559,7 +579,9 @@ class PolicyStrategy:
         switched_from: str | None = None,
         blocked_by: str | None = None,
         defaulted: bool = False,
+        selection: Selection | None = None,
     ) -> StrategyOutcome:
+        bypass = "bypassed_manual" if mode == "manual" else "bypassed_session" if reason == "session_pinned" else "not_applicable"
         return StrategyOutcome(
             model=profile.name,
             tier=tier,
@@ -568,4 +590,12 @@ class PolicyStrategy:
             switched_from=switched_from,
             blocked_by=blocked_by,
             defaulted=defaulted,
+            evidence=RoutingEvidence(
+                classification=ClassificationEvidence(bypass),
+                rule_status="manual" if mode == "manual" else "session_reuse" if reason == "session_pinned" else "policy",
+                pool_label=selection.tier if selection is not None else tier,
+                selection=self.policy.selection,
+                pool_source=selection.pool_source if selection is not None else "manual",
+                pool_candidates=selection.pool_candidates if selection is not None else (profile.name,),
+            ),
         )

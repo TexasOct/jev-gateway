@@ -83,7 +83,7 @@ export default function App() {
     },
     [onUnauthorized, t],
   );
-  const monitoring = useMonitoringData(run, onUnauthorized);
+  const monitoring = useMonitoringData(run, onUnauthorized, needsKey, view === "monitoring");
   const { loadMonitoring, resetDetail, refreshSelectedDetail, selected } =
     monitoring;
   const theme = useDashboardTheme(run, t);
@@ -189,20 +189,20 @@ export default function App() {
   const managementView = view === "providers" || view === "settings";
   // The shared model editor Dialog can also open from a workflow canvas model
   // node, so the configuration manager stays active while that request exists.
-  const providerManagement = useProviderManagement((managementView || canvasModel !== null) && !needsKey, onUnauthorized, refreshProviderCatalog);
+  const providerManagement = useProviderManagement((managementView || view === "strategy" || canvasModel !== null) && !needsKey, onUnauthorized, refreshProviderCatalog);
   const providerNavigationGuard = providerManagement.navigationGuardRef;
   const cancelProviderQuery = providerManagement.cancelQuery;
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (!strategyDirty && !strategyPending && !(managementView && providerManagement.pending) &&
+      if (!strategyDirty && !strategyPending && !((managementView || view === "strategy") && providerManagement.pending) &&
           !(managementView && hasUnsavedChanges(providerNavigationGuard))) return;
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
-  }, [strategyDirty, strategyPending, managementView, providerManagement.pending, providerNavigationGuard]);
+  }, [strategyDirty, strategyPending, managementView, view, providerManagement.pending, providerNavigationGuard]);
 
   const connect = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -258,7 +258,7 @@ export default function App() {
     (next: View) => {
       if (needsKey) return false;
       if (strategyPending) return false;
-      if (managementView && providerManagement.pending) return false;
+      if ((managementView || view === "strategy") && providerManagement.pending) return false;
       if (next === view) {
         if (next === "settings") void run(loadTheme);
         return false;
@@ -299,13 +299,14 @@ export default function App() {
       canvasModel={canvasModel}
       onOpenCanvasModel={(identity) => {
         if (strategyPending || providerManagement.pending) return false;
+        if (providerManagement.active) void providerManagement.load();
         setCanvasModel(identity); return true;
       }}
       onCloseCanvasModel={() => setCanvasModel(null)}
       onStrategyDirtyChange={setStrategyDirty}
       onStrategyPendingChange={setStrategyPending}
       onUnauthorized={onUnauthorized}
-      navigationPending={strategyPending || (managementView && providerManagement.pending)}
+      navigationPending={strategyPending || ((managementView || view === "strategy") && providerManagement.pending)}
       needsKey={needsKey}
       historyOwner={historyOwner}
       historyScope={historyScope}
@@ -327,7 +328,7 @@ export default function App() {
       onRefresh={() => {
         if (needsKey) return;
         if (strategyPending) return;
-        if (managementView && providerManagement.pending) return;
+        if ((managementView || view === "strategy") && providerManagement.pending) return;
         if (view === "strategy" && strategyDirty && !window.confirm(t("strategyDiscard"))) return;
         if (view === "strategy" && strategyDirty && configuration) {
           historyScope.discard(configuration.strategy);

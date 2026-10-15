@@ -4,6 +4,7 @@ import type {
   RoutingActivityPayload,
   SessionRequestsPayload,
   SessionsPayload,
+  SessionScope,
 } from "@/shared/api/types";
 import type { useLocale } from "@/shared/i18n";
 import type { StrategiesPayload } from "./model/strategy-distribution";
@@ -14,6 +15,15 @@ type Translate = ReturnType<typeof useLocale>["t"];
 type FormatDateTime = ReturnType<typeof useLocale>["formatDateTime"];
 
 export interface MonitoringViewProps {
+  inspectorSessions?: SessionsPayload | null;
+  sessionScope?: SessionScope;
+  onScopeChange?: (scope: SessionScope) => void;
+  inspectorLoading?: boolean;
+  inspectorError?: boolean;
+  inspectorPageError?: boolean;
+  inspectorEpoch?: number;
+  onLoadMoreInspector?: () => void;
+  onRetryInspector?: () => void;
   /** All registered strategies from GET /v1/routing/strategies. Null while loading. */
   strategies?: StrategiesPayload | null;
   policyCatalog?: PolicyCatalog | null;
@@ -55,6 +65,45 @@ export interface MonitoringViewProps {
 export function MonitoringView(props: MonitoringViewProps) {
   return (
     <div className="monitoring-view mx-auto grid w-full max-w-[1280px] min-w-0 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] content-start gap-4 max-[899px]:grid-cols-1">
+      <SessionInspector
+        policyCatalog={props.policyCatalog}
+        locale={props.locale}
+        providers={props.providers}
+        sessions={props.inspectorSessions === undefined ? props.sessions : props.inspectorSessions}
+        sessionScope={props.sessionScope}
+        onScopeChange={props.onScopeChange}
+        selectedSessionId={props.selectedSessionId}
+        detail={props.detail}
+        selectedRequestId={props.selectedRequestId}
+        sessionPageError={props.inspectorPageError ?? props.sessionPageError}
+        detailPageError={props.detailPageError}
+        sessionLoading={props.inspectorLoading ?? props.sessionLoading}
+        detailLoading={props.detailLoading}
+        monitoringError={props.inspectorError ?? props.monitoringError}
+        providerError={props.providerError}
+        detailError={props.detailError}
+        distributionComplete={
+          Boolean(props.sessionsComplete) &&
+          props.sessions !== null &&
+          props.sessions.has_more === false &&
+          !props.sessionPageError &&
+          !props.monitoringError &&
+          props.sessions.storage.enabled !== false &&
+          !props.sessions.storage.error
+        }
+        sessionListEpoch={props.inspectorEpoch ?? props.sessionListEpoch}
+        detailListEpoch={props.detailListEpoch}
+        t={props.t}
+        formatDateTime={props.formatDateTime}
+        onSelectSession={props.onSelectSession}
+        onLoadMoreSessions={props.onLoadMoreInspector ?? props.onLoadMoreSessions}
+        onLoadMoreDetail={props.onLoadMoreDetail}
+        onRetrySessions={props.onLoadMoreInspector ?? props.onRetrySessions}
+        onRetryDetail={props.onRetryDetail}
+        onRetryMonitoring={props.onRetryInspector ?? props.onRetryMonitoring}
+        onRetrySelectedDetail={props.onRetrySelectedDetail}
+        onSelectRequest={props.onSelectRequest}
+      />
       <StrategyDistribution
         strategies={props.strategies}
         policyCatalog={props.policyCatalog}
@@ -72,43 +121,6 @@ export function MonitoringView(props: MonitoringViewProps) {
         onRetrySessions={props.onRetrySessions}
         onRetryMonitoring={props.onRetryMonitoring}
         t={props.t}
-      />
-      <SessionInspector
-        policyCatalog={props.policyCatalog}
-        locale={props.locale}
-        providers={props.providers}
-        sessions={props.sessions}
-        selectedSessionId={props.selectedSessionId}
-        detail={props.detail}
-        selectedRequestId={props.selectedRequestId}
-        sessionPageError={props.sessionPageError}
-        detailPageError={props.detailPageError}
-        sessionLoading={props.sessionLoading}
-        detailLoading={props.detailLoading}
-        monitoringError={props.monitoringError}
-        providerError={props.providerError}
-        detailError={props.detailError}
-        distributionComplete={
-          Boolean(props.sessionsComplete) &&
-          props.sessions !== null &&
-          props.sessions.has_more === false &&
-          !props.sessionPageError &&
-          !props.monitoringError &&
-          props.sessions.storage.enabled !== false &&
-          !props.sessions.storage.error
-        }
-        sessionListEpoch={props.sessionListEpoch}
-        detailListEpoch={props.detailListEpoch}
-        t={props.t}
-        formatDateTime={props.formatDateTime}
-        onSelectSession={props.onSelectSession}
-        onLoadMoreSessions={props.onLoadMoreSessions}
-        onLoadMoreDetail={props.onLoadMoreDetail}
-        onRetrySessions={props.onRetrySessions}
-        onRetryDetail={props.onRetryDetail}
-        onRetryMonitoring={props.onRetryMonitoring}
-        onRetrySelectedDetail={props.onRetrySelectedDetail}
-        onSelectRequest={props.onSelectRequest}
       />
     </div>
   );

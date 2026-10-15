@@ -50,9 +50,9 @@ models can be configured after entering the console.
 | `POST` | `/v1/routing/reload` | Re-read the catalog file and apply reloadable settings. |
 | `GET` | `/v1/routing/decisions/{decision_id}` | One decision in the bounded in-memory log, not a SQLite lookup. |
 | `GET` | `/v1/routing/activity` | Bounded process-local in-flight request and stream counts by routed model path. |
-| `GET` | `/v1/routing/sessions` | Live sessions enriched with the latest retained request and decision. |
+| `GET` | `/v1/routing/sessions` | Current sessions by default; `scope=retained` lists stored session metadata after eviction/restart. |
 | `GET` | `/v1/routing/sessions/{session_id}` | Live snapshot for one session. |
-| `GET` | `/v1/routing/sessions/{session_id}/requests` | Live snapshot plus retained request evidence, newest first. |
+| `GET` | `/v1/routing/sessions/{session_id}/requests` | Current snapshot plus retained requests; `scope=retained` also opens retained-only sessions. |
 | `GET` | `/v1/routing/providers/summary` | Configured providers and retained attempts in a fixed rolling 15-minute window. |
 | `GET` | `/v1/provider-configuration` | Safe provider/model configuration, presets, supported types, write availability, and an opaque revision. |
 | `PUT` | `/v1/gateway-credential` | Initialize or replace the gateway key through the managed credential owner. |
@@ -60,6 +60,7 @@ models can be configured after entering the console.
 | `PUT` | `/v1/provider-configuration` | Apply validated provider changes and confirmed model imports to the baseline and credential file. |
 | `POST` | `/v1/provider-discovery` | Fetch candidate upstream models for a saved or in-memory LLM provider. |
 | `POST` | `/v1/provider-connection-test` | Test a saved or candidate LLM provider through a bounded model-listing request. |
+| `POST` | `/v1/decision-connection-test` | Explicit synthetic typed-classification test for a saved or candidate decision provider. |
 | `POST` | `/v1/provider-metadata` | Look up price, capability, and limit suggestions with source information. |
 | `GET` | `/v1/routing/configuration` | Editable routing surface: rule order, labels and their pools, every model with tags and priority, plus overlay state. |
 | `POST` | `/v1/routing/strategies` | Create an empty named editable workflow with `{name}`. |
@@ -106,6 +107,16 @@ session list still shows live state, and session detail returns an empty request
 list when evidence is unavailable. The requests route accepts slashes in session
 IDs (`{session_id:path}` internally); the single-session snapshot route does not.
 
+The two list/detail routes accept `scope=live|retained`, defaulting to `live`.
+Retained scope includes sessions absent from process memory, with `in_memory`
+reported separately. Detail separates retained `session` metadata from nullable
+`memory_session`; opening history does not restore a live session or pin. Counts
+and dates describe surviving records, not lifetime traffic. Disabled/degraded
+storage makes history unavailable rather than certifying an empty history.
+List rows contain metadata only. Request content is the selected request's
+inbound context snapshot; repeated snapshots must not be concatenated into one
+transcript, and the final assistant response is not captured by this surface.
+
 New previews and decisions expose `defaulted: true|false` beside the final label.
 Session list rows, live snapshots and retained request decisions expose this
 optional boolean when their selection source is known. True identifies the
@@ -115,11 +126,28 @@ Retained decisions read this flag from the existing `signals_json` column;
 there is no database-column migration. Pins retain the source after event-history
 eviction, and the list flag describes the selection whose label it displays.
 
+New decisions and previews also expose `strategy_source` (`default`, `explicit`,
+`session`) and request-scoped `routing_evidence`. Classification includes a closed
+status, accepted typed answers and safe provider attempts with HTTP status and
+elapsed milliseconds. `rule_status` distinguishes `matched` (one-based
+`matched_rule_index`), `accepted_unmatched`, `classifier_fallback`, `classified`,
+`policy`, `manual` and `session_reuse`. Pool evidence identifies the actual
+eligible candidates and label/manual/session/global-default selection source.
+Classifier failure and successful upstream completion can coexist. `defaulted`
+continues to describe the global default model; it does not report classifier
+success. Missing legacy classification/attempts/timing remain unknown.
+
+Recorded request decisions add `config_context` from their captured `config_hash`,
+with applicable strategy/questions/rules/pools/default model and historical
+enablement, or `{status: "unavailable", config_hash}`. It never uses today's
+configuration to explain an old request and never returns provider configuration,
+credentials or arbitrary parameters. Safe projection is bounded to 64 KiB.
+
 Both monitoring lists accept `limit` (default 30, maximum 100) and an opaque
 `cursor`. Without a cursor, each returns the first page. Responses retain their
 existing `data` or `requests` array and add `page_size`, `has_more`, and
 `next_cursor` (null after the last page). A malformed cursor, a cursor from the
-other endpoint, or one from another session returns `400 invalid_cursor`; Bearer
+other endpoint/scope, or one from another session returns `400 invalid_cursor`; Bearer
 authentication follows the existing gateway Bearer rule on every page. Cursors
 are signed with a process-local secret, so a gateway restart invalidates them;
 restart the traversal from the first page after `invalid_cursor`. Clients that
@@ -127,6 +155,9 @@ previously assumed the arrays contained all rows must now follow `next_cursor`.
 Requests sort by `received_at DESC, rowid DESC`.
 Live sessions sort by presence of retained request evidence, then latest request
 time (or live monotonic update time if absent), then session ID, all descending.
+Retained sessions sort by last retained request time and session ID descending.
+An invalid scope returns `400 invalid_scope`. Nonlive detail remains 404 in live
+scope; retained scope returns 404 only when no surviving session evidence exists.
 Session list queries do not read prompt or context content. Pages are best effort:
 the server does not keep a cross-request snapshot. New or expired sessions and
 retention pruning can shift later pages, so clients should deduplicate by stable
@@ -594,6 +625,27 @@ Warnings contain finite diagnostic codes, including `generation_unverified`, and
 never upstream bodies, addresses or secrets. The Dashboard translates these codes.
 The probe reuses discovery's address pinning, verified TLS, time/body/page limits
 and redirect rejection.
+
+`POST /v1/decision-connection-test` accepts exactly one saved decision-provider
+selector `{provider_id}` or candidate `{provider, credential?}`, where the optional
+credential uses the existing `keep`/`set`/`clear` actions. Saved selectors cannot
+edit credentials. It requires the management-write Bearer guard before parsing,
+uses fixed synthetic state/questions, and changes no files or enablement. It
+does not call a generation model or fail over to another provider.
+
+The response is `{provider_id, scope: "decision_classification", synthetic: true,
+generation_tested: false, decision_enabled, status, http_status, elapsed_ms,
+answers}`. Accepted answers contain only synthetic `connectivity.choice` of
+`ready` or `unready`. Status is `accepted`, `missing_key`, `unsupported_protocol`,
+`busy`, `http_error`, `timeout`, `network_error`, `invalid_json`,
+`invalid_envelope`, `invalid_answers`, `address_error` or `response_too_large`.
+Upstream 401/404/429 produce a semantic HTTP 200 result with numeric `http_status`;
+gateway authorization 401 remains separate. Errors never expose response prose,
+headers, addresses or secrets. The probe uses validated public destinations,
+verified TLS/IP pinning and no redirects, with 5-second/4-KiB-request/64-KiB-response
+bounds and four concurrent slots. It can explicitly test while global
+classification is disabled, reporting the unchanged switch. Success certifies
+this synthetic evaluation, not routing enablement or chat generation.
 
 `POST /v1/provider-discovery` accepts a saved `provider_id` or an in-memory
 `provider` candidate, with an optional write-only `credential`. It returns

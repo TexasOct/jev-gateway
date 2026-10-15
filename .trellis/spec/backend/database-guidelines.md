@@ -88,6 +88,15 @@ Primary keys are text identifiers already created by the application, except
 Boolean values are stored as `INTEGER`. Structured values use `*_json` text
 columns. Timestamps and durations use `REAL`.
 
+Routing inspection stores `strategy_source` and immutable safe
+`routing_evidence` beside `defaulted` in existing `signals_json`; no column
+migration is needed. HTTP views whitelist these fields and leave missing legacy
+facts unknown. Request details join their recorded `config_hash` to a bounded,
+safe explanatory `config_context`, never the current catalog. Retained-session
+metadata and bounded request pages remain writer-owned queries; their lists do
+not decode request bodies. Exact bounds, cursor scopes and null semantics are in
+[routing/session inspection](./routing-session-inspection.md).
+
 Indexes follow `idx_<table>_<field>` naming. Current indexes cover request time,
 request/session lookup, decision request/session/strategy/config lookup, outcome
 request lookup, and `(session_id, continuation_id)` for continuations.

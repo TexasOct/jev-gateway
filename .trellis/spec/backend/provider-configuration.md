@@ -42,6 +42,7 @@ instances merely to satisfy validation.
 | POST | `/v1/provider-discovery` | Read saved/candidate provider's upstream model list |
 | POST | `/v1/provider-metadata` | Read fixed public sources for metadata suggestions |
 | POST | `/v1/provider-connection-test` | Authenticated nonmutating bounded model-listing probe |
+| POST | `/v1/decision-connection-test` | Authenticated nonmutating synthetic typed-classification probe |
 
 Discovery and metadata services remain independent of the FastAPI composition
 root. Their coordinated entry points are:
@@ -179,6 +180,13 @@ types, decision protocols, or `provider/upstream_model` identities. System One
 uses a full evaluation URL and optional model, with no model-list probe. LLM
 `allow_private_network` is a strict boolean that defaults to false and controls
 only discovery.
+
+Decision connectivity uses the separate explicit synthetic endpoint, with the
+same saved/candidate credential owner and management authorization. Its bounded
+typed evaluation reports the unchanged global enablement switch and safe
+status; selecting or testing a provider never enables classification or changes
+configuration. The full contract is in
+[routing/session inspection](./routing-session-inspection.md).
 
 Provider validation, apply, discovery and metadata lookup require the configured
 gateway key. Initial `/v1/setup` and `/v1/gateway-credential` writes share the

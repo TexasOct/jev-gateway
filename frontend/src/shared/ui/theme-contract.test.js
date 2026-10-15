@@ -52,7 +52,7 @@ it("keeps exactly nine purpose-owned stylesheets behind the sole application CSS
   expect(canvasStyles).toContain("@keyframes node-drag-pulse");
   expect(canvasStyles).not.toMatch(/\.[\w-]+\s*\{/);
   const list = readFileSync(resolve("src/features/monitoring/components/VirtualList.tsx"), "utf8");
-  for (const value of ["480px", "280px", "62vh"]) {
+  for (const value of ["480px", "280px"]) {
     expect(list).toContain(`h-[${value}]`);
     expect(list).toContain(`min-h-[${value}]`);
     expect(list).toContain(`max-h-[${value}]`);

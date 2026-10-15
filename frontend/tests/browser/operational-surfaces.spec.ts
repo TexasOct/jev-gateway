@@ -12,25 +12,24 @@ for (const width of [1440, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     mockApi.pagedDetailSessionId = "session-1";
     await page.goto("/dashboard/");
     await expect(page.locator("html")).toHaveAttribute("data-scheme", scheme);
-    const disclosure = page.locator(".monitoring-secondary > summary");
-    await expect(disclosure).toBeVisible();
+    await expect(page.getByRole("heading", { name: locale === "en" ? en.inspectorTitle : zhCN.inspectorTitle, exact: true })).toBeVisible();
     await expect(page.locator('.monitoring-read-state[data-slot="badge"]')).toBeVisible();
     await page.screenshot({ path: info.outputPath("monitoring-overview.png"), fullPage: true });
-    await disclosure.click();
     const sessions = page.locator(".virtual-list.sessions"), timeline = page.locator(".virtual-list.timeline");
-    for (const [list, height] of [[sessions, width > 720 ? "480px" : "280px"], [timeline, width > 720 ? "480px" : "558px"]] as const) {
-      for (const property of ["height", "min-height", "max-height"]) await expect(list).toHaveCSS(property, height);
-    }
+    for (const property of ["height", "min-height", "max-height"]) await expect(sessions).toHaveCSS(property, width > 720 ? "480px" : "280px");
+    expect(await timeline.evaluate(element => element.clientHeight)).toBeLessThan(132);
     await expect(sessions.locator(".virtual-row").first()).toHaveCSS("height", "132px");
     const first = sessions.locator('.virtual-row[data-key="session-1"] button');
     await expect(first).toHaveCSS("display", "grid");
     await first.focus();
     await page.keyboard.press("Enter");
+    await expect.poll(() => timeline.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    expect(await timeline.evaluate(element => element.clientHeight)).toBeLessThanOrEqual(264);
     const request = timeline.locator('.virtual-row[data-key="request-1"]');
-    await expect(request).toHaveCSS("height", "360px");
+    await expect(request).toHaveCSS("height", "88px");
     const select = request.locator("button.request-select");
     await expect(select).toHaveAttribute("data-slot", "button");
-    await expect(request.locator(".trace-outcome")).toHaveAttribute("data-slot", "badge");
+    await expect(page.locator(".request-detail [data-slot=badge]").first()).toBeVisible();
     await select.focus();
     await expect(select).toBeFocused();
     await page.screenshot({ path: info.outputPath("monitoring-selected.png"), fullPage: true });
@@ -39,7 +38,7 @@ for (const width of [1440, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     expect(box).not.toBeNull();
     await page.mouse.move(box!.x + box!.width - 2, Math.max(1, Math.min(899, box!.y + box!.height / 2)));
     await page.mouse.wheel(0, 2600);
-    await expect.poll(() => timeline.evaluate(element => element.scrollTop)).toBeGreaterThan(1800);
+    await expect.poll(() => timeline.evaluate(element => element.scrollTop)).toBeGreaterThan(300);
     await expect.poll(() => mockApi.requests.filter(({ path }) => path.includes("cursor=fixture-request-page-2")).length).toBe(1);
     await expect(select).toBeAttached();
     await expect(select).toBeFocused();

@@ -7,6 +7,7 @@ Adding a strategy type does not require editing the engine. Implement
 
 from .contracts import (
     DecisionMaker,
+    RoutingEvidence,
     RoutingRequest,
     RoutingStrategy,
     SetupIncompleteError,
@@ -31,6 +32,7 @@ __all__ = [
     "DecisionMatrixStrategy",
     "DecisionStrategy",
     "PolicyStrategy",
+    "RoutingEvidence",
     "RoutingRequest",
     "RoutingStrategy",
     "SetupIncompleteError",

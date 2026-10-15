@@ -7,10 +7,11 @@ import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
 import { useWorkspaceFrames } from "@/shared/navigation/useWorkspaceFrames";
 import { matrixChoiceLabel } from "@/shared/routing/choice-label";
 import RoutingCanvas from "./RoutingCanvas";
+import { DecisionRoutingControl } from "@/features/providers/suppliers/DecisionRoutingControl";
 import type { CanvasHistoryScope } from "./model/history-scope";
 import { canvasAvailableRect, changeLabelMembership, handoffInspectorFocus, inspectorFallbackPosition, inspectorPosition, pageViewport, reconcileRuleSelection, visibleCanvasRect } from "./model/canvas";
 import type { RuleLayoutMutation } from "./model/canvas";
-import type { ConfigurationPayload, LabelRow, WorkflowWritePayload, StrategiesPayload } from "@/shared/api/types";
+import type { ConfigurationPayload, ProviderConfiguration, LabelRow, WorkflowWritePayload, StrategiesPayload } from "@/shared/api/types";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -28,6 +29,14 @@ import type { DraftDiff, RoutingDraft } from "./model/draft";
 import { selectionCaption } from "./model/selection";
 
 interface EditorProps {
+  decisionConfiguration?: ProviderConfiguration | null;
+  decisionPending?: boolean;
+  decisionReadError?: boolean;
+  decisionWriteError?: boolean;
+  decisionRefreshFailed?: boolean;
+  onRetryDecisionRead?: () => void;
+  onRetryDecisionCatalog?: () => void;
+  onSetDecisionEnabled?: (enabled: boolean) => void;
   historyScope?: CanvasHistoryScope;
   discardEpoch?: number;
   config: ConfigurationPayload;
@@ -74,7 +83,7 @@ function ChoiceFields({ choice, labels, selections, onChoice }: {
   </>;
 }
 
-export default function RoutingEditor({ historyScope, discardEpoch = 0, config, error, onReloaded, onError, onDirtyChange, onPendingChange, onUnauthorized, onOpenModel }: EditorProps) {
+export default function RoutingEditor({ historyScope, discardEpoch = 0, config, error, onReloaded, onError, onDirtyChange, onPendingChange, onUnauthorized, onOpenModel, decisionConfiguration, decisionPending = false, onSetDecisionEnabled, decisionReadError = false, decisionWriteError = false, decisionRefreshFailed = false, onRetryDecisionRead, onRetryDecisionCatalog }: EditorProps) {
   const active = useWorkspaceActive();
   const requestAnimationFrame = useWorkspaceFrames(active);
   const activeRef = useRef(active);
@@ -90,6 +99,7 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
     onError(caught instanceof Error ? caught.message : String(caught));
   }, [onError, onUnauthorized]);
   const [strategies, setStrategies] = useState<StrategiesPayload["data"]>([]);
+  const [decisionReadinessOpen, setDecisionReadinessOpen] = useState(false);
   const [strategyAction, setStrategyAction] = useState<"create" | "delete" | null>(null);
   const [strategyName, setStrategyName] = useState("");
   const [modelChooser, setModelChooser] = useState(false);
@@ -448,6 +458,9 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   const chooserModels = config.models.filter((model) => !mountedModels.some((item) => item.id === model.id)
     && `${model.provider} ${model.upstream_model} ${model.id}`.toLocaleLowerCase().includes(modelQuery.toLocaleLowerCase()));
 
+  const configuredDecision = decisionConfiguration?.decision;
+  const selectedDecisionProvider = configuredDecision?.providers.find((provider) => provider.id === (draft.decisionProvider ?? configuredDecision.default_provider))
+    ?? (!draft.decisionProvider ? configuredDecision?.providers[0] : undefined);
   const heading = <>
       {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
       <div className="strategy-controls flex min-w-0 items-center gap-1">
@@ -468,7 +481,18 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
           <NativeSelectOption value="">{t("workflowDecisionProviderDefault")}</NativeSelectOption>
           {(config.decision_providers ?? []).map((provider) => <NativeSelectOption key={provider.id} value={provider.id}>{provider.display_name || provider.id}{provider.model ? ` · ${provider.model}` : ""}</NativeSelectOption>)}
         </NativeSelect>
-      </label><p className="m-0">{t("workflowDecisionProviderNote")}</p></div>}
+      </label><p className="m-0">{t("workflowDecisionProviderNote")}</p>
+      <div className="mt-1 flex h-[76px] min-h-[76px] min-w-0 items-center justify-between gap-2 rounded-md border border-outline bg-panel px-3 py-2">
+        <div role="status" className="grid min-w-0 gap-1 text-xs">
+          <span className={configuredDecision?.enabled ? "text-positive" : "text-ink-muted"}>{configuredDecision ? t(configuredDecision.enabled ? "classificationOn" : "classificationOff") : t("decisionReadinessUnknown")}</span>
+          {configuredDecision && <span className="truncate" title={selectedDecisionProvider?.id}>{selectedDecisionProvider ? `${selectedDecisionProvider.id} · ${t(selectedDecisionProvider.has_api_key ? "classificationProviderReady" : "classificationProviderMissing")}` : t("pmDecisionNeedsProvider")}</span>}
+        </div>
+        <Button variant="outline" size="sm" className="min-h-10 max-w-40 shrink-0 whitespace-normal" onClick={() => setDecisionReadinessOpen(true)}>{t("decisionManage")}</Button>
+      </div>
+      {decisionReadError && <div role="alert" className="text-xs text-caution">{t("decisionReadinessUnknown")} <Button variant="outline" size="sm" onClick={onRetryDecisionRead}>{t("routingRetryRead")}</Button></div>}
+      {decisionWriteError && <p role="alert" className="m-0 text-xs text-caution">{t("pmError")}</p>}
+      {decisionRefreshFailed && <div role="alert" className="text-xs text-caution">{t("pmRefreshFailed")} <Button variant="outline" size="sm" disabled={decisionPending} onClick={onRetryDecisionCatalog}>{t("pmRetryCatalog")}</Button></div>}
+      </div>}
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {policyRecovery !== null && <div className="notice warn bg-panel text-ink" role="status"><span className="block">{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
@@ -583,6 +607,10 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
         </div>}</div></aside>}
       </>}
       </RoutingCanvas>
+      {decisionReadinessOpen && <Dialog title={t("pmDecisionRouting")} fallbackFocusRef={strategySelectRef} onClose={() => setDecisionReadinessOpen(false)} footer={<Button variant="outline" onClick={() => setDecisionReadinessOpen(false)}>{t("cancel")}</Button>}>
+        {configuredDecision ? <DecisionRoutingControl decision={{ ...configuredDecision, providers: selectedDecisionProvider ? [selectedDecisionProvider] : [] }} disabled={editDisabled || dirty || layoutDirty || decisionPending || decisionReadError || decisionRefreshFailed || !decisionConfiguration?.write_available || !onSetDecisionEnabled} onToggle={() => onSetDecisionEnabled?.(!configuredDecision.enabled)} t={t} diagnostic onUnauthorized={onUnauthorized} configurationGeneration={decisionConfiguration?.revision} /> : <p role="status">{t("decisionReadinessUnknown")}</p>}
+        <p className="mt-3 text-xs text-ink-muted">{t("decisionSelectionNote")}</p>
+      </Dialog>}
       {review && <Dialog title={t("reviewChanges")} fallbackFocusRef={strategySelectRef} onClose={() => { if (!busy) setReview(null); }} footer={<>
         <Button onClick={save} disabled={writeDisabled || busy || policyRecovery !== null || layoutDirty || incomplete || questionErrors.length > 0 || (review.warnings.length > 0 && !acknowledged)}>{t("confirmAndSave")}</Button>
         <Button variant="outline" disabled={busy} onClick={() => setReview(null)}>{t("backToEditing")}</Button>

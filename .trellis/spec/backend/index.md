@@ -18,6 +18,7 @@ Product behavior and configuration details remain in `README.md` and `docs/`.
 | --- | --- | --- |
 | [Directory structure](./directory-structure.md) | Module ownership, extension points, imports, and naming | Complete |
 | [Decision providers](./decision-providers.md) | Decision config, protocol adapters, compatibility, failover, and validation | Complete |
+| [Routing evidence and session inspection](./routing-session-inspection.md) | Immutable classifier evidence, retained history, UI ownership and synthetic decision diagnostics | Complete |
 | [Database guidelines](./database-guidelines.md) | SQLite schema, writer queue, migrations, and retention | Complete |
 | [Dashboard and routing configuration](./dashboard-routing-config.md) | Bundled operator UI, runtime overlay, configuration writes and read recovery, canvas ownership, assets, and packaging | Complete |
 | [Provider configuration](./provider-configuration.md) | Provider transactions, discovery network boundaries, metadata suggestions, and confirmed imports | Implementation contract |

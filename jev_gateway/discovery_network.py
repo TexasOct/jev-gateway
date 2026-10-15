@@ -23,7 +23,7 @@ class DiscoveryNetworkError(ValueError):
             "invalid_url", "blocked_target", "dns_failed", "timeout", "busy",
             "redirect_rejected", "authentication_failed", "rate_limited",
             "upstream_failed", "response_too_large", "invalid_response",
-            "address_not_found", "listing_unsupported",
+            "address_not_found", "listing_unsupported", "invalid_json",
         }
         self.code = code if code in allowed else "upstream_failed"
         super().__init__(self.code)
@@ -171,12 +171,13 @@ class _PinnedConnection(http.client.HTTPConnection):
             raise
 
 
-def safe_get_json(
+def _safe_json(
     url: str, *, headers: Mapping[str, str] | None = None,
     allow_private_network: bool = False, timeout: float = 20.0,
     max_bytes: int = 4 * 1024 * 1024,
     resolver: Callable[[str, int, float], list[str]] | None = None,
     connection_factory: Callable[[ValidatedTarget, float], Any] | None = None,
+    post_body: bytes | None = None,
 ) -> JsonResponse:
     """Fetch one page without proxies, redirects, compression or TLS overrides."""
     deadline = time.monotonic() + min(20.0, max(0.001, timeout))
@@ -204,8 +205,15 @@ def safe_get_json(
         timer = threading.Timer(max(0.001, deadline - time.monotonic()), interrupt)
         timer.daemon = True
         timer.start()
-        connection.request("GET", target.request_target, headers=request_headers)
+        if post_body is None:
+            connection.request("GET", target.request_target, headers=request_headers)
+        else:
+            request_headers["Content-Type"] = "application/json"
+            connection.request("POST", target.request_target, body=post_body, headers=request_headers)
         response = connection.getresponse()
+        if post_body is not None and response.status != 200:
+            # Diagnostic failures need the status only, never the upstream body.
+            return JsonResponse(None, response.status)
         if 300 <= response.status < 400 and response.status != 304:
             raise DiscoveryNetworkError("redirect_rejected")
         if response.status in {401, 403}:
@@ -248,7 +256,7 @@ def safe_get_json(
     except (TimeoutError, socket.timeout):
         raise DiscoveryNetworkError("timeout") from None
     except (json.JSONDecodeError, UnicodeError, RecursionError):
-        raise DiscoveryNetworkError("invalid_response") from None
+        raise DiscoveryNetworkError("invalid_json" if post_body is not None else "invalid_response") from None
     except Exception:
         code = "timeout" if time.monotonic() >= deadline else "upstream_failed"
         raise DiscoveryNetworkError(code) from None
@@ -260,3 +268,25 @@ def safe_get_json(
                 connection.close()
             except OSError:
                 pass
+
+
+def safe_get_json(
+    url: str, *, headers: Mapping[str, str] | None = None,
+    allow_private_network: bool = False, timeout: float = 20.0,
+    max_bytes: int = 4 * 1024 * 1024,
+    resolver: Callable[[str, int, float], list[str]] | None = None,
+    connection_factory: Callable[[ValidatedTarget, float], Any] | None = None,
+) -> JsonResponse:
+    """Fetch one bounded page without redirects or credential-bearing URLs."""
+    return _safe_json(url, headers=headers, allow_private_network=allow_private_network,
+                      timeout=timeout, max_bytes=max_bytes, resolver=resolver,
+                      connection_factory=connection_factory)
+
+
+def safe_post_json(url: str, body: Mapping[str, Any], *, headers: Mapping[str, str], timeout: float = 5.0) -> JsonResponse:
+    """Submit a bounded synthetic decision with pinned TLS and a total deadline."""
+    content = json.dumps(body).encode()
+    if len(content) > 4096:
+        raise DiscoveryNetworkError("invalid_response")
+    return _safe_json(url, headers=headers, timeout=min(timeout, 5.0),
+                      max_bytes=65536, post_body=content)

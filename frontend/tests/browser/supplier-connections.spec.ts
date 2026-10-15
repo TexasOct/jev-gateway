@@ -99,7 +99,7 @@ test("shared-reference rejection preserves draft and exposes recovery explanatio
   expect(state.writes).toEqual([]);
 });
 
-test("dirty cancel and navigation keep input unless discarded; decision tests cannot claim remote success", async ({ page, context }) => {
+test("dirty cancel and navigation keep input unless discarded; failed synthetic decisions cannot claim success", async ({ page, context }) => {
   const state = fixture(); await installProviderFixture(context, state); await open(page); await edit(page);
   await page.getByLabel("Display name", { exact: true }).fill("Unsaved connection");
   page.once("dialog", (dialog) => dialog.dismiss());
@@ -112,10 +112,16 @@ test("dirty cancel and navigation keep input unless discarded; decision tests ca
   await page.getByLabel("Display name", { exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(page.locator('[data-provider-edit="fixture"][data-provider-kind="llm"]')).toBeFocused();
+  const probes: unknown[] = [];
+  await page.route("**/v1/decision-connection-test", async route => {
+    probes.push(route.request().postDataJSON());
+    await route.fulfill({ json: { provider_id: "judge", scope: "decision_classification", synthetic: true, generation_tested: false, decision_enabled: false, status: "unsupported_protocol", http_status: null, elapsed_ms: 0, answers: {} } });
+  });
   await page.getByRole("button", { name: "Decision providers", exact: true }).click(); await edit(page);
-  await page.getByRole("button", { name: "Test connection", exact: true }).click();
-  await expect(page.getByText("No remote availability was verified.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Only saving validates its configuration", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Test synthetic classification", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Synthetic classification did not pass" })).toBeVisible();
+  await expect(page.getByText("Uses fixed synthetic input.", { exact: false })).toBeVisible();
+  expect(probes).toHaveLength(1);
   expect(state.writes).toEqual([]); expect(state.selectors).toEqual([]);
 });
 
@@ -187,6 +193,12 @@ test("native cloud account setup keeps platform and advanced credential paths ex
 
 for (const kind of ["llm", "decision"] as const) test(`${kind} ordinary creation requires a key until advanced reference compatibility is deliberately selected`, async ({ page, context }) => {
   const state = fixture(); await installProviderFixture(context, state); await open(page);
+  const probes: unknown[] = [];
+  if (kind === "decision") await page.route("**/v1/decision-connection-test", async route => {
+    probes.push(route.request().postDataJSON());
+    await route.fulfill({ json: { provider_id: "synthetic-candidate", scope: "decision_classification", synthetic: true, generation_tested: false, decision_enabled: false, status: "accepted", http_status: 200, elapsed_ms: 1, answers: { connectivity: { choice: "ready" } } } });
+  });
+  const testName = kind === "llm" ? "Test connection" : "Test synthetic classification";
   if (kind === "decision") await page.getByRole("button", { name: "Decision providers", exact: true }).click();
   await page.getByRole("button", { name: "Add provider", exact: true }).click();
   await page.getByRole("button", { name: "Custom provider", exact: true }).click();
@@ -194,18 +206,23 @@ for (const kind of ["llm", "decision"] as const) test(`${kind} ordinary creation
   await page.getByLabel("Endpoint URL", { exact: true }).fill("https://example.test/compatible");
   await expect(page.getByLabel("Instance ID", { exact: true })).not.toBeVisible();
   await expect(page.getByLabel("Credential reference", { exact: true })).not.toBeVisible();
-  for (const name of ["Validate and save", "Test connection"]) await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+  for (const name of ["Validate and save", testName]) await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
   await page.getByText("Advanced configuration", { exact: true }).click();
   const id = await page.getByLabel("Instance ID", { exact: true }).inputValue();
   const allocated = await page.getByLabel("Credential reference", { exact: true }).inputValue();
   expect(allocated).toMatch(new RegExp(`^JEV_${id.toUpperCase()}_[A-F0-9]{32}_API_KEY$`));
   await expect(page.getByRole("button", { name: "Validate and save", exact: true })).toBeDisabled();
   await page.getByLabel("Credential reference", { exact: true }).fill("EXISTING_COMPATIBLE_REFERENCE");
-  await page.getByRole("button", { name: "Test connection", exact: true }).click();
+  await page.getByRole("button", { name: testName, exact: true }).click();
   if (kind === "llm") {
     await expect.poll(() => state.connectionSelectors?.length).toBe(1);
     expect(state.connectionSelectors?.[0]).toHaveProperty("provider.api_key_env", "EXISTING_COMPATIBLE_REFERENCE");
-  } else await expect(page.getByText("No remote availability was verified.", { exact: false })).toBeVisible();
+  } else {
+    await expect(page.getByRole("status").filter({ hasText: "Synthetic classification accepted" })).toBeVisible();
+    expect(probes).toHaveLength(1);
+    expect(probes[0]).toHaveProperty("provider.api_key_env", "EXISTING_COMPATIBLE_REFERENCE");
+    expect(state.configuration.decision.enabled).toBe(false);
+  }
   expect(state.writes).toEqual([]); expect(state.validations).toEqual([]);
   await page.getByRole("button", { name: "Validate and save", exact: true }).click();
   await expect(page.getByText("Provider saved.", { exact: true })).toBeVisible();

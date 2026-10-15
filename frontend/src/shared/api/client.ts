@@ -8,6 +8,8 @@
 
 import type {
   CanvasLayout,
+  DecisionConnectionResult,
+  SessionScope,
   ConfigurationPayload,
   ConfigurationWarning,
   PolicyCatalog,
@@ -109,19 +111,20 @@ export const api = {
   discoverModels: (payload: ProviderSelector, signal?: AbortSignal) => request<DiscoveryResult>("/v1/provider-discovery", { method: "POST", body: JSON.stringify(payload), signal }),
   testProviderConnection: (payload: ProviderSelector, signal?: AbortSignal) => request<ProviderConnectionResult>("/v1/provider-connection-test", { method: "POST", body: JSON.stringify(payload), signal }),
   providerMetadata: (payload: ProviderSelector & { upstream_models: string[]; refresh: boolean }, signal?: AbortSignal) => request<MetadataResult>("/v1/provider-metadata", { method: "POST", body: JSON.stringify(payload), signal }),
+  testDecisionConnection: (payload: ProviderSelector, signal?: AbortSignal) => request<DecisionConnectionResult>("/v1/decision-connection-test", { method: "POST", body: JSON.stringify(payload), signal }),
   providers: () => request<ProvidersPayload>("/v1/routing/providers/summary"),
   routingActivity: (signal?: AbortSignal) =>
     request<RoutingActivityPayload>("/v1/routing/activity", { signal }),
   strategies: (signal?: AbortSignal) => request<StrategiesPayload>("/v1/routing/strategies", { signal }),
   policy: () => request<PolicyCatalog>("/v1/routing/policy"),
-  sessions: (cursor?: string, signal?: AbortSignal) =>
+  sessions: (cursor?: string, signal?: AbortSignal, scope: SessionScope = "live") =>
     request<SessionsPayload>(
-      `/v1/routing/sessions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/v1/routing/sessions${scope === "retained" ? `?scope=retained${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}` : cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
       { signal },
     ),
-  sessionRequests: (sessionId: string, cursor?: string, signal?: AbortSignal) =>
+  sessionRequests: (sessionId: string, cursor?: string, signal?: AbortSignal, scope: SessionScope = "live") =>
     request<SessionRequestsPayload>(
-      `/v1/routing/sessions/${encodeURIComponent(sessionId)}/requests${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/v1/routing/sessions/${encodeURIComponent(sessionId)}/requests${scope === "retained" ? `?scope=retained${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}` : cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
       { signal },
     ),
   configuration: (strategy?: string, signal?: AbortSignal) =>

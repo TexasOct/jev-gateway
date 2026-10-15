@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NoReturn, Protocol
 
+from jev_gateway.routing_evidence import project_config_context, project_routing_evidence
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -406,6 +408,12 @@ class RecordStore(Protocol):
         """Return one bounded request page and its last compound ordering key."""
         raise RuntimeError("RecordStore protocol method called directly")
 
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
+        raise RuntimeError("RecordStore protocol method called directly")
+
     def provider_summary(
         self, *, window_start: float, window_end: float
     ) -> dict[str, dict[str, Any]]:
@@ -622,6 +630,12 @@ class NullRecordStore:
     ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
         return [], None, False
 
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
+        return [], None, False
+
     def provider_summary(
         self, *, window_start: float, window_end: float
     ) -> dict[str, dict[str, Any]]:
@@ -705,6 +719,12 @@ class _UnavailableRecordStore:
     def session_request_page(
         self, session_id: str, *, limit: int, before: tuple[float, int] | None
     ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
+        self._unavailable()
+
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
         self._unavailable()
 
     def provider_summary(
@@ -842,11 +862,20 @@ def _optional_bool(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
-def _decision_source(signals_json: Any) -> dict[str, bool]:
-    """Project only an explicit boolean source; older evidence stays unknown."""
+def _decision_source(signals_json: Any) -> dict[str, Any]:
+    """Project explicit safe evidence only; missing legacy details remain absent."""
     signals = _decoded_json(signals_json, {})
-    value = signals.get("defaulted") if isinstance(signals, dict) else None
-    return {"defaulted": value} if isinstance(value, bool) else {}
+    if not isinstance(signals, dict):
+        return {}
+    result: dict[str, Any] = {}
+    if isinstance(signals.get("defaulted"), bool):
+        result["defaulted"] = signals["defaulted"]
+    if isinstance(signals.get("strategy_source"), str) and signals["strategy_source"] in {"default", "explicit", "session"}:
+        result["strategy_source"] = signals["strategy_source"]
+    evidence = project_routing_evidence(signals.get("routing_evidence"))
+    if evidence is not None:
+        result["routing_evidence"] = evidence
+    return result
 
 
 def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
@@ -895,6 +924,9 @@ def _evidence_row(row: sqlite3.Row) -> dict[str, Any]:
             "reasoning_effort_source": row["reasoning_effort_source"],
             "candidates": _decoded_json(row["candidates_json"], []),
             "created_at": row["decision_created_at"],
+            "config_context": project_config_context(
+                _decoded_json(row["catalog_json"], None), row["decision_strategy"], row["config_hash"]
+            ),
         }
     upstream = None
     if row["payload_json"] is not None:
@@ -1207,6 +1239,7 @@ class _SqliteBackend:
                     d.switched_from, d.blocked_by, d.reasoning_effort,
                     d.reasoning_effort_source, d.candidates_json, d.signals_json,
                     d.created_at AS decision_created_at,
+                    CASE WHEN length(CAST(cv.catalog_json AS BLOB)) <= 2097152 THEN cv.catalog_json END AS catalog_json,
                     u.provider AS submitted_provider, u.model AS submitted_model,
                     u.stream AS submitted_stream,
                     u.capture_content AS submitted_capture_content,
@@ -1220,6 +1253,7 @@ class _SqliteBackend:
                     SELECT dx.rowid FROM decisions dx WHERE dx.request_id = r.request_id
                     ORDER BY dx.created_at DESC, dx.rowid DESC LIMIT 1
                 )
+                LEFT JOIN config_versions cv ON cv.config_hash = d.config_hash
                 LEFT JOIN upstream_requests u ON u.decision_id = d.decision_id
                 LEFT JOIN outcomes o ON o.decision_id = d.decision_id
                 WHERE r.session_id = ?
@@ -1235,6 +1269,41 @@ class _SqliteBackend:
         last = page[-1] if page else None
         key = (last["received_at"], last["page_rowid"]) if last is not None else None
         return [_evidence_row(row) for row in page], key, len(rows) > limit
+
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
+        connection = self._connection
+        if connection is None:
+            return [], None, False
+        with self._lock:
+            rows = connection.execute(
+                """
+                WITH retained AS (
+                    SELECT session_id, MIN(received_at) AS first_request_at,
+                           MAX(received_at) AS last_request_at, COUNT(*) AS request_count
+                    FROM requests WHERE session_id IS NOT NULL
+                        AND (? IS NULL OR session_id = ?)
+                    GROUP BY session_id
+                )
+                SELECT retained.*, (
+                    SELECT client FROM requests r WHERE r.session_id = retained.session_id
+                    ORDER BY received_at DESC, rowid DESC LIMIT 1
+                ) AS client FROM retained
+                WHERE (? IS NULL OR (last_request_at, session_id) < (?, ?))
+                ORDER BY last_request_at DESC, session_id DESC LIMIT ?
+                """,
+                (session_id, session_id, None if before is None else before[0],
+                 None if before is None else before[0], None if before is None else before[1],
+                 min(100, max(1, limit)) + 1),
+            ).fetchall()
+        page = rows[:min(100, max(1, limit))]
+        evidence = self.latest_session_evidence(tuple(row["session_id"] for row in page))
+        data = [{**dict(row), **evidence.get(row["session_id"], {})} for row in page]
+        last = page[-1] if page else None
+        key = (last["last_request_at"], last["session_id"]) if last is not None else None
+        return data, key, len(rows) > limit
 
     def provider_summary(
         self, *, window_start: float, window_end: float
@@ -1575,6 +1644,15 @@ class SqliteRecordStore:
     ) -> tuple[list[dict[str, Any]], tuple[float, int] | None, bool]:
         return self._submit(
             lambda backend: backend.session_request_page(session_id, limit=limit, before=before),
+            wait=True,
+        )
+
+    def retained_session_page(
+        self, *, limit: int, before: tuple[float, str] | None,
+        session_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], tuple[float, str] | None, bool]:
+        return self._submit(
+            lambda backend: backend.retained_session_page(limit=limit, before=before, session_id=session_id),
             wait=True,
         )
 

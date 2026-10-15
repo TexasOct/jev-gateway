@@ -14,7 +14,8 @@ from jev_gateway.catalog import (
     RoutingPolicy,
 )
 
-from .contracts import DecisionMaker, RoutingRequest, SetupIncompleteError, StrategyOutcome
+from .contracts import DecisionMaker, RoutingEvidence, RoutingRequest, SetupIncompleteError, StrategyOutcome
+from .decision_provider.base import ClassificationEvidence, evaluate_with_evidence
 from .policy import PolicyStrategy
 
 __all__ = ["DecisionMatrixStrategy"]
@@ -50,20 +51,28 @@ class DecisionMatrixStrategy(PolicyStrategy):
         if request.manual is not None or (
             request.session is not None and self.policy.mode is RoutingMode.CACHED
         ):
-            return super().decide(request, catalog)
-        result = self.client.evaluate(
-            self._state(request),
+            outcome = super().decide(request, catalog)
+            return replace(outcome, evidence=replace(
+                outcome.evidence or RoutingEvidence(),
+                classification=ClassificationEvidence(
+                    "bypassed_manual" if request.manual is not None else "bypassed_session"
+                ), rule_status="manual" if request.manual is not None else "session_reuse",
+            ))
+        evaluation = evaluate_with_evidence(
+            self.client, self._state(request),
             self.questions,
             valid=lambda raw: _checked_answers(raw, self.questions) is not None,
         )
+        result = evaluation.result
         answers: dict[str, str] | None = None
-        source: str | None = None
+        source: str | None = evaluation.evidence.provider_id
         if result is not None:
             source = result.provider
             answers = _checked_answers(result.answers, self.questions)
 
         choice: Mapping[str, str] = self.fallback
         reason = "fallback"
+        matched_rule_index: int | None = None
         if answers is not None:
             choice = {}
             reason = "default"
@@ -71,6 +80,7 @@ class DecisionMatrixStrategy(PolicyStrategy):
                 if all(
                     answers.get(key) in values for key, values in rule["when"].items()
                 ):
+                    matched_rule_index = index + 1
                     choice = rule["select"]
                     reason = f"rule_{index + 1}"
                     break
@@ -83,7 +93,12 @@ class DecisionMatrixStrategy(PolicyStrategy):
             replace(request, facts=facts), catalog
         )
         evidence = f"decision_matrix:{source or 'local'}:{reason}"
-        return replace(outcome, reason=f"{evidence}:{outcome.reason}")
+        route_evidence = outcome.evidence or RoutingEvidence()
+        return replace(outcome, reason=f"{evidence}:{outcome.reason}", evidence=replace(
+            route_evidence, classification=evaluation.evidence,
+            rule_status="matched" if matched_rule_index is not None else "accepted_unmatched" if answers is not None else "classifier_fallback",
+            matched_rule_index=matched_rule_index,
+        ))
 
     @staticmethod
     def _state(request: RoutingRequest) -> dict[str, Any]:
@@ -215,7 +230,7 @@ def _checked_answers(
     answers: dict[str, str] = {}
     for key, question in questions.items():
         answer = raw.get(key)
-        value = answer.get("choice") if isinstance(answer, dict) else None
+        value = answer.get("choice") if isinstance(answer, Mapping) else None
         if not isinstance(value, str) or value not in question["criteria"]:
             return None
         answers[key] = value

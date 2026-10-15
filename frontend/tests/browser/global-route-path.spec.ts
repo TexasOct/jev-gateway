@@ -219,7 +219,6 @@ for (const locale of ["en", "zh-CN"] as const) {
     });
     await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
     await page.goto("/dashboard/");
-    await page.locator(".monitoring-secondary > summary").click();
     await expect(page.locator(".monitoring-overview .monitoring-meta")).toContainText("balanced · default · fixture/literal");
     await expect(page.locator(".session").filter({ hasText: "pin-literal" })).toContainText("balanced · default · fixture/literal");
     await expect(page.locator(".session").filter({ hasText: "pin-global" })).toContainText(zh ? "balanced · 默认 · fixture/global" : "balanced · Default · fixture/global");
@@ -227,6 +226,7 @@ for (const locale of ["en", "zh-CN"] as const) {
       await page.locator(".session").filter({ hasText: session.session_id }).click();
       const label = session.defaulted ? zh ? "默认" : "Default" : "default";
       await expect(page.locator(".monitoring-overview .monitoring-meta")).toContainText(`balanced · ${label} · fixture/${session.upstream_model}`);
+      await page.getByText(zh ? "可用证据的示意回放" : "Illustrative playback of available evidence", { exact: true }).click();
       await expect(page.locator('[data-trace-index="1"]')).toContainText(`balanced · ${label} · fixture/${session.upstream_model}`);
       await expect(page.locator('[data-trace-index="1"] pre')).toContainText('"label": "default"');
       await expect(page.locator('[data-trace-index="1"] pre')).toContainText(`"defaulted": ${session.defaulted}`);

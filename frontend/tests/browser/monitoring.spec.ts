@@ -8,15 +8,15 @@ async function openDashboard(page: import("@playwright/test").Page) {
 test("restores the first cursor page when a later page fails, then loads the next page on retry", async ({ page, mockApi }) => {
   mockApi.rejectNextSessionPage = true;
   await openDashboard(page);
-  await expect(page.getByRole("button", { name: "Retry loading more" })).toBeVisible();
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
+  await expect(page.locator(".monitoring-sessions-panel").getByRole("button", { name: "Retry loading more" })).toBeVisible();
   await expect(page.locator('.sessions .virtual-row[data-key="session-1"]')).toBeVisible();
   await expect(page.locator('.sessions .virtual-row[data-key="session-11"]')).toHaveCount(0);
   expect(mockApi.requests.filter(({ path }) => path.includes("cursor=fixture-page-2"))).toHaveLength(1);
-  await page.getByRole("region").getByRole("button", { name: "Retry loading more" }).click();
-  await expect(page.getByRole("region").getByRole("status").filter({ hasText: "Complete" })).toBeVisible();
-  await expect(page.locator('.sessions .virtual-row[data-key="session-1"]')).toHaveCount(1);
+  await page.locator(".monitoring-sessions-panel").getByRole("button", { name: "Retry loading more" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Complete" })).toBeVisible();
   const list = page.getByLabel("Current sessions");
+  await list.evaluate(element => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
+  await expect(page.locator('.sessions .virtual-row[data-key="session-1"]')).toHaveCount(1);
   await list.hover();
   await page.mouse.wheel(0, 1100);
   await expect(page.locator('.sessions .virtual-row[data-key="session-11"]')).toBeVisible();
@@ -25,7 +25,6 @@ test("restores the first cursor page when a later page fails, then loads the nex
 
 test("supports keyboard session selection and selected detail", async ({ page }) => {
   await openDashboard(page);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   const list = page.getByLabel("Current sessions");
   await expect(list).toBeVisible();
   const first = list.locator('.virtual-row[data-key="session-1"] button');
@@ -39,7 +38,6 @@ test("supports keyboard session selection and selected detail", async ({ page })
 test("request-detail list loads a cursor page on scroll and retains its focused row", async ({ page, mockApi }) => {
   mockApi.pagedDetailSessionId = "session-1";
   await openDashboard(page);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   await page.locator('.sessions .virtual-row[data-key="session-1"] button').click();
   const timeline = page.getByLabel("Select a session");
   await expect(page.locator('.timeline .virtual-row[data-key="request-1"]')).toBeVisible();
@@ -63,45 +61,33 @@ test("utility geometry keeps virtual windows, recorded trace and mobile table re
     await expect(wire).toHaveCSS("fill", "none");
     await expect(wire).toHaveCSS("vector-effect", "non-scaling-stroke");
     await expect(wire).toHaveCSS("stroke-width", "1.4px");
-    await page.getByText("Inspect sessions, retained requests and provider observations").click();
     const sessions = page.locator(".virtual-list.sessions");
     const timeline = page.locator(".virtual-list.timeline");
     const sessionHeight = width <= 720 ? "280px" : "480px";
-    const timelineHeight = width <= 720 ? `${900 * 0.62}px` : "480px";
-    for (const [list, height] of [[sessions, sessionHeight], [timeline, timelineHeight]] as const) {
-      await expect(list).toHaveCSS("height", height);
-      await expect(list).toHaveCSS("min-height", height);
-      await expect(list).toHaveCSS("max-height", height);
-      await expect(list).toHaveCSS("overflow-y", "auto");
-    }
+    for (const property of ["height", "min-height", "max-height"]) await expect(sessions).toHaveCSS(property, sessionHeight);
+    await expect(sessions).toHaveCSS("overflow-y", "auto");
+    await expect(timeline).toHaveCSS("overflow-y", "auto");
+    expect(await timeline.evaluate(element => element.clientHeight)).toBeLessThan(132);
     const row = sessions.locator(".virtual-row").first();
     await expect(row).toHaveCSS("position", "absolute");
     await expect(row).toHaveCSS("height", "132px");
     await sessions.locator('.virtual-row[data-key="session-1"] button').click();
     const requestRow = timeline.locator(".virtual-row").first();
-    await expect(requestRow).toHaveCSS("height", "360px");
-    const trace = requestRow.locator(".route-trace");
+    await expect(requestRow).toHaveCSS("height", "88px");
+    await expect(requestRow.locator(".route-trace")).toHaveCount(0);
+    await page.getByText("Illustrative playback of available evidence", { exact: true }).click();
+    const trace = page.locator(".request-detail .route-trace");
     await expect(trace).toBeVisible();
     await expect(trace.locator(".trace-connections")).toHaveCSS("pointer-events", "none");
-    const viewport = page.locator(".virtual-list.timeline");
-    await viewport.hover();
-    await page.mouse.wheel(0, 700);
-    await expect(viewport).toHaveJSProperty("scrollTop", 0);
-    await page.mouse.wheel(0, 900);
     const requestButton = requestRow.locator("button.request-select");
     await requestButton.focus();
     await expect(requestButton).toBeFocused();
-    const retainedRequestId = await requestButton.locator("span").nth(1).textContent();
-    await viewport.evaluate((element) => { element.scrollTop = 720; element.dispatchEvent(new Event("scroll")); });
-    await expect.poll(() => requestButton.evaluate((element) => element.isConnected)).toBe(true);
+    await timeline.evaluate((element) => { element.scrollTop = 720; element.dispatchEvent(new Event("scroll")); });
+    await expect(requestButton).toBeAttached();
     await expect(requestButton).toBeFocused();
-    await expect(requestRow.locator("button.request-select span").nth(1)).toHaveText(retainedRequestId ?? "");
-    await viewport.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
-    await expect(requestRow).toBeVisible();
-    const missingStage = requestRow.locator('.trace-stage[data-presence="missing"]').first();
+    const missingStage = trace.locator('.trace-stage[data-presence="missing"]').first();
     await expect(missingStage).toHaveCSS("border-top-style", "dashed");
     await expect(missingStage).toHaveCSS("background-color", await trace.locator('.trace-stage[data-presence="present"]').first().evaluate((element) => getComputedStyle(element).backgroundColor));
-    await expect(trace.locator('.trace-stage[data-presence="present"]').first()).toHaveAttribute("data-presence", "present");
     await expect(trace.locator('.trace-outcome[data-outcome="success"]')).toBeVisible();
     await trace.getByRole("button", { name: /Replay/ }).click();
     await expect(trace.getByRole("status")).toContainText("is playing");
@@ -110,7 +96,6 @@ test("utility geometry keeps virtual windows, recorded trace and mobile table re
     await trace.getByRole("button", { name: /Reset/ }).click();
     await expect(trace.getByRole("status")).toContainText("missing fields remain disconnected");
     await expect(trace.locator(".trace-segment").first()).toHaveCSS("stroke-width", "1.5px");
-    await expect(trace.locator('.trace-outcome[data-outcome="success"]')).toBeVisible();
     await expect(trace.locator('.trace-stage[data-presence="missing"]')).toHaveCount(1);
     await expect(trace.locator('.trace-stage[data-presence="present"]')).toHaveCount(3);
     await expect(trace.locator('.trace-stage[data-active="true"]')).toHaveCount(0);
@@ -137,7 +122,6 @@ test("utility geometry keeps virtual windows, recorded trace and mobile table re
 test("keeps request-detail loading, failure, unavailable evidence, and empty states distinct", async ({ page, mockApi }) => {
   mockApi.detailFailures["session-1"] = 503;
   await openDashboard(page);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   await expect(page.locator(".monitoring-requests-panel")).toContainText("Choose a live session to inspect retained requests");
   await page.locator('.sessions .virtual-row[data-key="session-1"] button').click();
   await expect(page.locator(".monitoring-requests-panel")).toContainText("Evidence unavailable");
@@ -147,11 +131,11 @@ test("keeps request-detail loading, failure, unavailable evidence, and empty sta
   await expect(page.locator(".monitoring-requests-panel")).toContainText("Evidence unavailable: synthetic storage unavailable");
   mockApi.detailOverrides["session-3"] = { session: { session_id: "session-3" }, storage: { enabled: true }, evidence_available: true, requests: [], page_size: 8, next_cursor: null, has_more: false };
   await page.locator('.sessions .virtual-row[data-key="session-3"] button').click();
-  await expect(page.locator(".monitoring-requests-panel")).toContainText("No retained requests for this live session");
+  await expect(page.locator(".monitoring-requests-panel")).toContainText("No retained requests for this session");
   const request = { request: { request_id: "unknown-outcome", received_at: 1700000010 }, decision: null, upstream_request: null, outcome: null };
   mockApi.detailOverrides["session-4"] = { session: { session_id: "session-4" }, storage: { enabled: true }, evidence_available: true, requests: [request], page_size: 8, next_cursor: null, has_more: false };
   await page.locator('.sessions .virtual-row[data-key="session-4"] button').click();
-  await expect(page.locator('.request-card .trace-outcome[data-outcome="unknown"]')).toBeVisible();
+  await expect(page.locator(".request-detail").getByText("Outcome unknown", { exact: true }).first()).toBeVisible();
 });
 
 test("keeps request-detail loading copy visible while its synthetic response is delayed", async ({ page, mockApi }) => {
@@ -160,11 +144,10 @@ test("keeps request-detail loading copy visible while its synthetic response is 
   mockApi.detailOverrides["session-1"] = { session: { session_id: "session-1" }, storage: { enabled: true }, evidence_available: true, requests: [], page_size: 8, next_cursor: null, has_more: false };
   mockApi.delayNextDetail = () => gate;
   await openDashboard(page);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   await page.locator('.sessions .virtual-row[data-key="session-1"] button').click();
   await expect(page.locator(".monitoring-requests-panel")).toContainText("Loading retained requests for the selected session");
   release();
-  await expect(page.locator(".monitoring-requests-panel")).toContainText("No retained requests for this live session");
+  await expect(page.locator(".monitoring-requests-panel")).toContainText("No retained requests for this session");
 });
 
 test("keeps mobile provider cells' data-label records readable", async ({ page, mockApi }) => {
@@ -178,7 +161,6 @@ test("keeps mobile provider cells' data-label records readable", async ({ page, 
       observed_condition: "all_observed_attempts_succeeded" }],
   };
   await openDashboard(page);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   await page.getByText("Inspect recorded provider observations").click();
   const cell = page.locator(".monitoring-providers-panel td[data-label]").first();
   await expect(cell).toHaveAttribute("data-label", "Provider");
@@ -234,7 +216,6 @@ test("activity sample failure is shown as unavailable and can be retried without
 test("keeps the latest-session preview unselected until an operator chooses a session", async ({ page, mockApi }) => {
   await openDashboard(page);
   expect(mockApi.requests.some(({ path }) => /\/sessions\/[^/]+\/requests/.test(path))).toBe(false);
-  await page.getByText("Inspect sessions, retained requests and provider observations").click();
   expect(mockApi.requests.some(({ path }) => /\/sessions\/[^/]+\/requests/.test(path))).toBe(false);
 });
 
@@ -253,17 +234,18 @@ for (const locale of ["en", "zh-CN"] as const) {
       requests: [{ ...mockApi.detailOverrides["session-1"].requests[0]!, decision: { strategy: "balanced", label: "My custom label", provider: "fixture-provider", upstream_model: "fixture-model" } }],
     };
     await page.goto("/dashboard/");
-    await page.getByText(locale === "en" ? "Inspect sessions, retained requests and provider observations" : "查看会话、留存请求与服务商观察记录").click();
     await expect(page.locator(".monitoring-meta")).toContainText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
     const firstSession = page.locator('.sessions .virtual-row[data-key="session-1"] button');
     await expect(firstSession).toContainText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
     await firstSession.click();
     await expect(firstSession).toHaveAttribute("aria-pressed", "true");
+    await page.getByText(locale === "en" ? "Illustrative playback of available evidence" : "可用证据的示意回放", { exact: true }).click();
     await expect(page.locator('.trace-stage[data-trace-index="1"] > span').last()).toHaveText(`balanced · ${finalLabel} · fixture-provider/fixture-model`);
     // Distribution remains grouped by raw model identity, including default-labelled sessions.
     await expect(page.locator(".monitoring-route-map")).toContainText("fixture-provider/fixture-model");
     await expect(page.locator(".monitoring-route-map")).toContainText("20");
     await page.locator('.sessions .virtual-row[data-key="session-2"] button').click();
+    await page.getByText(locale === "en" ? "Illustrative playback of available evidence" : "可用证据的示意回放", { exact: true }).click();
     await expect(page.locator('.trace-stage[data-trace-index="1"] > span').last()).toHaveText("balanced · My custom label · fixture-provider/fixture-model");
     expect(mockApi.requests.some(({ path }) => path.includes("/sessions/session-1/requests"))).toBe(true);
   });

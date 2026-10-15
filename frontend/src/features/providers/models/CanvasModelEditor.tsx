@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RefObject } from "react";
 import type { useLocale } from "@/shared/i18n";
 import { ModelDialog } from "./ModelDialog";
@@ -22,6 +22,18 @@ export function CanvasModelEditor({ request, manager, t, onClose, fallbackFocusR
   fallbackFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const [editAttempted, setEditAttempted] = useState(false);
+  // Strategy readiness may already have populated the shared manager. A newly
+  // opened model still waits for its admitted read before taking modal focus.
+  // Once admitted, keep the editor mounted through auth/read suspension so its
+  // draft survives reconnection.
+  const [initialReadComplete, setInitialReadComplete] = useState(!manager.loading);
+  useEffect(() => {
+    let current = true;
+    if (!manager.loading && manager.error === null && manager.configuration) {
+      void Promise.resolve().then(() => { if (current) setInitialReadComplete(true); });
+    }
+    return () => { current = false; };
+  }, [manager.loading, manager.error, manager.configuration]);
   const configuration = manager.configuration;
   const model = useMemo(
     () => configuration?.models.find((record) => record.provider === request.provider && record.upstream_model === request.upstream),
@@ -34,7 +46,7 @@ export function CanvasModelEditor({ request, manager, t, onClose, fallbackFocusR
   // The caller keys this component on the identity, so a new node remounts it
   // and the attempted-save flag cannot leak across models.
   const identity = `${request.provider}::${request.upstream}`;
-  if (!configuration) return null;
+  if (!initialReadComplete || !configuration) return null;
   const currentModel = configuration.models.find((record) => record.provider === request.provider && record.upstream_model === request.upstream);
   const targetAvailable = !!currentModel;
   const routingOverlayFields = currentModel?.routing_overlay_fields ?? ["tags", "priority"] as const;

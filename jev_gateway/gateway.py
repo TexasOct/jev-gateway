@@ -527,6 +527,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
             ("POST", "/v1/provider-discovery"),
             ("POST", "/v1/provider-metadata"),
             ("POST", "/v1/provider-connection-test"),
+            ("POST", "/v1/decision-connection-test"),
             ("POST", "/v1/routing/strategies"),
             ("POST", "/v1/routing/configuration/validate"),
             ("PUT", "/v1/routing/configuration"),
@@ -989,6 +990,16 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     def apply_provider_configuration(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
         require_config_write(authorization)
         return provider_command(body, apply=True)
+
+    @app.post("/v1/decision-connection-test")
+    def decision_connection_test(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        require_config_write(authorization)
+        from jev_gateway.decision_diagnostics import test_decision_connection
+        try:
+            provider, key, enabled = provider_service.decision_probe_provider(body)
+            return test_decision_connection(provider, key, decision_enabled=enabled)
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
+            raise provider_error(error) from None
 
     @app.post("/v1/provider-connection-test")
     def provider_connection_test(body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
@@ -1648,6 +1659,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
                     tools=body.tools,
                     response_format=body.response_format,
                     strategy=chosen_strategy,
+                    strategy_source="explicit" if explicit else "session" if session is not None and session.strategy == chosen_strategy else "default",
                     request_id=request_id,
                     reasoning_effort=requested_reasoning_effort,
                 )

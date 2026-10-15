@@ -27,6 +27,7 @@ import { ProviderSetupFields } from "./ProviderSetupFields";
 import { initialSetupValues, missingSetupFields, setupForWrite } from "./setup";
 import { sameParameterReferences } from "./setupProjection";
 import { ModelManagementView } from "../models/ModelManagementView";
+import { DecisionDiagnostic } from "./DecisionDiagnostic";
 import { DecisionRoutingControl } from "./DecisionRoutingControl";
 
 type Translate = ReturnType<typeof useLocale>["t"];
@@ -452,6 +453,9 @@ export function ProviderView({ manager, t }: Props) {
       )}
       {kind === "decision" && config && !editor && !browsing && !manager.loading && (manager.errorOwner !== "read" || operationError === null) && (
         <DecisionRoutingControl
+          diagnostic
+          onUnauthorized={manager.onUnauthorized}
+          configurationGeneration={config.revision}
           decision={config.decision}
           disabled={disabled}
           t={t}
@@ -685,7 +689,7 @@ export function ProviderView({ manager, t }: Props) {
                 >
                   {t("pmCancel")}
                 </Button>
-                  <Button
+                  {kind === "llm" && <Button
                     className="min-h-11"
                     type="button"
                     variant="ghost"
@@ -702,9 +706,9 @@ export function ProviderView({ manager, t }: Props) {
                     onClick={() => { if (candidateSelector) void connection.test(candidateSelector, kind); }}
                   >
                     {t(connection.pending ? "spTesting" : "spTest")}
-                  </Button>
+                  </Button>}
               </div>
-              <p className="m-0 text-xs text-ink-muted">{t(kind === "llm" ? "spTestScope" : "spDecisionScope")}</p>
+              {kind === "decision" ? <DecisionDiagnostic selector={candidateSelector} configurationGeneration={config?.revision} disabled={manager.pending || missingNewCredential || incompleteSetup || transportInvalid || directIncomplete || !editor.draft.id.trim() || !editor.draft.api_base?.trim()} onUnauthorized={manager.onUnauthorized} t={t} /> : <p className="m-0 text-xs text-ink-muted">{t("spTestScope")}</p>}
               {connection.result && <p role="status" className="m-0 text-sm text-ink-muted">{t(connection.statusKey!)}{connection.result.status === "success" && connection.result.model_count !== null && ` (${connection.result.model_count})`}</p>}
               {connection.error !== null && <p role="alert" className="m-0 text-sm text-ink-muted">{errorText(connection.error)} {t("spTestRetry")}</p>}
             </fieldset>

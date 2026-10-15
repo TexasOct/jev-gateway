@@ -37,6 +37,7 @@ from jev_gateway.records import (
 from jev_gateway.request_facts import RequestFacts, extract_request_facts
 from jev_gateway.sessions import MemorySessionStore, SessionState
 from jev_gateway.strategy import (
+    RoutingEvidence,
     RoutingRequest,
     SetupIncompleteError,
     StrategyContractError,
@@ -87,6 +88,8 @@ class Decision:
     defaulted: bool = False
     context_window: int | None = None
     max_output_tokens: int | None = None
+    strategy_source: str | None = None
+    evidence: RoutingEvidence | None = None
 
     @property
     def label(self) -> str:
@@ -99,6 +102,8 @@ class Decision:
             "request_id": self.request_id,
             "session_id": self.session_id,
             "strategy": self.strategy,
+            "strategy_source": self.strategy_source,
+            "routing_evidence": self.evidence.as_dict() if self.evidence is not None else None,
             "route": self.route_name,
             "provider": self.provider,
             "model": self.model,
@@ -259,6 +264,7 @@ class RoutingEngine:
         strategy: str | None = None,
         request_id: str | None = None,
         reasoning_effort: str | None = None,
+        strategy_source: str | None = None,
     ) -> Decision:
         """Route one request, using the stored session when one exists."""
         if not any(profile.enabled for profile in self.catalog.profiles):
@@ -314,6 +320,8 @@ class RoutingEngine:
             reasoning_effort=effort,
             reasoning_effort_source=effort_source,
             facts=facts,
+            strategy_source=strategy_source or ("default" if strategy is None else "explicit"),
+            evidence=outcome.evidence,
         )
         self._record_decision(decision)
         self._log.append(decision)
@@ -372,6 +380,8 @@ class RoutingEngine:
         )
         return {
             "strategy": strategy_impl.name,
+            "strategy_source": "default" if strategy is None else "explicit",
+            "routing_evidence": outcome.evidence.as_dict() if outcome.evidence is not None else None,
             "session_id": session_id,
             "route": outcome.model,
             "provider": profile.provider,
@@ -601,7 +611,9 @@ class RoutingEngine:
             reasoning_effort=decision.reasoning_effort,
             reasoning_effort_source=decision.reasoning_effort_source,
             candidates=decision.candidates,
-            signals={"defaulted": decision.defaulted},
+            signals={"defaulted": decision.defaulted,
+                     "strategy_source": decision.strategy_source,
+                     "routing_evidence": decision.evidence.as_dict() if decision.evidence is not None else None},
             created_at=decision.created_at,
         )
         self._store(lambda: self.record_store.record_decision(record), "decision")
@@ -667,6 +679,8 @@ class RoutingEngine:
         reasoning_effort: str | None,
         reasoning_effort_source: str,
         facts: RequestFacts,
+        strategy_source: str,
+        evidence: RoutingEvidence | None,
     ) -> Decision:
         return Decision(
             decision_id=f"dec-{uuid.uuid4().hex[:16]}",
@@ -690,6 +704,8 @@ class RoutingEngine:
             created_at=self._clock(),
             context_window=profile.context_window,
             max_output_tokens=profile.max_output_tokens,
+            strategy_source=strategy_source,
+            evidence=evidence,
         )
 
     def _persist(self, decision: Decision, session: SessionState | None) -> None:

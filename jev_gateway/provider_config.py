@@ -13,7 +13,7 @@ from typing import Any
 
 from litellm import provider_list
 
-from jev_gateway.catalog import Catalog, catalog_from_document, provider_from_dict, model_metadata, _metadata_number, _finite_number
+from jev_gateway.catalog import Catalog, DecisionProvider, catalog_from_document, decision_from_dict, provider_from_dict, model_metadata, _metadata_number, _finite_number
 from jev_gateway.config_transaction import configuration_read_lock, optional_bytes, replace_configuration
 from jev_gateway.credentials import credential_snapshot, env_update, credential_path, credential_update, read_credential_bytes, validate_secret, validate_reference
 from jev_gateway.model_metadata import _automatic_metadata_value
@@ -434,6 +434,36 @@ class ProviderConfiguration:
             }
             replace_configuration(self.models_file, changes, activate=lambda: activate(catalog, registry), restore_runtime=restore_runtime)
             return {"valid": True, "applied": True, **self.project(catalog, revision(self.models_file), document=candidate, overlay=overlay, write_available=True)}
+
+    def decision_probe_provider(self, body: Any) -> tuple[DecisionProvider, str | None, bool]:
+        """Resolve saved/candidate decision credentials without writing or activation."""
+        if not isinstance(body, dict) or ("provider_id" in body) == ("provider" in body) or set(body) - {"provider_id", "provider", "credential"}:
+            raise ValueError("Supply one decision provider selector.")
+        with configuration_read_lock(self.models_file):
+            document = read_models_document(self.models_file)
+            decision = document.get("decision") or {}
+            if "provider_id" in body:
+                if set(body) != {"provider_id"}:
+                    raise ValueError("Saved selector cannot edit credentials.")
+                provider = next((p for p in decision.get("providers", []) if p["id"] == body["provider_id"]), None)
+                if provider is None:
+                    raise ValueError("Decision provider does not exist.")
+            else:
+                provider = copy.deepcopy(body["provider"])
+            if not isinstance(provider, dict):
+                raise ValueError("Provider must be an object.")
+            reference = validate_reference(provider.get("api_key_env"))
+            credential = body.get("credential", {"action": "keep"})
+            action, value = _credential_action(credential)
+            content = read_credential_bytes(self.models_file)
+            env_content = optional_bytes(self.models_file.parent / ".env")
+            if action != "keep":
+                content = credential_update(content, reference, value)
+                if action == "clear":
+                    env_content = env_update(env_content, reference, None)
+            env = credential_snapshot(self.models_file, external=self.external, env_content=env_content or b"", credential_content=content or b'{"version":1,"values":{}}')
+            settings = decision_from_dict({"providers": [provider]}, "decision probe", env)
+            return settings.providers[0], env.get(reference), bool(decision.get("enabled", False))
 
     def discovery_provider(self, body: Any) -> tuple[dict[str, Any], str | None, set[str]]:
         if not isinstance(body, dict) or ("provider_id" in body) == ("provider" in body):

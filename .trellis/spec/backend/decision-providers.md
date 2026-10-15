@@ -21,6 +21,15 @@ Canonical `models.json` uses `decision: {enabled, default_provider, timeout_seco
 
 `DecisionResult` contains the provider ID and normalized typed-choice answers. The System One adapter sends `state` and `questions`, plus `model` only when configured, and accepts an `answers` object whose entries contain string `choice` values. The strategy checks required question names and allowed criteria before using the result. `decision_matrix` currently has no score or boolean rule vocabulary.
 
+Results and nested answers are detached immutable values. The optional
+`evaluate_with_evidence` returns a `DecisionEvaluation` even on failure; the
+compatibility helper preserves evaluate-only injected makers. Safe per-call
+attempts distinguish disabled/missing setup, HTTP status, timeout and invalid
+answers without a shared last-error field or raw upstream prose. Strategies
+carry rule/bypass/pool evidence independently from `defaulted`. See
+[routing/session inspection](./routing-session-inspection.md) for the exact
+closed statuses, persistence projection, legacy uncertainty and diagnostics.
+
 The old top-level `jev` key and its Python helpers `JevSettings`, `JevSource`, `jev_from_dict`, and `Catalog.jev` have been removed. Migrate to `decision`, replacing `sources` with `providers`, `default_source` with `default_provider`, and supplying each provider's explicit `protocol`. Legacy endpoints that relied on an implicit model also need an explicit `model`; the canonical schema does not infer one. The old strategy kinds `jev` and `jev_matrix` are replaced by `decision` and `decision_matrix`, with no aliases. `JevClient`, `JevClassifier`, `JevStrategy`, `JevMatrixStrategy`, and `DecisionSettings.default_source` / `.sources` are removed as well. Strategy descriptions and routing snapshots serialize canonical `decision` terminology.
 
 ## 4. Validation & error matrix
