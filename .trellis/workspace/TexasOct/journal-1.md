@@ -466,3 +466,37 @@ Accepted routing evidence, retained sessions, readable context and explicit synt
 ### Next Steps
 
 - Publish0.1.11 through existing release workflow, then overwrite operator install without backups and verify preservation/health.
+
+
+## Session 17: Publish 0.1.12 and overwrite operator installation
+<!-- trellis-session: v=2 fp=a29d650358888f24 -->
+
+**Date**: 2026-10-15
+**Task**: Publish 0.1.12 and overwrite operator installation
+**Branch**: `main`
+
+### Summary
+
+Task completed and archived. Stable0.1.12 published by workflow38717601893 and installed over operator0.1.9 without backups; owned service running/healthy, existing configuration and records preserved.
+
+### Main Changes
+
+- Preserved failedv0.1.11 tag/run; fixed two fixture credentials and obtained independent repair PASS.
+- Verified four public assets, hosted producer bytes and same wheel across Ubuntu/macOS/public-installer receipts.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e24155a83ac48f8930d65aab760b381c27b9070b` | fix: isolate routing inspector test credentials |
+| `3ed0118310a309b4155a82f5533961c44e588f81` | chore(trellis): rearchive verified release fixture repair |
+
+### Testing
+
+- [OK] Hosted backend3405 passed/2 skipped; frontend446 passed; Pyright zero errors/warnings.
+- [OK] Local/public installed smokes native0 success:true;102 wheel members classified,96 product files,107 RECORD hashes and2 owned entrypoints verified.
+- [OK] Nine runtime-file bytes/modes unchanged; SQLite integrity and original row multiplicities preserved; health/dashboard/retained history reads pass.
+
+### Status
+
+[OK] **Completed**

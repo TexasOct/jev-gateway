@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
+- **Total Sessions**: 17
 - **Last Active**: 2026-10-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~468 | Active |
+| `journal-1.md` | ~502 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-10-15 | Publish 0.1.12 and overwrite operator installation | `e24155a83ac48f8930d65aab760b381c27b9070b`, `3ed0118310a309b4155a82f5533961c44e588f81` | `main` |
 | 16 | 2026-10-15 | Complete routing session inspection for 0.1.11 | `3c3dc7caea6bdbc4188284f86867c128ce5986ef` | `feat/routing-session-inspector` |
 | 15 | 2026-10-15 | Publish stable 0.1.9 | `049b8bf80ac873d9f4a9ff11fbee723332a13374`, `400b13d2040a0b31380f51beb5e1ce967e44bddf` | `work/release-0.1.9` |
 | 14 | 2026-10-13 | Repair legacy workflow editing and publish 0.1.8 | `6b5580eb98d62995eec21b913a292188f50493ce`, `ea34e794840d9b96e92b2e2c25ebc9229bd56d6c`, `412b7659f936487ed0402e88252de831e6f564dd` | `main` |
