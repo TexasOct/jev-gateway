@@ -23,7 +23,7 @@ User approval: "开始实现", followed by emphasis on appropriate UI design. Th
 - [x] Independent integrated check; fix valid findings and rerun their affected gates.
 - [x] Update executable contracts/specs and report exact completed scope, validation, remaining installation/release state.
 
-Implementation accepted after independent recheck `6a7f1845-ad95-43e2-9de3-6e34ce58b137` (PASS). Full receipts are in `research/final-acceptance.md` and `research/parent-final-receipt.json`. Phase3.4 commit confirmation is pending; no index, publication or operator installation change has occurred.
+Implementation accepted after independent recheck `6a7f1845-ad95-43e2-9de3-6e34ce58b137` (PASS) and committed as `3c3dc7caea6bdbc4188284f86867c128ce5986ef`. The user authorized task archival, stable0.1.11 publication and local overwrite installation without backups. The task is archived; publication/install observations follow in `acceptance.md`. Original detailed receipts remain under local `research/`.
 
 ## Commands
 
