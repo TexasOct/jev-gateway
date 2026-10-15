@@ -157,6 +157,7 @@ def test_failure_unmatched_defaults_and_bypasses_are_independent(monkeypatch: An
 
 
 def test_retained_sessions_survive_restart_and_use_recorded_config(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setenv("JEV_OPENROUTER_API_KEY", "synthetic")
     document = shipped_document()
     document["decision"]["enabled"] = False
     config = make_stored_config(tmp_path, gateway_api_key="management", document=document)
@@ -372,7 +373,8 @@ def test_synthetic_post_uses_pinned_bounded_transport(monkeypatch: Any, scenario
     assert "upstream secret" not in repr(result)
 
 
-def test_context_projection_is_bounded_and_excludes_provider_and_catalog_data() -> None:
+def test_context_projection_is_bounded_and_excludes_provider_and_catalog_data(monkeypatch: Any) -> None:
+    monkeypatch.setenv("JEV_OPENROUTER_API_KEY", "synthetic")
     catalog = catalog_from_document(shipped_document(), "fixture")
     snapshot = catalog.routing_snapshot()
     snapshot["providers"][0]["params"] = {"private": "never-project"}
