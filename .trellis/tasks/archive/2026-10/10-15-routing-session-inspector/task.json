@@ -21,7 +21,7 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Original UI/runtime PASS preserved. CI fixture repair committed and independently accepted;43 inspector tests,Pyright,0.1.12 package validator and isolated installed-wheel smoke passed. Re-archiving for stable0.1.12 publication and local overwrite installation without backups. Failedv0.1.11 tag remains immutable with no release.",
+  "notes": "Completed and archived. Stable0.1.12 published after successful build and Ubuntu/macOS installed smokes; public assets and isolated public installer verified. Operator upgraded from0.1.9 to0.1.12 through verified public installer, native0; owned service running/healthy, runtime files and original database rows preserved, no operator backups. Failedv0.1.11 tag remains immutable with no release.",
   "meta": {
     "implementation_status": "accepted",
     "independent_review": "PASS",
@@ -34,8 +34,14 @@
     ],
     "release_repair_review": "PASS",
     "release_repair_review_run": "4995f0fc-4a6b-440f-9e7c-1fd0fe7848ab",
-    "publication_status": "pending",
-    "local_installation_status": "pending",
-    "backups_requested": false
+    "publication_status": "published",
+    "local_installation_status": "installed",
+    "backups_requested": false,
+    "operator_backups_created": false,
+    "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.12",
+    "release_source_commit": "3ed0118310a309b4155a82f5533961c44e588f81",
+    "release_workflow_run": 38717601893,
+    "public_wheel_sha256": "14ef7fbab5dbb8eeea89a57761f1f61efd9726cbe219d3522167fb788cf1661c",
+    "installed_version": "0.1.12"
   }
 }

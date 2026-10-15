@@ -1,5 +1,11 @@
 # Routing/session inspection acceptance
 
+Final disposition: completed and archived. Stable0.1.12 is published and the
+operator installation has been overwritten with its verified public wheel,
+preserving configuration and records without operator backups. Earlier stage
+observations below remain as history; final publication/install receipts follow
+at the end.
+
 Implementation accepted on `feat/routing-session-inspector`, based on `6fbd3a7`.
 Source commit: `3c3dc7caea6bdbc4188284f86867c128ce5986ef`.
 The user subsequently authorized completion, archival, publication of the next
@@ -72,3 +78,38 @@ isolated macOS installed-wheel smoke for0.1.12 completed native0 with
 returned PASS and independently ran the two decisive tests (2 passed in0.38s).
 Dependency records are unchanged. Publication and operator install are the
 remaining authorized steps; no operator backups are requested or created.
+
+## Final publication and operator installation
+
+- Stable Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.12
+- Immutable signed tag source: `3ed0118310a309b4155a82f5533961c44e588f81`.
+- Native workflow `38717601893`: build, Ubuntu installed smoke, macOS installed
+  smoke and publication all succeeded. Hosted backend3405 passed/2 skipped,
+  frontend446 passed and CLI Pyright zero errors/warnings.
+- All four public assets match API sizes/digests, SHA256 sidecars and downloaded
+  hosted producer bytes. Both hosted smoke receipts are `success:true` and bind
+  the same public wheel. Public package/static/template parity covers96 files.
+- Public wheel SHA256:
+  `14ef7fbab5dbb8eeea89a57761f1f61efd9726cbe219d3522167fb788cf1661c`.
+- The isolated public-installer smoke completed native0 with `success:true`.
+  It used the documented nine-tool headless PATH adaptation in a private script
+  copy; only the tool tuple changed, all other bytes and the no-Node guard were
+  unchanged. No raw four-tool public-installer run is claimed.
+- Operator installation upgraded0.1.9 to0.1.12 through the verified public script,
+  native0. The observed actual uv input matches the public wheel. All102 wheel
+  members were classified,96 product files match,107 installed RECORD hashes
+  validate, four generated metadata files are classified, and both CLI shims
+  belong to the managed tool environment.
+- The originally running, ownership-verified service was stopped and restarted
+  through its CLI. Final status is running and `/healthz` reports `ok`. Served
+  Dashboard index and both JS/CSS assets match the public wheel; authenticated
+  retained-session listing succeeds and the new diagnostic route is present.
+- All nine runtime-file digests and modes are unchanged. SQLite integrity is
+  `ok`, and every original typed row multiplicity on original columns survives.
+  No old environment copy, recovery wheel, configuration copy or SQLite backup
+  was created. Verification retained only digests/statistics and native receipts.
+
+Detailed release/install receipts are local-only under
+`.trellis/.runtime/routing-session-release-0.1.12/`; failed0.1.11 and original
+REWORK receipts remain separate. This closure does not relabel the three known
+baseline integration failures or native LSP environment findings as passing.
