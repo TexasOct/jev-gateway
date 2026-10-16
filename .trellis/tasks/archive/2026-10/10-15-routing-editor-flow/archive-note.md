@@ -10,7 +10,8 @@ Frontend acceptance remains 448 unit tests and 410 related browser cases. Exact
 source fingerprints match those receipts. Local 0.1.13 packaging additionally
 passed lock validation, current bundled assets, 13 release-validation tests,
 wheel/installer parity and all 169 isolated installed-wheel checks. Dependencies
-are unchanged. Hosted publication is pending its normal Ubuntu/macOS smoke gates.
+are unchanged. Hosted publication subsequently passed both Ubuntu/macOS smoke
+gates, and the public installer passed all 169 checks with native exit 0.
 
 This was direct work on `main`, with no PR branch. Archival therefore uses the
 documented branch-validation exception. Publication evidence will be appended to
@@ -18,3 +19,10 @@ documented branch-validation exception. Publication evidence will be appended to
 
 Private release receipts and the pre-commit recovery snapshot are under
 `~/.local/state/jev-gateway/release-0.1.13-2026-10-16T05-34-29-412Z/`.
+
+Publication is complete: stable latest
+`https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.13`, workflow
+`38857450133`, signed tag source `e8f465d5294620b974f38b02f7d41a925e823199`.
+All four public asset bytes match the hosted artifact and published digests.
+The public wheel SHA256 is
+`d74c2f79d36e87df80206a9f774a6db0740802dad3a2b1f3014f90226756380a`.

@@ -500,3 +500,38 @@ Task completed and archived. Stable0.1.12 published by workflow38717601893 and i
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: Commit workspace and publish JEV Gateway 0.1.13
+<!-- trellis-session: v=2 fp=246147f2c44bbcae -->
+
+**Date**: 2026-10-16
+**Task**: Commit workspace and publish JEV Gateway 0.1.13
+**Branch**: `main`
+
+### Summary
+
+Committed all operator-authorized workspace changes, archived accepted routing tasks, and verified the stable 0.1.13 publication. Supplier subscription onboarding remains planning.
+
+### Main Changes
+
+- Committed all current code, tests, README/project documentation and task design artifacts; synchronized all three version records without dependency changes.
+- Signed tag v0.1.13 targets e8f465d5294620b974f38b02f7d41a925e823199. Release: https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.13.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3e0118bed550c2f1c56e499148210071c6edf6eb` | feat(routing): simplify strategy editor and prepare 0.1.13 |
+| `e8f465d5294620b974f38b02f7d41a925e823199` | chore(trellis): archive accepted routing tasks for 0.1.13 |
+
+### Testing
+
+- [OK] Local frontend: 448 unit tests, 410 related browser cases, lint/build and both TypeScript configurations passed.
+- [OK] Hosted workflow 38857450133: 3405 backend passed, 2 skipped; 448 frontend units passed; pyright clean. Ubuntu/macOS each passed 169 installed-wheel checks.
+- [OK] Four public assets match sizes, API digests, sidecars and hosted bytes. Public-installer smoke native exit0, success true, 169 checks with documented reversible nine-tool PATH seam and unchanged no-Node guard.
+- [OK] Public wheel SHA256 d74c2f79d36e87df80206a9f774a6db0740802dad3a2b1f3014f90226756380a. Prior release refs preserved.
+
+### Status
+
+[OK] **Completed**

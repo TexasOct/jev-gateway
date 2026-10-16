@@ -21,11 +21,15 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Frontend acceptance complete: 448 unit tests and 410 related browser cases passed. Operator explicitly authorized all current workspace changes and release 0.1.13. Work is committed; hosted publication is pending its existing gates.",
+  "notes": "Frontend acceptance complete: 448 unit tests and 410 related browser cases passed. Operator explicitly authorized all current workspace changes and release 0.1.13. Signed publication succeeded at e8f465d5294620b974f38b02f7d41a925e823199; hosted Ubuntu/macOS and public-installer checks each passed all169 cases. Public latest stable assets and checksums verified.",
   "meta": {
     "implementation_status": "accepted",
     "acceptance": "acceptance.md",
     "release_version": "0.1.13",
+    "release_url": "https://github.com/TexasOct/jev-gateway/releases/tag/v0.1.13",
+    "release_workflow": 38857450133,
+    "release_source": "e8f465d5294620b974f38b02f7d41a925e823199",
+    "publication_status": "verified",
     "commit_pending": false
   }
 }
