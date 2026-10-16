@@ -2,21 +2,31 @@ import { describe, expect, it } from "vitest";
 import { configuration } from "../../../../tests/fixtures/configuration";
 import { alignNodes, arrangeNodes, classifyConnection, connectMatchEdge, disconnectEdge, marqueeNodes, planFitViewport, translateNodes, validLayout } from "../model/canvas";
 import { addCriterion, draftFromConfiguration, incompleteLabels, invalidQuestions, removeCriterion, toOverlayPayload, workflowEdges } from "../model/draft";
-import { canvasDimensions, canvasOutputs } from "../model/outputs";
+import { canvasDimensions, canvasInputPort, canvasOutputPort, canvasOutputs } from "../model/outputs";
+import { NODE_CARD_WIDTH } from "../model/node-card";
 
 describe("semantic output channels", () => {
-  it("projects each question/criterion to the canonical ordered entry and preserves stable IDs through growth", () => {
+  it("projects the combined answer set once and preserves identity and dimensions through criterion growth", () => {
     const draft = draftFromConfiguration(configuration);
     const added = addCriterion(addCriterion(draft, "intent", "code"), "intent", "prose");
     const outputs = canvasOutputs(added, configuration);
-    expect(outputs.questions!.filter((row) => row.kind === "context").map((row) => row.name)).toEqual(["intent = default", "intent = other", "intent = code", "intent = prose"]);
+    expect(outputs.questions!.filter((row) => row.kind === "context").map((row) => row.id)).toEqual(["context"]);
     expect(outputs.questions!.filter((row) => row.kind === "context").every((row) => row.edge?.to === "rule-0")).toBe(true);
     expect(outputs.questions!.at(-1)!.edge).toEqual({ from: "questions", to: "fallback", kind: "failure" });
     expect(workflowEdges(added, configuration).filter((edge) => edge.kind === "context")).toHaveLength(1);
     expect(outputs.questions![0]!.id).toBe(canvasOutputs(draft, configuration).questions![0]!.id);
     const shrunk = removeCriterion(added, "intent", "prose");
-    expect(canvasDimensions(outputs).questions!.height).toBe(196);
-    expect(canvasDimensions(canvasOutputs(shrunk, configuration)).questions!.height).toBe(168);
+    expect(canvasDimensions(outputs).questions).toEqual(canvasDimensions(canvasOutputs(shrunk, configuration)).questions);
+    expect(canvasDimensions(outputs).questions!.height).toBe(112);
+    const multiple = { ...added, questions: { ...added.questions, complexity: { type: "choice", instructions: "Choose complexity", criteria: { low: "Low", high: "High" } } } };
+    expect(canvasOutputs(multiple, configuration).questions).toEqual(outputs.questions);
+  });
+
+  it("uses the top and bottom for ordered continuation and keeps editable match ports lateral", () => {
+    const rows = canvasOutputs(draftFromConfiguration(configuration), configuration)["rule-0"]!;
+    expect(canvasInputPort("rule-0", rows)).toEqual({ x: NODE_CARD_WIDTH / 2, y: 0 });
+    expect(canvasOutputPort(rows, 0)).toMatchObject({ x: NODE_CARD_WIDTH, y: 70 });
+    expect(canvasOutputPort(rows, 1)).toEqual({ x: NODE_CARD_WIDTH / 2, y: canvasDimensions({ "rule-0": rows })["rule-0"]!.height });
   });
 
   it.each(["rule-0", "fallback"])("keeps a repairable %s match slot with an explicit empty label and blocks stale reconnection", (from) => {
@@ -89,21 +99,31 @@ describe("semantic output channels", () => {
     { type: "choice", instructions: "Choose", criteria: { " ": "One", two: "Two" }, reason: "criterionName" },
     { type: "choice", instructions: "Choose", criteria: { one: "", two: "Two" }, reason: "criterionDescription" },
     { type: "choice", instructions: "Choose", criteria: { one: " \t ", two: "Two" }, reason: "criterionDescription" },
-  ])("blocks $reason drafts and hides their result channels until repaired", ({ reason, ...question }) => {
+  ])("blocks $reason drafts while keeping the combined context and failure paths stable", ({ reason, ...question }) => {
     const draft = draftFromConfiguration(configuration);
     const invalid = { ...draft, questions: { ...draft.questions, invalid: question } };
     expect(invalidQuestions(invalid)).toEqual([{ name: "invalid", reason }]);
     const rows = canvasOutputs(invalid, configuration).questions!;
-    expect(rows.filter((row) => row.kind === "context").map((row) => row.name)).toEqual(["intent = default", "intent = other"]);
+    expect(rows.filter((row) => row.kind === "context").map((row) => row.id)).toEqual(["context"]);
     expect(rows.at(-1)!.kind).toBe("failure");
     const repaired = { ...invalid, questions: { ...invalid.questions, invalid: { type: "choice", instructions: "Choose", criteria: { one: "One", two: "Two" } } } };
     expect(invalidQuestions(repaired)).toEqual([]);
-    expect(canvasOutputs(repaired, configuration).questions!.filter((row) => row.kind === "context")).toHaveLength(4);
+    expect(canvasOutputs(repaired, configuration).questions).toEqual(rows);
   });
 });
 
 describe("expanded layout geometry", () => {
   const dimensions = { questions: { width: 190, height: 420 }, "rule-0": { width: 190, height: 112 }, "rule-1": { width: 190, height: 112 }, fallback: { width: 190, height: 84 } };
+  it("aligns destinations to their matching rule instead of catalog insertion order", () => {
+    const draft = draftFromConfiguration(configuration);
+    draft.rules = [{ when: { intent: "other" }, select: { label: "quality" } }, draft.rules[0]!];
+    const outputs = canvasOutputs(draft, configuration);
+    const positions = arrangeNodes(Object.keys(outputs), canvasDimensions(outputs), workflowEdges(draft, configuration));
+    expect(positions["zone::balanced/quality"]!.y).toBe(positions["rule-0"]!.y);
+    expect(positions["zone::balanced/default"]!.y).toBe(positions["rule-1"]!.y);
+    expect(positions["model::fixture-provider/fixture-model"]!.y).toBeGreaterThan(positions["zone::balanced/quality"]!.y);
+    expect(positions["model::fixture-provider/fixture-model"]!.x).toBeGreaterThan(positions["zone::balanced/default"]!.x + 240);
+  });
   it("arranges stage nodes using their actual height and aligns only the selected group", () => {
     const positions = arrangeNodes(Object.keys(dimensions), dimensions);
     expect(positions["rule-1"]!.y).toBe(positions["rule-0"]!.y + 112 + 48);

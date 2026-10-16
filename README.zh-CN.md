@@ -6,7 +6,7 @@
 
 JEV Gateway 是一个兼容 OpenAI 对话接口的模型路由网关，按配置的成本、质量和能力规则在多个提供方之间选择模型。客户端指定策略即可，无需写死模型；会话既可以固定模型，也可以逐轮重新选择。
 
-[快速开始](#quick-start) · [模型标识](#model-identity) · [路由策略](#routing-strategies) · [HTTP API](#http-api) · [文档](#documentation) · [许可](#license) · [开发](#development)
+[快速开始](#quick-start) · [模型标识](#model-identity) · [路由策略](#routing-strategies) · [HTTP API](#http-api) · [项目结构](#project-structure) · [文档](#documentation) · [许可](#license) · [开发](#development)
 
 <a id="what-it-does"></a>
 
@@ -185,12 +185,49 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 成功的对话响应会带上 `X-JEV-Route`、`X-JEV-Provider`、`X-JEV-Model`、`X-JEV-Route-Label`、`X-JEV-Task-Type`、`X-JEV-Mode`、`X-JEV-Reason`、`X-JEV-Strategy`、`X-JEV-Decision-Id`，并在适用时附带请求、会话、切换、推理与切换受阻原因的响应头。端点契约、鉴权、错误码与 reload 语义见 [`docs/http-api.md`](docs/http-api.md)。
 
+<a id="project-structure"></a>
+
+## 项目结构
+
+仓库由 Python 网关服务、React 管理面板、自动化测试和发布脚本组成。主要目录如下：
+
+```text
+jev-gateway/
+├── jev_gateway/              # Python 网关、配置、路由与 CLI
+│   ├── strategy/             # 策略注册、策略契约与路由决策
+│   ├── provider/             # 提供方传输基类及内置实现
+│   ├── provider_adapters/    # 上游协议适配
+│   ├── cli/                  # jev / jev-gateway 命令行操作
+│   ├── logging/              # 目录与配置相关日志功能
+│   ├── templates/            # 配置和凭证示例
+│   └── static/               # 面板构建产物（由脚本生成）
+├── frontend/                 # Vite + React 管理面板源码
+├── tests/                    # Python 服务、CLI、路由及集成测试
+├── scripts/                  # 构建、安装、卸载、发布校验脚本
+├── docs/                     # 运维、API、配置、路由与发布文档
+├── models.json               # 开发环境的路由/模型配置示例
+├── pyproject.toml            # Python 包、依赖与命令行入口
+├── Dockerfile / compose.yaml # 容器构建与运行
+└── README.md                 # 英文项目入口；本文件为中文入口
+```
+
+### 主要运行路径
+
+1. `jev_gateway/cli/` 提供安装后使用的管理命令和服务启动入口。
+2. 网关通过 `jev_gateway/gateway.py` 接收 OpenAI 兼容请求，使用目录、策略及提供方模块完成模型选择和转发。
+3. `jev_gateway/strategy/` 封装策略类型与路由策略；`jev_gateway/provider/`、`provider_adapters/` 负责上游提供方通信。
+4. `frontend/` 是控制台前端；`scripts/build-frontend.sh` 将构建结果写入 `jev_gateway/static/`，供 Python 服务打包和提供。
+5. `tests/` 覆盖上述服务与前端交互相关契约；`scripts/` 和 `.github/workflows/` 支持安装、构建、校验与发布。
+
+配置与路由的详细行为以 [`docs/models-config.md`](docs/models-config.md) 和 [`docs/routing-design.md`](docs/routing-design.md) 为准；本节是代码导航，不替代 API 或配置参考。
+
 <a id="documentation"></a>
 
 ## 文档
 
 | 文档 | 内容 |
 | --- | --- |
+| [`docs/project-structure.md`](docs/project-structure.md) | 仓库目录、架构边界、请求路径与开发入口。 |
 | [`docs/local-install.md`](docs/local-install.md) | curl、本地、容器与 wheel 安装。 |
 | [`docs/cli.md`](docs/cli.md) | CLI 命令、提供方设置与生命周期管理。 |
 | [`docs/credentials.md`](docs/credentials.md) | 只写的网页密钥设置与纯服务端文件配置。 |

@@ -6,7 +6,7 @@ import { LocaleProvider } from "@/shared/i18n";
 import RoutingCanvas from "../RoutingCanvas";
 import { marqueeNodes, translateNodes } from "../model/canvas";
 import { draftFromConfiguration } from "../model/draft";
-import { NODE_CARD_BASE_HEIGHT, NODE_CARD_CONTENT_HEIGHT, NODE_CARD_CONTENT_INSET, NODE_CARD_PORT_RADIUS, NODE_CARD_ROWS, nodeCardCenter, nodeCardMetrics, nodeCardPorts, nodeCardPortsWithCenter } from "../model/node-card";
+import { NODE_CARD_BASE_HEIGHT, NODE_CARD_CONTENT_HEIGHT, NODE_CARD_CONTENT_INSET, NODE_CARD_PORT_RADIUS, NODE_CARD_ROWS, NODE_CARD_WIDTH, nodeCardCenter, nodeCardMetrics, nodeCardPorts, nodeCardPortsWithCenter } from "../model/node-card";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,7 +14,7 @@ describe("node card geometry", () => {
   it("matches the three rendered rows without unused measured height", () => {
     expect(NODE_CARD_ROWS).toEqual({ type: 12, title: 16, summary: 12 });
     expect(NODE_CARD_CONTENT_HEIGHT + 2 * NODE_CARD_CONTENT_INSET).toBe(NODE_CARD_BASE_HEIGHT);
-    expect(nodeCardMetrics()).toEqual({ width: 190, height: 56 });
+    expect(nodeCardMetrics()).toEqual({ width: NODE_CARD_WIDTH, height: 56 });
   });
 
   it("shares the existing marquee and joint movement bounds", () => {
@@ -29,12 +29,12 @@ describe("node card geometry", () => {
 
   it("keeps the identity header and one spaced row per semantic output", () => {
     expect(nodeCardCenter("left")).toEqual({ x: 0, y: 28 });
-    expect(nodeCardCenter("right")).toEqual({ x: 190, y: 28 });
+    expect(nodeCardCenter("right")).toEqual({ x: NODE_CARD_WIDTH, y: 28 });
     expect(nodeCardPorts(0)).toEqual([]);
-    expect(nodeCardPorts(1)).toEqual([{ x: 190, y: 70, radius: 9 }]);
+    expect(nodeCardPorts(1)).toEqual([{ x: NODE_CARD_WIDTH, y: 70, radius: 9 }]);
     expect(nodeCardPorts(2).map((port) => port.y)).toEqual([70, 98]);
     expect(nodeCardPorts(3).map((port) => port.y)).toEqual([70, 98, 126]);
-    expect(nodeCardMetrics(3)).toEqual({ width: 190, height: 140 });
+    expect(nodeCardMetrics(3)).toEqual({ width: NODE_CARD_WIDTH, height: 140 });
     expect(nodeCardCenter("left", 3)).toEqual({ x: 0, y: 70 });
   });
 
@@ -74,16 +74,16 @@ describe("node card geometry", () => {
     const html = renderToStaticMarkup(createElement(LocaleProvider, null, createElement(RoutingCanvas, {
       heading: "", children: () => null, draft: draftFromConfiguration(config), config,
       disabled: false, selected: "", selection: [], onSelect: noop, onSelection: noop, onDraft: noop,
-      onError: noop, canAddRule: true, onAnchor: noop, revealNode: null,
+      onError: noop, onAddModel: noop, canAddModel: true, canAddRule: true, onAnchor: noop, revealNode: null,
       onReveal: noop, inspectorOpen: false, topology: null,
     })));
     const cards = [...html.matchAll(/<button[^>]*data-canvas-node="[^"]+"[^>]*>/g)].map(([tag]) => tag);
     expect(cards).toHaveLength(5);
     for (const card of cards) {
-      expect(card).toContain('class="routing-canvas-node absolute block w-[190px] overflow-hidden');
+      expect(card).toContain('class="routing-canvas-node absolute block overflow-hidden');
       expect(card).toContain('[touch-action:none]');
       expect(card).toContain('style="left:');
-      expect(card).toMatch(/width:190px;height:(56|84|112)px/);
+      expect(card).toMatch(new RegExp(`width:${NODE_CARD_WIDTH}px;height:(56|84|112)px`));
     }
     for (const kind of ["questions", "rule", "fallback", "label", "model"]) expect(html).toContain(`data-node-kind="${kind}"`);
     expect(html).toContain(name);

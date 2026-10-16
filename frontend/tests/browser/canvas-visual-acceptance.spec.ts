@@ -93,7 +93,7 @@ for (const viewport of [
         expect(geometry.find(({ id }) => id === "questions")!.height).toBeGreaterThan(56);
         expect(geometry.find(({ id }) => id === "zone::balanced/default")!.height).toBeGreaterThan(300);
         for (const node of geometry) {
-          expect(node.width).toBe(190);
+          expect(node.width).toBe(240);
           expect(node.height).toBeGreaterThanOrEqual(56);
         }
         const columns: Record<string, typeof geometry> = {};

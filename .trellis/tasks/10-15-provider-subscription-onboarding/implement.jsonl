@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Existing provider config transaction, discovery, import and metadata contracts to preserve in generic onboarding."}
+{"file": ".trellis/spec/backend/credential-configuration.md", "reason": "Credential ownership, safe projection and protected transaction requirements for generic auth lifecycle."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer contract discipline for backend/UI/registry and credential lifecycle."}
+{"file": ".trellis/tasks/10-15-provider-subscription-onboarding/research/provider-capability-matrix.md", "reason": "Existing preset inventory and provider capability constraints."}
+{"file": ".trellis/tasks/10-15-provider-subscription-onboarding/research/url-based-onboarding-ui.md", "reason": "URL/device-code onboarding UX precedents and security constraints."}

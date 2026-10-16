@@ -1,4 +1,4 @@
-export const NODE_CARD_WIDTH = 190;
+export const NODE_CARD_WIDTH = 240;
 export const NODE_CARD_BASE_HEIGHT = 56;
 export const NODE_CARD_ROWS = { type: 12, title: 16, summary: 12 } as const;
 export const NODE_CARD_CONTENT_HEIGHT = NODE_CARD_ROWS.type + NODE_CARD_ROWS.title + NODE_CARD_ROWS.summary;

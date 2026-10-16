@@ -1,8 +1,8 @@
 import type { ConfigurationPayload } from "@/shared/api/types";
 import type { ConnectionIntent } from "./canvas";
-import { invalidQuestions, workflowEdges, workflowModels } from "./draft";
+import { workflowEdges, workflowModels } from "./draft";
 import type { RoutingDraft, WorkflowEdge } from "./draft";
-import { nodeCardMetrics } from "./node-card";
+import { NODE_CARD_WIDTH, nodeCardCenter, nodeCardMetrics, nodeCardPorts } from "./node-card";
 import type { NodeDimensions } from "./node-card";
 
 export type CanvasOutput = {
@@ -17,13 +17,8 @@ export type CanvasOutput = {
 export function canvasOutputs(draft: RoutingDraft, config: ConfigurationPayload): Record<string, CanvasOutput[]> {
   const edges = workflowEdges(draft, config);
   const entry = edges[0]!;
-  const invalid = new Set(invalidQuestions(draft).map(({ name }) => name));
   const outputs: Record<string, CanvasOutput[]> = {
-    questions: Object.entries(draft.questions).filter(([question]) => !invalid.has(question)).flatMap(([question, definition]) =>
-      Object.keys(definition.criteria).map((criterion) => ({
-        id: JSON.stringify([question, criterion]), kind: "context" as const,
-        name: `${question} = ${criterion}`, edge: entry, intent: { kind: "reconnect" as const, edge: entry },
-      }))),
+    questions: [{ id: "context", kind: "context", edge: entry, intent: { kind: "reconnect", edge: entry } }],
   };
   const failure = edges.find((edge) => edge.kind === "failure")!;
   outputs.questions!.push({ id: "failure", kind: "failure", edge: failure, intent: { kind: "reconnect", edge: failure } });
@@ -47,4 +42,15 @@ export function canvasOutputs(draft: RoutingDraft, config: ConfigurationPayload)
 
 export function canvasDimensions(outputs: Record<string, CanvasOutput[]>): NodeDimensions {
   return Object.fromEntries(Object.entries(outputs).map(([id, rows]) => [id, nodeCardMetrics(rows.length)]));
+}
+
+/** Ordered rules accept the combined result above and continue below. */
+export function canvasInputPort(id: string, outputs: CanvasOutput[]) {
+  return id.startsWith("rule-") ? { x: NODE_CARD_WIDTH / 2, y: 0 } : nodeCardCenter("left", outputs.length);
+}
+
+export function canvasOutputPort(outputs: CanvasOutput[], index: number) {
+  return outputs[index]?.kind === "unmatched"
+    ? { x: NODE_CARD_WIDTH / 2, y: nodeCardMetrics(outputs.length).height }
+    : nodeCardPorts(outputs.length)[index]!;
 }

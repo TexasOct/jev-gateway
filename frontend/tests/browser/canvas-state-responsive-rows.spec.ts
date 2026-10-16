@@ -260,7 +260,10 @@ for (const [locale, width, height, scheme] of [
     const menuBox = (await menu.boundingBox())!;
     expect(menuBox.x).toBeGreaterThanOrEqual(0); expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(width + 1);
     expect(menuBox.y).toBeGreaterThanOrEqual(0); expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(height + 1);
-    await page.keyboard.press("Escape");
+    await expect(menu.getByRole("menuitem", { name: words.workflowAddModel, exact: true })).toBeEnabled();
+    await menu.getByRole("menuitem", { name: words.workflowAddModel, exact: true }).click();
+    await expect(page.getByRole("dialog", { name: words.workflowChooseModel, exact: true })).toBeVisible();
+    await page.getByRole("button", { name: words.cancel, exact: true }).click();
     await expect(menu).toHaveCount(0);
 
     // R4 removes the drawer. Current floating actions remain inside the native viewport.
@@ -323,7 +326,7 @@ test("C23 dense output rows, handles and growth/shrink keep the documented metri
     const style = getComputedStyle(element), box = element.getBoundingClientRect();
     return { id: element.getAttribute("data-canvas-node"), width: box.width, height: box.height, cardWidth: Number.parseFloat(style.width) };
   }));
-  for (const node of metrics) expect(node.width).toBe(190);
+  for (const node of metrics) expect(node.width).toBe(240);
   const pool = metrics.find(node => node.id === "zone::balanced/default")!;
   // Ten pool members plus the tag-pool "add" output give eleven 28px rows above
   // the 56px identity header; the documented row metric is what this row pins.

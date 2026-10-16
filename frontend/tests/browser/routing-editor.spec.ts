@@ -32,13 +32,13 @@ test("native route branches retain selection and endpoints with and without redu
   await expect(page.getByRole("region", { name: en.canvasConnectionActions })).toContainText("default");
   const activePath = fallbackBranch.locator("..").locator("[data-workflow-edge]");
   await expect(fallbackBranch).toHaveAttribute("aria-pressed", "true");
-  await expect(activePath).toHaveCSS("stroke-width", "3px");
+  await expect(activePath).toHaveCSS("stroke-width", "2.5px");
   await expect(activePath).toHaveCSS("stroke", /rgb\(\d+, \d+, \d+\)/);
-  await expect(activePath).toHaveCSS("stroke-dasharray", "6px, 5px");
+  await expect(activePath).toHaveCSS("stroke-dasharray", "4px, 4px");
   const match = page.locator('[data-canvas-edge][data-edge-from="rule-0"][data-edge-kind="match"]');
   const otherPath = match.locator("..").locator("[data-workflow-edge]");
   await expect(match).toHaveAttribute("aria-pressed", "false");
-  await expect(otherPath).toHaveCSS("stroke-width", "2px");
+  await expect(otherPath).toHaveCSS("stroke-width", "1.5px");
   // ConfiguredRouteFlow tracing is retired. Mounted native edges are static in
   // both preferences; this does not certify an equivalent trace animation.
   await expect(activePath).toHaveCSS("animation-name", "none");
@@ -48,10 +48,10 @@ test("native route branches retain selection and endpoints with and without redu
   await expect(page.getByRole("region", { name: en.canvasConnectionActions })).toContainText("default");
   await expect(page.locator('[data-flow-motion="tracing"]')).toHaveCount(0);
   await expect(match).toHaveAttribute("aria-pressed", "true");
-  await expect(otherPath).toHaveCSS("stroke-width", "3px");
+  await expect(otherPath).toHaveCSS("stroke-width", "2.5px");
   await expect(otherPath).toHaveCSS("stroke", /\d+, \d+, \d+|color\(\)/);
   await expect(otherPath).toHaveCSS("stroke-dasharray", "none");
-  await expect(activePath).toHaveCSS("stroke-width", "2px");
+  await expect(activePath).toHaveCSS("stroke-width", "1.5px");
   await expect(otherPath).toHaveCSS("animation-name", "none");
   expect(await edges.evaluateAll(elements => elements.map(element => ({ from: element.getAttribute("data-edge-from"), kind: element.getAttribute("data-edge-kind"), to: element.getAttribute("data-edge-to") })))).toEqual(endpoints);
   await page.keyboard.press("Escape"); await expect(match).toBeFocused();
@@ -143,8 +143,8 @@ test("canvas utilities preserve measured geometry, toolbar controls and real hit
     const node = canvas.locator('[data-canvas-node="questions"]');
     await expect(node).toBeVisible();
     await expect(node).toHaveCSS("position", "absolute");
-    await expect(node).toHaveCSS("width", "190px");
-    await expect(node).toHaveCSS("height", "140px");
+    await expect(node).toHaveCSS("width", "240px");
+    await expect(node).toHaveCSS("height", "112px");
     await expect(node).toHaveCSS("overflow", "hidden");
     await expect(node).toHaveCSS("touch-action", "none");
     await expect(canvas).toHaveCSS("position", "absolute");

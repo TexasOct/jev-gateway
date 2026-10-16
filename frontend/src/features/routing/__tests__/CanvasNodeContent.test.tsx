@@ -67,9 +67,10 @@ describe("canvas node content", () => {
     for (const [id, kind, name, summary] of cases) {
       const html = renderNode(id!, "Existing title", locale);
       expect(html).toContain(`data-node-kind="${kind}"`);
-      expect(html).toContain(`>${name}</span>`);
-      expect(html).toContain('text-sm font-semibold leading-4 text-ink" title="Existing title">Existing title</span>');
-      expect(html).toContain(`text-[11px] leading-3 text-ink-muted" title="${summary}">${summary}</span>`);
+      expect(html).toContain(`title="${name}"`);
+      const title = kind === "questions" ? "scale" : kind === "rule" ? "scale = large" : kind === "fallback" ? words.canvasFailureRoute : "Existing title";
+      expect(html).toContain(`title="${title}">${title}</span>`);
+      expect(html).toContain(`title="${summary}">${summary}</span>`);
       const svg = html.match(/<svg\b[^>]*>.*?<\/svg>/)![0];
       expect(svg).toContain('width="14" height="14"');
       expect(svg).toContain('stroke="currentColor" stroke-width="1.8"');
@@ -111,7 +112,8 @@ describe("canvas node content", () => {
     const draft = draftFromConfiguration(config);
     draft.rules[0] = { when: { scale: "<script>bad()</script>" }, select: { label: 'craft & "routine"' } };
     const html = renderNode("rule-0", title, "en", draft);
-    expect(html).toContain(`text-sm font-semibold leading-4 text-ink" title="${encoded}">${encoded}</span>`);
+    expect(html).toContain(`>${encoded}</span>`);
+    expect(html).toContain('title="scale = &lt;script&gt;bad()&lt;/script&gt;"');
     expect(html).toContain('title="scale=&lt;script&gt;bad()&lt;/script&gt; → craft &amp; &quot;routine&quot;"');
     expect(html).not.toMatch(/<(img|script)\b/);
   });
@@ -120,7 +122,7 @@ describe("canvas node content", () => {
     expect(getCanvasNodeKind(id)).toBe("unknown");
     const html = renderNode(id, "");
     expect(html).toContain('data-node-kind="unknown"');
-    expect(html).toContain('text-sm font-semibold leading-4 text-ink" title="Node">Node</span>');
+    expect(html).toContain('title="Node">Node</span>');
     expect(html).toContain("Details unavailable");
   });
 

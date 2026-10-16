@@ -31,6 +31,8 @@ for (const width of [320, 390, 1280]) for (const locale of ["en", "zh-CN"] as co
     const measurements = [];
     for (const [target, container] of [[add, ".canvas-tools"], [page.getByRole("button", { name: words.settings, exact: true }), "[data-dashboard-view-nav]"]] as const) {
       await expect(target).toBeEnabled();
+      // Start inside each controls region; traversing graph nodes also reveals them.
+      await page.locator(container).getByRole("button").first().focus();
       const reverse = await target.evaluate(el => !!(el.compareDocumentPosition(document.activeElement!) & Node.DOCUMENT_POSITION_FOLLOWING));
       for (let count = 0; count < 180 && !(await target.evaluate(el => el === document.activeElement)); count++) {
         await expect(target).toBeEnabled();

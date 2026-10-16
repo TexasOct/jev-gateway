@@ -59,7 +59,7 @@ async function drag(page: Page, source: Locator, target: Locator) {
 }
 
 for (const locale of ["en", "zh-CN"] as const) {
-  test(`selects the exact question result wire and names its output in ${locale}`, async ({ page, mockApi }, testInfo) => {
+  test(`selects the combined question result wire by pointer and keyboard in ${locale}`, async ({ page, mockApi }, testInfo) => {
     setupCatalog(mockApi); await open(page);
     const words = locale === "en" ? en : zhCN;
     if (locale === "zh-CN") {
@@ -70,14 +70,14 @@ for (const locale of ["en", "zh-CN"] as const) {
     const wires = page.locator('[data-canvas-edge][data-edge-from="questions"][data-edge-kind="context"]');
     const pressed = page.locator('[data-canvas-edge][aria-pressed="true"]');
     const panel = page.getByRole("region", { name: words.canvasConnectionActions });
-    await expect(wires).toHaveCount(2);
-    for (const [index, criterion] of ["default", "other"].entries()) {
+    await expect(wires).toHaveCount(1);
+    for (const index of [0]) {
       const wire = wires.nth(index);
-      const tuple = JSON.stringify(["questions", JSON.stringify(["intent", criterion]), "rule-0"]);
+      const tuple = JSON.stringify(["questions", "context", "rule-0"]);
       await clickWire(page, wire);
       await expect(pressed).toHaveCount(1);
       await expect(pressed).toHaveAttribute("data-canvas-edge", tuple);
-      await expect(panel.locator("p").first()).toHaveText(`${words.questions} · intent = ${criterion} → ${words.rule} 1`);
+      await expect(panel.locator("p").first()).toHaveText(`${words.questions} · ${words.canvasResults} → ${words.rule} 1`);
       await expect(panel).toContainText(words.canvasReason_context);
       await expect(panel.getByRole("button", { name: words.canvasDisconnect })).toBeDisabled();
       await panel.getByRole("button", { name: words.cancel, exact: true }).click();
@@ -86,9 +86,9 @@ for (const locale of ["en", "zh-CN"] as const) {
       await wire.focus(); await wire.press("Enter");
       await expect(pressed).toHaveCount(1);
       await expect(pressed).toHaveAttribute("data-canvas-edge", tuple);
-      await expect(panel.locator("p").first()).toHaveText(`${words.questions} · intent = ${criterion} → ${words.rule} 1`);
+      await expect(panel.locator("p").first()).toHaveText(`${words.questions} · ${words.canvasResults} → ${words.rule} 1`);
       await expect(panel).toContainText(words.canvasReason_context);
-      if (criterion === "other") await page.screenshot({ path: testInfo.outputPath(`connection-${locale}.png`), fullPage: true });
+      await page.screenshot({ path: testInfo.outputPath(`connection-${locale}.png`), fullPage: true });
       await page.keyboard.press("Escape");
       await expect(panel).toHaveCount(0);
       await expect(pressed).toHaveCount(0);
@@ -96,8 +96,8 @@ for (const locale of ["en", "zh-CN"] as const) {
     }
     await page.locator('[data-output-node="questions"][data-output-kind="context"]').last().click();
     await expect(pressed).toHaveCount(1);
-    await expect(pressed).toHaveAttribute("data-canvas-edge", JSON.stringify(["questions", JSON.stringify(["intent", "other"]), "rule-0"]));
-    await expect(panel.locator("p").first()).toHaveText(`${words.questions} · intent = other → ${words.rule} 1`);
+    await expect(pressed).toHaveAttribute("data-canvas-edge", JSON.stringify(["questions", "context", "rule-0"]));
+    await expect(panel.locator("p").first()).toHaveText(`${words.questions} · ${words.canvasResults} → ${words.rule} 1`);
     await page.getByRole("button", { name: words.canvasPanTool, exact: true }).click();
     await expect(panel).toHaveCount(0);
     await expect(pressed).toHaveCount(0);
@@ -190,7 +190,7 @@ test("reconnects an empty failure fallback by pointer drag and cancels keyboard 
   await expect(page.getByRole("button", { name: "Review changes", exact: true })).toBeEnabled();
 });
 
-test("question options grow and shrink ports and dense handles keep full size and exact wire centers", async ({ page, mockApi }) => {
+test("question options keep a stable result port while dense pool handles retain exact wire centers", async ({ page, mockApi }) => {
   const catalog = setupCatalog(mockApi);
   catalog.models = Array.from({ length: 12 }, (_, index) => ({ ...catalog.models[0]!, id: `fixture-provider/member-${index}`, upstream_model: `member-${index}` }));
   catalog.labels[0]!.models = catalog.models.map((model) => model.id);
@@ -221,11 +221,11 @@ test("question options grow and shrink ports and dense handles keep full size an
   const inspector = page.locator(".workflow-inspector");
   await inspector.getByLabel("New criterion key").fill("extra");
   await inspector.getByRole("button", { name: "Add", exact: true }).first().click();
-  await expect(page.locator('[data-output-node="questions"]')).toHaveCount(4);
-  await expect(questions).toHaveCSS("height", "168px");
+  await expect(page.locator('[data-output-node="questions"]')).toHaveCount(2);
+  await expect(questions).toHaveCSS("height", "112px");
   await inspector.getByLabel("Criterion key", { exact: true }).last().locator("..").locator("..").getByRole("button", { name: "Remove", exact: true }).click();
-  await expect(page.locator('[data-output-node="questions"]')).toHaveCount(3);
-  await expect(questions).toHaveCSS("height", "140px");
+  await expect(page.locator('[data-output-node="questions"]')).toHaveCount(2);
+  await expect(questions).toHaveCSS("height", "112px");
 });
 
 test("aligns a selected group and restores its layout without policy writes", async ({ page, mockApi }) => {
@@ -256,7 +256,7 @@ test("legacy connection actions preserve fixed, explicit and tag-pool facts with
   const panel = page.getByRole("region", { name: "Connection actions" });
   await page.locator('[data-output-node="questions"][data-output-kind="context"]').first().click();
   await expect(panel).toContainText(en.canvasReadOnly); await expect(panel.getByRole("button", { name: "Disconnect connection" })).toHaveCount(0);
-  await expect(page.locator('[data-canvas-edge][data-edge-from="questions"][data-edge-kind="context"]')).toHaveCount(2);
+  await expect(page.locator('[data-canvas-edge][data-edge-from="questions"][data-edge-kind="context"]')).toHaveCount(1);
   await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   const explicit = page.locator('[data-output-node="zone::balanced/quality"]');
   await expect(explicit).toHaveCount(1); await explicit.focus(); await explicit.press("Enter");
@@ -292,17 +292,17 @@ test("blocks unsupported question drafts with a specific error", async ({ page, 
 });
 
 for (const field of ["Instructions", "Criterion description"] as const) {
-  test(`blocks blank ${field.toLowerCase()} and restores result ports after repair`, async ({ page, mockApi }) => {
+  test(`blocks blank ${field.toLowerCase()} while retaining stable result ports through repair`, async ({ page, mockApi }) => {
     setupCatalog(mockApi); await open(page);
     await page.locator('[data-canvas-node="questions"]').click();
     const input = page.locator(".workflow-inspector").getByRole("textbox", { name: field, exact: true }).first();
     await input.fill("   ");
     const message = field === "Instructions" ? "Enter question instructions before review." : "Every criterion needs a nonempty description before review.";
     await expect(page.getByText(`intent: ${message}`, { exact: true })).toBeVisible();
-    await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(0);
+    await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Review changes", exact: true })).toBeDisabled();
     await input.fill("Repaired question text");
-    await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(2);
+    await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Review changes", exact: true })).toBeEnabled();
     expect(mockApi.requests.filter(({ method, path }) => method !== "GET" && path.includes("configuration"))).toEqual([]);
   });

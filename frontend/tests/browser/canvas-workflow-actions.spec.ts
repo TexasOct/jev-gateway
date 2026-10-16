@@ -259,7 +259,7 @@ test("invalid question configuration has a located explicit repair and undo", as
   await page.getByRole("button", { name: en.canvasUseChoice, exact: true }).click();
   await expect(page.getByRole("complementary", { name: en.nodeInspector })).toBeVisible();
   await expect(entry).toHaveAttribute("data-node-state", "selected");
-  await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(2);
+  await expect(page.locator('[data-output-node="questions"][data-output-kind="context"]')).toHaveCount(1);
   await page.locator(".routing-canvas-scroll").focus(); await page.keyboard.press("ControlOrMeta+z");
   await expect(entry).toHaveAttribute("data-node-state", "invalid");
 });

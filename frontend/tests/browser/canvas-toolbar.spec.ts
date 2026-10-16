@@ -48,8 +48,14 @@ for (const { width, height } of [{ width: 1280, height: 900 }, { width: 1430, he
       expect(placement.policy.width).toBeLessThanOrEqual(400);
       expect(placement.tools.width).toBeLessThanOrEqual(600);
       await expect(page.getByRole("combobox", { name: words.strategy, exact: true })).toBeVisible();
-      await expect(page.getByRole("combobox", { name: words.workflowDecisionProvider, exact: true })).toBeVisible();
-      await expect(page.getByText(words.workflowDecisionProviderNote, { exact: true })).toBeVisible();
+      const strategySettings = page.getByRole("button", { name: words.strategySettings, exact: true });
+      await expect(strategySettings).toBeVisible();
+      await strategySettings.click();
+      const settingsDialog = page.getByRole("dialog", { name: words.strategySettings, exact: true });
+      await expect(settingsDialog.getByRole("combobox", { name: words.workflowDecisionProvider, exact: true })).toBeVisible();
+      await expect(settingsDialog.getByText(words.workflowDecisionProviderNote, { exact: true })).toBeVisible();
+      await settingsDialog.getByRole("button", { name: words.backToEditing, exact: true }).click();
+      await expect(strategySettings).toBeFocused();
       const policyActions = await page.locator(".workflow-toolbar").evaluate((element) => {
         const buttons = [...element.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
         return { rows: Math.max(...buttons.map((box) => box.top)) - Math.min(...buttons.map((box) => box.top)), minHeight: Math.min(...buttons.map((box) => box.height)), overflow: element.scrollWidth > element.clientWidth };

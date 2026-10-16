@@ -108,7 +108,7 @@ for (const { width, locale, font } of scenarios) {
       for (const kind of ["questions", "rule", "fallback", "label", "model"]) {
         const node = nodes.filter({ has: page.locator(`[data-node-kind="${kind}"]`) }).first();
         const svg = node.locator("svg.lucide");
-        await expect(node).toHaveCSS("width", "190px");
+        await expect(node).toHaveCSS("width", "240px");
         const outputCount = await page.locator(`[data-output-node="${await node.getAttribute("data-canvas-node")}"]`).count();
         await expect(node).toHaveCSS("height", `${56 + outputCount * 28}px`);
         await expect(svg).toHaveCSS("width", "14px");
@@ -148,7 +148,7 @@ for (const { width, locale, font } of scenarios) {
       await expect(page.locator(".workflow-info, .workflow-drawer")).toHaveCount(0);
       const close = page.getByRole("button", { name: words.closeInspector, exact: true });
       await expectDecorativeIcon(close, words.closeInspector);
-      await expect(close).toHaveCSS("height", "36px");
+      await expect(close).toHaveCSS("height", "40px");
       await close.focus();
       await close.press("Enter");
       await expect(page.locator(".workflow-inspector")).toHaveCount(0);

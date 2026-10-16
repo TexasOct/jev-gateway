@@ -38,9 +38,13 @@ for (const [locale, copy] of [["en", en], ["zh-CN", zhCN]] as const) {
     await page.addInitScript((value) => localStorage.setItem("jev-dashboard-locale", value), locale);
     await page.goto("/dashboard/");
     await page.getByRole("button", { name: copy.strategyEditor, exact: true }).click();
-    const selector = page.getByRole("combobox", { name: copy.workflowDecisionProvider, exact: true });
-    await expect(page.getByText(copy.workflowDecisionProviderNote, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: copy.strategySettings, exact: true }).click();
+    const settingsDialog = page.getByRole("dialog", { name: copy.strategySettings, exact: true });
+    await expect(settingsDialog).toBeVisible();
+    const selector = settingsDialog.getByRole("combobox", { name: copy.workflowDecisionProvider, exact: true });
+    await expect(settingsDialog.getByText(copy.workflowDecisionProviderNote, { exact: true })).toBeVisible();
     await selector.selectOption(provider.id);
+    await settingsDialog.getByRole("button", { name: copy.backToEditing, exact: true }).click();
     await page.getByRole("button", { name: copy.reviewChanges, exact: true }).click();
     await page.getByRole("button", { name: copy.confirmAndSave, exact: true }).click();
     await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
@@ -54,8 +58,12 @@ for (const [locale, copy] of [["en", en], ["zh-CN", zhCN]] as const) {
     await expect(page.getByRole("region", { name: copy.pmDecisionRouting, exact: true })).toContainText(copy.pmDecisionEnabled);
     expect(state.writes[0]?.operations).toEqual([{ action: "set_decision_enabled", enabled: true }]);
     await page.getByRole("button", { name: copy.strategyEditor, exact: true }).click();
-    await expect(selector).toHaveValue(provider.id);
-    await selector.selectOption("");
+    await page.getByRole("button", { name: copy.strategySettings, exact: true }).click();
+    const reopenedSettings = page.getByRole("dialog", { name: copy.strategySettings, exact: true });
+    const reopenedSelector = reopenedSettings.getByRole("combobox", { name: copy.workflowDecisionProvider, exact: true });
+    await expect(reopenedSelector).toHaveValue(provider.id);
+    await reopenedSelector.selectOption("");
+    await reopenedSettings.getByRole("button", { name: copy.backToEditing, exact: true }).click();
     await page.getByRole("button", { name: copy.reviewChanges, exact: true }).click();
     await page.getByRole("button", { name: copy.confirmAndSave, exact: true }).click();
     await expect(page.locator(".workflow-toolbar[data-policy-draft]")).toHaveAttribute("data-policy-draft", "unchanged");
@@ -66,7 +74,8 @@ for (const [locale, copy] of [["en", en], ["zh-CN", zhCN]] as const) {
     expect(state.writes).toHaveLength(1);
     await page.reload();
     await page.getByRole("button", { name: copy.strategyEditor, exact: true }).click();
-    await expect(selector).toHaveValue("");
+    await page.getByRole("button", { name: copy.strategySettings, exact: true }).click();
+    await expect(page.getByRole("dialog", { name: copy.strategySettings, exact: true }).getByRole("combobox", { name: copy.workflowDecisionProvider, exact: true })).toHaveValue("");
     expect(state.unexpected ?? []).toEqual([]);
   });
 

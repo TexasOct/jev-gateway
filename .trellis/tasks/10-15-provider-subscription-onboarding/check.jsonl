@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend and test quality requirements for final review."}
+{"file": ".trellis/spec/backend/provider-configuration.md", "reason": "Review provider compatibility and transaction invariants."}
+{"file": ".trellis/spec/backend/credential-configuration.md", "reason": "Review credential security and persistence invariants."}
+{"file": ".trellis/tasks/10-15-provider-subscription-onboarding/research/provider-capability-matrix.md", "reason": "Review inventory and support claims against captured evidence."}
+{"file": ".trellis/tasks/10-15-provider-subscription-onboarding/research/url-based-onboarding-ui.md", "reason": "Review URL-guidance claims and security constraints."}

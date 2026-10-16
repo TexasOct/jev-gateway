@@ -8,7 +8,7 @@ JEV Gateway routes OpenAI-compatible chat requests across model providers using 
 cost, quality, and capability rules. Choose a strategy instead of hard-coding a model, and either
 keep a session on one route or reconsider it each turn.
 
-[Quick start](#quick-start) · [Model identity](#model-identity) · [Routing strategies](#routing-strategies) · [HTTP API](#http-api) · [Documentation](#documentation) · [License](#license) · [Development](#development)
+[Quick start](#quick-start) · [Model identity](#model-identity) · [Routing strategies](#routing-strategies) · [HTTP API](#http-api) · [Project structure](#project-structure) · [Documentation](#documentation) · [License](#license) · [Development](#development)
 
 ## What it does
 
@@ -209,6 +209,7 @@ authentication, error codes, and reload semantics: [`docs/http-api.md`](docs/htt
 
 | Document | Contents |
 | --- | --- |
+| [`docs/project-structure.md`](docs/project-structure.md) | Repository layout, architecture boundaries, request flow, and development entry points. |
 | [`docs/local-install.md`](docs/local-install.md) | Curl, local, container, and wheel installation. |
 | [`docs/cli.md`](docs/cli.md) | CLI commands, provider setup, and lifecycle management. |
 | [`docs/credentials.md`](docs/credentials.md) | Write-only dashboard setup and file-based server credentials. |

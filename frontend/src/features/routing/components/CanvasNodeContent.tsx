@@ -46,13 +46,14 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
   const kind = getCanvasNodeKind(id);
   const Icon = nodeIcons[kind];
   const typeName = t(kindKeys[kind]);
-  const title = text || typeName;
+  let title = text || typeName;
   let summary = t("canvasNodeUnavailable");
 
   switch (kind) {
     case "questions": {
       const count = Object.keys(draft.questions).length;
       summary = t(count === 1 ? "canvasNodeQuestionCountOne" : "canvasNodeQuestionCount").replace("{count}", String(count));
+      title = Object.keys(draft.questions).join(" · ") || title;
       break;
     }
     case "rule": {
@@ -62,12 +63,15 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
           .map(([name, value]) => `${name}=${Array.isArray(value) ? `(${value.join(" | ")})` : value}`)
           .join(", ");
         summary = `${conditions || t("canvasNodeNoConditions")} → ${matrixChoiceLabel(rule.select, config.labels[0]?.name) || t("labelUnavailable")}`;
+        title = Object.entries(rule.when).map(([name, value]) =>
+          `${name} = ${Array.isArray(value) ? value.join(" / ") : value}`).join(" · ") || t("canvasNodeNoConditions");
       }
       break;
     }
     case "fallback": {
       const label = matrixChoiceLabel(draft.fallback, config.labels[0]?.name);
       summary = label ? `${t("label")}: ${label}` : t("labelUnavailable");
+      title = t("canvasFailureRoute");
       break;
     }
     case "label": {
@@ -90,12 +94,12 @@ export default function CanvasNodeContent({ id, text, draft, config }: Props) {
     }
   }
 
-  return <span className={`canvas-node-content canvas-node-kind-${kind} absolute left-0 right-0 top-0 grid h-[56px] min-w-0 grid-rows-[12px_16px_12px] content-center select-none px-1.5`} data-node-kind={kind}>
-    <span className="canvas-node-type flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase leading-3 tracking-wide text-ink-muted" title={typeName}>
+  return <span className={`canvas-node-content canvas-node-kind-${kind} absolute left-0 right-0 top-0 grid h-[56px] min-w-0 ${kind === "rule" ? "grid-rows-[12px_32px]" : "grid-rows-[12px_16px_12px]"} content-center select-none px-3`} data-node-kind={kind}>
+    <span className="canvas-node-type flex min-w-0 items-center gap-1 text-[10px] font-medium leading-3 text-ink-muted" title={typeName}>
       <Icon className="canvas-node-icon shrink-0" size={14} strokeWidth={1.8} aria-hidden="true" focusable="false" />
-      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{typeName}</span>
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{kind === "rule" ? text : typeName}</span>
     </span>
-    <span className="canvas-node-title min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold leading-4 text-ink" title={title}>{title}</span>
-    <span className="canvas-node-summary min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-3 text-ink-muted" title={summary}>{summary}</span>
+    <span className={`canvas-node-title min-w-0 overflow-hidden text-sm font-semibold leading-4 text-ink ${kind === "rule" ? "line-clamp-2 break-words" : "text-ellipsis whitespace-nowrap"}`} title={title}>{title}</span>
+    <span className={kind === "rule" ? "canvas-node-summary sr-only" : "canvas-node-summary min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-3 text-ink-muted"} title={summary}>{summary}</span>
   </span>;
 }

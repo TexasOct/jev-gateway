@@ -1,6 +1,6 @@
 /** Named workflow drafts, protected policy writes, and node inspection. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, GitBranch, LoaderCircle, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, GitBranch, LoaderCircle, Plus, RotateCcw, Settings2, Trash2, X } from "lucide-react";
 
 import { api, ApiError } from "@/shared/api/client";
 import { useWorkspaceActive } from "@/shared/navigation/workspace-activity";
@@ -53,8 +53,6 @@ interface EditorProps {
   onOpenModel?: (identity: { provider: string; upstream: string }) => boolean;
 }
 
-const actionButtonClass = "min-h-9 rounded-md border-outline bg-panel px-3 text-ink hover:border-primary hover:bg-panel-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
-
 function zoneId(tag: string): string { return `zone::${tag}`; }
 
 function DiffList({ diff, t }: { diff: DraftDiff; t: ReturnType<typeof useTranslation>["t"] }) {
@@ -100,10 +98,12 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   }, [onError, onUnauthorized]);
   const [strategies, setStrategies] = useState<StrategiesPayload["data"]>([]);
   const [decisionReadinessOpen, setDecisionReadinessOpen] = useState(false);
+  const [strategySettingsOpen, setStrategySettingsOpen] = useState(false);
   const [strategyAction, setStrategyAction] = useState<"create" | "delete" | null>(null);
   const [strategyName, setStrategyName] = useState("");
   const [modelChooser, setModelChooser] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
+  const [editingQuestion, setEditingQuestion] = useState("");
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
@@ -279,6 +279,8 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   const updateRuleDraft = useCallback((next: RoutingDraft, mutation?: RuleLayoutMutation) => {
     if (policyReadOnly || next === draft) return;
     setDraft(next);
+    const addedQuestion = Object.keys(next.questions).find((name) => !Object.hasOwn(draft.questions, name));
+    if (addedQuestion) setEditingQuestion(addedQuestion);
     if (mutation) {
       setTopology((current) => ({ serial: (current?.serial ?? 0) + 1, mutation }));
       setSelectedNode((id) => reconcileRuleSelection(id, mutation));
@@ -457,6 +459,7 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   const mountedModels = workflowModels(draft, config);
   const chooserModels = config.models.filter((model) => !mountedModels.some((item) => item.id === model.id)
     && `${model.provider} ${model.upstream_model} ${model.id}`.toLocaleLowerCase().includes(modelQuery.toLocaleLowerCase()));
+  const canChooseModel = !!config.definition && config.editable !== false && !editDisabled;
 
   const configuredDecision = decisionConfiguration?.decision;
   const selectedDecisionProvider = configuredDecision?.providers.find((provider) => provider.id === (draft.decisionProvider ?? configuredDecision.default_provider))
@@ -464,40 +467,25 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   const heading = <>
       {config.models.length === 0 ? <p role="status" className="text-sm text-ink-muted">{t("setupEmptyModels")}</p> : null}
       <div className="strategy-controls flex min-w-0 items-center gap-1">
-        <label className="flex min-w-0 flex-1 items-center gap-2 pl-2">
-          <GitBranch className="size-4 shrink-0 text-ink-muted" aria-hidden="true" focusable="false" />
-          <span className="sr-only">{t("strategy")}</span>
-          <NativeSelect className="border-transparent bg-transparent font-semibold shadow-none hover:bg-panel-muted" ref={strategySelectRef} value={config.strategy} disabled={busy || layoutDirty || policyRecovery !== null || !active} onChange={(event) => changeStrategy(event.target.value)}>
-            {!strategies.some((item) => item.name === config.strategy) && <NativeSelectOption value={config.strategy}>{config.strategy}</NativeSelectOption>}
-            {strategies.filter((item) => item.editable).map((item) => <NativeSelectOption key={item.name} value={item.name}>{item.name}</NativeSelectOption>)}
-          </NativeSelect>
-        </label>
-        <Button variant="ghost" size="icon" aria-label={t("workflowCreate")} title={t("workflowCreate")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null} onClick={() => setStrategyAction("create")}><Plus aria-hidden="true" focusable="false" /></Button>
-        <Button variant="ghost" size="icon" className="text-ink-muted" aria-label={t("workflowDelete")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null || !config.deletable} title={!config.deletable ? t("workflowDefaultProtected") : t("workflowDelete")} onClick={() => setStrategyAction("delete")}><Trash2 aria-hidden="true" focusable="false" /></Button>
-      </div>
-      {config.definition && <div className="grid min-w-0 gap-1 text-xs text-ink-muted"><label className="flex min-w-0 items-center gap-2">
-        <span>{t("workflowDecisionProvider")}</span>
-        <NativeSelect aria-label={t("workflowDecisionProvider")} value={draft.decisionProvider ?? ""} disabled={editDisabled} onChange={(event) => setEditableDraft((current) => ({ ...current, decisionProvider: event.target.value || undefined }))}>
-          <NativeSelectOption value="">{t("workflowDecisionProviderDefault")}</NativeSelectOption>
-          {(config.decision_providers ?? []).map((provider) => <NativeSelectOption key={provider.id} value={provider.id}>{provider.display_name || provider.id}{provider.model ? ` · ${provider.model}` : ""}</NativeSelectOption>)}
-        </NativeSelect>
-      </label><p className="m-0">{t("workflowDecisionProviderNote")}</p>
-      <div className="mt-1 flex h-[76px] min-h-[76px] min-w-0 items-center justify-between gap-2 rounded-md border border-outline bg-panel px-3 py-2">
-        <div role="status" className="grid min-w-0 gap-1 text-xs">
-          <span className={configuredDecision?.enabled ? "text-positive" : "text-ink-muted"}>{configuredDecision ? t(configuredDecision.enabled ? "classificationOn" : "classificationOff") : t("decisionReadinessUnknown")}</span>
-          {configuredDecision && <span className="truncate" title={selectedDecisionProvider?.id}>{selectedDecisionProvider ? `${selectedDecisionProvider.id} · ${t(selectedDecisionProvider.has_api_key ? "classificationProviderReady" : "classificationProviderMissing")}` : t("pmDecisionNeedsProvider")}</span>}
+        <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 hover:bg-panel-muted">
+            <GitBranch className="size-4 shrink-0 text-ink-muted" aria-hidden="true" focusable="false" />
+            <span className="sr-only">{t("strategy")}</span>
+            <NativeSelect className="border-transparent bg-transparent font-semibold shadow-none" ref={strategySelectRef} value={config.strategy} disabled={busy || layoutDirty || policyRecovery !== null || !active} onChange={(event) => changeStrategy(event.target.value)}>
+              {!strategies.some((item) => item.name === config.strategy) && <NativeSelectOption value={config.strategy}>{config.strategy}</NativeSelectOption>}
+              {strategies.filter((item) => item.editable).map((item) => <NativeSelectOption key={item.name} value={item.name}>{item.name}</NativeSelectOption>)}
+            </NativeSelect>
+          </label>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button variant="ghost" size="icon" aria-label={t("workflowCreate")} title={t("workflowCreate")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null} onClick={() => setStrategyAction("create")}><Plus aria-hidden="true" focusable="false" /></Button>
+            <Button variant="ghost" size="icon" className="text-ink-muted" aria-label={t("workflowDelete")} title={!config.deletable ? t("workflowDefaultProtected") : t("workflowDelete")} disabled={writeDisabled || busy || layoutDirty || policyRecovery !== null || !config.deletable} onClick={() => setStrategyAction("delete")}><Trash2 aria-hidden="true" focusable="false" /></Button>
+            <Button variant="ghost" size="icon" aria-label={t("strategySettings")} title={t("strategySettings")} onClick={() => setStrategySettingsOpen(true)}><Settings2 aria-hidden="true" focusable="false" /></Button>
+          </div>
         </div>
-        <Button variant="outline" size="sm" className="min-h-10 max-w-40 shrink-0 whitespace-normal" onClick={() => setDecisionReadinessOpen(true)}>{t("decisionManage")}</Button>
-      </div>
-      {decisionReadError && <div role="alert" className="text-xs text-caution">{t("decisionReadinessUnknown")} <Button variant="outline" size="sm" onClick={onRetryDecisionRead}>{t("routingRetryRead")}</Button></div>}
-      {decisionWriteError && <p role="alert" className="m-0 text-xs text-caution">{t("pmError")}</p>}
-      {decisionRefreshFailed && <div role="alert" className="text-xs text-caution">{t("pmRefreshFailed")} <Button variant="outline" size="sm" disabled={decisionPending} onClick={onRetryDecisionCatalog}>{t("pmRetryCatalog")}</Button></div>}
-      </div>}
       {error ? <div className="notice warn" role="alert">{error}</div> : null}
       {policyRecovery !== null && <div className="notice warn bg-panel text-ink" role="status"><span className="block">{t(policyRecovery === "applied" ? "routingSavedReadPending" : policyRecovery === "reset" ? "routingResetReadPending" : "routingWriteUnknown")}</span> <Button variant="outline" disabled={busy || !active} onClick={retryPolicyRead}>{t("routingRetryRead")}</Button></div>}
       {pendingFields && <p className="notice warn" role="status">{t("canvasPendingFields")}</p>}
       {incomplete && <div className="notice warn" role="status"><span>{t("canvasIncompleteDraft")}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode(incompleteNodes[0] ?? "fallback")}>{t("canvasRepair")}</Button></div>}
-      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <Button variant="outline" size="sm" type="button" onClick={() => selectEditorNode("questions")}>{t("canvasRepair")}</Button>{reason === "type" && <Button variant="outline" size="sm" type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setEditableDraft(setQuestion(draft, name, { ...question, type: "choice" })); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</Button>}</div>)}
+      {questionErrors.map(({ name, reason }) => <div key={name} className="notice warn" role="status"><span>{name}: {t(({ type: "canvasQuestionTypeError", criteria: "canvasQuestionCriteriaError", instructions: "canvasQuestionInstructionsError", criterionName: "canvasQuestionCriterionNameError", criterionDescription: "canvasQuestionCriterionDescriptionError" } as const)[reason])}</span> <Button variant="outline" size="sm" type="button" onClick={() => { setEditingQuestion(name); selectEditorNode("questions"); }}>{t("canvasRepair")}</Button>{reason === "type" && <Button variant="outline" size="sm" type="button" disabled={editDisabled} onClick={() => { const question = draft.questions[name]; if (question) setEditableDraft(setQuestion(draft, name, { ...question, type: "choice" })); setEditingQuestion(name); selectEditorNode("questions"); }}>{t("canvasUseChoice")}</Button>}</div>)}
       {config.overlay.error === null ? null : (
         <div className="notice warn" role="alert"><span>{tr("overlayUnreadable", { error: config.overlay.error })}</span> <span>{t("canvasOverlayRepair")}</span> <Button variant="outline" size="sm" type="button" disabled={writeDisabled || policyReadOnly || busy || policyRecovery !== null || layoutDirty || review !== null} onClick={() => setResetReview(true)}>{t("resetBaseline")}</Button></div>
       )}
@@ -522,13 +510,13 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
   </>;
 
   const actions = <div className="workflow-toolbar flex flex-nowrap items-center gap-1 border-t border-outline pt-1 [&>button]:min-h-10" data-policy-draft={diff.changed ? "pending" : "unchanged"}>
-    <Button variant="ghost" className="mr-auto px-2 text-ink-muted has-[>svg]:px-2 max-[600px]:size-10 max-[600px]:p-0 max-[600px]:has-[>svg]:px-0" aria-label={t("workflowAddModel")} title={t("workflowAddModel")} disabled={editDisabled} onClick={() => setModelChooser(true)}><Plus aria-hidden="true" focusable="false" /><span className="max-[600px]:sr-only">{t("workflowAddModel")}</span></Button>
-    <Button className="h-10 px-2 has-[>svg]:px-2 disabled:border-transparent disabled:bg-panel-muted disabled:text-ink-muted disabled:opacity-100" type="button" aria-label={t("reviewChanges")} onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}>{layoutDirty ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" focusable="false" /> : <Check aria-hidden="true" focusable="false" />}{layoutDirty ? t("canvasSavingLayout") : t("reviewChanges")}</Button>
+    <span className="mr-auto" />
     <Button variant="ghost" size="icon" className="text-ink-muted" type="button" aria-label={t("discardChanges")} title={t("discardChanges")} onClick={() => {
       setDraft(draftFromConfiguration(config)); setHistoryBoundary((value) => value + 1); setDiscardBoundary((value) => value + 1);
       setQuestionNames({}); setCriterionNames({}); setNewCriteria({}); setNewQuestion(""); selectLayoutNodes([]); setNotice(null); setReview(null);
     }} disabled={writeDisabled || busy || policyRecovery !== null || review !== null || !dirty}><X aria-hidden="true" focusable="false" /></Button>
     <Button variant="ghost" size="icon" className="text-ink-muted" type="button" aria-label={t("resetBaseline")} title={t("resetBaseline")} onClick={() => setResetReview(true)} disabled={writeDisabled || policyReadOnly || busy || policyRecovery !== null || layoutDirty || review !== null || !config.overlay.applied}><RotateCcw aria-hidden="true" focusable="false" /></Button>
+    <Button className="h-10 px-2 has-[>svg]:px-2 disabled:border-transparent disabled:bg-panel-muted disabled:text-ink-muted disabled:opacity-100" type="button" aria-label={t("reviewChanges")} onClick={startReview} disabled={writeDisabled || !config.definition || config.editable === false || busy || policyRecovery !== null || layoutDirty || pendingFields || resetReview || review !== null || !diff.changed || incomplete || questionErrors.length > 0}>{layoutDirty ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" focusable="false" /> : <Check aria-hidden="true" focusable="false" />}{layoutDirty ? t("canvasSavingLayout") : t("reviewChanges")}</Button>
   </div>;
 
   return (
@@ -537,7 +525,7 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
       if (inspectorOpen) { event.preventDefault(); event.stopPropagation(); closeInspector(); }
     }}>
             <RoutingCanvas historyScope={historyScope} heading={heading} actions={actions} draft={draft} config={config} disabled={canvasDisabled} policyDisabled={policyReadOnly} selected={selectedNode} selection={selectedNodes}
-               onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onError={onError} topology={topology}
+               onSelect={selectCanvasNode} onSelection={selectLayoutNodes} onDraft={updateRuleDraft} onAddModel={() => setModelChooser(true)} canAddModel={canChooseModel} onError={onError} topology={topology}
                onUnauthorized={onUnauthorized}
               inspectorOpen={inspectorOpen} onAnchor={setAnchor} revealNode={revealNode} onReveal={selectEditorNode}
               onOpenModel={onOpenModel}
@@ -549,17 +537,17 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
               >
           {() => <>
           {inspectorOpen && selectedNodes.length <= 1 && <aside className="workflow-inspector absolute z-[6] flex w-[min(340px,calc(100vw-24px))] max-h-[460px] flex-col overflow-hidden rounded-lg border border-outline bg-panel shadow-[0_8px_28px_color-mix(in_srgb,var(--text)_16%,transparent)] data-[fallback=true]:z-10" ref={inspectorRef} data-fallback={inspectorAt?.fallback} style={{ left: inspectorAt?.x, top: inspectorAt?.y, width: inspectorAt?.width, height: inspectorAt?.height, visibility: inspectorAt && !nodeDragging ? "visible" : "hidden" }} aria-label={t("nodeInspector")}>
-            <header className="inspector-heading flex items-center justify-between gap-2 border-b border-outline bg-panel-muted p-3"><h3 className="text-sm font-semibold text-ink">{t("nodeInspector")}</h3><Button variant="outline" className={actionButtonClass} type="button" title={t("closeInspector")} aria-label={t("closeInspector")} onClick={closeInspector}><span className="inline-flex w-[9px] items-center justify-center"><X aria-hidden="true" focusable="false" /></span></Button></header>
+            <header className="inspector-heading flex items-center justify-between gap-2 border-b border-outline p-3"><div className="grid min-w-0 gap-1"><h3 className="text-sm font-semibold text-ink">{selectedRuleExists ? `${t("rule")} ${selectedRuleIndex + 1}` : selectedNode === "questions" ? t("questionDefinitions") : selectedNode === "fallback" ? t("canvasFailureRoute") : t("nodeInspector")}</h3><span className="text-xs text-ink-muted">{diff.changed ? t("pendingChanges") : t("noPendingChanges")}</span></div><Button variant="ghost" size="icon" type="button" title={t("closeInspector")} aria-label={t("closeInspector")} onClick={closeInspector}><X aria-hidden="true" focusable="false" /></Button></header>
         <div className="inspector-body min-h-0 flex-1 overflow-y-auto p-3 text-[13px] text-ink">
-        <p className="mb-3 border-s-2 border-primary bg-panel-muted p-2 text-xs text-ink-muted">{t("reviewChanges")} · {diff.changed ? t("pendingChanges") : t("noPendingChanges")}</p>
         <p className="mb-3 text-xs text-ink-muted">{selectedRuleExists ? t("ruleOrderFirstMatch") : selectedNode === "questions" ? t("canvasQuestionEntry") : selectedNode === "fallback" ? t("unmatchedFallback") : selectedNode.startsWith("zone::") ? t("modelPool") : t("model")}</p>
-        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&>fieldset]:border-0 [&>fieldset]:p-0 [&_fieldset_fieldset]:border-0 [&_fieldset_fieldset]:p-0 [&_label]:grid [&_label]:gap-2 [&_label]:text-xs [&_label]:text-ink-muted [&_label:has(input[type=checkbox])]:flex [&_label:has(input[type=checkbox])]:items-center [&_label:has(input[type=checkbox])]:gap-2" aria-live="polite">
+        {selectedNodes.length <= 1 && <div className="workflow-edit space-y-3 [&>fieldset]:border-0 [&>fieldset]:p-0 [&_fieldset_fieldset]:border-0 [&_label]:grid [&_label]:gap-2 [&_label]:text-xs [&_label]:text-ink-muted [&_label:has(input[type=checkbox])]:flex [&_label:has(input[type=checkbox])]:items-center [&_label:has(input[type=checkbox])]:gap-2" aria-live="polite">
           {selectedNode === "questions" ? <fieldset className="grid min-w-0 gap-3 border-0 p-0 disabled:opacity-70" disabled={editDisabled}>
-            <legend>{t("questionDefinitions")}</legend>
-            {Object.entries(draft.questions).map(([name, question]) => <div key={name} className="grid gap-3 border-b border-outline pb-3">
+            <legend className="sr-only">{t("questionDefinitions")}</legend>
+            {Object.keys(draft.questions).length > 1 && <label>{t("canvasEditQuestion")}<NativeSelect value={Object.hasOwn(draft.questions, editingQuestion) ? editingQuestion : Object.keys(draft.questions)[0]} onChange={(event) => setEditingQuestion(event.target.value)}>{Object.keys(draft.questions).map((name) => <NativeSelectOption key={name} value={name}>{name}</NativeSelectOption>)}</NativeSelect></label>}
+            {Object.entries(draft.questions).filter(([name]) => name === (Object.hasOwn(draft.questions, editingQuestion) ? editingQuestion : Object.keys(draft.questions)[0])).map(([name, question]) => <div key={name} className="grid gap-3 border-b border-outline pb-3">
               <label>{t("questionName")}<Input value={questionNames[name] ?? name} onChange={(event) => setQuestionNames((current) => ({ ...current, [name]: event.target.value }))} /></label>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setEditableDraft((current) => renameQuestion(current, name, questionNames[name]!)); setQuestionNames({}); }}>{t("rename")}</Button>
+                <Button variant="outline" type="button" disabled={!questionNames[name] || (questionNames[name] !== name && Object.hasOwn(draft.questions, questionNames[name] ?? ""))} onClick={() => { setEditableDraft((current) => renameQuestion(current, name, questionNames[name]!)); setEditingQuestion(questionNames[name]!); setQuestionNames({}); }}>{t("rename")}</Button>
                 <Button variant="outline" type="button" disabled={Object.keys(draft.questions).length <= 1 || draft.rules.some((rule) => Object.hasOwn(rule.when, name) && Object.keys(rule.when).length === 1)} onClick={() => setEditableDraft((current) => removeQuestion(current, name))}>{t("remove")}</Button>
               </div>
               <label>{t("instructions")}<Textarea value={question.instructions} onChange={(event) => setEditableDraft((current) => setQuestion(current, name, { ...question, instructions: event.target.value }))} /></label>
@@ -575,7 +563,7 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
               <Button variant="outline" type="button" onClick={() => { setEditableDraft((current) => addCriterion(current, name, newCriteria[name] ?? "")); setNewCriteria((current) => ({ ...current, [name]: "" })); }}>{t("add")}</Button>
             </div>)}
             <label>{t("newQuestion")}<Input value={newQuestion} onChange={(event) => setNewQuestion(event.target.value)} /></label>
-            <Button variant="outline" type="button" onClick={() => { setEditableDraft((current) => addQuestion(current, newQuestion)); setNewQuestion(""); }}>{t("add")}</Button>
+            <Button variant="outline" type="button" onClick={() => { setEditableDraft((current) => addQuestion(current, newQuestion)); setEditingQuestion(newQuestion); setNewQuestion(""); }}>{t("add")}</Button>
           </fieldset> : null}
           {selectedNode === "fallback" && <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
             <legend>{t("unmatchedFallback")}</legend>
@@ -584,22 +572,26 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
           {selectedRuleExists && (() => {
             const index = selectedRuleIndex, rule = draft.rules[index]!;
             return <fieldset className="grid min-w-0 gap-3 rounded-lg border border-outline p-3 disabled:opacity-70" disabled={editDisabled}>
-              <legend>{t("rule")} {index + 1}</legend>
-              <Button variant="outline" type="button" disabled={editDisabled} onClick={() => applyRuleRemoval(index)}>{t("deleteRule")}</Button>
-              <section aria-label={t("canvasConditions")} className="space-y-2"><h4 className="text-xs font-semibold">{t("canvasConditions")}</h4>{Object.entries(draft.questions).map(([question, definition]) => {
+              <legend className="sr-only">{t("rule")} {index + 1}</legend>
+              <section aria-label={t("canvasDestination")} className="space-y-2 border-b border-outline pb-3"><h4 className="text-xs font-semibold">{t("canvasDestination")}</h4><ChoiceFields choice={rule.select} labels={config.labels} selections={selections} onChoice={(patch) => setEditableDraft((current) => setRuleChoice(current, index, patch))} /></section>
+              <section aria-label={t("canvasConditions")} className="space-y-3"><h4 className="text-xs font-semibold">{t("canvasAllConditions")}</h4><p className="text-xs leading-5 text-ink-muted">{t("canvasConditionsHint")}</p>{Object.entries(draft.questions).map(([question, definition]) => {
                 const selected = rule.when[question], values = selected === undefined ? [] : Array.isArray(selected) ? selected : [selected];
-                return <fieldset key={question} className="min-w-0 space-y-2"><legend className="mb-2 text-xs font-semibold">{question}</legend>
+                return <fieldset key={question} className="min-w-0 space-y-2 rounded-md bg-panel-muted p-3"><legend className="mb-2 text-xs font-semibold">{question}</legend>
                   <label><Checkbox checked={selected !== undefined} disabled={editDisabled || (selected !== undefined && Object.keys(rule.when).length === 1)} onChange={(event) => setEditableDraft((current) => toggleRuleQuestion(current, index, question, event.target.checked))} />{t("includeQuestion")}</label>
-                  {Object.keys(definition.criteria).map((criterion) => <label key={criterion}><Checkbox disabled={editDisabled || selected === undefined} checked={values.includes(criterion)} onChange={(event) => setEditableDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} />{criterion}</label>)}
+                  <details className="text-xs text-ink-muted"><summary className="cursor-pointer py-1">{t("instructions")}</summary><p className="whitespace-pre-wrap break-words py-2 leading-5">{definition.instructions}</p></details>
+                  {selected !== undefined && <p className="text-xs text-ink-muted">{t("canvasAnyValue")}</p>}
+                  {Object.entries(definition.criteria).map(([criterion, description]) => <label key={criterion} className="rounded py-1"><Checkbox aria-label={criterion} disabled={editDisabled || selected === undefined || (values.length === 1 && values.includes(criterion))} checked={values.includes(criterion)} onChange={(event) => setEditableDraft((current) => toggleRuleCriterion(current, index, question, criterion, event.target.checked))} /><span className="grid min-w-0 gap-0.5"><span className="font-medium text-ink [overflow-wrap:anywhere]">{criterion}</span><span className="text-xs leading-4 text-ink-muted [overflow-wrap:anywhere]">{description}</span></span></label>)}
                 </fieldset>;
               })}</section>
-              <section aria-label={t("canvasDestination")} className="space-y-2 border-t border-outline pt-2"><h4 className="text-xs font-semibold">{t("canvasDestination")}</h4><ChoiceFields choice={rule.select} labels={config.labels} selections={selections} onChoice={(patch) => setEditableDraft((current) => setRuleChoice(current, index, patch))} /></section>
-              <Button variant="outline" type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</Button>
-              <Button variant="outline" type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</Button>
+              <div className="flex flex-wrap items-center gap-1 border-t border-outline pt-2">
+                <Button variant="ghost" type="button" disabled={editDisabled || index === 0} onClick={() => applyRuleMove(index, index - 1)}>{t("moveEarlier")}</Button>
+                <Button variant="ghost" type="button" disabled={editDisabled || index === draft.rules.length - 1} onClick={() => applyRuleMove(index, index + 1)}>{t("moveLater")}</Button>
+                <Button variant="ghost" size="icon" className="ml-auto text-destructive" type="button" aria-label={t("deleteRule")} title={t("deleteRule")} disabled={editDisabled} onClick={() => applyRuleRemoval(index)}><Trash2 aria-hidden="true" focusable="false" /></Button>
+              </div>
             </fieldset>;
           })()}
           {selectedNode.startsWith("model::") ? (() => { const model = mountedModels.find((item) => item.id === selectedNode.slice(7)); return model ? <fieldset className="grid min-w-0 gap-3 border-0 p-0 disabled:opacity-70"><legend>{t("model")} {model.id}</legend>
-            <Button variant="outline" disabled={busy || policyRecovery !== null} onClick={() => onOpenModel?.({ provider: model.provider, upstream: model.upstream_model })}>{t("canvasOpenModel")}</Button>
+            <Button variant="outline" disabled={busy || layoutDirty || decisionPending || policyRecovery !== null} onClick={() => onOpenModel?.({ provider: model.provider, upstream: model.upstream_model })}>{t("canvasOpenModel")}</Button>
             <Button variant="outline" disabled={editDisabled} onClick={() => { handoffFocus(); setEditableDraft(removeModelNode(draft, config, model.id)); setSelectedNode(""); setInspectorOpen(false); workspaceRef.current?.querySelector<HTMLElement>(".routing-canvas-scroll")?.focus(); }}>{t("workflowRemoveModel")}</Button>
             {config.labels.map((label) => <label key={label.tag}><Checkbox disabled={editDisabled} checked={labelMembers(draft, config, label).some((item) => item.id === model.id)} onChange={(event) => updateMembership(model.id, label.tag, event.target.checked)} />{label.name}</label>)}
           </fieldset> : null; })() : null}
@@ -607,6 +599,26 @@ export default function RoutingEditor({ historyScope, discardEpoch = 0, config, 
         </div>}</div></aside>}
       </>}
       </RoutingCanvas>
+      {strategySettingsOpen && <Dialog title={t("strategySettings")} fallbackFocusRef={strategySelectRef} onClose={() => setStrategySettingsOpen(false)} footer={<Button variant="outline" onClick={() => setStrategySettingsOpen(false)}>{t("backToEditing")}</Button>}>
+        {config.definition && <div className="grid min-w-0 gap-3">
+          <label className="grid min-w-0 gap-1 text-xs text-ink-muted">
+            <span>{t("workflowDecisionProvider")}</span>
+            <NativeSelect aria-label={t("workflowDecisionProvider")} value={draft.decisionProvider ?? ""} disabled={editDisabled} onChange={(event) => setEditableDraft((current) => ({ ...current, decisionProvider: event.target.value || undefined }))}>
+              <NativeSelectOption value="">{t("workflowDecisionProviderDefault")}</NativeSelectOption>
+              {(config.decision_providers ?? []).map((provider) => <NativeSelectOption key={provider.id} value={provider.id}>{provider.display_name || provider.id}{provider.model ? ` · ${provider.model}` : ""}</NativeSelectOption>)}
+            </NativeSelect>
+          </label>
+          <p className="m-0 text-xs text-ink-muted">{t("workflowDecisionProviderNote")}</p>
+          <div role="status" className="grid gap-1 text-xs">
+            <span className={configuredDecision?.enabled ? "text-positive" : "text-ink-muted"}>{configuredDecision ? t(configuredDecision.enabled ? "classificationOn" : "classificationOff") : t("decisionReadinessUnknown")}</span>
+            {selectedDecisionProvider && <span className="text-ink-muted">{selectedDecisionProvider.id} · {t(selectedDecisionProvider.has_api_key ? "classificationProviderReady" : "classificationProviderMissing")}</span>}
+            <Button variant="outline" className="justify-self-start" onClick={() => { setStrategySettingsOpen(false); setDecisionReadinessOpen(true); }}>{t("decisionManage")}</Button>
+          </div>
+          {decisionReadError && <div role="alert" className="text-xs text-caution">{t("decisionReadinessUnknown")} <Button variant="outline" size="sm" onClick={onRetryDecisionRead}>{t("routingRetryRead")}</Button></div>}
+          {decisionWriteError && <p role="alert" className="m-0 text-xs text-caution">{t("pmError")}</p>}
+          {decisionRefreshFailed && <div role="alert" className="text-xs text-caution">{t("pmRefreshFailed")} <Button variant="outline" size="sm" disabled={decisionPending} onClick={onRetryDecisionCatalog}>{t("pmRetryCatalog")}</Button></div>}
+        </div>}
+      </Dialog>}
       {decisionReadinessOpen && <Dialog title={t("pmDecisionRouting")} fallbackFocusRef={strategySelectRef} onClose={() => setDecisionReadinessOpen(false)} footer={<Button variant="outline" onClick={() => setDecisionReadinessOpen(false)}>{t("cancel")}</Button>}>
         {configuredDecision ? <DecisionRoutingControl decision={{ ...configuredDecision, providers: selectedDecisionProvider ? [selectedDecisionProvider] : [] }} disabled={editDisabled || dirty || layoutDirty || decisionPending || decisionReadError || decisionRefreshFailed || !decisionConfiguration?.write_available || !onSetDecisionEnabled} onToggle={() => onSetDecisionEnabled?.(!configuredDecision.enabled)} t={t} diagnostic onUnauthorized={onUnauthorized} configurationGeneration={decisionConfiguration?.revision} /> : <p role="status">{t("decisionReadinessUnknown")}</p>}
         <p className="mt-3 text-xs text-ink-muted">{t("decisionSelectionNote")}</p>

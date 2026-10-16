@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Scoped v2 workflow and selected-model ownership; management validate/apply lifecycle."}
+{"file":".trellis/spec/backend/decision-providers.md","reason":"One typed classification call, explicit provider reference and independent fallback."}

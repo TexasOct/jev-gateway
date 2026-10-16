@@ -34,7 +34,7 @@ it("keeps exactly nine purpose-owned stylesheets behind the sole application CSS
   expect(geometry).toMatch(/routing-canvas-scroll[^\n]*absolute inset-0[^\n]*overflow-auto[^\n]*overscroll-contain[^\n]*\[touch-action:none\]/);
   expect(geometry).toMatch(/routing-canvas-board relative min-h-full overflow-clip/);
   expect(geometry).toMatch(/routing-canvas-content absolute left-0 top-\[var\(--canvas-origin-y,0px\)\]/);
-  expect(geometry).toMatch(/routing-canvas-node absolute block w-\[190px\] overflow-hidden[^\n]*\[touch-action:none\]/);
+  expect(geometry).toMatch(/routing-canvas-node absolute block overflow-hidden[^\n]*\[touch-action:none\]/);
   expect(geometry).toContain("height: dimensions[id]!.height");
   expect(geometry).toMatch(/routing-canvas-lines pointer-events-none absolute inset-0/);
   expect(geometry).toMatch(/canvas-edge-handle[^\n]*\[pointer-events:auto\]/);
@@ -43,7 +43,6 @@ it("keeps exactly nine purpose-owned stylesheets behind the sole application CSS
   expect(geometry).toMatch(/workspace-chrome absolute left-3 right-3 top-3[^\n]*grid[^\n]*max-w-\[400px\]/);
   expect(geometry).toMatch(/canvas-tools absolute bottom-3 left-1\/2[^\n]*-translate-x-1\/2[^\n]*data-canvas-occlusion="bottom"/);
   expect(geometry).toMatch(/canvas-tool-buttons flex[^\n]*flex-nowrap[^\n]*overflow-x-auto overflow-y-hidden/);
-  expect(geometry).toContain("animate-[node-drag-pulse_0.9s_ease-in-out_infinite_alternate]");
   expect(editor).toMatch(/workflow-workspace relative[^\n]*isolate/);
   expect(editor).toMatch(/workflow-inspector absolute/);
   expect(editor).not.toMatch(/workflow-drawer absolute/);

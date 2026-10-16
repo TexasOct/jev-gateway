@@ -117,8 +117,9 @@ for (const width of [1280, 390, 320]) for (const locale of ["en", "zh-CN"] as co
     await expect(page.getByRole("button", { name: words.workflowDelete, exact: true })).toBeDisabled();
     await expect(page.locator('[data-canvas-node="model::' + EXTRA + '"]')).toHaveCount(0);
     await expect(page.locator(".workflow-info, .workflow-drawer, .workspace-heading, .workspace-status")).toHaveCount(0);
-    const add = page.getByRole("button", { name: words.workflowAddModel, exact: true });
+    const add = page.getByRole("button", { name: words.canvasAddNode, exact: true });
     await add.click();
+    await page.getByRole("menuitem", { name: words.workflowAddModel, exact: true }).click();
     const chooser = page.getByRole("dialog", { name: words.workflowChooseModel });
     await expect(chooser).toBeVisible(); await chooser.getByRole("textbox", { name: words.workflowModelSearch }).fill("unselected");
     await page.screenshot({ path: info.outputPath("model-chooser.png"), fullPage: true });
@@ -168,7 +169,8 @@ for (const width of [1280, 390, 320]) for (const locale of ["en", "zh-CN"] as co
 test("dirty refusal, held validation, failed committed read and GET-only recovery preserve strategy identity", async ({ page, mockApi }) => {
   const fixture = await installWorkflow(page, mockApi);
   await page.goto("/dashboard/"); await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
-  await page.getByRole("button", { name: en.workflowAddModel, exact: true }).click();
+  await page.getByRole("button", { name: en.canvasAddNode, exact: true }).click();
+  await page.getByRole("menuitem", { name: en.workflowAddModel, exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: /unselected/ }).click();
   const selector = page.getByRole("combobox", { name: en.strategy, exact: true });
   page.once("dialog", (dialog) => dialog.dismiss()); await selector.selectOption("Other"); await expect(selector).toHaveValue("balanced");
@@ -200,7 +202,7 @@ test("native pointer/keyboard layout edits, local pool removal, reset and strate
     if (!element.contains(document.elementFromPoint(x, y))) throw new Error("Native node point is occluded");
     return { x, y, width: (element as HTMLElement).offsetWidth, header: element.querySelector(".canvas-node-content")!.getBoundingClientRect().height, rows: [...element.querySelectorAll<HTMLElement>("span[style]")].filter((item) => item.style.height === "28px").length };
   });
-  expect(point.width).toBe(190); expect(point.header).toBe(56); expect(point.rows).toBeGreaterThan(0);
+  expect(point.width).toBe(240); expect(point.header).toBe(56); expect(point.rows).toBeGreaterThan(0);
   await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x + 50, point.y + 40, { steps: 5 }); await page.mouse.up();
   await expect.poll(() => fixture.layouts.get("balanced")?.nodes.questions).toEqual({ x: 90, y: 70 });
   await page.keyboard.press("Alt+ArrowRight"); await expect.poll(() => fixture.layouts.get("balanced")?.nodes.questions).toEqual({ x: 110, y: 70 });
@@ -268,7 +270,7 @@ test("unresolved layout read retries GET and strategy names reject without losin
 test("read-only workflow permits shared model inspection and keeps all native mutations disabled", async ({ page, mockApi }) => {
   const fixture = await installWorkflow(page, mockApi); fixture.configs.get("balanced")!.write_available = false;
   await page.goto("/dashboard/"); await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
-  for (const name of [en.workflowCreate, en.workflowDelete, en.workflowAddModel, en.reviewChanges, en.canvasAddNode]) await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+  for (const name of [en.workflowCreate, en.workflowDelete, en.reviewChanges, en.canvasAddNode]) await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
   const model = page.locator('[data-canvas-node="model::' + MODEL + '"]'); await keyboardTarget(page, model); await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog"); await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: en.mmSave, exact: true })).toBeDisabled();
@@ -399,7 +401,8 @@ test("canceled dirty departure preserves history while confirmed discard and dep
   const question = page.locator('[data-canvas-node="questions"]'); await keyboardTarget(page, question); await page.keyboard.press("Alt+ArrowRight");
   await expect.poll(() => fixture.layouts.get("Other")?.nodes.questions).toEqual({ x: 70, y: 80 });
   const add = async () => {
-    await page.getByRole("button", { name: en.workflowAddModel, exact: true }).click();
+    await page.getByRole("button", { name: en.canvasAddNode, exact: true }).click();
+    await page.getByRole("menuitem", { name: en.workflowAddModel, exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: /unselected/ }).click();
     await expect(page.locator('[data-canvas-node="model::' + EXTRA + '"]')).toBeVisible();
   };

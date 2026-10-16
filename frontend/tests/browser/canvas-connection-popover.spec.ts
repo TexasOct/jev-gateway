@@ -6,6 +6,7 @@ import { workflowConfiguration as configuration } from "../fixtures/configuratio
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 import { settledCanvasGeometry } from "./canvas-wave3-focus";
+import { NODE_CARD_WIDTH } from "../../src/features/routing/model/node-card";
 
 function setup(state: MockApiState) {
   state.appliedConfiguration = structuredClone(configuration);
@@ -215,7 +216,7 @@ for (const width of [1280, 320]) {
   for (const corner of ["top-left", "top-right", "bottom-left", "bottom-right"]) {
     test(`connection port near ${corner} keeps the card visible at ${width}px`, async ({ page, mockApi }) => {
       setup(mockApi);
-      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - 210 : -171, y: 0 };
+      mockApi.canvasLayout!.nodes["rule-0"] = { x: corner.includes("right") ? width - NODE_CARD_WIDTH - 20 : 19 - NODE_CARD_WIDTH, y: 0 };
       await page.setViewportSize({ width, height: 740 }); await open(page);
       const output = page.locator('[data-output-node="rule-0"][data-canvas-output="match"]');
       const panel = page.getByRole("region", { name: en.canvasConnectionActions });

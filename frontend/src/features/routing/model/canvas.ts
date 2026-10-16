@@ -127,7 +127,7 @@ export function defaultPosition(id: string): Position {
     return { x: 400 + Math.floor(index / 50) * 210, y: 80 + (index % 50) * 140 };
   }
   if (id.startsWith("zone::")) return { x: 850, y: 80 };
-  return { x: 2200, y: 80 };
+  return { x: 1300, y: 80 };
 }
 
 export type ConnectionIntent = { kind: "reconnect"; edge: WorkflowEdge } | { kind: "new-pool"; from: string } | { kind: "new-match"; from: string } | { kind: "remove"; edge: WorkflowEdge };
@@ -477,16 +477,25 @@ export function intentTargets(draft: RoutingDraft, config: ConfigurationPayload,
 }
 
 /** Stage columns use cumulative content heights, with overflow columns within layout bounds. */
-export function arrangeNodes(ids: string[], dimensions: NodeDimensions): Record<string, Position> {
+export function arrangeNodes(ids: string[], dimensions: NodeDimensions, edges: WorkflowEdge[] = []): Record<string, Position> {
   const stages = [ids.filter((id) => id === "questions"), ids.filter((id) => id.startsWith("rule-") || id === "fallback"),
     ids.filter((id) => id.startsWith("zone::")), ids.filter((id) => id.startsWith("model::"))];
   const result: Record<string, Position> = {};
   let previousRight = 0;
-  for (const [stage, nodes] of stages.entries()) {
-    let x = Math.max([50, 400, 850, 2200][stage]!, previousRight + (stage ? 160 : 0)), y = 80;
+  for (const [stage, stageNodes] of stages.entries()) {
+    let x = Math.max([50, 400, 850, 1300][stage]!, previousRight + (stage ? 160 : 0)), y = 80;
     let columnWidth = 0;
+    // Align pools with their first matching rule and shared models with their pools.
+    const preferredY = (id: string) => {
+      const sources = edges.filter((edge) => edge.to === id && edge.kind === (stage === 2 ? "match" : "pool"))
+        .flatMap((edge) => result[edge.from] ? [result[edge.from]!.y] : []);
+      return sources.length ? stage === 2 ? Math.min(...sources) : Math.round(sources.reduce((sum, value) => sum + value, 0) / sources.length) : null;
+    };
+    const nodes = stage < 2 ? stageNodes : [...stageNodes].sort((a, b) => (preferredY(a) ?? Infinity) - (preferredY(b) ?? Infinity));
     for (const id of nodes) {
       const size = dimensions[id] ?? nodeCardMetrics();
+      const preferred = stage >= 2 ? preferredY(id) : null;
+      if (preferred !== null && preferred + size.height <= MAX_COORD) y = Math.max(y, preferred);
       if (y + size.height > MAX_COORD && y > 80) { x += columnWidth + 40; y = 80; columnWidth = 0; }
       result[id] = { x, y };
       columnWidth = Math.max(columnWidth, size.width);

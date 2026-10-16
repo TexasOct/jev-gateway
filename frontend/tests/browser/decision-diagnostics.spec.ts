@@ -99,9 +99,12 @@ test("strategy readiness uses the real global switch and its diagnostic dialog r
   });
   await page.goto("/dashboard/");
   await page.getByRole("button", { name: en.strategyEditor, exact: true }).click();
-  await expect(page.getByRole("status").filter({ hasText: en.classificationOff })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: en.classificationProviderReady })).toBeVisible();
-  const trigger = page.getByRole("button", { name: en.decisionManage, exact: true });
+  const settings = page.getByRole("button", { name: en.strategySettings, exact: true });
+  await settings.click();
+  const settingsDialog = page.getByRole("dialog", { name: en.strategySettings, exact: true });
+  await expect(settingsDialog.getByRole("status").filter({ hasText: en.classificationOff })).toBeVisible();
+  await expect(settingsDialog.getByRole("status").filter({ hasText: en.classificationProviderReady })).toBeVisible();
+  const trigger = settingsDialog.getByRole("button", { name: en.decisionManage, exact: true });
   await trigger.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: en.pmDecisionRouting, exact: true });
@@ -113,8 +116,9 @@ test("strategy readiness uses the real global switch and its diagnostic dialog r
   await page.screenshot({ path: path.resolve("../.trellis/tasks/10-15-routing-session-inspector/research/ui-screenshots/after-strategy-diagnostic.png") });
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  expect(await trigger.evaluate(element => element.matches(":focus-visible"))).toBe(true);
+  const strategySelector = page.getByRole("combobox", { name: en.strategy, exact: true });
+  await expect(strategySelector).toBeFocused();
+  expect(await strategySelector.evaluate(element => element.matches(":focus-visible"))).toBe(true);
   expect(probes).toBe(1);
   expect(state.writes).toEqual([]);
   expect(state.configuration.decision.enabled).toBe(false);

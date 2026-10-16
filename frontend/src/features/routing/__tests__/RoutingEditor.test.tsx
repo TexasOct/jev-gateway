@@ -21,7 +21,8 @@ describe("named workflow presentation", () => {
     expect(html).toContain('class="strategy-controls');
     expect(html).toContain(`>${words.strategy}<`);
     expect(html).toContain('value="balanced" selected=""');
-    for (const name of [words.workflowCreate, words.workflowDelete, words.workflowAddModel, words.reviewChanges, words.discardChanges, words.resetBaseline]) expect(html).toContain(name);
+    for (const name of [words.workflowCreate, words.workflowDelete, words.reviewChanges, words.discardChanges, words.resetBaseline, words.strategySettings]) expect(html).toContain(name);
+    expect(html).not.toContain(`aria-label="${words.workflowAddModel}"`);
     for (const name of [words.canvasSelectTool, words.canvasPanTool, words.canvasAddNode, words.canvasZoomOut, words.canvasZoomIn, words.canvasLayoutTools]) {
       const button = html.match(/<button\b[^>]*>.*?<\/button>/g)!.find((item) => item.includes(`aria-label="${name}"`))!;
       expect(button).toBeDefined();
@@ -30,21 +31,27 @@ describe("named workflow presentation", () => {
     }
     expect(html).toContain('data-canvas-node="model::fixture-provider/fixture-model"');
     expect(html).not.toContain('data-canvas-node="model::p/unselected"');
-    expect(html).toContain('width:190px');
+    expect(html).toContain('width:240px');
     expect(html).toContain('h-[56px]');
     expect(html).toContain('height:28px');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="' + words.canvasZoomReset + '"');
     expect(html).toContain('>1:1</button>');
   });
-  it("shows the strategy-scoped decision provider selector and configured model", () => {
+  it("keeps strategy provider configuration behind the compact settings action", () => {
     const payload = structuredClone(config);
     payload.definition = { kind: "decision_matrix", policy: { labels: { routine: {} } }, options: { questions: {}, rules: [], fallback: { label: "routine" } } };
     payload.decision_providers = [{ id: "provider-a", display_name: "Provider A", model: "decision-model" }];
     const html = renderEditor(payload);
-    expect(html).toContain(`aria-label="${messages.en.workflowDecisionProvider}"`);
-    expect(html).toContain(`Provider A · decision-model`);
-    expect(html).toContain(messages.en.workflowDecisionProviderDefault);
+    expect(html).toContain(`aria-label="${messages.en.strategySettings}"`);
+    expect(html).toContain(`aria-label="${messages.en.workflowCreate}"`);
+    expect(html).toContain(`aria-label="${messages.en.workflowDelete}"`);
+    expect(html).not.toContain(`aria-label="${messages.en.workflowAddModel}"`);
+    expect(html).toContain(`aria-label="${messages.en.reviewChanges}"`);
+    expect(html).toContain(`aria-label="${messages.en.discardChanges}"`);
+    expect(html).toContain(`aria-label="${messages.en.resetBaseline}"`);
+    expect(html).not.toContain(`aria-label="${messages.en.workflowDecisionProvider}"`);
+    expect(html).not.toContain(`Provider A · decision-model`);
   });
 
   it("groups policy actions at the top left and separates canvas tools at the bottom center", () => {
@@ -66,7 +73,8 @@ describe("named workflow presentation", () => {
   it("explicit empty selection mounts no model node while preserving the chooser library", () => {
     const html = renderEditor({ ...config, selected_models: [] });
     expect(html).not.toContain('data-canvas-node="model::');
-    expect(html).toContain("Add model");
+    expect(html).not.toContain('aria-label="Add model"');
+    expect(html).toContain(`aria-label="${messages.en.canvasAddNode}"`);
     expect(config.models).toHaveLength(2);
   });
   it("retains visible errors and read-only native navigation with disabled mutations", () => {
@@ -79,13 +87,13 @@ describe("named workflow presentation", () => {
     expect(html).toMatch(/aria-label="Layout tools"[^>]*disabled=""/);
     expect(html).toContain('aria-label="Select nodes (V)" aria-pressed="true"');
   });
-  it.each(["uneditable", "missing-definition"])("disables semantic model selection for %s while leaving strategy creation under its owner", (state) => {
+  it.each(["uneditable", "missing-definition"])("disables model selection through the canvas menu for %s while leaving strategy creation under its owner", (state) => {
     const payload = structuredClone(config);
     if (state === "uneditable") payload.editable = false;
     else delete payload.definition;
     expect(payload.write_available).toBe(true);
     const html = renderEditor(payload);
-    expect(buttonMarkup(html, messages.en.workflowAddModel)).toContain('disabled=""');
+    expect(buttonMarkup(html, messages.en.canvasAddNode)).toContain('disabled=""');
     expect(buttonMarkup(html, messages.en.workflowCreate)).not.toContain('disabled=""');
     expect(html).toContain('data-policy-draft="unchanged"');
     expect(html).toContain('data-canvas-edge=');

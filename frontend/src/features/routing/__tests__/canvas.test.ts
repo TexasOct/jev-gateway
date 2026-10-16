@@ -85,13 +85,13 @@ describe("connection compatibility and layout interactions", () => {
     const chineseMobile = planFitViewport({ "model::p/c": { x: 2900, y: 1900 } }, "model::p/c", [], { width: 324, height: 489 }, board);
     expect(chineseMobile.mode).toBe("node");
     expect(chineseMobile.zoom).toBe(1);
-    expect(chineseMobile.scroll.x).toBe(2833);
+    expect(chineseMobile.scroll.x).toBe(2858);
     expect(chineseMobile.scroll.y).toBeCloseTo(1683.5);
     const group = planFitViewport(positions, "questions", ["questions", "zone::pool"], { width: 390, height: 340 }, board);
     expect(group.mode).toBe("node");
     expect(group.zoom).toBeGreaterThanOrEqual(0.5);
     const close = { questions: { x: 50, y: 80 }, "rule-0": { x: 260, y: 80 }, "model::p/a": { x: 2200, y: 80 } };
-    const focused = planFitViewport(close, "questions", ["questions", "rule-0"], { width: 390, height: 340 }, board);
+    const focused = planFitViewport(close, "questions", ["questions", "rule-0"], { width: 440, height: 340 }, board);
     expect(focused.mode).toBe("group");
     expect(focused.zoom).toBeGreaterThanOrEqual(0.75);
     expect(focused.scroll.x).toBeGreaterThan(0);
@@ -109,7 +109,7 @@ describe("connection compatibility and layout interactions", () => {
     expect(marqueeNodes({ x: 0, y: 0 }, { x: 220, y: 100 }, positions)).toEqual(["a"]);
     expect(translateNodes(positions, ["a", "b"], { x: 20, y: 10 }, 1000, 800)).toEqual({ a: { x: 40, y: 30 }, b: { x: 260, y: 30 } });
     expect(translateNodes(positions, ["a", "b"], { x: -50, y: -50 }, 1000, 800)).toEqual({ a: { x: 0, y: 0 }, b: { x: 220, y: 0 } });
-    expect(translateNodes({ a: { x: 750, y: 700 }, b: { x: 790, y: 710 } }, ["a", "b"], { x: 80, y: 80 }, 1000, 800)).toEqual({ a: { x: 750, y: 705 }, b: { x: 790, y: 715 } });
+    expect(translateNodes({ a: { x: 750, y: 700 }, b: { x: 790, y: 710 } }, ["a", "b"], { x: 80, y: 80 }, 1000, 800)).toEqual({ a: { x: 700, y: 705 }, b: { x: 740, y: 715 } });
   });
 });
 

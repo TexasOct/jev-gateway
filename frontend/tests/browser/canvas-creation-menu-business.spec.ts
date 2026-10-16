@@ -5,6 +5,7 @@ import { configuration } from "../fixtures/configuration";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
 import { settledCanvasGeometry } from "./canvas-wave3-focus";
+import { NODE_CARD_WIDTH } from "../../src/features/routing/model/node-card";
 
 test.use({ hasTouch: true });
 
@@ -72,7 +73,14 @@ async function created(page: Page, kind: "rule" | "question", words: typeof en) 
   const id = kind === "rule" ? `rule-${configuration.rules.length}` : "questions", node = page.locator(`[data-canvas-node="${id}"]`);
   await expect(node).toHaveClass(/selected/);
   if (kind === "rule") { await expect(page.locator('[data-canvas-node^="rule-"]')).toHaveCount(configuration.rules.length + 1); await expect(node).toHaveAttribute("data-node-state", "incomplete"); await expect(page.getByText(words.canvasIncompleteDraft, { exact: true })).toBeVisible(); await expect(inspector.getByRole("combobox", { name: words.label, exact: true })).toBeEnabled(); }
-  else { const names = inspector.getByRole("textbox", { name: words.questionName, exact: true }); await expect(names).toHaveCount(Object.keys(configuration.questions).length + 1); await expect(names.last()).toHaveValue("question_1"); await expect(inspector.getByRole("textbox", { name: words.instructions, exact: true }).last()).toBeEnabled(); }
+  else {
+    const selector = inspector.getByRole("combobox", { name: words.canvasEditQuestion, exact: true });
+    await expect(selector.locator("option")).toHaveCount(Object.keys(configuration.questions).length + 1);
+    await expect(selector).toHaveValue("question_1");
+    const name = inspector.getByRole("textbox", { name: words.questionName, exact: true });
+    await expect(name).toHaveCount(1); await expect(name).toHaveValue("question_1");
+    await expect(inspector.getByRole("textbox", { name: words.instructions, exact: true })).toBeEnabled();
+  }
   return node;
 }
 test.afterEach(async ({ page, mockApi }, info) => {
@@ -186,7 +194,7 @@ for (const kind of ["rule", "question"] as const) for (const zoom of [1, .75, 1.
     await evidence(page, info, "captured-original-coordinate", { beforeMovement, captured });
     await page.mouse.click(captured.x, captured.y, { button: "right" });
     const menu = page.getByRole("menu", { name: words.canvasActions });
-    await expect(menu.getByRole("menuitem")).toHaveText([words.addRule, words.canvasAddQuestion]);
+    await expect(menu.getByRole("menuitem")).toHaveText([words.addRule, words.canvasAddQuestion, words.workflowAddModel]);
     await menu.getByRole("menuitem", { name: kind === "rule" ? words.addRule : words.canvasAddQuestion, exact: true }).click();
     const node = await created(page, kind, words), id = kind === "rule" ? `rule-${configuration.rules.length}` : "questions";
     await evidence(page, info, "spatial-before-assertion", { captured, canonical: mockApi.canvasLayout?.nodes[id], requests: mockApi.requests });
@@ -264,7 +272,7 @@ for (const width of [1280, 320]) for (const locale of ["en", "zh-CN"] as const) 
     if (route === "keyboard") { at = await tabTo(page, add); await page.keyboard.press(kind === "rule" ? "Enter" : "Space"); }
     else { at = await exposed(add); expect(at.hit).toBe(true); await page.touchscreen.tap(at.x, at.y); }
     const action = page.getByRole("menuitem", { name: kind === "rule" ? words.addRule : words.canvasAddQuestion, exact: true });
-    if (route === "keyboard") { await page.keyboard.press(kind === "rule" ? "Home" : "End"); await expect(action).toBeFocused(); expect((await exposed(action)).focusVisible).toBe(true); await page.keyboard.press("Enter"); }
+    if (route === "keyboard") { await page.keyboard.press("Home"); if (kind === "question") await page.keyboard.press("ArrowDown"); await expect(action).toBeFocused(); expect((await exposed(action)).focusVisible).toBe(true); await page.keyboard.press("Enter"); }
     else { const point = await exposed(action); expect(point.hit).toBe(true); await page.touchscreen.tap(point.x, point.y); }
     const node = await created(page, kind, words); await frames(page); const revealed = await exposed(node); await evidence(page, info, "before-reveal-assertion", { revealed, requests: mockApi.requests }); expect(revealed.hit).toBe(true);
     expect(mockApi.requests.filter(r => r.method !== "GET" && r.path !== "/v1/dashboard/canvas-layout?strategy=balanced")).toEqual([]);
@@ -309,9 +317,9 @@ for (const width of [1280, 320]) for (const locale of ["en", "zh-CN"] as const) 
     const y = Math.round((geometry.y - geometry.canvas.top + geometry.scroll.y - geometry.origin.y) / geometry.zoom);
     const fixture = structuredClone(initial);
     for (const [index, id] of Object.keys(fixture.nodes).entries()) fixture.nodes[id as keyof typeof fixture.nodes] = { x: 1500, y: 1500 + index * 200 };
-    if (kind === "node") fixture.nodes["rule-0"] = { x: Math.max(0, x - (right ? 178 : 12)), y: Math.max(0, y - 18) };
+    if (kind === "node") fixture.nodes["rule-0"] = { x: Math.max(0, x - (right ? NODE_CARD_WIDTH - 12 : 12)), y: Math.max(0, y - 18) };
     else if (right) {
-      fixture.nodes["rule-0"] = { x: Math.max(0, x - 230), y: Math.max(0, y - offsets.outputY) };
+      fixture.nodes["rule-0"] = { x: Math.max(0, x - NODE_CARD_WIDTH / 2 - 40), y: Math.max(0, y - offsets.outputY) };
       fixture.nodes["zone::balanced/default"] = { x: x + 80, y: Math.max(0, y + (bottom ? -200 : 200)) };
     } else {
       fixture.nodes["zone::balanced/default"] = { x: 80, y: Math.max(0, y - offsets.inputY) };

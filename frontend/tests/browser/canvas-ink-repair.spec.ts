@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { test, expect } from "./fixtures";
 import { en } from "../../src/shared/i18n/en";
 import { zhCN } from "../../src/shared/i18n/zh-CN";
+import { NODE_CARD_WIDTH } from "../../src/features/routing/model/node-card";
 
 // Decode Playwright's RGB/RGBA PNG so contrast uses the painted backdrop.
 function pixel(png: Buffer, x: number, y: number): number[] {
@@ -36,9 +37,9 @@ function pixel(png: Buffer, x: number, y: number): number[] {
 const luminance = (rgb: number[]) => rgb.map(value => value / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
 
 for (const locale of ["en", "zh-CN"] as const) for (const scheme of ["light", "dark"] as const) {
-  test(`neighbor Input ink stays behind the card and small text meets 4.5:1 ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
+  test(`compact input ports keep neighboring cards clear and small text meets 4.5:1 ${locale} ${scheme}`, async ({ page, mockApi }, info) => {
     const words = locale === "en" ? en : zhCN;
-    mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: { "rule-0": { x: 350, y: 80 }, fallback: { x: 550, y: 80 } } };
+    mockApi.canvasLayout = { version: 1, viewport: { x: 0, y: 0 }, nodes: { "rule-0": { x: 350, y: 80 }, fallback: { x: 350 + NODE_CARD_WIDTH + 10, y: 80 } } };
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/dashboard/");
@@ -52,15 +53,17 @@ for (const locale of ["en", "zh-CN"] as const) for (const scheme of ["light", "d
     const box = (await card.boundingBox())!;
     const clip = { x: box.x + 5, y: box.y + 5, width: box.width - 10, height: box.height - 10 };
     const before = await page.screenshot({ path: info.outputPath("neighbor-before.png"), clip });
-    const input = page.locator('[data-canvas-input="fallback"]').locator("..").locator("span");
+    const input = page.locator('[data-canvas-input="fallback"]');
+    await expect(input).toHaveAccessibleName(`${words.canvasInput}: ${words.fallback}`);
+    await expect(input).toHaveText("");
+    await expect(input.locator("span")).toHaveCSS("pointer-events", "none");
     const geometry = await input.evaluate(el => ({ label: el.getBoundingClientRect().toJSON(), card: document.querySelector('[data-canvas-node="rule-0"]')!.getBoundingClientRect().toJSON() }));
-    expect(geometry.label.left).toBeLessThan(geometry.card.right);
-    expect(geometry.label.right).toBeGreaterThan(geometry.card.left);
+    expect(geometry.label.left).toBeGreaterThanOrEqual(geometry.card.right);
     await input.evaluate(el => (el as HTMLElement).style.visibility = "hidden");
     const after = await page.screenshot({ path: info.outputPath("neighbor-suppressed.png"), clip });
     expect.soft(before.equals(after), "external Input label must not paint over a neighboring card").toBe(true);
     await input.evaluate(el => (el as HTMLElement).style.visibility = "");
-    const summary = card.locator(".canvas-node-summary");
+    const summary = card.locator(".canvas-node-type");
     const sample = await summary.evaluate(el => {
       const color = getComputedStyle(el).color;
       const canvas = document.createElement("canvas"), context = canvas.getContext("2d")!;

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/dashboard-routing-config.md","reason":"Verify preservation of unrelated workflows, model membership and layouts."}
+{"file":".trellis/spec/backend/routing-session-inspection.md","reason":"Verify honest classifier, matching-rule and pool evidence in live previews."}
