@@ -3,7 +3,7 @@
   "name": "routing-editor-flow",
   "title": "Simplify routing editor flow and condition editing",
   "description": "Redesign the routing canvas around one classified result, ordered rules, readable conditions and focused editing while preserving policy execution and strategy ownership.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,16 +11,21 @@
   "creator": "TexasOct",
   "assignee": "TexasOct",
   "createdAt": "2026-10-15",
-  "completedAt": null,
+  "completedAt": "2026-10-16",
   "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "3e0118bed550c2f1c56e499148210071c6edf6eb",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "notes": "Frontend acceptance complete: 448 unit tests and 410 related browser cases passed. Operator explicitly authorized all current workspace changes and release 0.1.13. Work is committed; hosted publication is pending its existing gates.",
+  "meta": {
+    "implementation_status": "accepted",
+    "acceptance": "acceptance.md",
+    "release_version": "0.1.13",
+    "commit_pending": false
+  }
 }

@@ -3,7 +3,7 @@
   "name": "task-type-router",
   "title": "Task-type and complexity routing strategy",
   "description": "Implement the approved DeepSeek/Luna/Sol task-type and complexity routing design and add it to the local JEV Gateway using managed configuration APIs.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,17 +11,17 @@
   "creator": "TexasOct",
   "assignee": "TexasOct",
   "createdAt": "2026-10-15",
-  "completedAt": null,
+  "completedAt": "2026-10-16",
   "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "3e0118bed550c2f1c56e499148210071c6edf6eb",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Approved strategy implemented and installed through authenticated scoped management APIs. Installed0.1.12 parser/registry and56 local checks passed;10 synthetic live classifier previews passed after reload. Seven protected runtime files, three other workflows/layouts and all original rows in five history tables preserved. Provider continuation cache kept its normal live retention. Configuration-only: no package/source/version change or service restart. Repository bookkeeping is uncommitted.",
+  "notes": "Approved strategy implemented and installed through authenticated scoped management APIs. Installed0.1.12 parser/registry and56 local checks passed;10 synthetic live classifier previews passed after reload. Seven protected runtime files, three other workflows/layouts and all original rows in five history tables preserved. Provider continuation cache kept its normal live retention. Configuration-only acceptance required no package/source/version change or service restart. Repository artifacts are committed under the later explicit all-workspace release authorization.",
   "meta": {
     "implementation_status": "accepted",
     "local_configuration_status": "installed",
@@ -36,6 +36,6 @@
     "local_manual_bypass_cases": 1,
     "live_preview_cases": 10,
     "acceptance": "acceptance.md",
-    "commit_pending": true
+    "commit_pending": false
   }
 }
